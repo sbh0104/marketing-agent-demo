@@ -1,0 +1,20 @@
+# 마케팅 AI 에이전트 설정 — 과제 안내의 예시 값입니다.
+# 모든 키가 필요합니다. 빠진 키나 모르는 키가 있으면 실행하지 않습니다.
+topic: 연애
+keywords: [연애, 썸, 연애 상담, 이별, 소개팅]
+poll_interval_min: 30          # 탐지 주기(분). 실행 중에 바꾸면 다음 대기부터 적용
+trigger:
+  min_views: 1000
+  max_views: 5000
+  max_age_hours: 12
+  min_views_per_hour: 150
+limits:
+  daily_max_comments: 10       # 최근 24시간 게시 수 상한 (성공 + 결과 모르는 예약)
+  channel_cooldown_hours: 24   # 같은 채널 재댓글 대기 시간
+  daily_max_searches: 100      # 하루 검색 호출 상한 (쿼터 약 100회/일) — Phase 2 가 조정
+comment:
+  min_chars: 40
+  max_chars: 120
+chrome_debug_url: http://localhost:9222
+allowed_videos:        # 실제 게시는 여기 있는 본인 테스트 영상에만
+  - https://youtu.be/내-테스트-영상-ID
