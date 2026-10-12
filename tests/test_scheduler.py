@@ -104,6 +104,45 @@ class RunLoopTest(unittest.TestCase):
             harness.run(max_cycles=None)
         self.assertEqual(harness.errors, [])
 
+    def run_with_interval(self, minutes: int) -> tuple[list[float], list[tuple[str, Exception]]]:
+        ticks = iter([0.0, 10.0, 20.0])
+        sleeps: list[float] = []
+        errors: list[tuple[str, Exception]] = []
+
+        def reload() -> Config:
+            return dataclasses.replace(BASE, poll_interval_min=minutes)
+
+        def sleep(seconds: float) -> None:
+            sleeps.append(seconds)
+            if len(sleeps) > 40000:
+                raise AssertionError("sleep 조각이 너무 많습니다 — 대기 전체에 상한이 없습니다")
+
+        done = run_loop(
+            lambda config: None,
+            reload,
+            BASE,
+            on_error=lambda where, exc: errors.append((where, exc)),
+            sleep=sleep,
+            monotonic=lambda: next(ticks),
+            max_cycles=2,
+        )
+        self.assertEqual(done, 2)
+        return sleeps, errors
+
+    def test_huge_interval_sleeps_in_day_chunks(self) -> None:
+        sleeps, errors = self.run_with_interval(10**20)
+        self.assertEqual(errors, [])
+        self.assertLessEqual(max(sleeps), 86400.0)
+        # 대기 전체 상한 약 100년 − 걸린 10초
+        self.assertEqual(sum(sleeps), 100 * 365 * 86400 - 10.0)
+
+    def test_astronomic_interval_does_not_overflow(self) -> None:
+        sleeps, errors = self.run_with_interval(10**400)
+        self.assertEqual(errors, [])
+        self.assertLessEqual(max(sleeps), 86400.0)
+        # 대기 전체 상한 약 100년 − 걸린 10초
+        self.assertEqual(sum(sleeps), 100 * 365 * 86400 - 10.0)
+
 
 class RealFileReloadTest(unittest.TestCase):
     """실제 config.yaml 을 실행 중에 고쳐 다시 읽기 — 잘못 고친 값은 이전 설정 유지로 끝나야 합니다."""
