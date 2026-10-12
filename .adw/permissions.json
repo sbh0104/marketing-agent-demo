@@ -1,0 +1,23 @@
+{
+  "_": [
+    "이 프로젝트가 소유하는 권한 결정. 트래커가 정한 allow/deny 를 여기에 적으면,",
+    "install 이 매 설치마다 .claude/settings.json 으로 합집합 병합합니다.",
+    "",
+    "왜 여기인가 — .claude/settings.json 은 하네스(ADWS)가 소유하고 설치가 병합하는",
+    "파일입니다. 그래서 계획이 그 파일을 Out of scope 로 두는 것이 옳은데, 그러면",
+    "프로젝트의 결정이 갈 곳이 없어집니다. 실제로 그렇게 사라졌습니다: 트래커가 못",
+    "박은 deny 10줄이 제안본에만 남고 라이브에는 allow 절반만 적용돼, 문은 열렸고",
+    "자물쇠만 안 걸린 상태로 사이클이 돌았습니다(GEOApp 2026-08-13).",
+    "",
+    "이 파일은 커밋됩니다(backlog·constitution 처럼 프로젝트 설정입니다).",
+    "설치는 덮어쓰지 않습니다 — 여러분의 것입니다.",
+    "",
+    "예:",
+    "  \"deny\": [\"Bash(docker compose down:*)\", \"Bash(make db-reset:*)\"]",
+    "  \"allow\": [\"Bash(uv:*)\", \"Bash(docker compose:*)\"]"
+  ],
+  "permissions": {
+    "allow": [],
+    "deny": []
+  }
+}
