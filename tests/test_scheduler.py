@@ -2,12 +2,14 @@
 from __future__ import annotations
 
 import dataclasses
+import tempfile
 import unittest
 from collections.abc import Iterable
 from pathlib import Path
 
 from agent.config import Config, ConfigError, load_config
 from agent.scheduler import run_loop
+from tests.test_config import BAD_VALUES, REPO_CONFIG, variant, write_config
 
 BASE = load_config(Path(__file__).resolve().parent.parent / "config.yaml")
 FIVE = dataclasses.replace(BASE, poll_interval_min=5)
@@ -101,6 +103,54 @@ class RunLoopTest(unittest.TestCase):
         with self.assertRaises(KeyboardInterrupt):
             harness.run(max_cycles=None)
         self.assertEqual(harness.errors, [])
+
+
+class RealFileReloadTest(unittest.TestCase):
+    """실제 config.yaml 을 실행 중에 고쳐 다시 읽기 — 잘못 고친 값은 이전 설정 유지로 끝나야 합니다."""
+
+    def run_three_cycles(
+        self, bad_text: str
+    ) -> tuple[int, list[Config], list[tuple[str, Exception]], list[float], Config]:
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        directory = Path(tmp.name)
+        path = write_config(directory, REPO_CONFIG.read_text(encoding="utf-8"))
+        initial = load_config(path)
+        cycles: list[Config] = []
+        errors: list[tuple[str, Exception]] = []
+        sleeps: list[float] = []
+        ticks = iter([0.0, 10.0, 1800.0, 1830.0, 2100.0])
+
+        def cycle(config: Config) -> None:
+            cycles.append(config)
+            if len(cycles) == 1:
+                write_config(directory, bad_text)
+            elif len(cycles) == 2:
+                write_config(directory, variant("poll_interval_min: 30 ", "poll_interval_min: 5 "))
+
+        done = run_loop(
+            cycle,
+            lambda: load_config(path),
+            initial,
+            on_error=lambda where, exc: errors.append((where, exc)),
+            sleep=sleeps.append,
+            monotonic=lambda: next(ticks),
+            max_cycles=3,
+        )
+        return done, cycles, errors, sleeps, initial
+
+    def test_bad_edit_keeps_previous_config_and_fix_is_picked_up(self) -> None:
+        for bad in BAD_VALUES:
+            with self.subTest(bad.label):
+                done, cycles, errors, sleeps, initial = self.run_three_cycles(
+                    variant(bad.old, bad.new)
+                )
+                self.assertEqual(done, 3)
+                self.assertEqual([where for where, _ in errors], ["config"])
+                self.assertIsInstance(errors[0][1], ConfigError)
+                self.assertEqual(cycles[:2], [initial, initial])
+                self.assertEqual(cycles[2], dataclasses.replace(initial, poll_interval_min=5))
+                self.assertEqual(sleeps, [1790.0, 270.0])
 
 
 if __name__ == "__main__":

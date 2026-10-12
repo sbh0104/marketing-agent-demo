@@ -5,6 +5,8 @@ import copy
 import tempfile
 import unittest
 from pathlib import Path
+from typing import NamedTuple
+from unittest import mock
 
 from agent.config import (
     CommentConfig,
@@ -42,6 +44,62 @@ VALID = {
 
 def valid() -> dict[str, object]:
     return copy.deepcopy(VALID)
+
+
+class BadValue(NamedTuple):
+    """실행 중에 잘못 고친 설정 한 줄 — 읽기 오류의 재현 입력."""
+
+    label: str
+    old: str
+    new: str
+    cause: type[Exception]
+    needle: str
+
+
+def variant(old: str, new: str) -> str:
+    text = REPO_CONFIG.read_text(encoding="utf-8")
+    if text.count(old) != 1:
+        raise AssertionError(f"config.yaml 에 정확히 한 번 나오지 않습니다: {old!r}")
+    return text.replace(old, new)
+
+
+def write_config(directory: Path, text: str) -> Path:
+    path = directory / "config.yaml"
+    path.write_text(text, encoding="utf-8", newline="\n")
+    return path
+
+
+# ship-check BLOCKED(2026-10-13) 재현 입력 — 실제 파일에 그대로 씁니다
+BAD_VALUES: tuple[BadValue, ...] = (
+    BadValue(
+        "date_shaped_topic",
+        "topic: 연애\n",
+        "topic: 2026-02-30\n",
+        ValueError,
+        "설정 값을 읽을 수 없습니다 (ValueError: ",
+    ),
+    BadValue(
+        "int_over_4300_digits",
+        "poll_interval_min: 30 ",
+        "poll_interval_min: " + "1" * 5000 + " ",
+        ValueError,
+        "설정 값을 읽을 수 없습니다 (ValueError: ",
+    ),
+    BadValue(
+        "int_too_large_for_float",
+        "  max_age_hours: 12\n",
+        "  max_age_hours: 1" + "0" * 400 + "\n",
+        OverflowError,
+        "설정 값을 읽을 수 없습니다 (OverflowError: ",
+    ),
+    BadValue(
+        "nesting_3000_deep",
+        "topic: 연애\n",
+        "topic: " + "[" * 3000 + "]" * 3000 + "\n",
+        RecursionError,
+        "설정 값을 읽을 수 없습니다 (RecursionError: ",
+    ),
+)
 
 
 class CommittedConfigTest(unittest.TestCase):
@@ -226,6 +284,45 @@ class LoadConfigTest(unittest.TestCase):
                 with self.assertRaises(ConfigError) as caught:
                     load_config(path)
                 self.assertIn("UTF-8", str(caught.exception))
+
+
+class ReadFailureTest(unittest.TestCase):
+    def setUp(self) -> None:
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.dir = Path(tmp.name)
+
+    def test_every_read_failure_is_config_error(self) -> None:
+        for bad in BAD_VALUES:
+            with self.subTest(bad.label):
+                path = write_config(self.dir, variant(bad.old, bad.new))
+                with self.assertRaises(ConfigError) as caught:
+                    load_config(path)
+                self.assertIn(bad.needle, str(caught.exception))
+                self.assertIsInstance(caught.exception.__cause__, bad.cause)
+
+    def test_fixed_file_loads_again(self) -> None:
+        date_shaped = BAD_VALUES[0]
+        path = write_config(self.dir, variant(date_shaped.old, date_shaped.new))
+        with self.assertRaises(ConfigError):
+            load_config(path)
+        write_config(self.dir, REPO_CONFIG.read_text(encoding="utf-8"))
+        self.assertEqual(load_config(path), load_config(REPO_CONFIG))
+
+    def test_unexpected_exception_while_reading_is_config_error(self) -> None:
+        path = write_config(self.dir, REPO_CONFIG.read_text(encoding="utf-8"))
+        failure = TypeError("뜻밖의 오류")
+        with mock.patch("agent.config.config_from_mapping", side_effect=failure):
+            with self.assertRaises(ConfigError) as caught:
+                load_config(path)
+        self.assertIsInstance(caught.exception.__cause__, TypeError)
+        self.assertIn("(TypeError: ", str(caught.exception))
+
+    def test_keyboard_interrupt_is_not_converted(self) -> None:
+        path = write_config(self.dir, REPO_CONFIG.read_text(encoding="utf-8"))
+        with mock.patch("agent.config.parse_yaml", side_effect=KeyboardInterrupt):
+            with self.assertRaises(KeyboardInterrupt):
+                load_config(path)
 
 
 if __name__ == "__main__":
