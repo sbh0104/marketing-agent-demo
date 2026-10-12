@@ -217,22 +217,36 @@ Phase 3–5 가 정합니다.)
 |---|---|---|---|
 | 1 | 영상 주소를 읽을 수 없음 | `False` | `invalid_video` |
 | 2 | 허용 목록에 없음 | `False` | `not_in_allowlist` |
-| 3 | `dry_run` 이 참 | `False` | `dry_run` |
+| 3 | `dry_run` 이 정확히 `False` 가 아님 (참 · `None` · `0` · `""` 포함) | `False` | `dry_run` |
 | 4 | 그 밖 | `True` | `allowlisted` |
 
 - `PostDecision.mode` 는 `live` 가 참이면 `"live"`, 아니면 `"test"` 입니다.
 - 허용 목록 이유가 `dry_run` 보다 앞서므로, 로그에는 언제나 허용 목록 원인이 남습니다.
 - 허용 목록 항목과 영상 주소는 모두 11자 영상 ID 로 바꿔 비교합니다(`video_id_from_ref`).
-  받는 형식:
-  - 맨 ID: `abcdefghijk`
-  - `https://youtu.be/abcdefghijk` (뒤에 `?si=…` 등이 붙어도 됨)
-  - `https://www.youtube.com/watch?v=abcdefghijk` (`&t=…` 등 다른 매개변수 무시)
-  - `https://youtube.com/…`, `https://m.youtube.com/…` 의 `/watch?v=` 와 `/shorts/<ID>`
-  - 스킴은 `http`/`https` 만. 호스트 대소문자는 무시합니다.
+  받는 형식은 아래뿐이고 정확히 이 모양이어야 합니다:
+  - 맨 ID `abcdefghijk`
+  - `https://youtu.be/abcdefghijk` — 경로가 정확히 `/<ID>` (뒤에 `?si=…` 등 매개변수는
+    붙어도 됨)
+  - `https://www.youtube.com/watch?v=abcdefghijk` — `v` 값이 정확히 하나 (`&t=…` 등 다른
+    매개변수 무시)
+  - `https://www.youtube.com/shorts/abcdefghijk` — 뒤 `/` 하나까지
+  - 호스트는 `youtu.be` · `youtube.com` · `www.youtube.com` · `m.youtube.com` 그대로(대소문자
+    무시) — 사용자 정보(`…@`)나 포트(`:443`)가 붙으면 읽지 않습니다. 스킴은 `http`/`https` 만.
+- 쿼리의 `%` 인코딩은 서버처럼 한 번 풀어 읽습니다 — `v` 의 수는 푼 뒤에 세므로
+  `?%76=B&v=A` 는 `v` 가 두 개라 읽을 수 없고, `&pp=…%3D%3D` · `&ab_channel=%EC…` 같은 다른
+  매개변수는 무시됩니다.
 - 그 밖의 호스트(`youtube.com.evil.example`, `youtube.com@evil.example` 같은 닮은꼴 포함),
-  `ftp:` 같은 다른 스킴, 11자가 아닌 ID 는 읽을 수 없는 것으로 칩니다. 읽을 수 없는 허용
-  목록 항목은 어떤 영상과도 맞지 않으므로, 과제의 자리표시자 `https://youtu.be/내-테스트-영상-ID`
-  만 있으면 아무 영상도 실제 게시되지 않습니다.
+  `ftp:` 같은 다른 스킴, 11자가 아닌 ID 는 읽을 수 없는 것으로 칩니다.
+- 형식에서 벗어난 이웃 모양도 읽을 수 없는 것입니다: ID 뒤의 다른 경로 칸(`/<ID>/x`,
+  `/<ID>/../<다른 ID>`, `/shorts/<ID>/../../watch?v=<다른 ID>`), 경로의 `.`/`..` 칸, 경로에
+  `%` 가 든 주소(`%2e%2e`, `/%41…`), `v` 가 두 번 이상이거나 빈 `v` 가 섞인 주소(`?v=A&v=B`,
+  `?v=&v=A`), 어디든 `\` 가 든 주소(`evil.com\@youtu.be/…`). 가드와 브라우저가 같은 주소를
+  다르게 읽을 자리를 남기지 않기 위해서입니다. 그래서 경로에 `%` 가 든 정상 주소는 허용 목록
+  항목으로도 쓸 수 없습니다 — 맨 ID 나 위 형식으로 적으세요.
+- 읽을 수 없는 허용 목록 항목은 어떤 영상과도 맞지 않으므로, 과제의 자리표시자
+  `https://youtu.be/내-테스트-영상-ID` 만 있으면 아무 영상도 실제 게시되지 않습니다.
+- `dry_run` 은 `is not False` 로 검사합니다 — 참 · 거짓이 아닌 값(`None`, `0`, `""`)도 테스트
+  모드입니다. 되돌릴 수 없는 남의 영상 댓글을 막는 쪽을 택했습니다.
 
 ## 6. 게시 흐름 — 모든 단계가 따릅니다
 
@@ -356,6 +370,12 @@ run_loop(cycle, reload, initial, *, on_error, sleep=time.sleep,
   ```
   python3 -m tests.mutants guard-allow-all
   python3 -m tests.mutants guard-ignore-dry-run
+  python3 -m tests.mutants guard-dry-run-truthy
+  python3 -m tests.mutants guard-first-v
+  python3 -m tests.mutants guard-youtu-be-first-segment
+  python3 -m tests.mutants guard-shorts-first-segment
+  python3 -m tests.mutants guard-host-ignores-userinfo
+  python3 -m tests.mutants guard-allow-backslash
   python3 -m tests.mutants store-no-dedupe
   python3 -m tests.mutants store-no-cap
   python3 -m tests.mutants store-no-cooldown

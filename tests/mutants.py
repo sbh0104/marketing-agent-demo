@@ -29,7 +29,43 @@ MUTANTS: dict[str, tuple[str, str, str, str]] = {
     "guard-ignore-dry-run": (
         "agent.guard",
         "tests.test_guard",
+        "if dry_run is not False:",
+        "if False:",
+    ),
+    "guard-dry-run-truthy": (
+        "agent.guard",
+        "tests.test_guard",
+        "if dry_run is not False:",
         "if dry_run:",
+    ),
+    "guard-first-v": (
+        "agent.guard",
+        "tests.test_guard",
+        'candidate = values[0] if len(values) == 1 else ""',
+        'candidate = values[0] if values else ""',
+    ),
+    "guard-youtu-be-first-segment": (
+        "agent.guard",
+        "tests.test_guard",
+        "candidate = parts.path[1:]",
+        'candidate = parts.path[1:].split("/")[0]',
+    ),
+    "guard-shorts-first-segment": (
+        "agent.guard",
+        "tests.test_guard",
+        'candidate = rest[:-1] if rest.endswith("/") else rest',
+        'candidate = rest.split("/")[0]',
+    ),
+    "guard-host-ignores-userinfo": (
+        "agent.guard",
+        "tests.test_guard",
+        "host = parts.netloc.lower()",
+        'host = (parts.hostname or "").lower()',
+    ),
+    "guard-allow-backslash": (
+        "agent.guard",
+        "tests.test_guard",
+        r'if "\\" in text:',
         "if False:",
     ),
     "store-no-dedupe": (
