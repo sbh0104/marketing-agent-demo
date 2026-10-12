@@ -1,4 +1,4 @@
-"""허용 목록 가드 테스트 — 행 G1–G7 과 영상 주소 읽기."""
+"""허용 목록 가드 테스트 — 행 G1–G7, 영상 주소 읽기, 엄격한 주소 읽기(ship-check 재현 입력)."""
 from __future__ import annotations
 
 import inspect
@@ -10,6 +10,47 @@ VID = "abcdefghijk"
 OTHER = "zyxwvutsrqp"
 PLACEHOLDER = "https://youtu.be/내-테스트-영상-ID"
 ALLOWED = [f"https://youtu.be/{VID}"]
+REPRO_A = "AAAAAAAAAAA"  # ship-check 재현의 허용된 데모 영상
+REPRO_B = "BBBBBBBBBBB"  # ship-check 재현의 남의 영상
+
+# 계약 5절 형식의 이웃 모양 — 허용 목록에 A 가 있어도 모두 invalid_video
+REJECTED_REFS = (
+    f"https://youtu.be/{REPRO_A}/../{REPRO_B}",
+    f"https://youtu.be/{REPRO_A}/%2e%2e/{REPRO_B}",
+    f"https://www.youtube.com/watch?v={REPRO_A}&v={REPRO_B}",
+    f"https://www.youtube.com/shorts/{REPRO_A}/../../watch?v={REPRO_B}",
+    f"https://evil.com\\@youtu.be/{REPRO_A}",
+    f"https://youtu.be/{REPRO_A}/x",
+    f"https://www.youtube.com/shorts/{REPRO_A}/x",
+    f"https://www.youtube.com/shorts/{REPRO_A}//",
+    f"https://youtu.be/./{REPRO_A}",
+    f"https://www.youtube.com/./watch?v={REPRO_A}",
+    f"https://www.youtube.com/watch?v=&v={REPRO_A}",
+    f"https://youtu.be/%41{REPRO_A[1:]}",
+    f"https://www.youtube.com/watch?%76={REPRO_B}&v={REPRO_A}",
+    f"https://www.youtube.com/watch?v={REPRO_A}%26v%3D{REPRO_B}",
+    f"https://www.youtube.com/watch?v={REPRO_A}&x=a\\b",
+    f"https://evil.example@youtu.be/{REPRO_A}",
+    f"https://youtu.be:443/{REPRO_A}",
+)
+
+# 계약 5절 형식 — 모두 REPRO_A 로 읽혀야 합니다 (양성 대조)
+ACCEPTED_REFS = (
+    REPRO_A,
+    f"https://youtu.be/{REPRO_A}",
+    f"https://youtu.be/{REPRO_A}?si=abc123",
+    f"HTTPS://YOUTU.BE/{REPRO_A}",
+    f"https://www.youtube.com/watch?v={REPRO_A}&t=30s",
+    f"https://www.youtube.com/watch?feature=share&v={REPRO_A}",
+    f"https://www.youtube.com/watch?v=%41{REPRO_A[1:]}",
+    f"https://www.youtube.com/watch?v={REPRO_A}&ab_channel=%EC%97%B0%EC%95%A0",
+    f"https://www.youtube.com/watch?v={REPRO_A}&pp=ygUJ7Jew7JWg%3D%3D",
+    f"https://youtube.com/watch?v={REPRO_A}",
+    f"https://m.youtube.com/watch?v={REPRO_A}",
+    f"https://www.youtube.com/shorts/{REPRO_A}",
+    f"https://www.youtube.com/shorts/{REPRO_A}/",
+    f"http://youtube.com/shorts/{REPRO_A}?feature=share",
+)
 
 
 class GuardRowsTest(unittest.TestCase):
@@ -87,6 +128,11 @@ class GuardRowsTest(unittest.TestCase):
         params = list(inspect.signature(decide_post).parameters)
         self.assertEqual(params, ["video_ref", "allowed_videos", "dry_run"])
 
+    def test_non_bool_dry_run_is_test_mode(self) -> None:
+        for value in (None, 0, "", 0.0, "false", []):
+            with self.subTest(dry_run=value):
+                self.assert_decision(decide_post(VID, ALLOWED, value), False, "dry_run")
+
 
 class VideoIdFromRefTest(unittest.TestCase):
     def test_table(self) -> None:
@@ -116,6 +162,42 @@ class VideoIdFromRefTest(unittest.TestCase):
     def test_allowed_ids_drop_unparseable_entries(self) -> None:
         entries = [PLACEHOLDER, f"https://youtu.be/{VID}", OTHER, "nonsense"]
         self.assertEqual(allowed_video_ids(entries), frozenset({VID, OTHER}))
+
+
+class StrictAddressTest(unittest.TestCase):
+    def test_rejected_addresses_are_invalid_even_when_allowlisted(self) -> None:
+        for ref in REJECTED_REFS:
+            with self.subTest(ref=ref):
+                self.assertIsNone(video_id_from_ref(ref))
+            for dry_run in (False, True):
+                with self.subTest(ref=ref, dry_run=dry_run):
+                    decision = decide_post(ref, [REPRO_A], dry_run)
+                    self.assertIs(decision.live, False)
+                    self.assertEqual(decision.reason, "invalid_video")
+                    self.assertIsNone(decision.video_id)
+
+    def test_rejected_addresses_never_become_allowlist_entries(self) -> None:
+        self.assertEqual(allowed_video_ids(REJECTED_REFS), frozenset())
+        for ref in REJECTED_REFS:
+            with self.subTest(ref=ref):
+                decision = decide_post(REPRO_A, [ref], False)
+                self.assertIs(decision.live, False)
+                self.assertEqual(decision.reason, "not_in_allowlist")
+
+    def test_contract_forms_still_read(self) -> None:
+        for ref in ACCEPTED_REFS:
+            with self.subTest(ref=ref):
+                self.assertEqual(video_id_from_ref(ref), REPRO_A)
+                decision = decide_post(ref, [REPRO_A], False)
+                self.assertIs(decision.live, True)
+                self.assertEqual(decision.reason, "allowlisted")
+
+    def test_canonical_watch_url_reads_back(self) -> None:
+        for vid in (VID, OTHER, REPRO_A, "a-b_c-d_e-f"):
+            url = f"https://www.youtube.com/watch?v={vid}"
+            with self.subTest(url=url):
+                self.assertEqual(video_id_from_ref(url), vid)
+                self.assertIs(decide_post(url, [vid], False).live, True)
 
 
 if __name__ == "__main__":
