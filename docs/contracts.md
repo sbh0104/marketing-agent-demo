@@ -355,10 +355,15 @@ run_loop(cycle, reload, initial, *, on_error, sleep=time.sleep,
 3. 돈 횟수를 더하고, `max_cycles` 에 닿으면 다시 읽기나 대기 없이 횟수를 돌려줍니다.
 4. `config = reload()` — `ConfigError` 는 `on_error("config", exc)` 로 알리고 이전 설정을
    유지합니다.
-5. `sleep(max(0.0, config.poll_interval_min * 60 − (monotonic() − started)))`
+5. `wait = min(poll_interval_min × 60, 약 100년) − (monotonic() − started)` 만큼, 하루 이하
+   조각으로 나눠 `sleep` 합니다. `wait` 가 0 이하이면 `sleep(0.0)` 을 한 번 부릅니다.
 
 - 주기는 사이클 *시작* 부터 잽니다. 사이클이 주기보다 오래 걸리면 쉬지 않고 바로 다음 사이클을
   돕니다.
+- 아주 큰 `poll_interval_min` 도 루프를 죽이지 않습니다 — sleep 한 번은 하루까지(운영체제마다
+  다른 sleep 한도에 닿지 않게), 대기 전체는 약 100년까지(아주 큰 정수를 실수로 바꾸다 나는
+  OverflowError 방지). 하루 이하 주기는 지금처럼 sleep 한 번이고, 설정 규칙
+  (`poll_interval_min ≥ 1`)은 그대로입니다.
 - `poll_interval_min` 만 고치면 재시작이나 OS 설정 없이 다음 대기부터 주기가 바뀝니다.
 - 신호 처리나 fork 는 쓰지 않습니다. Phase 7 의 진입점이 `run_loop` 를 부릅니다.
 
@@ -388,7 +393,9 @@ run_loop(cycle, reload, initial, *, on_error, sleep=time.sleep,
   python3 -m tests.mutants store-put-overwrites-attempts
   python3 -m tests.mutants store-double-reserve
   python3 -m tests.mutants config-narrow-read-errors
+  python3 -m tests.mutants scheduler-one-sleep
+  python3 -m tests.mutants scheduler-unclamped-wait
   ```
 
-  `decide_post` · `video_id_from_ref` · `put` · `reserve_live` · `check_post` · `load_config` 의
-  본문을 고칠 때는 이 명령들이 계속 1 로 끝나는지 함께 확인합니다.
+  `decide_post` · `video_id_from_ref` · `put` · `reserve_live` · `check_post` · `load_config` ·
+  `run_loop` 의 본문을 고칠 때는 이 명령들이 계속 1 로 끝나는지 함께 확인합니다.

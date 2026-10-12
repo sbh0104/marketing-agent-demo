@@ -5,6 +5,10 @@
 poll_interval_min 만 고치면 재시작 없이 다음 대기부터 주기가 바뀝니다. 잘못 고친 설정은
 on_error("config", …) 로 알리고 이전 설정을 계속 씁니다. 사이클이 실패해도 알리고
 계속 돕니다. Ctrl-C(KeyboardInterrupt)는 그대로 위로 올라갑니다.
+
+대기는 하루 이하 조각으로 나눠 잡고(운영체제마다 다른 sleep 한도에 닿지 않게), 전체는 약
+100년까지로 묶습니다(아주 큰 정수를 실수로 바꾸다 나는 OverflowError 방지). 하루 이하 주기는
+sleep 한 번입니다.
 """
 from __future__ import annotations
 
@@ -12,6 +16,20 @@ import time
 from collections.abc import Callable
 
 from agent.config import Config, ConfigError
+
+_DAY_S = 86400.0  # sleep 한 번의 상한 — 하루는 어느 운영체제에서나 됩니다
+_LONGEST_WAIT_S = 100 * 365 * 86400  # 대기 전체의 상한(약 100년) — 이보다 긴 주기는 사실상 영원히 기다림과 같습니다
+
+
+def _wait(sleep: Callable[[float], None], seconds: float) -> None:
+    """seconds 만큼 하루 이하 조각으로 나눠 잡습니다. 0 이하면 sleep(0.0) 을 한 번 부릅니다."""
+    remaining = max(0.0, seconds)
+    while True:
+        chunk = min(remaining, _DAY_S)
+        sleep(chunk)
+        remaining -= chunk
+        if remaining <= 0.0:
+            return
 
 
 def run_loop(
@@ -40,4 +58,5 @@ def run_loop(
             config = reload()
         except ConfigError as exc:
             on_error("config", exc)
-        sleep(max(0.0, config.poll_interval_min * 60 - (monotonic() - started)))
+        wait = min(config.poll_interval_min * 60, _LONGEST_WAIT_S) - (monotonic() - started)
+        _wait(sleep, wait)
