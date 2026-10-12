@@ -27,7 +27,7 @@
 
 ## To do
 
-- [ ] Phase 1 — 뼈대와 계약 (plans/interview-marketing-agent.md#phase-1)
+- [~] Phase 1 — 뼈대와 계약 (plans/interview-marketing-agent.md#phase-1)
 - [ ] Phase 2 — ① 탐지 · 조회수 추적 (plans/interview-marketing-agent.md#phase-2)
 - [ ] Phase 3 — ② 판별 · 주제 일치 (plans/interview-marketing-agent.md#phase-3)
 - [ ] Phase 4 — ③ 타이밍 · 뜨기 직전 판단 (plans/interview-marketing-agent.md#phase-4)
