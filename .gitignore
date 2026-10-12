@@ -2,10 +2,15 @@
 .env
 .env.*
 !.env.example
+.envrc
+.env-local
+# OAuth 클라이언트 비밀 · 토큰 파일
+client_secret_*.json
+token.json
 
-# 크롬 전용 프로필 — 권장 위치는 chrome-profile/ (Phase 6 이 정합니다)
+# 크롬 전용 프로필 — chrome-profile/ 또는 저장소 밖에만 둡니다 (계약 8절)
 chrome-profile/
-# 크롬 프로필 안의 비밀 파일 — 프로필 폴더 이름과 상관없이 막습니다
+# 크롬 프로필 안의 비밀 파일 — 위치 규칙을 어겼을 때의 둘째 방어, 프로필 폴더 이름과 상관없이 막습니다
 Cookies
 Cookies-journal
 Login Data*
@@ -13,6 +18,13 @@ Web Data*
 Local State
 Local Storage/
 Session Storage/
+Preferences
+Secure Preferences
+History*
+IndexedDB/
+Sessions/
+Extension Cookies
+Account Web Data
 # 쿠키 · Playwright 로그인 상태 내보내기
 cookies*.json
 *storage_state*.json

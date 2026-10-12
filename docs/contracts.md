@@ -342,12 +342,19 @@ Phase 3–5 가 정합니다.)
 - API 키는 `.env` 에만 둡니다. `.gitignore` 가 `.env`, `.env.*` 를 막고 `.env.example` 만
   커밋합니다. `.env.example` 에는 `YOUTUBE_API_KEY=` 가 있고, AI 접속 키 이름은 Phase 3 이
   더합니다. `.env` 를 읽는 코드는 비밀 값을 처음 읽는 Phase 2 가 더합니다.
-- 크롬 전용 프로필의 권장 위치는 `chrome-profile/` 이고 통째로 무시됩니다. 실제 경로는
-  Phase 6 이 정합니다.
-- 프로필 폴더 이름이 무엇이든, 프로필 안의 비밀 파일은 어느 깊이에서든 이름으로 막습니다:
-  `Cookies`, `Cookies-journal`, `Login Data*`, `Web Data*`, `Local State`, `Local Storage/`,
-  `Session Storage/`. 쿠키 · 로그인 상태 내보내기(`cookies*.json`, `*storage_state*.json`)도
-  막습니다.
+- 크롬 전용 프로필은 `chrome-profile/`(통째로 무시됩니다) 또는 저장소 밖에만 둡니다 — 저장소
+  안의 다른 폴더는 금지입니다. Phase 6 · 8 의 실행 안내는 이 두 위치만 예시로 보입니다. 이 위치
+  규칙이 첫 방어입니다.
+- 둘째 방어 — 사람이 위치 규칙을 어겨도, 프로필 안의 비밀 파일은 폴더 이름과 상관없이 어느
+  깊이에서든 이름으로 막습니다: `Cookies`, `Cookies-journal`, `Login Data*`, `Web Data*`,
+  `Local State`, `Local Storage/`, `Session Storage/`, `Preferences`, `Secure Preferences`,
+  `History*`, `IndexedDB/`, `Sessions/`, `Extension Cookies`, `Account Web Data`. 쿠키 · 로그인
+  상태 내보내기(`cookies*.json`, `*storage_state*.json`)와 다른 도구의 비밀 · 인증 파일
+  (`.envrc`, `.env-local`, `client_secret_*.json`, `token.json`)도 막습니다.
+- 흔한 이름(`History`, `Preferences` 등)이라 저장소 어디서든 git 이 무시합니다 — 그런 이름의
+  진짜 파일을 만들면 커밋되지 않습니다. 이름 목록은 크롬 버전이 바뀌면 뒤처질 수 있으므로
+  Phase 8 직전 `git ls-files` 사람 확인은 그대로 남습니다. `tests/test_gitignore.py` 가 이
+  목록을 임의 폴더 아래에서 `git check-ignore` 로 확인합니다.
 - `data/` 와 `logs/` 는 폴더만(`.gitkeep`) 커밋합니다. `logs/sample.log` 는 제출물이라 커밋할
   수 있습니다.
 
