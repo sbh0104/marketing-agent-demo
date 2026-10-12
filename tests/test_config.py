@@ -216,6 +216,17 @@ class LoadConfigTest(unittest.TestCase):
             load_config(self.dir / "없는-파일.yaml")
         self.assertIn("설정 파일을 읽을 수 없습니다", str(caught.exception))
 
+    def test_non_utf8_save_raises_config_error(self) -> None:
+        # 윈도우 메모장의 ANSI(CP949)·Unicode(UTF-16) 저장 — run_loop 는 ConfigError 만 잡습니다
+        text = REPO_CONFIG.read_text(encoding="utf-8")
+        path = self.dir / "config.yaml"
+        for codec in ("cp949", "utf-16"):
+            with self.subTest(codec=codec):
+                path.write_bytes(text.encode(codec, errors="replace"))
+                with self.assertRaises(ConfigError) as caught:
+                    load_config(path)
+                self.assertIn("UTF-8", str(caught.exception))
+
 
 if __name__ == "__main__":
     unittest.main()

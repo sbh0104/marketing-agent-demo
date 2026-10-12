@@ -215,9 +215,15 @@ def config_from_mapping(data: Mapping[str, object]) -> Config:
 
 
 def load_config(path: Path | str) -> Config:
-    """설정 파일을 읽어 검사합니다. 윈도우 메모장이 붙이는 BOM 은 떼어 냅니다."""
+    """설정 파일을 읽어 검사합니다. 윈도우 메모장이 붙이는 BOM 은 떼어 냅니다.
+
+    UTF-8 이 아닌 저장(메모장의 ANSI·Unicode)도 ConfigError 입니다 — run_loop 가 이전 설정을
+    유지하려면 읽기 오류가 모두 ConfigError 여야 합니다.
+    """
     try:
         text = Path(path).read_text(encoding="utf-8-sig")
     except OSError as exc:
         raise ConfigError(f"설정 파일을 읽을 수 없습니다: {path}") from exc
+    except UnicodeDecodeError as exc:
+        raise ConfigError(f"설정 파일이 UTF-8 이 아닙니다 (UTF-8 로 다시 저장하세요): {path}") from exc
     return config_from_mapping(parse_yaml(text))
