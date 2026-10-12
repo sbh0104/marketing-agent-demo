@@ -77,7 +77,11 @@ _StrictLoader.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, _c
 
 
 def parse_yaml(text: str) -> dict[str, object]:
-    """YAML 글을 최상위 '키: 값' 묶음으로 읽습니다. 문법 오류는 ConfigError 가 됩니다."""
+    """YAML 글을 최상위 '키: 값' 묶음으로 읽습니다. 문법 오류는 ConfigError 가 됩니다.
+
+    값을 만들다 나는 ValueError · RecursionError 등은 그대로 올라가며, load_config 가
+    ConfigError 로 바꿉니다.
+    """
     try:
         data = yaml.load(text, Loader=_StrictLoader)
     except yaml.MarkedYAMLError as exc:
@@ -217,8 +221,11 @@ def config_from_mapping(data: Mapping[str, object]) -> Config:
 def load_config(path: Path | str) -> Config:
     """설정 파일을 읽어 검사합니다. 윈도우 메모장이 붙이는 BOM 은 떼어 냅니다.
 
-    UTF-8 이 아닌 저장(메모장의 ANSI·Unicode)도 ConfigError 입니다 — run_loop 가 이전 설정을
-    유지하려면 읽기 오류가 모두 ConfigError 여야 합니다.
+    run_loop 가 이전 설정을 유지하려면 읽기 중 나는 오류가 모두 ConfigError 여야 합니다 —
+    UTF-8 이 아닌 저장(메모장의 ANSI·Unicode), 날짜 모양의 틀린 값(`2026-02-30` → ValueError),
+    4300자를 넘는 정수(ValueError), 실수로 바꿀 수 없는 큰 정수(OverflowError), 아주 깊은
+    중첩(RecursionError) 등 그 밖의 모든 Exception 이 ConfigError 가 됩니다.
+    KeyboardInterrupt 같은 BaseException 은 그대로 올라갑니다.
     """
     try:
         text = Path(path).read_text(encoding="utf-8-sig")
@@ -226,4 +233,9 @@ def load_config(path: Path | str) -> Config:
         raise ConfigError(f"설정 파일을 읽을 수 없습니다: {path}") from exc
     except UnicodeDecodeError as exc:
         raise ConfigError(f"설정 파일이 UTF-8 이 아닙니다 (UTF-8 로 다시 저장하세요): {path}") from exc
-    return config_from_mapping(parse_yaml(text))
+    try:
+        return config_from_mapping(parse_yaml(text))
+    except ConfigError:
+        raise
+    except Exception as exc:
+        raise ConfigError(f"설정 값을 읽을 수 없습니다 ({type(exc).__name__}: {exc}): {path}") from exc

@@ -55,6 +55,11 @@ Phase 2–7 의 모든 단계가 기대는 계약입니다. 설정 읽기, 영�
   따옴표로 감싸세요.
 - 같은 키가 두 번 나오면 두 번째 줄 번호와 함께 오류입니다. 윈도우 메모장이 붙이는 BOM 은
   떼어 내고 읽습니다. UTF-8 이 아닌 저장(메모장의 ANSI·Unicode)은 `ConfigError` 입니다.
+- 읽는 중 나는 그 밖의 모든 오류도 `ConfigError` 입니다 — 날짜 모양의 틀린 값
+  (`topic: 2026-02-30`), 4300자를 넘는 정수, 실수로 바꿀 수 없는 큰 정수
+  (`max_age_hours: 1000…0`), 아주 깊은 중첩. 메시지는
+  `설정 값을 읽을 수 없습니다 (<원인 종류>: <원인>): <경로>` 이고 원인은 `__cause__` 에
+  남습니다. `KeyboardInterrupt` 는 바꾸지 않고 그대로 올라갑니다.
 - 주기 루프는 사이클마다 `config.yaml` 을 다시 읽습니다(9절). 실행 중에 값을 고치면 다음
   대기부터 적용되고, 잘못 고친 파일은 이전 설정을 유지합니다.
 
@@ -363,7 +368,7 @@ run_loop(cycle, reload, initial, *, on_error, sleep=time.sleep,
   인자와 이유, 로그 사건과 필수 필드)은 고정입니다.
 - 더하는 것은 그 필드를 쓰는 단계(Phase)가 `models.py` · `config.py` 에서, 테스트와 함께, 이
   문서도 함께 고칩니다. 이미 있는 이름의 뜻을 바꾸거나 지우지 않습니다.
-- 가드와 저장소 규칙이 테스트로 지켜지는지는 음성 대조로 확인합니다. 각 명령은 가드 한 줄을
+- 가드 · 저장소 · 설정 읽기 규칙이 테스트로 지켜지는지는 음성 대조로 확인합니다. 각 명령은 가드 한 줄을
   메모리에서만 망가뜨리고 테스트를 돌리며, **종료 코드 1(테스트가 잡음)** 이어야 합니다. 2 는
   바꿀 글자를 찾지 못했다는 뜻이라 실패입니다:
 
@@ -382,7 +387,8 @@ run_loop(cycle, reload, initial, *, on_error, sleep=time.sleep,
   python3 -m tests.mutants store-reserved-not-counted
   python3 -m tests.mutants store-put-overwrites-attempts
   python3 -m tests.mutants store-double-reserve
+  python3 -m tests.mutants config-narrow-read-errors
   ```
 
-  `decide_post` · `put` · `reserve_live` · `check_post` 의 본문을 고칠 때는 이 명령들이 계속
-  1 로 끝나는지 함께 확인합니다.
+  `decide_post` · `video_id_from_ref` · `put` · `reserve_live` · `check_post` · `load_config` 의
+  본문을 고칠 때는 이 명령들이 계속 1 로 끝나는지 함께 확인합니다.
