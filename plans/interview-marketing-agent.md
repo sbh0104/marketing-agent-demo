@@ -3,8 +3,8 @@
 <!-- Maintained by the deep-interview skill. Re-running the interview updates this file in place. -->
 
 - Created: 2026-10-12
-- Last updated: 2026-10-12
-- Overall status: Planning
+- Last updated: 2026-10-13
+- Overall status: In progress
 
 ## Summary
 유튜브 댓글 에이전트 (과제 안내: `docs/marketing-agent.pdf`). 주제 키워드로 새 영상을 찾고(탐지), AI가 주제 일치를 판별하고(판별), 조회수 조건으로 '뜨기 직전' 영상을 고르고(타이밍), 영상 고민에 맞춘 댓글을 쓰고(작성), 로그인된 크롬에 자동 게시합니다(게시). 빠른 제작이 목표라 뼈대(Phase 1)를 먼저 만들고, Phase 2–6은 뼈대의 계약만 따르므로 동시에 진행합니다. 실제 게시는 허용 목록 영상에만, 코드에서 강제합니다. 언어는 Python + Playwright, 판별과 작성에는 `systemone model jev`를 씁니다.
@@ -24,7 +24,7 @@ Parallel shape: Phase 1 → (Phase 2 ‖ 3 ‖ 4 ‖ 5 ‖ 6) → Phase 7 → Ph
 ---
 
 ## Phase 1 — 뼈대와 계약 (설정 · 데이터 모양 · 저장 · 운영 가드)
-- Status: Not started
+- Status: In progress
 - Slug: foundation-contracts
 - Goal: 다섯 모듈이 같은 약속(설정 값, 영상 한 건의 데이터 모양, 처리 기록 저장소, 허용 목록 가드, 테스트 모드 플래그, 로그 형식)을 쓰도록 뼈대를 만든다. 이후 Phase 2–6은 이 계약에만 의존한다.
 
@@ -42,13 +42,25 @@ Decisions
   - 다국어: 한국어 한정 (검색 `ko`, 한국 지역, 한국어 댓글).
   - 가용성·복구: 로컬 프로세스 한 개, 가동 시간 목표 없음. 실패 시 원인과 화면 캡처를 기록하고 다음 영상으로 넘어감 (과제 ⑤).
   - 호환성: Mac과 Windows에서 실행 가능해야 함 (과제 README 필수 항목).
+- 2026-10-13 ship-check BLOCKED 복구 (분류 `code miss` — 결정은 맞고 코드가 어김, `.adw/ship-report.md` § Blockers). 같은 브랜치에서 아래를 고친 뒤 ship-check 를 다시 받는다:
+  - 허용 목록 가드(`guard.py`)는 계약 5절의 형식을 **정확히** 받는다 — `youtu.be` 는 경로가 정확히 `/<ID>`, shorts 는 `/shorts/<ID>` (뒤 `/` 하나 허용), `watch` 는 `v` 값이 정확히 하나. 경로의 `.`/`..` 칸, `%`, `\` 가 든 주소는 읽을 수 없는 것(`invalid_video`)으로 친다. `dry_run` 은 `is not False` 로 검사해 참·거짓이 아닌 값은 테스트 모드로 간다 — 되돌릴 수 없는 남의 영상 댓글을 막는 쪽을 최적화 (인터뷰 답변: 질문 1 A).
+  - 계약 6절(게시 흐름)에 두 줄을 더한다 — ① 게시 단계는 받은 주소 문자열을 크롬에 넘기지 않고 `https://www.youtube.com/watch?v={decision.video_id}` 를 새로 만들어 연다. ② 클릭 직전 크롬의 실제 주소(`page.url`)로 `decide_post` 를 한 번 더 부르고, `live` 가 아니면 클릭하지 않는다(테스트 모드로 저장). 가드와 브라우저가 같은 주소를 다르게 읽을 자리 자체를 없애기 위함 — 가드의 엄격함 하나에만 기대지 않는 두 겹 잠금 (질문 1 A).
+  - 설정 로더(`load_config`)는 읽기 중 나는 모든 오류(`ValueError`·`OverflowError`·`RecursionError` 포함 — 날짜 모양 값 `2026-02-30`, 아주 큰 정수, 깊은 중첩)를 `ConfigError` 로 바꾼다. plan 결정 "잘못 고친 설정은 이전 설정을 유지하고 `on_error("config", …)` 로 알린다"의 이행이며 결정 변경은 아님.
+  - 계약 8절(비밀 값): 크롬 프로필은 `chrome-profile/` 또는 저장소 밖에만 둔다 — 저장소 안 다른 폴더는 금지. Phase 6·8 의 실행 안내는 이 두 위치만 예시로 보인다. 이와 별도로 `.gitignore` 와 계약 8절 이름 목록에 측정된 11개를 더한다: `Preferences`, `Secure Preferences`, `History*`, `IndexedDB/`, `Sessions/`, `Extension Cookies`, `Account Web Data`, `.envrc`, `.env-local`, `client_secret_*.json`, `token.json` — 위치 규칙이 첫 방어, 이름 목록이 사람이 규칙을 어겼을 때의 둘째 방어 (질문 2 C).
+- **The plan decides** — 위 복구의 테스트 모양 · 후보: 거부해야 할 이웃 주소 표(`/../`, `%2e%2e`, `/shorts/A/../../watch?v=B`, `evil.com\@youtu.be/A`, `watch?v=A&v=B`, ID 뒤 추가 경로, `dry_run=None/0/""`)를 `tests/test_guard.py` 에 · 실제 파일을 고쳐 다시 읽는 재로딩 테스트를 `tests/test_config.py` 에 · 프로필 파일 이름 목록을 임의 폴더 아래에서 `git check-ignore` 로 확인하는 검사 · 조건: ship-report 의 재현 입력 다섯 가지와 날짜 모양 값이 모두 테스트에 실제 입력으로 들어가야 함.
 
 Trade-offs accepted
 - 바로 쓸 수 있는 프레임워크 대신 얇은 직접 구현을 택함 — 빠른 제작을 위해 기능이 적음.
+- (2026-10-13) 클릭 직전 `page.url` 재확인 때문에 유튜브가 중간 화면(로그인·동의 화면 등)을 띄우면 정상 게시도 테스트 모드로 빠질 수 있다 — 위험한 쪽이 아니라 안전한 쪽 실패로 받아들임.
+- (2026-10-13) 계약 5절 목록 밖의 주소 모양(예: 경로에 `%` 가 든 정상 주소)은 허용 목록 항목으로도 쓸 수 없다 — 허용 목록 작성자가 맨 ID 나 표준 형식으로 적어야 함.
+- (2026-10-13) `History`·`Preferences` 같은 흔한 이름이 저장소 어디서든 git 에서 무시된다 — 그런 이름의 진짜 파일을 만들면 커밋되지 않음.
 
 Responsibilities & risks to guard against
 - 계약을 바꾸면 Phase 2–6 전부에 영향 — Phase 1의 데이터 모양은 변경하지 않는 것을 원칙으로 함.
 - `.env`, 크롬 프로필, 쿠키가 커밋되지 않았는지 Phase 8 전에 다시 확인.
+- (2026-10-13) 계약 6절의 두 줄은 Phase 6 이 지킨다 — Phase 6 리뷰에서 크롬에 여는 주소가 `decision.video_id` 로 만든 것인지, `PostDecision` 이 `decide_post` 에서만 오는지 확인 (ship-report R8).
+- (2026-10-13) 이름 목록은 크롬 버전이 바뀌면 뒤처진다 — 위치 규칙이 주 방어이고, Phase 8 직전 `git ls-files` 사람 확인은 그대로 남는다.
+- (2026-10-13) ship-report 의 나머지 위험(R1–R6, R9–R17)은 이번 복구 범위가 아니다 — Phase 7(R5 `on_error`, R10 단일 실행 잠금)과 Phase 6(R12 결과 모르는 게시는 `reserved` 유지)이 각자 지킨다.
 
 Dependencies
 - Depends on: none
@@ -177,6 +189,8 @@ Decisions
 - **The plan decides** — 크롬 프로필: 기본 프로필 불가. Chrome 136부터 기본 데이터 디렉터리에서 `--remote-debugging-port`가 무시되므로 전용 프로필(`--user-data-dir`를 기본 경로가 아닌 곳으로)을 쓰고 한 번 로그인한다. 대안: Chrome for Testing (자동화 전용 빌드, 크롬 팀 권장). 근거 `docs/research/browser-cdp.md`. 테스트가 프로필 경로 검증을 잠가야 함.
 - 게시 직전 허용 목록 확인 — 목록에 없으면 게시하지 않고 작성 결과만 파일로 저장 (과제 ⑤). Phase 1 가드를 호출한다.
 - 테스트 모드(`--dry-run`): 게시 직전까지만 실행하고 댓글을 파일로 저장.
+- (2026-10-13, Phase 1 계약 6절) 크롬에는 받은 주소 문자열이 아니라 `https://www.youtube.com/watch?v={decision.video_id}` 만 연다. 클릭 직전 `page.url` 로 `decide_post` 를 한 번 더 부르고 `live` 가 아니면 클릭하지 않는다 — 가드와 브라우저의 주소 해석 차이로 남의 영상에 게시되는 것을 막음 (Phase 1 복구 질문 1 A).
+- (2026-10-13, Phase 1 계약 8절) 프로필 위치는 `chrome-profile/` 또는 저장소 밖으로 한정 — 위 "The plan decides" 의 프로필 선택은 이 두 위치 안에서 고른다. 실행 안내에도 이 두 위치만 예시로 보인다 (Phase 1 복구 질문 2 C).
 
 Trade-offs accepted
 - 게시 자동화는 웹 화면 구조에 기대므로 유지 보수가 필요 — 실패 기록으로 대응.
@@ -257,3 +271,6 @@ Open questions
 | 2026-10-12 | 2 | 기본 키워드 5개 × 30분은 쿼터 초과 (240회/일 > 약 100회/일) → 주기·키워드 조합은 Plan에서 결정 | 쿼터 계산, `docs/research/search-quota.md` |
 | 2026-10-12 | 6 | 기본 크롬 프로필 사용 불가 → 전용 프로필 또는 Chrome for Testing | Chrome 136+ 기본 프로필에서 디버깅 포트 무시, `docs/research/browser-cdp.md` |
 | 2026-10-12 | 1 | NFR: 성능 목표 없음, 접근성 해당 없음, 한국어 한정, 가동 시간 목표 없음, Mac·Windows 호환 | 과제 PDF 요구 · CLI 에이전트 특성 |
+| 2026-10-13 | 1 | ship-check BLOCKED 분류: `code miss` — 가드 주소 해석과 설정 로더 예외가 기존 결정을 어김, 같은 브랜치에서 수정 후 ship-check 재실행 | `youtu.be/A/../B` 가 A 로 `live=True`, 날짜 모양 설정 값이 `run_loop` 를 죽임 (`.adw/ship-report.md` § Blockers, 인터뷰에서 재현) |
+| 2026-10-13 | 1, 6 | 가드는 계약 5절 형식만 정확히 받고, 계약 6절에 "크롬에는 `watch?v={decision.video_id}` 만 열고 클릭 직전 `page.url` 로 재확인"을 더함 (두 겹 잠금) | 가드와 브라우저가 같은 주소를 다르게 읽는 자리를 없앰 · Phase 6 시작 전이라 비용 0 (복구 질문 1 A) |
+| 2026-10-13 | 1, 6 | 크롬 프로필은 `chrome-profile/` 또는 저장소 밖에만 · `.gitignore` 와 계약 8절에 측정된 이름 11개 추가 | 위치가 첫 방어, 이름 목록이 규칙을 어겼을 때의 둘째 방어 · 계정 이메일·방문 기록 공개 방지 (복구 질문 2 C, ship-report R13) |
