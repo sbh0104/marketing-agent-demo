@@ -259,14 +259,25 @@ Phase 3–5 가 정합니다.)
    `check = store.check_post(video_id, channel_id, now, config.limits, live=decision.live)`.
 2. 막혔으면(`check.allowed` 가 거짓) `SKIP` 을 남기고 다음 영상으로 넘어갑니다.
 3. **실제 게시(`decision.live`):**
-   1. `store.reserve_live(video_id, now)`
-   2. 로그 `POST … mode=live result=reserved reason=allowlisted`
-   3. 클릭하고 게시를 확인
-   4. `store.resolve_live(video_id, "posted" | "failed", now, reason, screenshot)`
-   5. 로그 `POST … result=posted` 또는 `result=failed`
-4. **테스트 모드:** `store.save_test(video_id, now, reason=decision.reason)` 를 부르고 로그
-   `POST … mode=test result=saved reason=<decision.reason>`.
+   1. 받은 주소 문자열(`video_ref`)은 크롬에 넘기지 않고 `https://www.youtube.com/watch?v={decision.video_id}` 를 새로 만들어 엽니다.
+   2. 클릭 직전 확인: 크롬의 실제 주소로 `recheck = decide_post(page.url, config.allowed_videos, dry_run)` 를 한 번 더 부릅니다.
+      `recheck.live` 가 거짓이거나 `recheck.video_id != decision.video_id` 이면 클릭하지 않고 4(테스트 모드)로 갑니다.
+      이유는 `recheck.live` 가 거짓이면 `recheck.reason`, 다른 영상이면 `page_mismatch` 입니다.
+   3. `store.reserve_live(video_id, now)`
+   4. 로그 `POST … mode=live result=reserved reason=allowlisted`
+   5. 클릭하고 게시를 확인 — 3.2 와 이 클릭 사이에는 예약과 로그 말고 다른 일(이동 · 기다림)을 두지 않습니다.
+   6. `store.resolve_live(video_id, "posted" | "failed", now, reason, screenshot)`
+   7. 로그 `POST … result=posted` 또는 `result=failed`
+4. **테스트 모드:** `store.save_test(decision.video_id, now, reason=<decision.reason, 3.2 에서 왔으면 3.2 의 이유>)` 를 부르고 로그 `POST … mode=test result=saved reason=<그 reason>`.
 5. **`reserve_live` 가 오류를 냈으면 절대 클릭하지 않습니다.**
+
+- 3.1 · 3.2 는 가드와 브라우저가 같은 주소를 다르게 읽을 자리를 없애는 두 겹 잠금입니다(가드의
+  엄격함 하나에만 기대지 않음). 다시 확인을 예약 앞에 두는 까닭은 확정되지 않은 예약은 게시로
+  치므로(4절) 예약 뒤에는 테스트 모드로 바꿀 수 없기 때문입니다. 같은 영상인지도 보는 까닭은
+  자동 재생 · 다음 영상으로 크롬이 다른 허용 영상으로 옮겨 가면 저장소가 확인하지 않은 영상에
+  댓글이 달리기 때문입니다. `page_mismatch` 는 `decide_post` 의 이유가 아니라 게시 단계가 남기는
+  테스트 저장 이유입니다. 유튜브가 중간 화면(로그인 · 동의)을 띄우면 정상 게시도 테스트 모드로
+  빠질 수 있습니다 — 안전한 쪽 실패로 받아들입니다. Phase 6 이 지킵니다.
 
 ## 7. 로그 형식 — `logbook.py`
 
