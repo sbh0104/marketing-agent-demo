@@ -1,0 +1,279 @@
+"""트리거 판정 테스트 — 세 조건, 판단 보류, 경계, 순서, 음수 속도 없음."""
+from __future__ import annotations
+
+import copy
+import dataclasses
+import itertools
+import unittest
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+
+from agent.config import TriggerConfig, load_config
+from agent.logbook import Event, format_line
+from agent.models import Verdict, VideoRecord, ViewSample
+from agent.trigger import judge_trigger
+
+ROOT = Path(__file__).resolve().parent.parent
+UTC = timezone.utc
+KST = timezone(timedelta(hours=9))
+T0 = datetime(2026, 10, 12, 3, 0, tzinfo=UTC)  # 업로드 시각
+H = timedelta(hours=1)
+M = timedelta(minutes=1)
+S = timedelta(seconds=1)
+DEFAULTS = TriggerConfig(min_views=1000, max_views=5000, max_age_hours=12.0, min_views_per_hour=150.0)
+GOOD = ((2 * H, 1200), (2 * H + 30 * M, 1450))  # 2시간 30분에 1450회, 시간당 500회
+REASONS = {
+    ("hold", "too_few_samples"), ("no", "views_below_min"), ("no", "views_above_max"),
+    ("hold", "published_in_future"), ("no", "too_old"), ("hold", "views_decreased"),
+    ("no", "too_slow"), ("yes", "views_per_hour"),
+}
+
+
+def video(*samples, published_at=T0, detected_at=None) -> VideoRecord:
+    """업로드(T0) 뒤 (경과, 조회수) 기록들로 영상 기록을 만듭니다."""
+    return VideoRecord(
+        video_id="abcdefghijk", channel_id="UC123", title="제목", description="",
+        published_at=published_at, detected_at=detected_at or published_at, keyword="썸",
+        view_history=[ViewSample(T0 + offset, count) for offset, count in samples],
+    )
+
+
+def judged(record, after, config=DEFAULTS) -> tuple[str, str]:
+    judgement = judge_trigger(record, config, T0 + after)
+    return judgement.verdict.value, judgement.reason
+
+
+AT = 2 * H + 30 * M  # 따로 적지 않으면 이 시각에 판정합니다
+
+
+class HoldTests(unittest.TestCase):
+    def test_empty_history_is_hold(self) -> None:
+        self.assertEqual(judged(video(), 1 * H), ("hold", "too_few_samples"))
+
+    def test_single_sample_is_hold(self) -> None:
+        self.assertEqual(judged(video((2 * H, 1450)), AT), ("hold", "too_few_samples"))
+
+    def test_single_sample_holds_even_when_other_conditions_fail(self) -> None:
+        self.assertEqual(judged(video((20 * H, 6000)), 20 * H), ("hold", "too_few_samples"))
+
+    def test_same_instant_samples_count_as_one(self) -> None:
+        record = video((2 * H, 1200), (2 * H, 1450))
+        self.assertEqual(judged(record, AT), ("hold", "too_few_samples"))
+
+    def test_decrease_is_hold(self) -> None:
+        record = video((2 * H, 1450), (2 * H + 30 * M, 1300))
+        self.assertEqual(judged(record, AT), ("hold", "views_decreased"))
+
+    def test_decrease_holds_even_with_zero_min_rate(self) -> None:
+        record = video((2 * H, 1450), (2 * H + 30 * M, 1300))
+        config = dataclasses.replace(DEFAULTS, min_views_per_hour=0.0)
+        self.assertEqual(judged(record, AT, config), ("hold", "views_decreased"))
+
+    def test_future_published_at_is_hold(self) -> None:
+        record = video(*GOOD, published_at=T0 + 2 * H + 31 * M)
+        self.assertEqual(judged(record, AT), ("hold", "published_in_future"))
+
+
+class NoTests(unittest.TestCase):
+    def test_below_min_views(self) -> None:
+        record = video((2 * H, 900), (2 * H + 30 * M, 999))
+        self.assertEqual(judged(record, AT), ("no", "views_below_min"))
+
+    def test_above_max_views(self) -> None:
+        record = video((2 * H, 4900), (2 * H + 30 * M, 5001))
+        self.assertEqual(judged(record, AT), ("no", "views_above_max"))
+
+    def test_too_old(self) -> None:
+        record = video((11 * H + 30 * M, 1200), (12 * H, 1450))
+        self.assertEqual(judged(record, 12 * H + S), ("no", "too_old"))
+
+    def test_too_slow(self) -> None:
+        record = video((2 * H, 1200), (2 * H + 30 * M, 1274))  # 시간당 148회
+        self.assertEqual(judged(record, AT), ("no", "too_slow"))
+
+    def test_flat_count_is_too_slow(self) -> None:
+        record = video((2 * H, 1450), (2 * H + 30 * M, 1450))
+        self.assertEqual(judged(record, AT), ("no", "too_slow"))
+
+    def test_views_checked_before_age(self) -> None:
+        old = video((19 * H + 30 * M, 900), (20 * H, 999))
+        self.assertEqual(judged(old, 20 * H), ("no", "views_below_min"))
+        future = video((2 * H, 900), (2 * H + 30 * M, 999), published_at=T0 + 3 * H)
+        self.assertEqual(judged(future, AT), ("no", "views_below_min"))
+
+    def test_age_counts_from_published_not_detected(self) -> None:
+        record = video((11 * H + 30 * M, 1200), (12 * H, 1450), detected_at=T0 + 11 * H)
+        self.assertEqual(judged(record, 12 * H + S), ("no", "too_old"))
+
+
+class YesTests(unittest.TestCase):
+    """경계는 모두 통과입니다."""
+
+    def test_all_three_met(self) -> None:
+        self.assertEqual(judged(video(*GOOD), AT), ("yes", "views_per_hour"))
+
+    def test_min_views_bound_is_inclusive(self) -> None:
+        record = video((2 * H, 900), (2 * H + 30 * M, 1000))
+        self.assertEqual(judged(record, AT), ("yes", "views_per_hour"))
+
+    def test_max_views_bound_is_inclusive(self) -> None:
+        record = video((2 * H, 4800), (2 * H + 30 * M, 5000))
+        self.assertEqual(judged(record, AT), ("yes", "views_per_hour"))
+
+    def test_age_bound_is_inclusive(self) -> None:
+        record = video((11 * H + 30 * M, 1200), (12 * H, 1450))
+        self.assertEqual(judged(record, 12 * H), ("yes", "views_per_hour"))
+
+    def test_rate_bound_is_inclusive(self) -> None:
+        record = video((2 * H, 1200), (2 * H + 30 * M, 1275))  # 시간당 정확히 150회
+        self.assertEqual(judged(record, AT), ("yes", "views_per_hour"))
+
+    def test_flat_count_meets_zero_min_rate(self) -> None:
+        record = video((2 * H, 1450), (2 * H + 30 * M, 1450))
+        config = dataclasses.replace(DEFAULTS, min_views_per_hour=0.0)
+        self.assertEqual(judged(record, AT, config), ("yes", "views_per_hour"))
+
+    def test_published_exactly_now_passes_age(self) -> None:
+        record = video(*GOOD, published_at=T0 + 2 * H + 30 * M)
+        self.assertEqual(judged(record, AT), ("yes", "views_per_hour"))
+
+    def test_single_value_range(self) -> None:
+        config = TriggerConfig(1450, 1450, 12.0, 150.0)
+        self.assertEqual(judged(video(*GOOD), AT, config), ("yes", "views_per_hour"))
+
+    def test_contract_example_record_is_yes(self) -> None:
+        record = video(
+            (0 * H, 1200), (30 * M, 1450), published_at=datetime(2026, 10, 11, 23, 0, tzinfo=UTC)
+        )
+        self.assertEqual(judged(record, 30 * M), ("yes", "views_per_hour"))
+
+
+class OrderTests(unittest.TestCase):
+    def test_list_order_does_not_matter(self) -> None:
+        samples = [(1 * H, 1000), (2 * H, 1200), (2 * H + 30 * M, 1440), (2 * H + 30 * M, 1450)]
+        at_500 = dataclasses.replace(DEFAULTS, min_views_per_hour=500.0)
+        at_501 = dataclasses.replace(DEFAULTS, min_views_per_hour=501.0)
+        for order in itertools.permutations(samples):
+            with self.subTest(order=order):
+                record = video(*order)
+                self.assertEqual(judged(record, AT, at_500), ("yes", "views_per_hour"))
+                self.assertEqual(judged(record, AT, at_501), ("no", "too_slow"))
+
+    def test_order_is_by_instant_across_time_zones(self) -> None:
+        rec = video()
+        rec.view_history = [
+            ViewSample(T0 + 30 * M, 1450),
+            ViewSample(datetime(2026, 10, 12, 12, 0, tzinfo=KST), 1200),  # 03:00Z
+        ]
+        self.assertEqual(judged(rec, 30 * M), ("yes", "views_per_hour"))
+
+
+class SpeedTests(unittest.TestCase):
+    def test_rate_uses_latest_two_samples(self) -> None:
+        record = video((1 * H, 1000), (2 * H, 1100), (2 * H + 30 * M, 1450))
+        at_699 = dataclasses.replace(DEFAULTS, min_views_per_hour=699.0)
+        at_701 = dataclasses.replace(DEFAULTS, min_views_per_hour=701.0)
+        self.assertEqual(judged(record, AT, at_699), ("yes", "views_per_hour"))
+        self.assertEqual(judged(record, AT, at_701), ("no", "too_slow"))
+
+    def test_short_gap_after_restart_is_measured_as_is(self) -> None:
+        last = 2 * H + 30 * M + 20 * S
+        record = video((2 * H, 1200), (2 * H + 30 * M, 1200), (last, 1201))
+        at_180 = dataclasses.replace(DEFAULTS, min_views_per_hour=180.0)
+        at_181 = dataclasses.replace(DEFAULTS, min_views_per_hour=181.0)
+        self.assertEqual(judged(record, last), ("yes", "views_per_hour"))
+        self.assertEqual(judged(record, last, at_180), ("yes", "views_per_hour"))
+        self.assertEqual(judged(record, last, at_181), ("no", "too_slow"))
+
+    def test_rate_never_negative_over_generated_pairs(self) -> None:
+        counts = (0, 1, 999, 1000, 1450, 5000, 5001)
+        offsets = ((1 * H, 2 * H), (2 * H, 2 * H + 30 * M), (1 * H, 2 * H + 30 * M))
+        speed_only = TriggerConfig(0, 10**9, 12.0, 0.0)
+        for earlier_count, later_count in itertools.product(counts, repeat=2):
+            for earlier_at, later_at in offsets:
+                pair = ((earlier_at, earlier_count), (later_at, later_count))
+                for samples in (pair, pair[::-1]):
+                    with self.subTest(samples=samples):
+                        record = video(*samples)
+                        expected = (
+                            ("hold", "views_decreased")
+                            if later_count < earlier_count
+                            else ("yes", "views_per_hour")
+                        )
+                        self.assertEqual(judged(record, later_at, speed_only), expected)
+                        self.assertIn(judged(record, later_at), REASONS)
+
+
+class ConfigTests(unittest.TestCase):
+    def test_each_threshold_comes_from_config(self) -> None:
+        record = video(*GOOD)
+        self.assertEqual(judged(record, AT), ("yes", "views_per_hour"))
+        variants = (
+            ({"min_views": 1451}, ("no", "views_below_min")),
+            ({"max_views": 1449}, ("no", "views_above_max")),
+            ({"max_age_hours": 2.0}, ("no", "too_old")),
+            ({"min_views_per_hour": 501.0}, ("no", "too_slow")),
+        )
+        for change, expected in variants:
+            with self.subTest(change=change):
+                config = dataclasses.replace(DEFAULTS, **change)
+                self.assertEqual(judged(record, AT, config), expected)
+
+    def test_shipped_config_is_assignment_values(self) -> None:
+        shipped = load_config(ROOT / "config.yaml").trigger
+        self.assertEqual(shipped, DEFAULTS)
+        self.assertEqual(judged(video(*GOOD), AT, shipped), ("yes", "views_per_hour"))
+
+
+class ContractTests(unittest.TestCase):
+    def test_judgement_at_is_now(self) -> None:
+        judgement = judge_trigger(video(*GOOD), DEFAULTS, T0 + 2 * H + 30 * M)
+        self.assertIs(judgement.verdict, Verdict.YES)
+        self.assertEqual(judgement.at, T0 + 2 * H + 30 * M)
+
+    def test_same_input_same_judgement(self) -> None:
+        now = T0 + AT
+        first = judge_trigger(video(*GOOD), DEFAULTS, now)
+        second = judge_trigger(video(*GOOD), DEFAULTS, now)
+        self.assertEqual(first, second)
+
+    def test_record_is_not_changed(self) -> None:
+        rec = video(*GOOD)
+        before = copy.deepcopy(rec)
+        judge_trigger(rec, DEFAULTS, T0 + AT)
+        self.assertEqual(rec, before)
+        self.assertIsNone(rec.trigger)
+
+    def test_naive_now_is_rejected(self) -> None:
+        now = datetime(2026, 10, 12, 5, 30)
+        for record in (video(*GOOD), video()):
+            with self.subTest(record=record):
+                with self.assertRaisesRegex(ValueError, "now 에 시간대가 없습니다"):
+                    judge_trigger(record, DEFAULTS, now)
+
+    def test_every_reason_logs_unquoted(self) -> None:
+        scenarios = (
+            (video((2 * H, 1450)), AT),
+            (video((2 * H, 900), (2 * H + 30 * M, 999)), AT),
+            (video((2 * H, 4900), (2 * H + 30 * M, 5001)), AT),
+            (video(*GOOD, published_at=T0 + 2 * H + 31 * M), AT),
+            (video((11 * H + 30 * M, 1200), (12 * H, 1450)), 12 * H + S),
+            (video((2 * H, 1450), (2 * H + 30 * M, 1300)), AT),
+            (video((2 * H, 1200), (2 * H + 30 * M, 1274)), AT),
+            (video(*GOOD), AT),
+        )
+        seen = set()
+        for rec, after in scenarios:
+            now = T0 + after
+            j = judge_trigger(rec, DEFAULTS, now)
+            verdict, reason = j.verdict.value, j.reason
+            seen.add((verdict, reason))
+            with self.subTest(verdict=verdict, reason=reason):
+                fields = {"video": rec.video_id, "verdict": j.verdict, "reason": j.reason}
+                line = format_line(now, Event.TRIGGER, fields)
+                self.assertTrue(line.endswith(f"verdict={verdict} reason={reason}"), line)
+        self.assertEqual(seen, REASONS)
+
+
+if __name__ == "__main__":
+    unittest.main()
