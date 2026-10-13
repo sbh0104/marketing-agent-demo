@@ -448,3 +448,76 @@ run_loop(cycle, reload, initial, *, on_error, sleep=time.sleep,
   `decide_post` · `video_id_from_ref` · `put` · `reserve_live` · `check_post` · `load_config` ·
   `config_from_mapping` · `run_loop` · `format_line` 의 본문을 고칠 때는 이 명령들이 계속 1 로
   끝나는지 함께 확인합니다.
+
+## 11. 트리거 판정 — `trigger.py`
+
+```python
+judge_trigger(record, config, now) -> Judgement     # config 는 Config.trigger
+```
+
+`judge_trigger` 는 영상 기록 하나를 지금(`now`) 댓글 대상으로 볼지 정해 `Judgement(verdict, reason, at=now)` 를
+돌려줍니다. 기록은 바꾸지 않고, 같은 입력이면 언제나 같은 판정입니다. 기준은 부를 때마다 받은 `config` 에서
+읽으므로 실행 중 고친 설정이 다음 판정부터 적용됩니다. 시간대 없는 `now` 는 `ValueError` 입니다. 저장
+(`record.trigger`)과 `TRIGGER` 로그는 부르는 쪽(Phase 7)이 합니다.
+
+- **최신과 직전:** 조회수 기록을 시각(`at`) 순으로 놓습니다 — 목록 순서는 보지 않고, 시간대가 달라도 같은
+  순간이면 같은 시각이며, 같은 시각끼리는 조회수가 큰 쪽이 뒤입니다. 맨 뒤가 *최신*, 최신보다 시각이 이른
+  기록 중 맨 뒤가 *직전*입니다. 같은 시각의 기록 여럿은 한 번으로 셉니다.
+- **시간당 조회수** = (최신 조회수 − 직전 조회수) ÷ 두 시각 사이의 시간. 조회수가 그대로면 0 입니다.
+  조회수가 줄었으면(삭제 · 비공개 · 조회수 정정) 재지 않습니다 — 음수 속도는 없습니다.
+
+아래 차례대로 보고 처음 걸린 줄의 판정을 돌려줍니다:
+
+| 차례 | 조건 | verdict | reason |
+|---|---|---|---|
+| 1 | 시각이 다른 기록이 둘 미만(기록 없음 포함) | `hold` | `too_few_samples` |
+| 2 | 최신 조회수 < `min_views` | `no` | `views_below_min` |
+| 3 | 최신 조회수 > `max_views` | `no` | `views_above_max` |
+| 4 | `published_at` 이 `now` 보다 뒤 | `hold` | `published_in_future` |
+| 5 | `now − published_at` > `max_age_hours` 시간 | `no` | `too_old` |
+| 6 | 최신 조회수 < 직전 조회수 | `hold` | `views_decreased` |
+| 7 | 시간당 조회수 < `min_views_per_hour` | `no` | `too_slow` |
+| 8 | 그 밖 — 세 조건을 모두 만족 | `yes` | `views_per_hour` |
+
+- 경계는 모두 통과입니다 — 조회수 정확히 `min_views` · `max_views`, 나이 정확히 `max_age_hours`(그리고
+  `published_at` 이 `now` 와 같은 나이 0), 시간당 정확히 `min_views_per_hour` 는 대상입니다(과제의
+  "1,000–5,000 · 12시간 이내 · 150 이상").
+- **판정은 모두 `at` 시각의 판정입니다.** 다시 부르면 바뀌지 않는 것은 `too_old` 뿐입니다(나이는 줄지 않음).
+  `views_above_max` 는 조회수가 정정되어 줄 때만 바뀌고, `views_below_min` · `too_slow` 와 모든 `hold` 는
+  기록이 더 쌓이면 `yes` 가 될 수 있습니다. 그래서 부르는 쪽은 `too_old` 가 아닌 기록을 새 조회수 기록이 생길
+  때마다 다시 판정합니다. `hold` 는 잴 수 없어 미룬 판정(기록 부족 · 미래 업로드 시각 · 줄어든 조회수)이고,
+  `no` 는 재어 보니 지금은 아닌 판정입니다.
+- 기록이 한 번뿐인 영상은 다른 조건과 상관없이 `hold` 입니다(트래커 Phase 4 의 절충). 조회수가 줄면
+  `min_views_per_hour` 가 0 이어도 `hold` 입니다 — 지워졌거나 비공개가 된 영상을 대상으로 올리지 않고, 나이
+  창이 닫히면 `too_old` 로 끝납니다.
+- 나이는 업로드 시각(`published_at`)부터 잽니다(탐지 시각이 아님). `published_at` 이 `now` 보다 뒤이면 이
+  컴퓨터의 시계가 유튜브보다 늦다는 뜻이라 `hold published_in_future` 로 둡니다 — 시계가 따라잡으면 저절로
+  풀리고, 로그에서 찾을 수 있습니다. 시계가 늦으면 다른 영상의 나이도 그만큼 적게 재지만, 이 판정이 그것까지
+  고치지는 않습니다.
+- 기록 사이가 아주 짧으면(재시작 직후 바로 도는 사이클, `poll_interval_min: 1`) 조회수 몇 회 차이도 큰 속도가
+  됩니다 — 예: 20초 사이 1회는 시간당 180회로 `yes`. 최소 간격은 아직 정하지 않았습니다(실제 기록이 생긴 뒤
+  Phase 2 · 7 이 정함). 기록 주기(30분 · 2시간)에 따라 정밀도가 달라지는 것은 트래커가 받아들인 절충입니다.
+- 조건 차례는 과제가 적은 차례(조회수 · 나이 · 시간당 조회수)이고, 두 `hold`(미래 업로드 시각 · 줄어든
+  조회수)는 그것이 망치는 측정만 막습니다.
+- reason 은 모두 로그에 따옴표 없이 쓰이는 글자입니다. 3절 · 7절 예시의 `views_per_hour` 는 `yes` 의
+  reason 입니다.
+- **기준 제안:** 세 기준 값은 과제 값 그대로 둡니다(트래커 Phase 4 결정) — 실제 조회수 기록(Phase 2)이 아직
+  없어 다른 숫자를 뒷받침할 근거가 없습니다. 대신 과제가 정하지 않은 재는 방법을 정했습니다: 시간당 조회수를
+  업로드 뒤 평균(조회수 ÷ 나이)이나 첫 기록부터의 평균이 아니라 *가장 늦은 두 기록* 사이로 잽니다. "뜨기
+  직전"은 지금 빨라지는 영상인데, 업로드 뒤 평균은 이미 끝난 반짝 증가를 대상으로 올리고, 첫 기록부터의
+  평균은 지금의 가속을 느린 시작과 섞어 묽힙니다.
+- 음성 대조 — 각 명령은 판정 한 줄을 메모리에서만 망가뜨리고 `tests.test_trigger` 를 돌리며, **종료 코드
+  1(테스트가 잡음)** 이어야 합니다. `judge_trigger` 의 본문을 고칠 때 함께 확인합니다:
+
+  ```
+  python3 -m tests.mutants trigger-negative-speed
+  python3 -m tests.mutants trigger-flat-is-decrease
+  python3 -m tests.mutants trigger-list-order
+  python3 -m tests.mutants trigger-same-instant
+  python3 -m tests.mutants trigger-min-views-exclusive
+  python3 -m tests.mutants trigger-max-views-exclusive
+  python3 -m tests.mutants trigger-future-publish-passes
+  python3 -m tests.mutants trigger-future-publish-inclusive
+  python3 -m tests.mutants trigger-age-exclusive
+  python3 -m tests.mutants trigger-rate-exclusive
+  ```
