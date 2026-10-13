@@ -333,3 +333,27 @@
 - source: adw/smoke-sweep-s038
 - tag: plain
 - status: open
+
+### H-039 — `docs/contracts.md:534-537` 의 좁힌 풀이 줄이 트래커 Phase 1B 질문 4 A 의 뜻에 맞는지 확인하세요. 트래커 문장은 "옛 11 · 12절 = 그 기록을 남긴 페이즈가 더한 절" 입니다. 계약 줄은 그 앞에 "기록이 그 자리에서 제목이나 함수 · 모듈 이름으로 밝힌 절이 먼저" 를 둡니다. 반례는 Phase 5 출하 보고서의 "11절(트리거 판정)과 12절(주제 판별)" 입니다. 맞으면 확인하고, 아니면 트래커를 고칠지 정하세요.
+- project: marketing-agent-demo
+- when: 2026-10-14 · plans/interview-marketing-agent.md#phase-1b
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-1b-contract-section-names
+- tag: sensitive: tracker decision · confirmed 2026-10-14
+- status: confirmed
+
+### H-040 — 트래커 Phase 1B 의 낡은 개수를 고칠지 정하세요. 트래커는 Phase 2 가 "`## 11.` 제목 하나와 계약 11절 8곳(레인 계약서 60 · 69행 포함)"을 들였다고 적었습니다. 기준점 `7575fe6` 에서는 그 제목이 이미 번호가 없었고, 인용은 7곳(src 6 · docs/research 1)이었습니다. 질문 2 A 의 "1–10절 인용 8개 파일 13곳"도 Phase 2 파일을 빼고 센 수입니다. 기준점에서는 16곳이고, 모두 그대로 남았습니다.
+- project: marketing-agent-demo
+- when: 2026-10-14 · plans/interview-marketing-agent.md#phase-1b
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-1b-contract-section-names
+- tag: plain
+- status: open
+
+### H-041 — H-013(Phase 3 이 남긴 열린 사람 확인)의 앞 절반 "착지 때 다른 갈래가 먼저 `## 11.` 을 붙였으면 이 절 번호를 다시 매기기"는 이번 규칙(10절 뒤 절은 번호 없음)으로 할 일이 없어졌습니다. 뒤 절반(겹친 추가분 합치기)이 아직 남았는지 보고, 항목을 닫을지 정하세요.
+- project: marketing-agent-demo
+- when: 2026-10-14 · plans/interview-marketing-agent.md#phase-1b
+- from: ship-report.md § Human checks — .adw/ship-report.md § Spec compliance
+- source: adw/phase-1b-contract-section-names
+- tag: plain
+- status: open
