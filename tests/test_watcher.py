@@ -348,6 +348,29 @@ class DetectTest(WatcherCase):
         )
         self.assertEqual(report, CycleReport(1, (), 1, 0, False, False))
 
+    def test_store_write_error_propagates_s046(self) -> None:
+        # 계약 9절 — 저장소 쓰기 오류는 잡지 않고 run_loop 까지 올라갑니다
+        error = OSError("디스크가 찼습니다")
+        self.store = FailingStore(self.store_path, error)
+        self.api.pages[("연애", None)] = search_page([A])
+        self.api.videos[A] = video_item(A, 1200)
+        with self.assertRaises(OSError) as caught:
+            self.run_cycle()
+        self.assertIs(caught.exception, error)
+        self.assertEqual(self.events(), [])
+        self.assertIsNone(Store(self.store_path).get(A))
+
+
+class FailingStore(Store):
+    """put 이 쓰기 오류를 내는 저장소."""
+
+    def __init__(self, path: Path, error: OSError) -> None:
+        super().__init__(path)
+        self.error = error
+
+    def put(self, record: VideoRecord) -> None:
+        raise self.error
+
 
 class PaginationTest(WatcherCase):
     def test_next_page_follows_an_all_new_page_with_a_token(self) -> None:
@@ -359,6 +382,21 @@ class PaginationTest(WatcherCase):
         self.assertEqual(self.api.searches(), [("연애", None), ("연애", "P1")])
         self.assertEqual(self.event_names(), [Event.DETECT, Event.VIEWS] * 2)
         self.assertEqual(report, CycleReport(2, (A, B), 2, 0, False, False))
+
+    def test_next_page_keeps_the_first_page_published_after_s046(self) -> None:
+        self.api.pages[("연애", None)] = search_page([A], "P1")
+        self.api.pages[("연애", "P1")] = search_page([B])
+        self.api.videos[A] = video_item(A, 1200)
+        self.api.videos[B] = video_item(B, 1300)
+        self.run_cycle()
+        sent = [
+            (query.get("pageToken"), query.get("publishedAfter"))
+            for endpoint, query in self.api.calls
+            if endpoint == "search"
+        ]
+        self.assertEqual(
+            sent, [(None, "2026-10-12T00:00:00Z"), ("P1", "2026-10-12T00:00:00Z")]
+        )
 
     def test_pages_stop_at_a_video_known_before_the_cycle(self) -> None:
         self.seed(K)
@@ -643,6 +681,31 @@ INVALID_ITEMS: tuple[tuple[str, dict[str, object]], ...] = (
     ("no statistics", bad_item(statistics="")),
 )
 
+# INVALID_ITEMS 행마다 SKIP 줄 detail 의 앞부분 — 지금 코드가 내는 글 그대로 (S-047).
+# month 13 은 _PUBLISHED_RE 모양에는 맞아 strptime 에서 떨어지므로 strptime 의 글로 시작합니다.
+INVALID_DETAIL_PREFIX: dict[str, str] = {
+    "viewCount -5": "statistics.viewCount:",
+    "viewCount 1_000": "statistics.viewCount:",
+    "viewCount ' 12'": "statistics.viewCount:",
+    "viewCount arabic-indic": "statistics.viewCount:",
+    "viewCount 20 digits": "statistics.viewCount:",
+    "viewCount int": "statistics.viewCount:",
+    "viewCount missing": "statistics.viewCount:",
+    "publishedAt 어제": "snippet.publishedAt:",
+    "publishedAt None": "snippet.publishedAt:",
+    "publishedAt +09:00": "snippet.publishedAt:",
+    "publishedAt year 1 +14:00": "snippet.publishedAt:",
+    "publishedAt 9999 -01:00": "snippet.publishedAt:",
+    "publishedAt basic": "snippet.publishedAt:",
+    "publishedAt week date": "snippet.publishedAt:",
+    "publishedAt no zone": "snippet.publishedAt:",
+    "publishedAt month 13": "time data '2026-13-01T00:00:00'",
+    "publishedAt Z junk": "snippet.publishedAt:",
+    "channelId empty": "VideoRecord.channel_id:",
+    "no snippet": "snippet:",
+    "no statistics": "statistics:",
+}
+
 
 class IntakeTest(WatcherCase):
     def test_unavailable_video_is_skipped(self) -> None:
@@ -667,7 +730,8 @@ class IntakeTest(WatcherCase):
                 report = self.run_cycle()
                 [(event, fields)] = self.events()
                 self.assertEqual(event, Event.SKIP)
-                self.assertTrue(fields.pop("detail"))
+                detail = fields.pop("detail")
+                self.assertTrue(detail.startswith(INVALID_DETAIL_PREFIX[label]), detail)
                 self.assertEqual(
                     fields, {"video": A, "reason": "invalid_item", "call": "videos.list"}
                 )
@@ -784,6 +848,31 @@ class IntakeTest(WatcherCase):
             record.published_at, datetime(2026, 10, 12, 10, 0, 37, tzinfo=timezone.utc)
         )
         self.assertEqual(report.detected, (A,))
+
+    def test_published_at_takes_up_to_nine_fraction_digits_s046(self) -> None:
+        nine, ten = "2026-10-12T10:00:00.123456789Z", "2026-10-12T10:00:00.1234567890Z"
+        self.api.pages[("연애", None)] = search_page([A, B])
+        self.api.videos[A] = video_item(A, 1200, published=nine)
+        self.api.videos[B] = video_item(B, 1300, published=ten)
+        report = self.run_cycle()
+        record = Store(self.store_path).get(A)
+        assert record is not None
+        self.assertEqual(record.published_at, PUBLISHED)
+        self.assertIsNone(Store(self.store_path).get(B))
+        detail = f"snippet.publishedAt: UTC 'YYYY-MM-DDTHH:MM:SSZ' 모양이 아닙니다: {ten!r}"
+        self.assertEqual(
+            self.events(),
+            [detect(A), views(A, 1200), skip(B, "invalid_item", "videos.list", detail=detail)],
+        )
+        self.assertEqual(report, CycleReport(1, (A,), 1, 0, False, False))
+
+    def test_non_string_id_in_videos_list_is_ignored_s046(self) -> None:
+        self.api.pages[("연애", None)] = search_page([A])
+        self.api.payload["videos"] = {"items": [{"id": {"x": 1}}, video_item(A, 1200)]}
+        report = self.run_cycle()
+        self.assertEqual(self.api.video_batches(), [[A]])
+        self.assertEqual(self.events(), [detect(A), views(A, 1200)])
+        self.assertEqual(report, CycleReport(1, (A,), 1, 0, False, False))
 
     def test_offset_at_the_date_limit_does_not_poison_the_store(self) -> None:
         self.api.pages[("연애", None)] = search_page([B, C])

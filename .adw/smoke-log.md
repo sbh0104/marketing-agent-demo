@@ -485,7 +485,7 @@ other line is required on every item.
 - evidence: src/agent/youtube.py:148 (`utf-8-sig`→`utf-8` 초록), src/agent/youtube.py:130-135 (장부 `indent=None` · `sort_keys=False` 초록), src/agent/youtube.py:124 (`astimezone(utc)` 없는 `isoformat()` 초록), src/agent/youtube.py:242-243 (URL 만들기와 reserve 순서 바꾸기 초록), src/agent/youtube.py:104-105 (모르는 호출 ValueError 제거 초록), src/agent/youtube.py:259 (`replace(key, mask, 1)` 초록), src/agent/youtube.py:252 (`status != 200`→`status >= 400` 초록)(.adw/ship-report.md § Test integrity)
 - direction: tests/test_youtube.py 에 BOM 붙은 유효한 quota.json 을 읽음 · 쓴 장부 파일이 키 정렬 · 2칸 들여쓰기 · KST 인 now 로 reserve 해도 저장된 at 이 `+00:00` · page_token="\ud800" 처럼 URL 을 못 만드는 호출은 장부에 안 적히고 fetch 0회 · `reserve("comments.list", …)` 는 ValueError · URL 을 두 번 담은 OSError 문구에서 키가 둘 다 가려짐 · `(302, b'{"items": []}')` 은 `YouTubeError` 의 reason `"HTTP 302"` 를 단언한다 — 코드 변경 없음
 - touches: tests/test_youtube.py
-- status: open
+- status: resolved
 - attempts: 0 · last failure: —
 - first seen: 2026-10-13 · last seen: 2026-10-13
 
@@ -494,7 +494,7 @@ other line is required on every item.
 - evidence: src/agent/env.py:34 (`raw.strip()`→`raw` 초록), src/agent/env.py:39 (`not sep` 제거 초록), src/agent/env.py:28-29 (`except OSError` 제거 초록)(.adw/ship-report.md § Test integrity)
 - direction: tests/test_env.py 에 공백만 있는 줄과 들여 쓴 `# 주석` 줄은 건너뜀 · `=` 없는 `JUSTNAME` 줄은 줄 번호를 대고 값은 말하지 않는 `EnvError` · `.env` 자리가 폴더면 `EnvError` 를 단언한다 — 코드 변경 없음
 - touches: tests/test_env.py
-- status: open
+- status: resolved
 - attempts: 0 · last failure: —
 - first seen: 2026-10-13 · last seen: 2026-10-13
 
@@ -503,7 +503,7 @@ other line is required on every item.
 - evidence: src/agent/youtube.py:136 (`tmp = self.path` 로 바꿔 임시 파일 없이 바로 쓰는 변이 초록), src/agent/youtube.py:273 (`return str(reason)` 변이 초록 — 오류 줄이 `HTTP 404 None` 이 됨)(.adw/ship-report.md § Test integrity)
 - direction: tests/test_youtube.py 에 reserve 하는 동안 `os.replace` 를 가로채 첫 인자가 `quota.json.tmp` 이고 둘째가 `quota.json` 인지 · 404 본문의 `error.errors[0].reason` 이 `5` 나 `null` 이면 `YouTubeError` reason 이 정확히 `"HTTP 404"` 인지 단언한다 — 코드 변경 없음
 - touches: tests/test_youtube.py
-- status: open
+- status: resolved
 - attempts: 0 · last failure: —
 - first seen: 2026-10-14 · last seen: 2026-10-14
 
@@ -512,7 +512,7 @@ other line is required on every item.
 - evidence: src/agent/watcher.py:271 (`self._store.put(record)` 를 `try/except: return` 으로 감싼 변이 초록 — 계약 11절 "저장소 쓰기 오류는 run_loop 로 올라감"), src/agent/watcher.py:32 (소수 `{1,9}`→`{1,3}` 변이 초록), src/agent/watcher.py:89 (`isinstance(item.get("id"), str)` 제거 변이 초록), src/agent/youtube.py:220-225 (pageToken 이 있을 때 publishedAfter 를 빼는 변이 초록)(.adw/ship-report.md § Test integrity)
 - direction: tests/test_watcher.py 에 `put` 이 `OSError` 를 내는 Store 하위 클래스를 넣으면 `Watcher.run` 이 그 `OSError` 를 그대로 내는지 · publishedAt `"2026-10-12T10:00:00.123456789Z"` 가 저장되고 10자리 소수는 SKIP 인지 · videos.list 응답에 `{"id": {"x": 1}}` 항목이 섞여도 주기가 끝나고 그 항목이 무시되는지 · 다음 페이지 요청에도 첫 페이지와 같은 publishedAfter 가 실리는지 단언한다 — 코드 변경 없음
 - touches: tests/test_watcher.py
-- status: open
+- status: resolved
 - attempts: 0 · last failure: —
 - first seen: 2026-10-14 · last seen: 2026-10-14
 
@@ -521,6 +521,15 @@ other line is required on every item.
 - evidence: src/agent/watcher.py:268 (`detail=_clean(str(exc))` 를 `detail=None` · `detail="x"` 로 바꾼 변이 둘 다 초록 — tests/test_watcher.py:518 이 `assertTrue(fields.pop("detail"))` 로 참/거짓만 봄), src/agent/youtube.py:186 (`response.status` 를 `200` 으로 박은 변이 초록 — S-037 가 요구한 403 · 200 행으로는 잡히지 않음)(.adw/ship-report.md § Test integrity)
 - direction: tests/test_watcher.py IntakeTest 의 INVALID_ITEMS 행마다 SKIP 줄 detail 의 앞부분을 지금 코드가 내는 글 그대로 단언하고(예: viewCount `-5` 행은 `statistics.viewCount:` 로 시작), tests/test_youtube.py 에 `urllib.request.urlopen` 을 patch 해 204 응답이 `http_get` 에서 `(204, b"")` 로 돌아오는지 단언한다 — 코드 변경 없음
 - touches: tests/test_watcher.py, tests/test_youtube.py
+- status: resolved
+- attempts: 0 · last failure: —
+- first seen: 2026-10-14 · last seen: 2026-10-14
+
+### S-NEW-1 — 달력에 없는 publishedAt 의 SKIP detail 이 칸 이름 없이 파이썬 판마다 다른 strptime 글을 냄
+- source: sweep 20261014-035745-adw/smoke-sweep-s043-s047 · cycle 20261014-035745-adw/smoke-sweep-s043-s047 · tracker plans/interview-marketing-agent.md#phase-2 · deferred by ship-check
+- evidence: src/agent/watcher.py:55 — 모양 검사(`_PUBLISHED_RE`, watcher.py:32)를 통과한 `"2026-02-30T00:00:00Z"` 가 `strptime` 에서 떨어져 detail 이 3.14 에서 `day 30 must be in range 1..28 for month 2 in year 2026`, 3.10 에서 `day is out of range for month`(값도 칸 이름도 없음); 13월은 두 판 모두 `time data '2026-13-01T00:00:00' does not match format …` — 다른 invalid_item detail 은 모두 칸 이름으로 시작(watcher.py:54, :62)(.adw/ship-report.md § Risks R1)
+- direction: `_published` 에서 `strptime` 이 낸 `ValueError` 를 `snippet.publishedAt:` 로 시작하고 값(`{value!r:.40}`)을 담은 고정 문구로 바꿔 다시 내고, tests/test_watcher.py 의 `INVALID_DETAIL_PREFIX` 13월 행을 `snippet.publishedAt:` 로 바꾸고 2월 30일 행(INVALID_ITEMS 와 함께)을 더한다
+- touches: src/agent/watcher.py, tests/test_watcher.py
 - status: open
 - attempts: 0 · last failure: —
 - first seen: 2026-10-14 · last seen: 2026-10-14
