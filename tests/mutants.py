@@ -2,7 +2,7 @@
 
     python3 -m tests.mutants <이름>
 
-agent.guard / agent.store / agent.config / agent.scheduler / agent.logbook 의 소스에서 정확한 글자 하나를 바꿔 메모리에서만 모듈을 다시
+agent.guard / agent.store / agent.config / agent.scheduler / agent.logbook / agent.youtube / agent.watcher 의 소스에서 정확한 글자 하나를 바꿔 메모리에서만 모듈을 다시
 만들고(파일은 건드리지 않음), 해당 테스트 모듈을 돌립니다. 종료 코드 1 은 테스트가
 망가짐을 잡았다는 뜻, 2 는 이름을 모르거나 바꿀 글자가 정확히 한 번 나오지 않았다는
 뜻입니다. 이 파일은 test*.py 가 아니라서 discover 가 줍지 않습니다.
@@ -151,6 +151,68 @@ MUTANTS: dict[str, tuple[str, str, str, str]] = {
         "tests.test_logbook",
         "json.dumps(value, ensure_ascii=False).translate(_LINE_BREAK_ESCAPES)",
         "json.dumps(value, ensure_ascii=False)",
+    ),
+    "youtube-no-search-cap": (
+        "agent.youtube",
+        "tests.test_youtube",
+        'if call == "search.list" and used.searches >= limits.daily_max_searches:',
+        "if False:",
+    ),
+    "youtube-no-unit-cap": (
+        "agent.youtube",
+        "tests.test_youtube",
+        "if used.units + cost > DAILY_QUOTA_UNITS:",
+        "if False:",
+    ),
+    "youtube-unguarded-call": (
+        "agent.youtube",
+        "tests.test_youtube",
+        "self._ledger.reserve(call, now, limits)",
+        "pass",
+    ),
+    "youtube-window-never-expires": (
+        "agent.youtube",
+        "tests.test_youtube",
+        "[entry for entry in self._calls if entry.at > start]",
+        "list(self._calls)",
+    ),
+    "watcher-silent-hold": (
+        "agent.watcher",
+        "tests.test_watcher",
+        "self._logbook.write(Event.QUOTA, used=exc.used, limit=exc.limit, call=exc.call,"
+        " counter=exc.counter, **extra)",
+        "pass",
+    ),
+    "watcher-no-page-cap": (
+        "agent.watcher",
+        "tests.test_watcher",
+        "for _ in range(MAX_PAGES_PER_KEYWORD):",
+        "while True:",
+    ),
+    "watcher-silent-page-cap": (
+        "agent.watcher",
+        "tests.test_watcher",
+        "self._logbook.write(Event.QUOTA, used=MAX_PAGES_PER_KEYWORD,"
+        ' limit=MAX_PAGES_PER_KEYWORD, call="search.list", counter="pages", keyword=query)',
+        "pass",
+    ),
+    "watcher-keeps-surrogates": (
+        "agent.watcher",
+        "tests.test_watcher",
+        "return _SURROGATE_RE.sub(_REPLACEMENT, text)",
+        "return text",
+    ),
+    "watcher-unicode-digits": (
+        "agent.watcher",
+        "tests.test_watcher",
+        r'_COUNT_RE = re.compile(r"[0-9]{1,19}")',
+        r'_COUNT_RE = re.compile(r"\d+")',
+    ),
+    "watcher-published-any-shape": (
+        "agent.watcher",
+        "tests.test_watcher",
+        "if not isinstance(value, str) or not _PUBLISHED_RE.fullmatch(value):",
+        "if not isinstance(value, str):",
     ),
 }
 

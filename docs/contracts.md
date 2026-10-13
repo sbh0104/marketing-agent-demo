@@ -416,7 +416,7 @@ run_loop(cycle, reload, initial, *, on_error, sleep=time.sleep,
   인자와 이유, 로그 사건과 필수 필드)은 고정입니다.
 - 더하는 것은 그 필드를 쓰는 단계(Phase)가 `models.py` · `config.py` 에서, 테스트와 함께, 이
   문서도 함께 고칩니다. 이미 있는 이름의 뜻을 바꾸거나 지우지 않습니다.
-- 가드 · 저장소 · 설정 읽기 · 로그 한 줄 규칙이 테스트로 지켜지는지는 음성 대조로 확인합니다. 각 명령은 가드 한 줄을
+- 가드 · 저장소 · 설정 읽기 · 로그 한 줄 규칙 · 쿼터 가드 · 탐지 입력 검사가 테스트로 지켜지는지는 음성 대조로 확인합니다. 각 명령은 가드 한 줄을
   메모리에서만 망가뜨리고 테스트를 돌리며, **종료 코드 1(테스트가 잡음)** 이어야 합니다. 2 는
   바꿀 글자를 찾지 못했다는 뜻이라 실패입니다:
 
@@ -443,8 +443,140 @@ run_loop(cycle, reload, initial, *, on_error, sleep=time.sleep,
   python3 -m tests.mutants scheduler-one-sleep
   python3 -m tests.mutants scheduler-unclamped-wait
   python3 -m tests.mutants logbook-raw-line-breaks
+  python3 -m tests.mutants youtube-no-search-cap
+  python3 -m tests.mutants youtube-no-unit-cap
+  python3 -m tests.mutants youtube-unguarded-call
+  python3 -m tests.mutants youtube-window-never-expires
+  python3 -m tests.mutants watcher-silent-hold
+  python3 -m tests.mutants watcher-no-page-cap
+  python3 -m tests.mutants watcher-silent-page-cap
+  python3 -m tests.mutants watcher-keeps-surrogates
+  python3 -m tests.mutants watcher-unicode-digits
+  python3 -m tests.mutants watcher-published-any-shape
   ```
 
   `decide_post` · `video_id_from_ref` · `put` · `reserve_live` · `check_post` · `load_config` ·
-  `config_from_mapping` · `run_loop` · `format_line` 의 본문을 고칠 때는 이 명령들이 계속 1 로
-  끝나는지 함께 확인합니다.
+  `config_from_mapping` · `run_loop` · `format_line` · `QuotaLedger.reserve` ·
+  `YouTubeClient._call` · `Watcher.run` 의 본문을 고칠 때는 이 명령들이 계속 1 로 끝나는지
+  함께 확인합니다.
+
+## 11. 탐지 · 조회수 추적 — env.py · youtube.py · watcher.py (Phase 2)
+
+**진입점**
+
+```python
+key = require_secret("YOUTUBE_API_KEY", Path(".env"), os.environ)
+client = YouTubeClient(key, QuotaLedger(Path("data/quota.json")))
+watcher = Watcher(Store(Path("data/videos.json")), logbook, client, clock)
+```
+
+`watcher.cycle(config)` 는 `watcher.run(config, clock())` 이고, `run_loop` 의 사이클 자리(9절)에
+맞습니다 — Phase 7 이 잇습니다. 돌려주는 `CycleReport` 의 여섯 칸:
+
+| 칸 | 뜻 |
+|---|---|
+| `searches` | 받은 검색 페이지 수 |
+| `detected` | 새로 저장한 영상 ID, 찾은 순서대로 |
+| `sampled` | 조회수 표본을 남긴 영상 수 |
+| `truncated` | 페이지 상한에서 끊긴 검색어 수 — `QUOTA … counter=pages` 한 줄씩 |
+| `held` | 쿼터 가드가 호출을 막았는지 — `QUOTA` 줄을 남김 |
+| `failed` | `ERROR` 줄을 남겼는지 |
+
+`held` 와 `truncated` 가 "새 영상이 없었음" 과 "한도에 막혀 다 보지 못했음" 을 가릅니다.
+
+**비밀 값** — `require_secret(name, env_path, environ)`
+
+- 비어 있지 않은 환경 변수가 먼저이고, 없으면 `.env` 의 값입니다. 둘 다 비었으면
+  `EnvError("<이름> 가 비어 있습니다 — <경로> 에 <이름>=<키> 를 적으세요")`.
+- `.env` 는 `이름=값` 줄(이름은 `[A-Za-z_][A-Za-z0-9_]*`), `#` 로 시작하는 주석 줄, 빈 줄만
+  받습니다. 줄과 값의 앞뒤 공백은 지우고, 값 둘레의 같은 따옴표 한 쌍(`'…'` 또는 `"…"`)은
+  떼어 냅니다. 값 뒤의 `#` 은 주석이 아니라 값의 일부입니다.
+- 형식이 틀린 줄이나 두 번 나온 이름은 `EnvError` 이고, 메시지는 파일과 줄 번호
+  (`<경로> 2번째 줄: …`)를 말하지만 값은 **절대** 담지 않습니다. 파일이 없으면 빈 것으로 읽고,
+  BOM 은 떼어 내며, UTF-8 이 아닌 저장은 `EnvError` 입니다.
+- 키는 `[A-Za-z0-9_-]+` 여야 합니다. 아니면(빈 글자, 끝에 남은 `\r`, 공백, 한글) `YouTubeClient`
+  가 키를 되풀이하지 않는 `ValueError` 를 냅니다.
+
+**한 사이클**
+
+1. 검색 — `keywords` 를 설정 순서로, 같은 검색어는 한 번만 찾습니다. `search.list` 매개변수는
+   `part=snippet` · `type=video` · `order=date`(최신순) · `q=<검색어>` · `regionCode=KR` ·
+   `relevanceLanguage=ko` · `maxResults=50` · `publishedAfter=<now − trigger.max_age_hours, UTC …Z>`,
+   다음 페이지면 `pageToken` 이 더해집니다.
+2. 다음 페이지는 셋이 모두 맞을 때만 받습니다 — 그 페이지에 `nextPageToken` 이 있고, 사이클 시작
+   때 저장소에 있던 영상이 그 페이지에 없고, 그 검색어로 받은 페이지가 `MAX_PAGES_PER_KEYWORD`
+   (3) 보다 적을 때.
+3. 페이지 상한이 토큰을 남긴 채(아는 영상 없이) 검색어를 끝내면 최신 150개 뒤의 결과를 보지 못한
+   것이므로 `QUOTA used=3 limit=3 call=search.list counter=pages keyword=<검색어>` 를 남기고
+   `truncated` 에 셉니다. 정한 한도도 다른 한도처럼 로그에 남깁니다.
+4. 추적 — 이번에 찾은 새 영상(찾은 순서) 다음에 `published_at > now − trigger.max_age_hours` 인
+   저장 영상(`records()` 순)을 50개씩 `videos.list`(`part=snippet,statistics`)로 묻습니다. 영상
+   정보는 검색 결과가 아니라 `videos.list` 에서 씁니다 — 검색 제목은 HTML 이스케이프되고 설명은
+   잘려 있습니다.
+5. 새 영상은 `view_history=[ViewSample(now, 조회수)]` 로 저장하고 `DETECT` 다음 `VIEWS` 를
+   남깁니다. `keyword` 는 처음 찾은 검색어입니다.
+6. 아는 영상은 `get` 사본에 표본 하나를 덧붙여 `put` 합니다 — 제목 등은 처음 본 값 그대로이고
+   `attempts` 는 건드리지 않습니다. 로그는 `VIEWS … prev=<이전 조회수> delta=<차이>` 입니다.
+
+- `trigger.max_age_hours` 가 검색 기간(`publishedAfter`)과 추적 기간을 함께 정합니다(2절).
+
+**쿼터 가드** — `youtube.py` 가 쿼터 단위를 아는 유일한 곳입니다.
+
+- `UNIT_COST = {"search.list": 100, "videos.list": 1}`, `DAILY_QUOTA_UNITS = 10_000`(Google 기본
+  프로젝트 쿼터). Google 쿼터를 늘린 프로젝트는 이 상수 하나만 바꿉니다.
+- 모든 호출이 `YouTubeClient._call` 에서 `QuotaLedger.reserve(call, now, limits)` 를 거칩니다.
+  하루는 굴러가는 24시간이고 경계는 `>` 입니다 — 정확히 24시간 전의 호출은 세지 않습니다
+  (`check_post` 와 같음). 막는 조건은 둘입니다:
+  1. `search.list` 이고 최근 24시간의 `search.list` 수가 `limits.daily_max_searches` 이상 →
+     `counter=searches`
+  2. 최근 24시간의 단위 합 + 이 호출의 비용이 `DAILY_QUOTA_UNITS` 를 넘음 → `counter=units`
+- 허락된 호출은 요청을 보내기 *전에* `data/quota.json` 에 적습니다. 실패한 요청도 Google 이
+  쿼터를 떼므로 셉니다. 페이지 넘김도 `search.list` 한 번이라 가드를 비켜 가지 못합니다.
+- 기록 파일은 `{"calls": [{"at": "<UTC ISO>", "call": "search.list", "units": 100}, …],
+  "schema_version": 1}` 모양입니다(키 정렬, 2칸 들여쓰기, 쓸 때 24시간이 지난 항목은 지움,
+  임시 파일에 쓴 뒤 `os.replace`). JSON · 버전 · 항목 모양이 틀리면 `QuotaError` 를 내고
+  **파일은 그대로 둡니다** — 지우면 오늘 쓴 쿼터를 잊으므로, 고치거나 오늘 쓴 쿼터를 확인한 뒤
+  사람이 지웁니다.
+- 막힌 호출은 보내지 않고, watcher 가 `QUOTA used=<사용> limit=<한도> call=<호출>
+  counter=<searches|units|pages> [keyword=<검색어>]` 를 남깁니다.
+- 검색이 막히면 남은 검색은 그만두지만 추적은 돕니다. `videos.list` 가 막히면 추적을 그만둡니다.
+- `daily_max_searches` 를 90 보다 올리면 한 회마다 조회수 호출 몫이 100 단위씩 줄고, 100 이면
+  남지 않아 `videos.list` 가 `counter=units` 로 막힙니다(2절).
+- Google 은 태평양 자정에 쿼터를 되돌리지만 여기는 굴러가는 24시간입니다. 서머타임이 끝나는
+  25시간짜리 날에만 어긋날 수 있고, 그때는 `ERROR … reason="HTTP 403 quotaExceeded"` 줄로
+  드러납니다.
+
+**API 오류**
+
+- HTTP 200 이 아니면 `ERROR where=<호출> reason="HTTP <상태> <Google reason>"` 입니다(예:
+  `ERROR where=search.list reason="HTTP 403 quotaExceeded"`). 네트워크 오류는
+  `reason="network <종류>: …"`, 본문이 JSON 객체가 아니면 `reason="HTTP 200 invalid JSON"`.
+  검색 오류에는 `keyword` 가 붙습니다.
+- 오류가 난 단계는 멈춥니다 — 검색 오류면 남은 검색을 그만두고 추적으로 넘어가고, 조회수 오류면
+  추적을 그만둡니다.
+- 오류 글 속 API 키는 `<YOUTUBE_API_KEY>` 로 가리고, 원래 예외(키가 든 URL)는 덧붙이지 않습니다.
+
+**외부 글자**
+
+- 밖에서 온 글자(제목 · 설명 · 채널 ID · 검색어 · 오류 이유)의 외톨이 서로게이트는 U+FFFD 로
+  바꿉니다(HC1-2 R3) — 그대로 두면 `Store.save` 의 UTF-8 쓰기가 실패합니다.
+- 허용한 모양만 받습니다(`fullmatch`): 영상 ID 는 `VIDEO_ID_RE`, `viewCount` 는 ASCII 숫자
+  1–19자의 글자, `publishedAt` 은 `YYYY-MM-DDTHH:MM:SS[.소수]Z` 만입니다. `publishedAt` 은
+  `strptime` 으로 읽어 3.10 과 3.14 에서 똑같이 읽힙니다. 다른 시간대 표기는 건너뜁니다 — 날짜
+  끝의 `+14:00` 같은 표기는 `Store.save` 의 UTC 바꾸기를 넘치게 합니다.
+- 그 밖의 항목은 `SKIP video=<ID> reason=invalid_item|unavailable call=<search.list|videos.list>
+  [keyword=…] [detail=…]` 로 건너뜁니다. `unavailable` 은 `videos.list` 답에 그 ID 가 없을
+  때입니다.
+- 저장소 쓰기 오류는 잡지 않고 `run_loop` 까지 올라갑니다(9절).
+
+**로그 예시**
+
+```
+2026-10-12T21:00:00+09:00 DETECT video=abcdefghijk channel=UC123 keyword=썸 title="연락 텀 때문에 불안한 썸"
+2026-10-12T21:00:00+09:00 VIEWS video=abcdefghijk views=1200 prev=- delta=-
+2026-10-12T23:00:00+09:00 VIEWS video=abcdefghijk views=1450 prev=1200 delta=250
+2026-10-12T23:00:00+09:00 QUOTA used=90 limit=90 call=search.list counter=searches keyword=이별
+2026-10-12T21:00:00+09:00 QUOTA used=3 limit=3 call=search.list counter=pages keyword=연애
+2026-10-12T23:00:00+09:00 ERROR where=search.list reason="HTTP 403 quotaExceeded" keyword=연애
+2026-10-12T23:00:00+09:00 SKIP video=zyxwvutsrqp reason=unavailable call=videos.list
+```
