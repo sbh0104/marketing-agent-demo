@@ -930,6 +930,8 @@ SHORT = "짧은 초안표식"
 COMMENTS = ["영상 속 답장 기다리던 장면 공감해요 댓글표식", "저도 썸 탈 때 그랬어요 댓글표식"]
 GRADE_OK = {"scene_in_material": True, "reads_like_ad": False, "follows_concern": True}
 GRADE_BAD = {"scene_in_material": False, "reads_like_ad": False, "follows_concern": True}
+GRADE_AD = {"scene_in_material": True, "reads_like_ad": True, "follows_concern": True}
+GRADE_OFF_CONCERN = {"scene_in_material": True, "reads_like_ad": False, "follows_concern": False}
 MARKERS = ("제목표식", "설명표식", "댓글표식", "고민표식", "초안표식")
 AUTHOR = "작성자표식"
 AUTHOR_CHANNEL = "UCauthor표식0000000000000"
@@ -1961,6 +1963,17 @@ class VideoRoundTest(LiveCheckCase):
         self.assertEqual(len(self.calls_of("grade")), 6)
         # 넓힌 창의 SKIP 도 셉니다 — 쓴 영상 3 중 SKIP 2
         self.assertEqual(result["verdict"], "6B: stop — 작성 막힘(SKIP 2/3)")
+
+    def test_ad_or_off_concern_grade_is_bad(self) -> None:
+        self.jev.checks = [FAILING, PASSING, FAILING, FAILING, FAILING, FAILING]
+        self.claude.writes = [writer_reply(), writer_reply()]
+        self.claude.grades = [GRADE_AD, GRADE_OFF_CONCERN]
+        code, out, err, result = self.run_main()
+        drafts = self.by_id(result)[vid(1)]["drafts"]
+        self.assertEqual(
+            [(draft["grade"], draft["claude_grade"]) for draft in drafts],
+            [(GRADE_AD, "bad"), (GRADE_OFF_CONCERN, "bad")],
+        )
 
     def test_unparsable_reply_is_recorded_without_grade(self) -> None:
         self.add_video("연애", "widened", 6, 2000)
