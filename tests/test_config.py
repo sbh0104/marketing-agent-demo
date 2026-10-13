@@ -4,6 +4,7 @@ from __future__ import annotations
 import copy
 import tempfile
 import unittest
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import NamedTuple
 from unittest import mock
@@ -18,8 +19,10 @@ from agent.config import (
     load_config,
     parse_yaml,
 )
+from agent.store import Store
 
 REPO_CONFIG = Path(__file__).resolve().parent.parent / "config.yaml"
+NOW = datetime(2026, 10, 12, 12, 0, tzinfo=timezone.utc)
 
 VALID = {
     "topic": "연애",
@@ -102,6 +105,92 @@ BAD_VALUES: tuple[BadValue, ...] = (
 )
 
 
+class RangeValue(NamedTuple):
+    """읽기는 되지만 규칙 밖인 설정 한 줄 — 검사가 ConfigError 로 거부해야 합니다."""
+
+    label: str
+    old: str
+    new: str
+    needle: str
+
+
+# HC1 인터뷰(2026-10-13) 재현 입력과 ship-report R7 하한 행 — 실제 파일에 그대로 씁니다
+OUT_OF_RANGE_VALUES: tuple[RangeValue, ...] = (
+    RangeValue(
+        "cooldown_inf",
+        "channel_cooldown_hours: 24 ",
+        "channel_cooldown_hours: .inf ",
+        "유한한 숫자여야 합니다: limits.channel_cooldown_hours",
+    ),
+    RangeValue(
+        "cooldown_minus_inf",
+        "channel_cooldown_hours: 24 ",
+        "channel_cooldown_hours: -.inf ",
+        "유한한 숫자여야 합니다: limits.channel_cooldown_hours",
+    ),
+    RangeValue(
+        "cooldown_nan",
+        "channel_cooldown_hours: 24 ",
+        "channel_cooldown_hours: .nan ",
+        "유한한 숫자여야 합니다: limits.channel_cooldown_hours",
+    ),
+    RangeValue(
+        "cooldown_20000000",
+        "channel_cooldown_hours: 24 ",
+        "channel_cooldown_hours: 20000000 ",
+        "876000 이하여야 합니다: limits.channel_cooldown_hours",
+    ),
+    RangeValue(
+        "cooldown_just_over_ceiling",
+        "channel_cooldown_hours: 24 ",
+        "channel_cooldown_hours: 876000.5 ",
+        "876000 이하여야 합니다: limits.channel_cooldown_hours",
+    ),
+    RangeValue(
+        "cooldown_negative",
+        "channel_cooldown_hours: 24 ",
+        "channel_cooldown_hours: -1 ",
+        "0 이상이어야 합니다: limits.channel_cooldown_hours",
+    ),
+    RangeValue(
+        "max_age_inf",
+        "  max_age_hours: 12\n",
+        "  max_age_hours: .inf\n",
+        "유한한 숫자여야 합니다: trigger.max_age_hours",
+    ),
+    RangeValue(
+        "max_age_20000000",
+        "  max_age_hours: 12\n",
+        "  max_age_hours: 20000000\n",
+        "876000 이하여야 합니다: trigger.max_age_hours",
+    ),
+    RangeValue(
+        "max_age_zero",
+        "  max_age_hours: 12\n",
+        "  max_age_hours: 0\n",
+        "0 보다 커야 합니다: trigger.max_age_hours",
+    ),
+    RangeValue(
+        "views_per_hour_inf",
+        "  min_views_per_hour: 150\n",
+        "  min_views_per_hour: .inf\n",
+        "유한한 숫자여야 합니다: trigger.min_views_per_hour",
+    ),
+    RangeValue(
+        "views_per_hour_over_ceiling",
+        "  min_views_per_hour: 150\n",
+        "  min_views_per_hour: 1000000001\n",
+        "1000000000 이하여야 합니다: trigger.min_views_per_hour",
+    ),
+    RangeValue(
+        "daily_max_comments_negative",
+        "daily_max_comments: 10 ",
+        "daily_max_comments: -1 ",
+        "0 이상이어야 합니다: limits.daily_max_comments",
+    ),
+)
+
+
 class CommittedConfigTest(unittest.TestCase):
     def test_committed_config_holds_pdf_values_plus_search_ceiling(self) -> None:
         self.assertEqual(
@@ -164,7 +253,8 @@ class ParseYamlTest(unittest.TestCase):
 
 
 class Yaml11TrapTest(unittest.TestCase):
-    """YAML 1.1 이 몰래 bool · 날짜 · 정수로 바꾸는 값은 크게 실패해야 합니다."""
+    """글자 자리에서 YAML 1.1 이 몰래 bool · 날짜 · 정수로 바꾸는 값은 크게 실패해야 합니다.
+    숫자 자리의 YAML 1.1 숫자 표기는 계약 2절대로 읽힙니다."""
 
     def assert_rejected(self, snippet: str) -> None:
         data = valid()
@@ -183,6 +273,14 @@ class Yaml11TrapTest(unittest.TestCase):
 
     def test_unquoted_numeric_allowed_video(self) -> None:
         self.assert_rejected("allowed_videos:\n  - 12345678901\n")
+
+    def test_yaml11_number_spellings_are_read_in_number_keys(self) -> None:
+        data = valid()
+        data.update(parse_yaml("poll_interval_min: 017\n"))
+        data["limits"].update(parse_yaml("channel_cooldown_hours: 1:30\n"))
+        config = config_from_mapping(data)
+        self.assertEqual(config.poll_interval_min, 15)
+        self.assertEqual(config.limits.channel_cooldown_hours, 90.0)
 
 
 class ConfigFromMappingTest(unittest.TestCase):
@@ -323,6 +421,42 @@ class ReadFailureTest(unittest.TestCase):
         with mock.patch("agent.config.parse_yaml", side_effect=KeyboardInterrupt):
             with self.assertRaises(KeyboardInterrupt):
                 load_config(path)
+
+
+class RangeFailureTest(unittest.TestCase):
+    def setUp(self) -> None:
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.dir = Path(tmp.name)
+
+    def test_every_out_of_range_value_is_config_error(self) -> None:
+        for bad in OUT_OF_RANGE_VALUES:
+            with self.subTest(bad.label):
+                path = write_config(self.dir, variant(bad.old, bad.new))
+                with self.assertRaises(ConfigError) as caught:
+                    load_config(path)
+                self.assertIn(bad.needle, str(caught.exception))
+                # 변환 중 터진 것이 아니라 규칙이 거부한 값입니다
+                self.assertIsNone(caught.exception.__cause__)
+
+    def test_ceiling_values_load_and_stay_usable_downstream(self) -> None:
+        text = variant("  max_age_hours: 12\n", "  max_age_hours: 876000\n")
+        text = text.replace("channel_cooldown_hours: 24 ", "channel_cooldown_hours: 876000 ")
+        text = text.replace("  min_views_per_hour: 150\n", "  min_views_per_hour: 1000000000\n")
+        config = load_config(write_config(self.dir, text))
+        self.assertEqual(
+            (
+                config.trigger.max_age_hours,
+                config.trigger.min_views_per_hour,
+                config.limits.channel_cooldown_hours,
+            ),
+            (876000.0, 1000000000.0, 876000.0),
+        )
+        check = Store(self.dir / "videos.json").check_post(
+            "abcdefghijk", "UC1", NOW, config.limits, live=True
+        )
+        self.assertEqual((check.allowed, check.reason), (True, "ok"))
+        self.assertLess(NOW - timedelta(hours=config.trigger.max_age_hours), NOW)
 
 
 if __name__ == "__main__":

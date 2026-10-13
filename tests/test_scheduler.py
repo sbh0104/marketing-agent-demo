@@ -5,14 +5,25 @@ import dataclasses
 import tempfile
 import unittest
 from collections.abc import Iterable
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from agent.config import Config, ConfigError, load_config
 from agent.scheduler import run_loop
-from tests.test_config import BAD_VALUES, REPO_CONFIG, variant, write_config
+from agent.store import Store
+from tests.test_config import BAD_VALUES, OUT_OF_RANGE_VALUES, REPO_CONFIG, variant, write_config
 
 BASE = load_config(Path(__file__).resolve().parent.parent / "config.yaml")
 FIVE = dataclasses.replace(BASE, poll_interval_min=5)
+NOW = datetime(2026, 10, 12, 12, 0, tzinfo=timezone.utc)
+
+
+def use_downstream(config: Config, directory: Path) -> None:
+    """설정 값을 뒤 단계처럼 써 봅니다 — 저장소의 채널 대기 계산과 Phase 4 모양의 나이 창."""
+    Store(directory / "videos.json").check_post(
+        "abcdefghijk", "UC1", NOW, config.limits, live=True
+    )
+    _ = NOW - timedelta(hours=config.trigger.max_age_hours)
 
 
 class Harness:
@@ -166,6 +177,7 @@ class RealFileReloadTest(unittest.TestCase):
                 write_config(directory, bad_text)
             elif len(cycles) == 2:
                 write_config(directory, variant("poll_interval_min: 30 ", "poll_interval_min: 5 "))
+            use_downstream(config, directory)
 
         done = run_loop(
             cycle,
@@ -179,7 +191,7 @@ class RealFileReloadTest(unittest.TestCase):
         return done, cycles, errors, sleeps, initial
 
     def test_bad_edit_keeps_previous_config_and_fix_is_picked_up(self) -> None:
-        for bad in BAD_VALUES:
+        for bad in (*BAD_VALUES, *OUT_OF_RANGE_VALUES):
             with self.subTest(bad.label):
                 done, cycles, errors, sleeps, initial = self.run_three_cycles(
                     variant(bad.old, bad.new)
