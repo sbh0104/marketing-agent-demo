@@ -539,7 +539,7 @@ other line is required on every item.
 - evidence: tests/live_check.py:216-218 (`[row["confidence"] for row in negatives]` 를 `[row["noul"] for row in negatives]` 로 바꾼 변이에도 스위트 539개 초록 `OK (skipped=3)` — 그런데 정답 no 예시 하나가 noul 0.97 · 확신 0.6 이면 best_correct 가 21 → None 으로 바뀌어 `6B: go` 가 `6B: stop — 판별 미달(… 잘못된 일치 못 막음)` 이 됨; 모든 테스트 표본의 확신이 0.9 또는 noul 이 이미 1 을 넘는 0.98 이라 확신 쪽 후보가 한 번도 판정을 가르지 않음 · .adw/guard-matrix.md G1 의 ② 행에도 확신 하한 행이 없음)(.adw/ship-report.md § Test integrity)
 - direction: tests/test_live_check.py VerdictTest(또는 AccuracyTest)에 잘못된 일치를 확신 하한으로만 막을 수 있는 표본(예: 정답 yes 21개 noul 0.95 · 확신 0.9, 정답 no 1개 noul 0.97 · 확신 0.6)을 넣어 best_correct 21 · `6B: go` 를 단언하고, 같은 표본의 결과 파일을 `--verdict` 로 다시 세어도 같은 줄인지 단언한다 — 코드 변경 없음
 - touches: tests/test_live_check.py
-- status: open
+- status: resolved
 - attempts: 0 · last failure: —
 - first seen: 2026-10-14 · last seen: 2026-10-14
 
@@ -548,6 +548,6 @@ other line is required on every item.
 - evidence: tests/live_check.py:1157-1158 (`and not grade["reads_like_ad"]` 와 `and grade["follows_concern"]` 를 각각 `and True` 로 바꾼 두 변이 모두 스위트 539개 초록 — 테스트의 나쁜 채점 표본(GRADE_BAD)은 `scene_in_material` 하나만 다름; `claude_grade` 는 6B 가 사람 칸이 비었을 때 초안의 정답으로 쓰는 칸)(.adw/ship-report.md § Test integrity)
 - direction: tests/test_live_check.py GradeTest 에 `reads_like_ad=true` 인 답과 `follows_concern=false` 인 답을 하나씩 더해 각각 `claude_grade == "bad"` 를 단언한다 — 코드 변경 없음
 - touches: tests/test_live_check.py
-- status: open
+- status: resolved
 - attempts: 0 · last failure: —
 - first seen: 2026-10-14 · last seen: 2026-10-14
