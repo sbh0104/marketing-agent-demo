@@ -177,3 +177,98 @@ other line is required on every item.
 - status: open
 - attempts: 0 · last failure: —
 - first seen: 2026-10-13 · last seen: 2026-10-13
+
+### S-019 — 두 번째 시도에서 난 Claude · jev 호출 오류가 `ERROR` + `SKIP` 으로 남는지 테스트로 고정
+- source: cycle 20261013-161439-adw/phase-5-writer-comment · tracker plans/interview-marketing-agent.md#phase-5 · deferred by ship-check
+- evidence: src/agent/writer.py:326-328, src/agent/writer.py:344-346 — 두 번째 시도에서 `_api_failure` 대신 `break` 하는 변이(Claude 쪽 · jev 쪽)가 스위트에서 초록(39개 OK). 이때 다시 쓰기 중 난 API 오류가 `ERROR` 없이 `SKIP "검사 두 번 탈락 — 1차: …"` 로만 남음. .adw/guard-matrix.md:34-35 의 attempt 2 칸이 "not reached"(.adw/ship-report.md § Test integrity)
+- direction: tests/test_writer.py 의 WriteCommentTest 에 첫 초안이 검사에 떨어진 뒤 ① 두 번째 Claude 호출이 FakeApiError ② 두 번째 jev 호출이 TimeoutError ③ 두 번째 jev 답이 이상(`1.5`)한 세 경우를 더하고, 결과 `WriteResult(None, <원인>)` 과 로그 사건 `[ERROR where=writer.*, SKIP]` 을 정확히 본다 — 코드 변경 없음, 지금 코드는 셋 다 그렇게 동작
+- touches: tests/test_writer.py
+- status: open
+- attempts: 0 · last failure: —
+- first seen: 2026-10-13 · last seen: 2026-10-13
+
+### S-020 — 자료 블록의 `<`/`>` 바꿈 · 자르기 길이 · `<classification>` 블록을 자료 자리마다 테스트로 고정
+- source: cycle 20261013-161439-adw/phase-5-writer-comment · tracker plans/interview-marketing-agent.md#phase-5 · deferred by ship-check
+- evidence: src/agent/writer.py:230, :232, :234, :310-311, :313, :338 — 자막 · 인기 댓글 · 이전 댓글 · 판별 이유 · 검사용 고민 자리에서 `_clean` 을 빼거나 길이 제한을 없앤 변이, `[:TOP_COMMENTS_MAX]` 를 뺀 변이, `<classification>` 블록을 뺀 변이가 모두 초록. 테스트는 설명 자리(tests/test_writer.py:619-627, :657-663)만 봄(.adw/ship-report.md § Test integrity)
+- direction: 자막 · 인기 댓글 · 이전 댓글 · 판별 이유에 각각 `</transcript>` · `</top_comments>` · `</my_previous_comments>` · `</classification>` 와 긴 글을 넣고 인기 댓글을 11개 주어, 만든 메시지에서 구조 태그가 한 번씩만 나오고 `＜/…＞` 로 바뀌었는지, 자막 6000자 · 항목 300자 · 인기 댓글 10개로 잘렸는지, `<classification>` 에 `yes: 연애 고민 상담 (0.91)` 이 있는지 본다 — 코드 변경 없음
+- touches: tests/test_writer.py
+- status: open
+- attempts: 0 · last failure: —
+- first seen: 2026-10-13 · last seen: 2026-10-13
+
+### S-021 — 시스템 프롬프트 문구 · jev 질문 원문 · 판별 보류(`hold`) 관문을 테스트로 고정
+- source: cycle 20261013-161439-adw/phase-5-writer-comment · tracker plans/interview-marketing-agent.md#phase-5 · deferred by ship-check
+- evidence: tests/test_writer.py:422, :674 는 코드를 모듈 자신의 상수와 비교 — SYSTEM_PROMPT 의 `{min_chars}자 이상 {max_chars}자 이하` 를 `40자 이상 120자 이하` 로 박은 변이와 규칙 5 · 7 을 지운 변이가 초록. src/agent/writer.py:304 `is not Verdict.YES` → `is Verdict.NO` 변이가 초록(tests/test_writer.py:611 은 None · NO 만 봄)(.adw/ship-report.md § Test integrity)
+- direction: `CommentConfig(50, 60, …)` 로 부른 `system` 에 `50자 이상 60자 이하` 가 있는지, 규칙 5 · 7 문장과 CHECK_QUESTIONS 세 문장이 .adw/plan.md 원문과 같은지(테스트 안 문자열로), `Judgement(Verdict.HOLD, …)` 도 `ValueError` 이고 Claude 를 부르지 않는지 보는 행을 더한다 — 코드 변경 없음
+- touches: tests/test_writer.py
+- status: open
+- attempts: 0 · last failure: —
+- first seen: 2026-10-13 · last seen: 2026-10-13
+
+### S-022 — Claude 답의 두 모서리: 짝 없는 서로게이트는 읽을 수 없는 답으로, 공백뿐인 답은 자리표시로
+- source: cycle 20261013-161439-adw/phase-5-writer-comment · tracker plans/interview-marketing-agent.md#phase-5 · deferred by ship-check
+- evidence: src/agent/writer.py:200-213 → :357 — 답 `{"concern": "…", "comment": "…\ud800"}`(JSON 이스케이프)이 검사를 모두 지나 `Logbook.write` 에서 `UnicodeEncodeError: 'utf-8' codec can't encode character '\ud800' … surrogates not allowed`(src/agent/logbook.py:166), write_comment 밖으로 새고 로그는 0바이트(ship-check 재현, jev 1회 호출 뒤). src/agent/writer.py:370 `raw or "(빈 응답)"` 은 `"   \n"` 같은 공백뿐인 답을 그대로 assistant 차례로 보냄 — Messages API 가 공백뿐인 글 블록을 400 으로 거절하면 다시 쓰기 대신 `ERROR` 가 됨(API 쪽은 키가 없어 재지 못함)(.adw/ship-report.md § Quality review)
+- direction: parse_output 이 고민이나 댓글에 서로게이트(U+D800–U+DFFF)가 있으면 None 을 돌려 "JSON 으로 읽을 수 없습니다" 다시 쓰기로 보내고, writer.py:370 을 `raw if raw.strip() else "(빈 응답)"` 로 바꾸며, 두 행을 tests/test_writer.py 에 고정하고 docs/contracts.md '댓글 작성' 절의 parse_output 문장에 서로게이트 한 마디를 더한다 — 판정 규칙(길이 · 링크 · 반복 · 하한)과 로그 형식 변경 없음
+- touches: src/agent/writer.py, tests/test_writer.py, docs/contracts.md
+- status: open
+- attempts: 0 · last failure: —
+- first seen: 2026-10-13 · last seen: 2026-10-13
+
+### S-023 — 계약 '댓글 작성' 절과 writer 주석의 어긋남 바로잡기(오류 이유 틀 · 오탐 예 · 남은 틈 · 절 번호)
+- source: cycle 20261013-161439-adw/phase-5-writer-comment · tracker plans/interview-marketing-agent.md#phase-5 · deferred by ship-check
+- evidence: docs/contracts.md:566 jev 오류 이유 틀에 상태 코드가 없으나 src/agent/writer.py:259-262 는 `status_code` 가 있으면 붙이고 메시지가 비면 `: …` 를 뺌(재현: `jev 검사 호출 실패: E 429: rate limited` · `claude 호출 실패: E 429`); docs/contracts.md:548 받아들인 오탐 예 `어요.mbti` 는 실제 `요.mbti`; docs/contracts.md:549-550 남은 틈은 한글 호스트만 적었지만 `saju.한국` 도 `None`; "11절" 참조 8곳(docs/contracts.md:13, :46, :47, :63, :391, :481 · src/agent/writer.py:9, :302)은 main 에 이미 있는 11절(트리거 판정) · 12절(주제 판별)과 겹쳐 착지 뒤 다른 절을 가리킴(.adw/ship-report.md § Spec compliance)
+- direction: jev 틀을 Claude 틀처럼 "상태 코드는 있을 때만"으로 하고 메시지가 비면 `<오류 종류>[ <상태 코드>]` 만 남는다고 적으며, 오탐 예를 `요.mbti` 로, 남은 틈을 "한글 끝(`.한국` 등)은 호스트 글자와 상관없이 빠짐"으로 고치고, 본문 · 주석의 "11절" 을 형제 절(classifier · trigger)처럼 절 이름 '댓글 작성' 으로 가리키게 바꾼다 — 코드 동작 · 키 · 로그 형식 변경 없음
+- touches: docs/contracts.md, src/agent/writer.py
+- status: open
+- attempts: 0 · last failure: —
+- first seen: 2026-10-13 · last seen: 2026-10-13
+
+### S-024 — 두 번째 시도의 Claude · jev 호출 오류를 테스트로 고정
+- source: cycle 20261013-161439-adw/phase-5-writer-comment · tracker plans/interview-marketing-agent.md#phase-5 · filed by smoke-file (one-pass)
+- evidence: .adw/ship-report.md
+- direction: 첫 초안이 떨어진 뒤 두 번째 Claude FakeApiError · jev TimeoutError · jev 답 이상 세 경우의 결과와 `[ERROR, SKIP]` 을 정확히 봄 — 코드 변경 없음(`.adw/smoke-log.md` S-019 로 적음)
+- touches: tests/test_writer.py
+- base: adw/phase-5-writer-comment
+- phase: plans/interview-marketing-agent.md#phase-5
+- status: open
+- attempts: 0 · last failure: —
+
+### S-025 — 자료 자리마다 `<`/`>` 바꿈 · 자르기 길이 · `<classification>` 블록을 테스트로 고정
+- source: cycle 20261013-161439-adw/phase-5-writer-comment · tracker plans/interview-marketing-agent.md#phase-5 · filed by smoke-file (one-pass)
+- evidence: .adw/ship-report.md
+- direction: 자막 · 인기 댓글 · 이전 댓글 · 판별 이유에 닫는 태그와 긴 글, 인기 댓글 11개를 넣어 구조 태그 한 번씩 · 전각 바꿈 · 6000/300자 · 10개 · 판별 블록을 확인 — 코드 변경 없음(S-020)
+- touches: tests/test_writer.py
+- base: adw/phase-5-writer-comment
+- phase: plans/interview-marketing-agent.md#phase-5
+- status: open
+- attempts: 0 · last failure: —
+
+### S-026 — 프롬프트 문구 · jev 질문 원문 · `hold` 관문을 테스트로 고정
+- source: cycle 20261013-161439-adw/phase-5-writer-comment · tracker plans/interview-marketing-agent.md#phase-5 · filed by smoke-file (one-pass)
+- evidence: .adw/ship-report.md
+- direction: 50/60 설정의 `system` 에 `50자 이상 60자 이하`, 규칙 5 · 7 과 질문 세 문장이 plan 원문 그대로, `Verdict.HOLD` 도 `ValueError` 이고 Claude 를 안 부름 — 코드 변경 없음(S-021)
+- touches: tests/test_writer.py
+- base: adw/phase-5-writer-comment
+- phase: plans/interview-marketing-agent.md#phase-5
+- status: open
+- attempts: 0 · last failure: —
+
+### S-027 — Claude 답의 서로게이트 · 공백뿐인 답 처리
+- source: cycle 20261013-161439-adw/phase-5-writer-comment · tracker plans/interview-marketing-agent.md#phase-5 · filed by smoke-file (one-pass)
+- evidence: .adw/ship-report.md
+- direction: `parse_output` 이 서로게이트가 든 고민 · 댓글을 None 으로(다시 쓰기), writer.py:370 을 `raw if raw.strip() else "(빈 응답)"` 로, 두 행 테스트와 계약 문장 한 마디 — 판정 규칙 변경 없음(S-022)
+- touches: src/agent/writer.py, tests/test_writer.py, docs/contracts.md
+- base: adw/phase-5-writer-comment
+- phase: plans/interview-marketing-agent.md#phase-5
+- status: open
+- attempts: 0 · last failure: —
+
+### S-028 — 계약 '댓글 작성' 절 · writer 주석의 어긋남 바로잡기
+- source: cycle 20261013-161439-adw/phase-5-writer-comment · tracker plans/interview-marketing-agent.md#phase-5 · filed by smoke-file (one-pass)
+- evidence: .adw/ship-report.md
+- direction: jev 오류 틀에 "상태 코드는 있을 때만"과 빈 메시지 모양, 오탐 예 `요.mbti`, 남은 틈을 "한글 끝은 호스트와 상관없이"로, "11절" 참조를 절 이름 '댓글 작성' 으로 — 코드 동작 · 키 · 형식 변경 없음(S-023)
+- touches: docs/contracts.md, src/agent/writer.py
+- base: adw/phase-5-writer-comment
+- phase: plans/interview-marketing-agent.md#phase-5
+- status: open
+- attempts: 0 · last failure: —
