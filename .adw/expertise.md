@@ -8,7 +8,7 @@
 
 ### E-003 · gotcha — `verify-run` 부터 다시(control retry)는 옛 verify-plan 을 그대로 쓴다 — 그 사이 인터뷰가 트래커만 커밋해도 범위 끝을 `HEAD` 로 둔 검사는 빨개진다
 - evidence: 14:28 retry 본 패스에서 V18(`git diff --name-only 1baaf13 HEAD` = 10개)이 HC1-2 트래커 커밋 `a35981b` 때문에 11줄로 빨강; 범위를 verify-plan 이 잰 `7e39c3a` 로 고정하고 "그 뒤는 트래커 하나만"을 단언하자 초록, 음성 대조 3개는 그대로 빨강 (verify-report.md Fixes applied 1). `.adw/verify.sh` 는 git 이 무시해(`.adw/.gitignore:23`) 이 고침엔 커밋 SHA 가 없다 (cycle 20261013-062542-adw/phase-1-foundation-contracts)
-- first confirmed: 2026-10-13 · last confirmed: 2026-10-13
+- first confirmed: 2026-10-13 · last confirmed: 2026-10-14
 
 ### E-004 · tooling — 이 기계의 셸 `grep` 은 GNU grep 이 아니라 ugrep 7.8.4 를 부르는 셸 함수다 — GNU grep 의 동작(NUL 이 든 파일의 `binary file matches` 등)을 재는 시험은 `/usr/bin/grep` 을 경로로 불러야 같은 것을 잰다
 - evidence: ship-report.md:320 (R5); `type grep` → "grep is a function", `/usr/bin/grep` 따로 있음 (cycle 20261013-062542-adw/phase-1-foundation-contracts)
@@ -21,7 +21,7 @@
 
 ### E-006 · tooling — [stop:unknown · 1] 정지 부류 표에 "ship-check sensitive human checks — confirm in the interview before merge" 행이 없다 — 민감 확인 줄로 머지 전에 멈춘 ship-check 는 부류 `unknown` 으로 남는다
 - evidence: `.adw/journal/20261013-122544-stop-1/stop.md:1,5-6`(홈 트리) — "stop: ship-check · unknown · 1 · seen 2", "lesson: 표에 없는 정지 — 사유를 읽고 부류를 정한다"; 같은 꼴 첫 목격 20261013-075734-stop-1. 같은 stop.md 에 `stale harness: yes` — 현 하네스 표에 행이 이미 생겼는지는 이 retro 가 확인하지 못함
-- first confirmed: 2026-10-13 · last confirmed: 2026-10-13
+- first confirmed: 2026-10-13 · last confirmed: 2026-10-14
 
 ### E-007 · codebase — `judge_trigger` 는 기록 한 번(`too_few_samples`) · 조회수 미달/초과(`views_below_min` · `views_above_max`) 검사를 나이 검사(`too_old`)보다 먼저 한다 — 나이 창이 닫힌 영상도 그 셋 중 하나면 영원히 `too_old` 를 받지 못하고, 계약 '트리거 판정' 절의 설명 문장("바뀌지 않는 것은 `too_old` 뿐 … `views_below_min` 과 모든 `hold` 는 `yes` 가 될 수 있다", "조회수가 줄면 … `hold` … 나이 창이 닫히면 `too_old` 로 끝남")은 이 영상들에 대해 틀린다
 - evidence: `src/agent/trigger.py:48,51,53` 이 `:57`(`too_old`)보다 앞; `docs/contracts.md:485-492`; ship-report Q2 재현 — 72h 500→600 `('no', 'views_below_min')` · 72h 기록 한 번 `('hold', 'too_few_samples')` · 1450→0 삭제 `('no', 'views_below_min')`. 표(차례)는 결정대로, 틀린 것은 문장 — 고칠 방향은 Human checks 1 (cycle 20261013-161358-adw/phase-4-trigger-timing)
@@ -37,7 +37,7 @@
 
 ### E-010 · reviewer — 페이즈가 하류 페이즈에 넘긴 일과 주인 없이 받아들인 위험이 `plan.md` · 계약에만 남고 트래커의 하류 페이즈 절에는 오르지 않는다 — ship-check 가 두 페이즈 연속 "트래커 Phase 2 · 7 절에 주인 줄 적기"를 사람 확인으로 올렸고, Phase 1 에서는 주인 없이 받아들인 위험이 다음 ship-check 에 돌아왔다
 - evidence: Phase 1 summary flagged ②④ · Coverage ①(R3 · R6 가 두 번째 ship-check 에 돌아와 understand 부터 다시); Phase 4 ship-report R4 · R5 → Human checks 2 — 트래커 Phase 2 · 7 절 `간격|spacing` 검색 → 없음, 넘긴 일은 `.adw/plan.md:573-588` 과 계약 '트리거 판정' 절에만 (cycle 20261013-161358-adw/phase-4-trigger-timing)
-- first confirmed: 2026-10-13 · last confirmed: 2026-10-13
+- first confirmed: 2026-10-13 · last confirmed: 2026-10-14
 
 ### E-011 · tooling — `retro_collect.py` 의 `_tokens` 는 `Files:` 줄 경로의 양끝에서 `.` 를 벗긴다 — 점으로 시작하는 파일은 plan 이 `Files:` 에 적어도 "계획 밖 파일" · T4 경보 ⑷ 에 늘 들어간다(`.env.example` → `env.example`, `.gitignore` → 점이 없어져 경로로 안 보고 버림)
 - evidence: `.claude/skills/plan/scripts/retro_collect.py:437` `tok = tok.strip("`,;.…").lstrip("+")`. `python3 -I` 로 `declared_paths(plan.md)` → `'env.example'` 있음 · `'.env.example'` 없음, `_tokens('Files: .gitignore, .env.example')` → `{'env.example'}`. 이 사이클 plan.md:495 `Files: requirements.txt, .env.example, docs/research/jev.md, docs/contracts.md` 인데 번들 ⑷ = 1 — `.env.example` (cycle 20261013-161343-adw/phase-3-classifier-topic). Phase 1 의 ⑷ 13 에 든 `.env.example` · `.gitignore` 도 같은 벗김을 거쳤다(그 사이클의 원인 설명은 E-002)
@@ -78,6 +78,10 @@
 ### E-020 · codebase — `tests/test_chrome.py` · `tests/test_poster.py` 의 가짜 Playwright 객체는 기다리지도 시간 초과를 내지도 않고 CDP 연결 끊김을 흉내 내지 못한다 — 실제 `is_enabled()`(기본 30초) · `click(timeout=3000)` 의 자동 대기와 크롬 재시작 뒤 낡은 연결(`TargetClosedError`)은 스위트가 재지 못한다
 - evidence: ship-report.md:258-261 (Test integrity — 가짜 객체가 실제 API 와 맞는지), :194 (노트 1), :311-319 (R3 감사 데모 `attempt 0..2: raw Closed: Target page, context or browser has been closed (connects so far=1)`) (cycle 20261013-163932-adw/phase-6-poster-chrome)
 - first confirmed: 2026-10-13 · last confirmed: 2026-10-13
+
+### E-021 · reviewer — 받아들인 위험을 재현한 **입력**으로 적으면 다음 ship-check 가 같은 코드 자리에서 다음 입력을 찾아 다시 멈춘다 — 자리(함수 · `except` 줄)로 적자 멈춤이 끝났다
+- evidence: Phase 2 ship-check 5회 $69.9469(사이클 $103.6405 중, retro-bundle Steps) — 정지 셋(R11 깨진 리다이렉트 `Location` 의 `ValueError` · `UnicodeError` → R11′ `ftp://%00/` 의 `TypeError` · 3.10 `OverflowError` → B1 음수 chunk 크기 `ValueError`)이 모두 `YouTubeClient._call` 의 좁은 `except (OSError, http.client.HTTPException)`(`src/agent/youtube.py:245`, 트리 `abe85c5` 실측)을 빠져나간 새 예외 꼴이었다. 입력 목록을 고쳐 쓰다 덮개가 빠지기도 했다(`e265dbf` 가 `3d0ae81` 의 "`ValueError` 도 잡는다"를 지워 B1 이 주인 없이 남음). 트래커 `0d50c02` 가 셋째 예외를 "`_call` 에서 `self._fetch` 가 낸 예외는 무엇이든"으로 다시 적은 뒤, 다섯째 ship-check 는 새 정지 없이 READY WITH RISKS 였다(plans/interview-marketing-agent.md Phase 2 Decisions 2026-10-14 줄 · Trade-offs accepted 셋째 줄). 같은 동학의 앞 목격: E-005(Phase 1 — 열거한 꼴 목록을 ship-check 네 번이 매번 뚫음) · E-019(Phase 6) (cycle 20261013-161159-adw/phase-2-watcher-detect)
+- first confirmed: 2026-10-14 · last confirmed: 2026-10-14
 
 ## Retired (history — one line each, never deleted)
 - E-001 · gotcha — [stop:red-unbucketable · 1] ship-check BLOCKED 이고 통이 그 고침을 못 받는다 — 이 페이즈는 제 브랜치에서 아래 Blockers 를 범위로 다시 돈다 — retired 2026-10-13 (shipped (Phase 1 ship 게이트 승인 2026-10-13; `youtu.be/A/../B` 꼴은 `5352cf8` 로 막힘 — notes.md Expertise check))

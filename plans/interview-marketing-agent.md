@@ -92,7 +92,7 @@ Open questions
 ---
 
 ## Phase 2 — ① 탐지 · 조회수 추적 (watcher)
-- Status: In progress
+- Status: Done
 - Slug: watcher-detect
 - After: Phase 1
 - Goal: YouTube Data API v3로 키워드별 최신순 검색(한국 지역 · 한국어 · 최근 12시간 업로드)을 주기마다 실행하고, 찾은 영상의 조회수를 주기마다 다시 기록한다. 하루 검색 호출 수를 설정으로 제한한다.

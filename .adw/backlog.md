@@ -37,7 +37,7 @@
 - [x] [smoke] 스모크 스윕 — S-003
 - [x] [smoke] 스모크 스윕 — S-001, S-002, S-004, S-005, S-006
 - [x] Phase 1 — 뼈대와 계약 (plans/interview-marketing-agent.md#phase-1)
-- [~] Phase 2 — ① 탐지 · 조회수 추적 (plans/interview-marketing-agent.md#phase-2)
+- [x] Phase 2 — ① 탐지 · 조회수 추적 (plans/interview-marketing-agent.md#phase-2)
 - [x] Phase 3 — ② 판별 · 주제 일치 (plans/interview-marketing-agent.md#phase-3)
 - [x] Phase 4 — ③ 타이밍 · 뜨기 직전 판단 (plans/interview-marketing-agent.md#phase-4)
 - [x] Phase 5 — ④ 댓글 작성 · 자체 검사 (plans/interview-marketing-agent.md#phase-5)
@@ -62,6 +62,8 @@
 - [x] (retro 후보 · E-011) **[→ 상류 ADWS 백로그로 이관 (2026-10-14 원격 인터뷰 · 슬롯 b7fbd89c · Q1 A) — `~/project/ADWS/.adw/backlog.md` To do 끝의 `(retro 후보 · marketing-agent-demo E-011 이관)` 줄. 고칠 자리 `.claude/` 는 동기화가 덮는 하네스라 이 저장소에서는 안 고치고 ADWS 에서 고쳐 다음 동기화로 들어온다. 그때까지 회고 ⑷ · T4 경보의 점 파일 · 되짚기 판 셈은 부풀려 읽는다 — 다시 울리면 이 줄로 흡수해 닫는다]** 수집기가 `Files:` 경로 앞의 점을 벗겨 점 파일(`.env.example` · `.gitignore`)이 plan 에 적혀도 늘 "계획 밖" · T4 ⑷ 에 들어감 — 최소 계약 고침: `.claude/skills/plan/scripts/retro_collect.py:437` `tok.strip("`,;.…")` 를 앞에서는 백틱만 벗기고 `.` 는 끝에서만 벗기게 · 같은 ⑷ 셈의 되짚기 판 시작(`run_start` :457)을 가장 이른 단계가 아니라 마지막 plan 단계의 `first_started_at` 으로 — Phase 1 다시 세기 3 → 0 (E-002, T4 경보 인터뷰 2026-10-14 b7fbd89c 흡수) · `.claude/` 는 하네스 소유라 같은 고침이 상류 ADWS `template/` 에도 가야 동기화 뒤에 남음 (sightings: 20261013-161343-adw/phase-3-classifier-topic · 20261013-161439-adw/phase-5-writer-comment)
 - [x] ~~(retro 후보 · E-014) 레인마다 계약 새 절을 제 base 의 다음 번호(`## 11.`)로 매기고 본문 · 코드 주석이 그 번호("11절")를 가리켜, 착지 뒤 다른 절을 가리킴 — 최소 계약 고침: `docs/contracts.md` `## 10. 계약 변경 규칙` 에 "다른 절은 번호가 아니라 절 이름으로 가리킨다" 한 줄 (sightings: 20261013-161343-adw/phase-3-classifier-topic · 20261013-161439-adw/phase-5-writer-comment)~~ — 새 페이즈로: `Phase 1B — 계약 절 이름 규칙` (2026-10-14 원격 인터뷰 · 슬롯 be02ef18 · Q1–Q4 A) — 10절 뒤 절은 번호 없이 제목만 · 규칙 줄 + 스위트 테스트(10절 뒤 번호 제목 · "11절" 꼴 인용이면 빨강) · Phase 2 착지 뒤 그 제목과 8곳까지 · 옛 기록은 10절 풀이 한 줄로 읽고 장부 E-007 · E-012 는 이름으로 고침(H-008 · H-009 는 human-checks 규칙대로 그대로)
 - [x] ~~(retro 후보 · E-015) smoke-file 이 PASS 인 verify-report 를 본문 줄머리 `FAIL` 로 FAIL 로 읽어 ship-report 스모크 후보를 두 번 올림(홈 S-019~S-023 = S-024~S-028) — 최소 계약 고침: `.claude/skills/plan/scripts/smoke_file.py:73-76` `verdict()` 가 `section_body(text, "Verdict")` 만 보게(ship 쪽 `:75` 도 같은 꼴) (sightings: 20261013-161439-adw/phase-5-writer-comment — 한 번이지만 원장에 중복 다섯 건을 남김)~~ — ADWS 백로그로 이관 (2026-10-14 원격 인터뷰 · 슬롯 e0faf70b · Q1 A) — `~/project/ADWS/.adw/backlog.md` To do 끝의 `(retro 후보 · marketing-agent-demo E-015 이관)` 줄(한 줄 고침 · ship 쪽 `:75` · Phase 5 verify-report 를 시험 재료로). 고칠 `smoke_file.py` 는 ADWS `1a9b4236` 과 글자까지 같은 하네스라 동기화가 덮고 헌법 7조도 직접 고침을 막아, 이 저장소에는 고칠 코드가 없다. 그때까지는 검사가 초록인데 본문 줄머리가 `FAIL` 인 READY WITH RISKS 판에서 같은 고침이 통에 두 번 적힐 수 있다 — 두 번째 묶음(`filed by smoke-file (one-pass)`)은 스윕 전에 닫거나 헛 스윕(이번 8분 · 변화 0줄)을 감수. 다시 오르면 이 줄로 흡수해 닫는다
+
+- [ ] (retro 후보 · E-021) ship-check 가 받아들인 위험의 같은 코드 자리에서 새 입력을 찾아 다시 멈춤(받아들임을 입력으로 적음) — 최소 계약 고침: `.claude/skills/deep-interview/SKILL.md:98-99` Trade-offs accepted 꼴에 한 줄 — "ship-check 발견을 받아들일 때는 코드 자리(파일:함수 · 처리 줄)와 입력 부류로 적고, 재현한 입력은 경계가 아니라 예로 단다"(허브 🤖 attn-agent 의 답도 같은 꼴로). `.claude/` 는 ADWS 동기화 하네스라 고침은 상류에서(E-011 선례) (sightings: 20261013-062542-adw/phase-1-foundation-contracts (E-005) · 20261013-161159-adw/phase-2-watcher-detect)
 
 ## Done
 
