@@ -277,3 +277,11 @@
 - source: adw/phase-6-poster-chrome
 - tag: plain
 - status: open
+
+### H-032 — ship-check가 통(`.adw/smoke-log.md`)에 `S-NEW`로 미룬 결함을 같은 보고서의 `## Smoke candidates`에도 적으면, smoke-file이 같은 결함을 한 번 더 접수합니다(S-019–S-023 → S-024–S-028). ADW 템플릿의 ship-check/smoke-file 규칙에서 이 중복 접수를 어떻게 막을지 정하기
+- project: marketing-agent-demo
+- when: 2026-10-13 · adw/smoke-sweep-s024-s028
+- from: ship-report.md § Human checks — .adw/ship-report.md § Risks
+- source: adw/smoke-sweep-s024-s028
+- tag: plain
+- status: open
