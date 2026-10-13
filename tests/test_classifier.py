@@ -144,7 +144,7 @@ def fake_sdk() -> types.ModuleType:
     class TypeSafeAPITimeoutError(TypeSafeAPIConnectionError):
         pass
 
-    class TypeSafeAPIResponseValidationError(TypeSafeError):
+    class TypeSafeAPIResponseValidationError(TypeSafeAPIError):
         pass
 
     class TypeSafeClient:
@@ -506,8 +506,8 @@ class SdkAskTest(unittest.TestCase):
             (sdk.TypeSafeAPIConnectionError("연결 거부"), "TypeSafeAPIConnectionError"),
             (sdk.TypeSafeAPITimeoutError("시간 초과"), "TypeSafeAPITimeoutError"),
             (
-                sdk.TypeSafeAPIResponseValidationError("모양 다름"),
-                "TypeSafeAPIResponseValidationError",
+                sdk.TypeSafeAPIResponseValidationError(200),
+                "TypeSafeAPIResponseValidationError 200",
             ),
         )
         for error, message in rows:
@@ -528,6 +528,27 @@ class SdkAskTest(unittest.TestCase):
         self.sdk.Noul = broken
         with self.assertRaises(TypeError):
             classify(record(), config(), sdk_ask, T0)
+
+    def test_non_sdk_error_from_system_one_propagates(self) -> None:
+        # try 안(with 블록의 system_one)에서 난 SDK 밖 오류도 JevError · 보류가 되지 않습니다
+        error = TypeError("호출 중 잘못")
+        self.sdk.raises = error
+        with self.assertRaises(TypeError) as caught:
+            classify(record(), config(), sdk_ask, T0)
+        self.assertIs(caught.exception, error)
+        (client,) = self.sdk.clients
+        self.assertEqual(len(client.calls), 1)
+
+    def test_configured_model_reaches_ask_and_system_one(self) -> None:
+        data = valid()
+        data["classifier"]["model"] = "jev-test-x"
+        cfg = config_from_mapping(data)
+        fake = FakeJev()
+        classify(record(), cfg, fake, T0)
+        self.assertEqual(fake.calls[0][0], "jev-test-x")
+        classify(record(), cfg, sdk_ask, T0)
+        (client,) = self.sdk.clients
+        self.assertEqual(client.calls[0]["model"], "jev-test-x")
 
     def test_missing_sdk_raises(self) -> None:
         sys.modules["typesafe_sdk"] = None
@@ -676,9 +697,33 @@ class ExamplesTest(unittest.TestCase):
         self.assertIn("측정 실패", out)
         self.assertIn("ko: 맞음 0/22 · 잘못된 일치 0 · 잘못된 불일치 0 · 보류 0 · 오류 22", out)
 
+    def test_runner_error_in_en_only_exits_3(self) -> None:
+        labels = LabelJev(languages=("en",))
+
+        def en_fails(
+            model: str, state: str, questions: Mapping[str, Mapping[str, object]]
+        ) -> object:
+            if questions[MATCH_ID]["instructions"] in labels.wording.values():
+                raise JevError("TypeSafeRateLimitError 429")
+            return labels(model, state, questions)
+
+        code, out, _ = run_main([], KEY, en_fails)
+        self.assertIn("ko: 맞음 22/22 · 잘못된 일치 0 · 잘못된 불일치 0 · 보류 0 · 오류 0", out)
+        self.assertIn("en: 맞음 0/22 · 잘못된 일치 0 · 잘못된 불일치 0 · 보류 0 · 오류 22", out)
+        self.assertIn("측정 실패", out)
+        self.assertEqual(code, 3)
+
     def test_runner_perfect_labels_exit_0(self) -> None:
         code, out, _ = run_main([], KEY, LabelJev())
         self.assertIn("ko: 맞음 22/22 · 잘못된 일치 0 · 잘못된 불일치 0 · 보류 0 · 오류 0", out)
+        self.assertIn("권고: ko 그대로", out)
+        self.assertEqual(code, 0)
+
+    def test_runner_exactly_20_correct_without_false_yes_passes(self) -> None:
+        yes = [n for n, example in enumerate(EXAMPLES, 1) if example.label is Verdict.YES][:2]
+        self.assertEqual(len(yes), 2)
+        code, out, _ = run_main([], KEY, LabelJev({n: Verdict.NO for n in yes}))
+        self.assertIn("ko: 맞음 20/22 · 잘못된 일치 0 · 잘못된 불일치 2 · 보류 0 · 오류 0", out)
         self.assertIn("권고: ko 그대로", out)
         self.assertEqual(code, 0)
 
