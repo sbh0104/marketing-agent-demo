@@ -24,7 +24,7 @@ Parallel shape: Phase 1 → (Phase 2 ‖ 3 ‖ 4 ‖ 5 ‖ 6) → Phase 7 → Ph
 ---
 
 ## Phase 1 — 뼈대와 계약 (설정 · 데이터 모양 · 저장 · 운영 가드)
-- Status: Done
+- Status: Done (스모크 스윕이 페이즈 브랜치를 병합 · 2026-10-13)
 - Slug: foundation-contracts
 - Goal: 다섯 모듈이 같은 약속(설정 값, 영상 한 건의 데이터 모양, 처리 기록 저장소, 허용 목록 가드, 테스트 모드 플래그, 로그 형식)을 쓰도록 뼈대를 만든다. 이후 Phase 2–6은 이 계약에만 의존한다.
 
