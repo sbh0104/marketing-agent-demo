@@ -43,6 +43,8 @@ Phase 2–7 의 모든 단계가 기대는 계약입니다. 설정 읽기, 영�
 | `limits.daily_max_searches` | 정수 | ≥ 0 | `100` (과제 밖에서 더한 키) |
 | `comment.min_chars` | 정수 | ≥ 1 | `40` |
 | `comment.max_chars` | 정수 | ≥ `min_chars` | `120` |
+| `comment.writer_model` | 글자 | 비어 있지 않음 — 댓글을 쓰는 Claude 모델 이름 (11절) | `claude-sonnet-5-5` |
+| `comment.check_min_probability` | 숫자 | ≥ 0, ≤ 1 — jev 자체 검사 통과 하한 (11절) | `0.7` |
 | `chrome_debug_url` | 글자 | `http://` 또는 `https://` 로 시작 | `http://localhost:9222` |
 | `allowed_videos` | 글자 목록 | 비워 두면 `()`; 항목은 쓴 그대로 보관 | `- https://youtu.be/내-테스트-영상-ID` |
 
@@ -57,6 +59,9 @@ Phase 2–7 의 모든 단계가 기대는 계약입니다. 설정 읽기, 영�
   대기는 9절이 묶습니다.
 - `limits.daily_max_searches` 는 과제 예시에 없는 키입니다. Phase 2 의 하루 검색 상한을
   설정 값으로 두기 위해 지금 계약에 넣었습니다(쿼터 약 100회/일). Phase 2 가 값을 조정합니다.
+- `comment.writer_model` · `comment.check_min_probability` 는 과제 예시에 없는 키로, Phase 5 가
+  댓글 작성 · 자체 검사를 위해 더했습니다(11절). `check_min_probability` 의 상한 1 은 확률의
+  끝입니다.
 - **YAML 1.1 함정 — 글자 자리에서는 크게 실패합니다.** 따옴표 없는 `yes`/`no`/`on`/`off` 는
   bool, `2026-10-12` 는 날짜, `12345678901` 은 정수로 읽히므로 글자 자리에 오면 오류입니다
   (예: `keywords: [연애, no]`, `topic: yes`, `allowed_videos: [12345678901]`). 이런 값은
