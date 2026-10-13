@@ -1,1 +1,4 @@
 PyYAML>=6.0
+playwright>=1.40
+anthropic>=0.40
+typesafe-sdk>=0.7.4,<0.8

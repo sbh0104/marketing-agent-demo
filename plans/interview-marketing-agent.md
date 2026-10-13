@@ -7,24 +7,28 @@
 - Overall status: In progress
 
 ## Summary
-유튜브 댓글 에이전트 (과제 안내: `docs/marketing-agent.pdf`). 주제 키워드로 새 영상을 찾고(탐지), AI가 주제 일치를 판별하고(판별), 조회수 조건으로 '뜨기 직전' 영상을 고르고(타이밍), 영상 고민에 맞춘 댓글을 쓰고(작성), 로그인된 크롬에 자동 게시합니다(게시). 빠른 제작이 목표라 뼈대(Phase 1)를 먼저 만들고, Phase 2–6은 뼈대의 계약만 따르므로 동시에 진행합니다. 실제 게시는 허용 목록 영상에만, 코드에서 강제합니다. 언어는 Python + Playwright입니다. 판단(주제 판별 · 댓글 자체 검사)은 `systemone model jev`(TypeSafe)가 하고, 글쓰기(고민 한 줄 정리 · 댓글 작성)는 Claude가 합니다 — jev는 글을 생성하지 않기 때문입니다 (`docs/research/jev.md`).
+유튜브 댓글 에이전트 (과제 안내: `docs/marketing-agent.pdf`). 주제 키워드로 새 영상을 찾고(탐지), AI가 주제 일치를 판별하고(판별), 조회수 조건으로 '뜨기 직전' 영상을 고르고(타이밍), 영상 고민에 맞춘 댓글을 쓰고(작성), 로그인된 크롬에 자동 게시합니다(게시). 빠른 제작이 목표라 뼈대(Phase 1)를 먼저 만들고, Phase 2–6은 뼈대의 계약만 따르므로 동시에 진행합니다. 실제 게시는 허용 목록 영상에만, 코드에서 강제합니다. 언어는 Python + Playwright입니다. 판단(주제 판별 · 댓글 자체 검사)은 `systemone model jev`(TypeSafe)가 하고, 글쓰기(고민 한 줄 정리 · 댓글 작성)는 Claude가 합니다 — jev는 글을 생성하지 않기 때문입니다 (`docs/research/jev.md`). Phase 3 · 5는 키 없이 공식 문서 · SDK 소스 · 가짜 jev/Claude로만 만들고 테스트했으므로, Phase 7 전에 진짜 키로 한 번 붙여 봅니다 — 진짜 호출은 사람이 셸에서 돌리고 사이클은 커밋된 결과 파일만 읽습니다 (Phase 6A · 6B, 2026-10-13). Phase 1 의 세 파서(가드의 주소 꼬리 · 설정 정수 · 로그 글자)는 막을 꼴을 적어 두는 방식이라 출하 점검마다 목록 밖 꼴이 새로 나왔으므로, Phase 1A 가 받을 꼴만 적는 방식으로 바꾸고 로그를 읽는 단 하나의 방법(`read_log`)을 둡니다 (2026-10-14, 경험 장부 E-005). 계약서의 약속 문장(뿐 · 않 · 될 수 있 · 에만)이 코드보다 넓게 약속해 출하 점검이 두 번 사람을 불렀으므로, 헌법 9조가 페이즈가 쓰는 약속 줄마다 스위트 테스트를 짝짓고 틀린 문장은 사이클 안에서 코드만큼 줄이게 합니다 (2026-10-14, 경험 장부 E-009). 계약서 10절 뒤에 페이즈가 덧붙인 절은 레인마다 출발 때 사본의 "마지막 번호 + 1" 로 같은 번호(`## 11.`)를 매겨 착지 뒤 겹치고 "계약 11절" 인용이 다른 절을 가리켰으므로, Phase 1B 가 그 절들의 번호를 떼고 제목으로만 가리키게 하며 스위트 테스트로 지킵니다 (2026-10-14, 경험 장부 E-014). 페이즈가 뒤 페이즈에 넘긴 일은 출하 점검을 거쳐 사람 확인 장부(`.adw/human-checks.md`)까지 왔지만 받는 페이즈가 그 장부를 읽지 않아 트래커에 오르지 않았으므로, 헌법 10조가 받는 페이즈의 understand 에게 제목에 제 번호가 적힌 열린 항목을 가져오게 하고, plan 이 항목마다 하거나 새 주인(`→ Phase M` · `→ human`)을 달게 하며, 계획서의 넘김은 `- Handed to Phase M:` 꼴로 써서 출하 점검이 장부로 나르게 합니다 (2026-10-14, 경험 장부 E-010).
 
 ## Phases
-- [ ] Phase 1 — 뼈대와 계약 (설정 · 데이터 모양 · 저장 · 운영 가드)
+- [x] Phase 1 — 뼈대와 계약 (설정 · 데이터 모양 · 저장 · 운영 가드)
 - [ ] Phase 2 — ① 탐지 · 조회수 추적 (watcher)
-- [ ] Phase 3 — ② 판별 · 주제 일치 (classifier)
-- [ ] Phase 4 — ③ 타이밍 · 뜨기 직전 판단 (trigger)
-- [ ] Phase 5 — ④ 댓글 작성 · 자체 검사 (writer)
-- [ ] Phase 6 — ⑤ 크롬 연결 · 게시 · 확인 (poster)
+- [x] Phase 3 — ② 판별 · 주제 일치 (classifier)
+- [x] Phase 4 — ③ 타이밍 · 뜨기 직전 판단 (trigger)
+- [x] Phase 5 — ④ 댓글 작성 · 자체 검사 (writer)
+- [x] Phase 6 — ⑤ 크롬 연결 · 게시 · 확인 (poster)
+- [ ] Phase 1A — 파서 허용 쪽 규칙 (가드 주소 꼬리 · 설정 정수 상한 · 로그 글자 · 로그 읽기)
+- [ ] Phase 1B — 계약 절 이름 규칙 (10절 뒤 절은 번호 없이 · 제목으로 가리키기)
+- [ ] Phase 6A — 진짜 호출 준비 · 사람이 돌릴 실행기 (live check)
+- [ ] Phase 6B — 진짜 결과 반영 · 정확도 기록 · 기준값 조정
 - [ ] Phase 7 — 파이프라인 연결 · 운영 규칙 통합
 - [ ] Phase 8 — 제출물 (README · PROCESS.md · sample.log · 시연)
 
-Parallel shape: Phase 1 → (Phase 2 ‖ 3 ‖ 4 ‖ 5 ‖ 6) → Phase 7 → Phase 8. Phases 2–6 run at the same time only when `lane.max` ≥ 5 (see Cross-cutting open questions).
+Parallel shape: Phase 1 → (Phase 2 ‖ 3 ‖ 4 ‖ 5 ‖ 6) → (Phase 1A ‖ Phase 6A) → [사람이 진짜 실행 · 결과 커밋] → Phase 6B → Phase 7 → Phase 8. Phase 1A 는 Phase 2 뒤, Phase 7 앞 (2026-10-14). Phase 1B 는 Phase 2 뒤 — 1A · 6A 와 함께 돌 수 있음 (2026-10-14, E-014). Phases 2–6 run at the same time only when `lane.max` ≥ 5 (see Cross-cutting open questions).
 
 ---
 
 ## Phase 1 — 뼈대와 계약 (설정 · 데이터 모양 · 저장 · 운영 가드)
-- Status: Done
+- Status: Done (스모크 스윕이 페이즈 브랜치를 병합 · 2026-10-13)
 - Slug: foundation-contracts
 - Goal: 다섯 모듈이 같은 약속(설정 값, 영상 한 건의 데이터 모양, 처리 기록 저장소, 허용 목록 가드, 테스트 모드 플래그, 로그 형식)을 쓰도록 뼈대를 만든다. 이후 Phase 2–6은 이 계약에만 의존한다.
 
@@ -83,7 +87,7 @@ Dependencies
 - Unlocks: Phase 2, Phase 3, Phase 4, Phase 5, Phase 6
 
 Open questions
-- none
+- none (Revision 2026-10-14, E-005 인터뷰 — 이 Done 절의 문장은 Phase 1 이 출하한 그대로의 기록으로 둔다: Trade-offs 의 "(2026-10-13 HC1) 가드가 막는 쿼리 이름은 `v` 하나뿐이다(거부 목록 방식)", Responsibilities 의 "R7(정수 설정 키 상한 없음)은 계약 2절에 적힌 결정", Phase 7 로 넘긴 로그 제어 문자 고침은 Phase 1A 가 바꾼다 — 각각 받는 쿼리 이름 셋 · 정수 상한 필수 · 남길 글자 목록과 `read_log`. 아래 Phase 1A 절 참조.)
 
 ---
 
@@ -119,7 +123,7 @@ Responsibilities & risks to guard against
 
 Dependencies
 - Depends on: Phase 1
-- Unlocks: Phase 4 (조회수 기록), Phase 7
+- Unlocks: Phase 4 (조회수 기록), Phase 7, Phase 1A (같은 파일 충돌 회피 — 2026-10-14)
 
 Open questions
 - none
@@ -127,7 +131,7 @@ Open questions
 ---
 
 ## Phase 3 — ② 판별 · 주제 일치 (classifier)
-- Status: Not started
+- Status: Done
 - Slug: classifier-topic
 - After: Phase 1
 - Goal: 영상의 제목 · 설명 · 자막(있을 경우)을 읽고 주제 일치 여부와 이유를 기록한다. 키워드만 겹치는 영상(예: '연애'가 들어간 게임 영상)을 걸러낸다.
@@ -155,12 +159,12 @@ Dependencies
 - Unlocks: Phase 5, Phase 7
 
 Open questions
-- none (2026-10-12: jev 접속 방법은 공식 문서로 확인 — `docs/research/jev.md`. 키는 `.env`의 `TYPESAFE_API_KEY`.)
+- none (2026-10-12: jev 접속 방법은 공식 문서로 확인 — `docs/research/jev.md`. 키는 `.env`의 `TYPESAFE_API_KEY`.) (2026-10-13 메모, 결정 변경 아님: 이 페이즈는 키 · SDK 없이 가짜 jev로만 검증됐다 — 키 보유 여부를 인터뷰가 묻지 않았음. 진짜 정확도 측정과 기준값 조정은 Phase 6A · 6B가 맡는다.)
 
 ---
 
 ## Phase 4 — ③ 타이밍 · 뜨기 직전 판단 (trigger)
-- Status: Not started
+- Status: Done
 - Slug: trigger-timing
 - After: Phase 1
 - Goal: 조회수 1,000–5,000, 업로드 후 12시간 이내, 시간당 조회수 150 이상 — 세 조건을 모두 만족하면 대상으로 표시한다. 세 값은 `config.yaml`에서 바꾼다.
@@ -186,7 +190,7 @@ Open questions
 ---
 
 ## Phase 5 — ④ 댓글 작성 · 자체 검사 (writer)
-- Status: Not started
+- Status: Done (스모크 스윕이 페이즈 브랜치를 병합 · 2026-10-13)
 - Slug: writer-comment
 - After: Phase 1
 - Goal: 영상의 고민을 한 줄로 정리하고, 그 고민과 이어지는 '연애사주 경험' 댓글을 40–120자로 쓴다. 영상 속 구체적인 장면이나 말을 하나 이상 언급하고, 링크를 넣지 않으며, 이전 댓글과 같은 문장을 반복하지 않는다.
@@ -217,12 +221,12 @@ Dependencies
 - Unlocks: Phase 6, Phase 7
 
 Open questions
-- none (2026-10-12: 작성은 Claude, 검사는 jev로 확정. jev 접속은 Phase 3과 같다.)
+- none (2026-10-12: 작성은 Claude, 검사는 jev로 확정. jev 접속은 Phase 3과 같다.) (2026-10-13 메모, 결정 변경 아님: 이 페이즈는 가짜 Claude · 가짜 jev로만 검증됐다. 모델 id 확인과 통과 하한 조정은 Phase 6A · 6B가 맡는다.)
 
 ---
 
 ## Phase 6 — ⑤ 크롬 연결 · 게시 · 확인 (poster)
-- Status: Not started
+- Status: Done
 - Slug: poster-chrome
 - After: Phase 1
 - Goal: 로그인된 크롬에 연결해 영상을 열고, 댓글 창까지 이동해 입력하고, 게시하고, 내 댓글이 실제로 보이는지 확인한다. 실패하면 원인과 화면 캡처를 기록하고 다음 영상으로 넘어간다.
@@ -254,26 +258,164 @@ Open questions
 
 ---
 
+## Phase 1A — 파서 허용 쪽 규칙 (가드 주소 꼬리 · 설정 정수 상한 · 로그 글자 · 로그 읽기)
+- Status: Not started
+- Slug: parser-allow-rules
+- After: Phase 2
+- Goal: Phase 1 의 세 파서가 막을 꼴을 적어 두는 방식(거부 목록) 대신 받을 꼴만 적는 방식(허용 목록)으로 판단하게 바꾼다 — 가드의 youtu.be · shorts 쿼리 이름, 설정 정수의 범위, 로그 값에 날 글자로 남는 글자. 그리고 로그를 읽는 단 하나의 방법 `read_log` 를 둔다. Phase 1 출하 점검이 네 번 연속 목록 밖 꼴을 찾은 반복(경험 장부 E-005)을 끝내는 것이 목적이다.
+
+Decisions
+- (2026-10-14 E-005 인터뷰 질문 1 A, H-001) 허용 목록 가드(`guard.py` `video_id_from_ref`): youtu.be · shorts 주소의 쿼리 이름은 `si` · `t` · `feature` 셋만 받는다. 쿼리는 지금처럼 서버처럼 한 번 풀고 `&` · `;` 로 나눈 뒤 이름을 보며, 이름이 이 셋 밖이면 — `v` · `V` · `%56` · `+v`(푼 뒤 ` v`) · 전각 `ｖ` · `v\x01` · `list` · 빈 이름 · 처음 보는 이름 — `invalid_video` 다. 대소문자도 정확히 본다(`SI` 는 거부). watch 주소는 그대로 둔다(경로 정확히 `/watch`, `v` 값 정확히 하나, 다른 이름 무시) — 클릭 직전 다시 묻기가 읽는 크롬 `page.url` 의 꼬리를 아직 재지 않아서(H-023), 처음 보는 이름 하나에 정상 게시가 `page_mismatch` 로 빠지는 것을 피한다. 계약 5절의 "막는 이름은 `v` 하나이고 … 발견되면 그때 더합니다"를 "youtu.be · shorts 쿼리에서 받는 이름은 이 셋뿐"으로 바꾼다. 근거: 막는 이름 목록은 네 번째 ship-check 의 `youtu.be/A?v\x01`(Phase 1 ship-report R2)과 인터뷰에서 재 본 `?V=B` · `?%56=B` · `?+v=B` · `?ｖ=B` 를 모두 A 로 읽어 열린 채였다. 받는 이름 목록이면 유튜브가 무엇을 하든 처음 보는 꼴이 막힌 쪽에 떨어지고, H-002(진짜 유튜브로 철자 넷 재기)가 필요 없어진다 — 되돌릴 수 없는 남의 영상 댓글을 막는 쪽을 최적화.
+- (질문 2 A, H-006) 설정 정수(`config.py` `_int`)는 `_number` 처럼 상한을 필수 인자로 받는다 — 기본값이 없어서 정수 키를 새로 더하는 페이즈가 상한을 빼먹을 수 없다. 일곱 키(`poll_interval_min` · `trigger.min_views` · `trigger.max_views` · `limits.daily_max_comments` · `limits.daily_max_searches` · `comment.min_chars` · `comment.max_chars`, 착지 시점에 정수 키가 더 있으면 그것까지)에 상한을 두고 계약 2절 표의 규칙 칸에 적는다. 넘으면 `<상한> 이하여야 합니다: <키>` 오류이고, 실행 중이면 이전 설정을 유지한다. 계약 2절의 "정수 키에는 상한이 없습니다 — 비교와 셈에만 쓰이고"는 사실대로 고친다 — 정수는 `START interval_min=` · `QUOTA limit=` 로그 줄, Claude 작성 지시문(`writer.py:310`), 코드 검사 문구(`writer.py:164`)에 글자로 쓰인다. 근거: YAML 16진수 · 60진수 표기는 파이썬의 4,300자리 한도를 거치지 않아, `0x` + `F` 3,700개가 읽기를 통과한 뒤 `START` 줄(Phase 1 ship-report R4)과 Claude 지시문(인터뷰에서 재현)에서 `ValueError` 를 냈다 — "잘못 고친 설정은 이전 설정 유지"가 깨짐.
+- **The plan decides** — 정수 키마다의 상한 숫자 · 조건: 읽기를 통과한 가장 큰 값으로 `load_config` → `START` · `QUOTA` 로그 줄 → `SYSTEM_PROMPT.format` → `check_post` · `judge_trigger` · 주기 대기까지 예외가 없어야 하고, 과제 기본값과 지금 `config.yaml` 값은 통과해야 하며, 키마다 근거 한 줄(예: 하루 상한은 24시간 안에 실제로 가능한 수)을 계약 2절에 함께 적는다. 상한을 넘는 값과 `0x` + `F` 3,700개가 실제 파일 재로딩 테스트에서 `ConfigError` 이고 이전 설정이 유지됨을 테스트가 잠근다.
+- (질문 3 A, H-005 — Phase 7 의 로그 제어 문자 결정을 이 페이즈로 옮겨 대신함) 로그 쓰기(`logbook.py`): 값 안에 날 글자로 남는 것은 유니코드 범주 L(글자) · M(결합 표시) · N(숫자) · P(문장부호) · S(기호)와 보통 공백 U+0020 뿐이다. 그 밖의 모든 글자 — Cc(NUL · ESC · DEL · C1) · Cf(U+202E 같은 양방향 제어 · U+200B · U+200D) · 다른 공백 Zs(U+00A0 · U+3000) · Zl · Zp · Co · Cn · Cs(짝 없는 서로게이트) — 는 언제나 따옴표 값 안의 `\uXXXX` 로 쓰고, 그런 글자가 든 값은 공백이 없어도 따옴표 없이 쓰지 않는다. 계약 7절 "값 쓰는 법" 표와 그 아래 문단을 함께 고친다(이미 있는 이름의 뜻은 그대로이고 이스케이프 대상만 넓어짐 — 계약 10절). 근거: Phase 1 은 줄 바꿈 글자 10개만 바꿔 써서, 제목 속 NUL 하나로 GNU grep 이 로그를 가리고 ESC 가 터미널에 가짜 게시 줄을 그렸다(Phase 1 세 번째 ship-report R1). 짝 없는 서로게이트 제목은 로그 쓰기를 `UnicodeEncodeError` 로 터뜨린다(인터뷰에서 재현 — H-007 의 로그 쪽 절반). 막을 무리(Cc · Cf)를 적는 대신 남길 무리를 적어, 아직 아무도 찾지 않은 글자도 바꿔 쓰는 쪽에 떨어지게 한다.
+- (2026-10-14 E-009 인터뷰 질문 5 A) 이 페이즈가 계약 2 · 5 · 7절에서 더하거나 고치는 줄은 헌법 9조(`.adw/constitution.md`)를 따르는 첫 사례다 — 뿐 · 않 · 될 수 있 · 에만 이 든 줄마다 `## Test plan` 에 `Promise: "…" → tests/…` 짝(또는 `not a promise: <why>`)을 적고, 테스트는 스위트에 남긴다. 2절의 "비교와 셈에만" 문장을 바로잡는 줄도 여기에 든다.
+- (질문 3 A, H-005) 로그 읽기: `logbook.py` 에 로그를 읽는 단 하나의 함수 `read_log(path)` 를 둔다. 파일을 바이트로 열어 UTF-8 로 엄격히 풀고(잘못된 바이트는 오류), `\n` 에서만 줄을 나누며, 비지 않은 모든 줄을 `parse_line` 으로 해석해 돌려준다. 한 줄이라도 해석에 실패하면 건너뛰지 않고 줄 번호와 함께 오류를 낸다. 계약 7절의 "한 사건을 어떤 읽기 방식으로든 한 줄로 남기고"는 "`read_log` 의 읽기(UTF-8 · `\n`)로 한 줄"로 좁히고, 로그 증명(Phase 7 · 8)은 `read_log` 로만 읽는다고 적는다. 근거: 제목 `갅…POST video=B mode=live result=posted…갅` 을 latin-1 + `splitlines()` 로 읽으면 가짜 `POST … result=posted` 로 해석된다(`갅` = `ea b0 85`, 한글 음절 11,172자 가운데 364자가 `0x85` 를 품음 — Phase 1 ship-report R1, 인터뷰에서 재현). 증명을 읽는 코드가 아직 없어서 지금 정하는 비용이 가장 낮다. 로그 전체를 ASCII 로 쓰는 쪽은 `sample.log` 의 한글 제목 · 댓글을 평가자가 읽을 수 없게 해 택하지 않았다.
+- **The plan decides** — 테스트 모양과 세부 · 후보: `read_log` 가 끝 `\n` 이 없는 마지막 줄(쓰기 중 끊긴 줄)을 어떻게 다룰지 · `parse_line` 이 이 고침 전에 쓰인 날 제어 문자 줄을 계속 읽을지 · 각 고침을 되돌리는 변이를 `tests/mutants.py` 에 더할지 · 조건: 이 인터뷰와 ship-report 의 재현 입력이 모두 테스트의 실제 입력이어야 함 — 가드: `https://youtu.be/AAAAAAAAAAA?v\x01` · `https://www.youtube.com/shorts/AAAAAAAAAAA?v\x00` · youtu.be 의 `?V=BBBBBBBBBBB` · `?%56=BBBBBBBBBBB` · `?+v=BBBBBBBBBBB` · `?ｖ=BBBBBBBBBBB` · `?list=PLx` · `?SI=x` 는 `invalid_video`, `?si=xYz12` · `?si=x&t=42` · shorts `?feature=share` · watch `?v=<ID>&pp=…&ab_channel=…` 는 계속 그 ID; 설정: `0x` + `F` 3,700개를 `poll_interval_min` · `comment.max_chars` 에 넣은 파일; 로그: 위 `갅` 제목을 쓴 파일에서 `read_log` 가 `DETECT` 하나만 돌려줌, 잘못된 UTF-8 바이트가 든 파일에서 `read_log` 오류, 제목 `x\x00y\x00z` · `a\x1b[2Kb` · `x\ud800y` · `a　b` 가 쓰기에 성공하고 파일에 날 제어 문자 · 서로게이트가 0개이며 `/usr/bin/grep posted` 가 게시 줄을 보여 주고(binary 판정 없음 — 셸 `grep` 은 ugrep, 경험 장부 E-004) `read_log` 가 원래 값을 되돌림.
+
+Trade-offs accepted
+- (질문 1) youtu.be · shorts 허용 목록 항목에 `si` · `t` · `feature` 밖의 꼬리가 붙으면(재생목록에서 복사한 `?list=…`, 유튜브가 나중에 새로 붙일 이름) 그 영상은 오류 없이 테스트 모드로만 돈다 — 허용 목록 작성자는 맨 ID 나 공유 버튼 주소 그대로 적어야 한다(Phase 8 README 한 줄).
+- (질문 1) watch 주소 꼬리는 여전히 "`v` 정확히 하나, 다른 이름 무시"(막는 쪽)다 — 크롬 `page.url` 의 실제 꼬리를 재기(H-023) 전까지.
+- (질문 2) 상한을 너무 낮게 잡으면 정당한 값이 거부되고, 그때는 계약을 고치는 일이 하나 더 생긴다.
+- (질문 3) 제목 속 U+00A0 · U+3000 같은 공백이 로그에서 `　` 처럼 보인다(이모지 잇기 U+200D 는 Phase 7 의 옛 Cc · Cf 결정으로도 같았음). latin-1 등 다른 글자 코드로 로그를 연 사람은 여전히 깨진 화면을 본다 — 증명은 `read_log` 로만 한다.
+- (질문 4) 사이클이 하나 늘어난다(2–4시간 + ship-check — 가드가 민감 영역이라 사람 확인으로 한 번 멈출 수 있음). Phase 2 착지를 기다린다.
+
+Responsibilities & risks to guard against
+- 계약 2 · 5 · 7절을 바꾸는 계약 변경이다(계약 10절). 이미 출하된 Phase 2–6 코드가 세 함수를 부르는 자리(`decide_post` 의 `page.url` 다시 묻기 · `load_config` · `Logbook.write`)가 그대로 도는지 전체 스위트로 확인한다.
+- Phase 6A 가 먼저 착지해 정수 설정 키(서비스별 호출 천장 등)를 더했으면 이 페이즈가 그 키에도 상한을 준다. 이 페이즈가 먼저 착지하면 6A 가 `_int` 에 상한을 넘겨야 한다 — 늦게 착지하는 쪽이 맞춘다.
+- 사람 확인 H-001 · H-005 · H-006 은 이 페이즈 착지로 닫을 근거가 생기고(`status` 는 사람이 바꿈), H-002 는 가드 쪽이 막으므로 필요 없어짐을 보고서에 적는다. H-007 의 로그 쪽(서로게이트 제목이 로그 쓰기를 터뜨림)은 여기서 끝나고, 저장소 쪽은 Phase 2 · 7 에 남는다.
+- 같은 부류("열거한 꼴")가 Phase 1 밖에도 있다 — 댓글 링크 검사(E-017, H-020)와 크롬 프로필 점검(E-019, H-029). 이 페이즈의 범위가 아니며 각 사람 확인으로 남는다.
+
+Dependencies
+- Depends on: Phase 1 (`guard.py` · `config.py` · `logbook.py` 소유), Phase 2 (같은 파일 `docs/contracts.md` · `tests/test_config.py` · `tests/mutants.py` 를 고침 — 착지 뒤 출발해 충돌을 피함, 질문 4 A)
+- Unlocks: Phase 7 (로그 증명은 `read_log` 로)
+
+Open questions
+- none
+
+---
+
+## Phase 1B — 계약 절 이름 규칙 (10절 뒤 절은 번호 없이 · 제목으로 가리키기)
+- Status: Not started
+- Slug: contract-section-names
+- After: Phase 2
+- Goal: 계약서(`docs/contracts.md`) 10절 뒤에 페이즈가 덧붙인 절에서 번호를 떼고, 그 절들은 제목으로만 가리키게 하며, 스위트 테스트가 이 규칙을 지킨다. 레인마다 출발 때 사본의 "마지막 번호 + 1" 로 `## 11.` 을 매겨 착지 뒤 같은 번호의 절이 둘 생기고 "계약 11절" 인용이 다른 절을 가리킨 반복(경험 장부 E-014 — Phase 3 · 5 에서 목격, Phase 2 레인이 세 번째)을 끝낸다.
+
+Decisions
+- (2026-10-14 E-014 인터뷰 질문 1 A) 규칙 한 줄 + 스위트 테스트 — 계약 10절(계약 변경 규칙)에 규칙 줄을 두고 `tests/` 의 테스트가 그 규칙을 잰다. 규칙 글만으로는 main 에 들어간 뒤 출발한 레인에만 닿는다. 근거: Phase 3 이 같은 규칙을 자기 절에 적었지만(`docs/contracts.md:773-774`) 동시에 출발한 Phase 5 는 "계약 11절" 8곳을 썼고(스모크 S-023 이 고침), Phase 2 레인도 8곳을 썼다(`src/agent/env.py:1` · `youtube.py:1` · `watcher.py:1, 52, 132, 188` · 레인 계약서 60 · 69행). 사이클 점검 목록(verify-plan)에만 두는 쪽은 두 레인이 합쳐질 때 생기는 겹침을 못 잡아 택하지 않았다.
+- (질문 2 A) 1–10절은 번호로, 10절 뒤에 더하는 절은 번호 없이 제목만 단다 — 10절 규칙 줄: "1–10절은 번호로, 그 뒤에 더하는 절은 번호 없이 제목만 달고 제목으로 가리킨다". main 의 세 제목(`## 11. 댓글 작성 — `writer.py` (Phase 5)` · `## 11. 트리거 판정 — `trigger.py`` · `## 12. 주제 판별 — `classifier.py` (Phase 3)`)과 Phase 2 가 가져온 `## 11. 탐지 · 조회수 추적 — …` 에서 번호를 뗀다. 주제 판별 절의 "절 번호" 항목(`docs/contracts.md:773-774`, "번호는 들일 때 고칩니다")은 이 규칙이 대신하므로 지운다. 근거: 덧붙인 절은 이미 제목으로 가리키므로(코드 · 계약 본문 12곳) 번호를 읽는 곳이 없고, 번호를 계속 달면 착지마다 빨강 · 멈춤 · 다시 매기기를 치른다. 번호를 떼면 실수한 레인이 착지 전에 제 안에서 걸린다. 계약서 제목에 거는 링크(`contracts.md#…`)는 저장소에 없다(2026-10-14 검색 0건).
+- (질문 2 A) 테스트가 빨강이 되는 꼴 둘: ① `docs/contracts.md` 에서 `## 10.` 뒤에 오는 `## <숫자>.` 제목 ② `src/` · `tests/` · `docs/contracts.md` 에서 10보다 큰 번호의 절 인용("11절" 꼴). 1–10절의 번호 인용(`src/agent/guard.py:8` "5절" 등 8개 파일 13곳)은 그대로 둔다.
+- (질문 3 A) Phase 2 착지 뒤 출발해 Phase 2 의 제목 하나와 "계약 11절" 8곳(Phase 2 의 '탐지 · 조회수 추적' 절을 가리킴)도 이 페이즈가 절 이름으로 고친다 — 다섯 번째 출하 점검 중인 Phase 2 를 이 테스트로 한 번 더 세우지 않고, 테스트가 처음 들어가는 날 main 이 초록이게. 출발 시점에 다른 페이즈가 더 덧붙인 절이 있으면 그 절과 그 인용도 같은 규칙으로 고친다.
+- (질문 4 A) 풀이 한 줄: 10절 규칙 줄 옆에 "번호를 뗀 2026-10-14 전의 기록(트래커 · 장부 · 일지)에서 옛 11 · 12절은 그 기록을 남긴 페이즈가 더한 절이다 — Phase 2 '탐지 · 조회수 추적' · Phase 3 '주제 판별' · Phase 4 '트리거 판정' · Phase 5 '댓글 작성'" 을 적는다. 근거: 각 레인이 제 절을 11절로 만들었으므로 같은 "11절" 이 쓴 페이즈마다 다른 절이다(H-008 은 트리거 판정, E-012 는 주제 판별, Phase 2 레인이 트래커 Phase 2 · 7 절에 적은 "계약 11절" 은 탐지). 트래커는 헌법 5조로 사이클이 고칠 수 없고 Phase 2 의 트래커 줄은 아직 그 레인에만 있으므로, Phase 7 계획 단계가 어차피 읽는 계약서에 풀이를 둔다.
+- (질문 4 A) 열린 장부 기록은 이 인터뷰가 주 폴더에서 고쳤다(2026-10-14): 경험 장부 E-007 의 세 곳 → 계약 '트리거 판정' 절, E-012 의 한 곳 → 계약 '주제 판별' 절. 사이클 일지 · 해결된 스모크 줄(S-009 · S-023 · S-028) · 이 트래커의 결정 기록 표는 그때의 글 그대로다. 사람 확인 H-008 · H-009 는 고치지 않았다 — `.adw/human-checks.md` 머리 규칙이 "사람은 항목의 `- status:` 줄만 고치고, 항목은 착지 손(`lane.py`)만 쓴다" 이다. 두 항목의 "계약 11절" 은 Phase 4 가 남긴 것이라 풀이 줄대로 '트리거 판정' 절이다.
+- **The plan decides** — 테스트 파일 이름과 꼴 찾기 방법 · 풀이 줄을 테스트가 어떻게 비켜 갈지(그 한 줄만 예외로 두기, 또는 숫자 + "절" 꼴이 아닌 글로 쓰기) · 규칙 줄과 풀이 줄의 정확한 문구 · 조건: ① 고치기 전 main 의 계약서(겹친 `## 11.`)와 "계약 11절" 한 줄이 든 입력에서 테스트가 빨강이고 고친 뒤 초록 ② 1–10절 번호 인용 13곳은 초록 ③ 테스트 파일 안의 꼴 문자열이 테스트 자신을 빨강으로 만들지 않음 ④ 규칙 줄 · 풀이 줄이 헌법 9조 낱말(뿐 · 않 · 될 수 있 · 에만)을 담으면 `## Test plan` 에 이 테스트와 짝짓는다.
+
+Trade-offs accepted
+- (질문 2) 계약서 목차가 "1–10 번호 + 이름만 있는 절" 로 섞여 보인다. 대화에서도 "13절" 같은 짧은 손잡이 없이 제목으로 부른다.
+- (질문 3) Phase 2 착지부터 이 페이즈 착지까지(몇 시간) main 에 `## 11.` 이 셋이고, "계약 11절" 8곳은 탐지 절이 아닌 절과 구별되지 않는다. 코드 동작은 그대로다.
+- (질문 1) 테스트는 아는 꼴("11절")만 잡는다 — "§11", "11 절" 같은 다른 꼴은 놓칠 수 있다.
+- (질문 4) 장부 · 트래커는 테스트 밖이라 다음 회고나 인터뷰가 "N절" 을 다시 쓸 수 있다. 풀이 줄은 번호를 뗀 날 전의 기록만 받쳐 준다.
+
+Responsibilities & risks to guard against
+- 계약 10절을 바꾸는 계약 변경이다. 절 이름은 바꾸지 않는다 — 제목에서 번호만 뗀다. 이미 제목으로 가리키는 곳(`'댓글 작성' 절` · `'주제 판별' 절` · `'트리거 판정' 절`)이 그대로 맞는지 확인한다.
+- Phase 1A 도 Phase 2 뒤에 출발해 같은 계약서(2 · 5 · 7절, 10절의 변이 목록)를 고친다 — 착지 때 글자 충돌이 날 수 있고 늦게 착지하는 쪽이 맞춘다. 1A 는 새 절을 더하지 않으므로 이 테스트에 걸리지 않아야 한다.
+- 이 페이즈와 함께 출발한 6A 가 계약서에 번호 붙은 새 절을 쓰면 늦게 착지하는 쪽에서 이 테스트가 빨강이 된다 — 그 레인이 번호를 떼면 끝나는 고침이고, 테스트가 일하는 모습이다. 이 페이즈 뒤에 출발하는 페이즈(7 등)는 처음부터 번호 없는 제목으로 쓴다.
+- 사람 확인 H-008 · H-009 의 "계약 11절"(그리고 H-008 의 낡은 줄 번호 `docs/contracts.md:485-492`)은 그대로 남는다 — 사람이 답할 때 풀이 줄을 본다.
+
+Dependencies
+- Depends on: Phase 2 (그 레인의 `## 11.` 제목과 "계약 11절" 8곳을 함께 고침 — 착지 뒤 출발)
+- Unlocks: none (뒤 페이즈가 덧붙이는 절은 이 규칙을 따름)
+
+Open questions
+- none
+
+---
+
+## Phase 6A — 진짜 호출 준비 · 사람이 돌릴 실행기 (live check)
+- Status: Not started
+- Slug: live-check-prepare
+- After: Phase 2, Phase 3, Phase 5
+- Goal: 사람이 셸에서 한 번 돌리면 진짜 jev · Claude · YouTube를 부르고 결과를 `docs/live-check/` 아래 파일로 남기는 실행기와 실행 안내를 만든다. 이 사이클 안에서는 진짜 호출을 하지 않는다.
+
+Decisions
+- (2026-10-13 인터뷰 질문 2 C) 진짜 외부 호출(jev · Claude · YouTube)은 사람이 셸에서 돌리고, 사이클은 실행기를 만들어 가짜로만 테스트한다 — 외부 전송 버튼은 언제나 사람이 누르고 키는 사이클 손에 들어가지 않는 쪽을 최적화. 헌법 Never 절(자동 승인은 계획 · 배포 승인만 대신함)과 레인에 `.env`가 없다는 사실(`.gitignore:2`, 레인은 커밋된 main으로 만들어짐)에 맞춘다.
+- 실행기가 하는 일 두 가지: (1) 정확도 측정 — 기존 러너 `tests/jev_accuracy.py`의 측정(한국어 예시 22개 × 질문 언어 2개)을 진짜 jev로 · (2) 실제 영상 한 바퀴 — 설정 키워드로 YouTube 공개 영상 몇 개를 검색 → jev 판별 → Claude 고민 정리 · 댓글 초안 → jev 자체 검사 → 코드 검사. **크롬 연결 · 게시는 하지 않는다** (되돌릴 수 없는 일은 이 페이즈 밖).
+- 결과는 `docs/live-check/` 아래 파일로 쓰고 사람이 커밋한다 — 커밋하지 않은 파일은 Phase 6B의 레인에 보이지 않는다. 실행 안내 마지막 줄에 커밋 명령을 적는다.
+- 서비스마다 호출 수 천장을 두고, 닿으면 그 자리에서 멈추며 결과 파일에 천장 도달을 적는다 — 사람이 돌려도 반복 버그로 호출이 끝없이 나가지 않게.
+- 키 문자열은 결과 파일 · 화면 출력 · 오류 메시지 어디에도 나오지 않는다 — 결과 파일은 커밋되기 때문. 테스트가 가짜 키 문자열로 잠근다.
+- 키나 SDK가 없으면 아무것도 부르지 않고 무엇이 없는지 한 줄로 알리고 끝난다 (러너의 기존 "키 없으면 부르지 않음"과 같음). 키 읽기는 Phase 2가 더하는 `.env` 읽기를 쓴다.
+- 실행 안내는 이 기계 기준으로 쓴다: `pip`이 없고 `uv`가 있다(`~/.local/bin/uv`) — `uv venv` → `uv pip install -r requirements.txt` → 실행 → 커밋. 실행 전에 사람이 예시 22개의 정답 라벨을 훑는 단계(H-010)를 첫 줄에 둔다.
+- **The plan decides** — 결과 파일 모양(JSON · JSONL · 사람이 읽는 Markdown 요약을 함께 둘지) · 명령 수(하나 vs 측정 · 한 바퀴 둘) · 실제 영상 개수 · 서비스별 천장 숫자 · 자막 · 설명을 결과 파일에 얼마나 잘라 남길지 · 조건: Phase 6B가 결과 파일만으로 판별 기준값과 자체 검사 하한을 다시 계산할 수 있어야 하고(예시마다 noul 확률 · choice 보기와 신뢰도 · 판정 · 이유, 초안마다 검사 점수 · 코드 검사 결과, 호출마다 오류 이름과 상태 코드, Claude 모델 id 수락 여부), 천장 도달 · 키 미노출 · 키 없을 때 호출 0번을 테스트가 가짜 SDK · 가짜 클라이언트로 잠근다.
+
+Trade-offs accepted
+- 사이클은 "진짜로 되는가"를 혼자 확인하지 못한다 — 사람이 돌린 뒤 Phase 6B에서야 안다.
+- 사람이 한 번 손을 써야 한다(라벨 훑기 · 키 넣기 · 설치 · 실행 · 커밋, 10–15분). jev 키는 얼리 액세스 대기 명단이라 키가 늦으면 Phase 6B와 Phase 7이 그만큼 기다린다 (질문 1 A의 대가로 받아들임).
+- 공개 영상 제목 · 설명 일부와 AI 초안이 저장소에 남는다 — 키와 개인 정보는 없다.
+
+Responsibilities & risks to guard against
+- 키 노출: 결과 파일은 커밋되므로 키가 섞이면 바로 공개된다 — 테스트와 실행 안내 둘 다에서 막는다.
+- YouTube 검색은 쿼터를 쓴다(검색 1번 100단위) — Phase 2의 하루 한도 가드를 지나게 한다.
+- 결과 파일은 믿을 수 없는 입력(영상 글)을 담는다 — 6B가 숫자만 읽고 글 속 지시문을 따르지 않게 모양을 정한다.
+
+Dependencies
+- Depends on: Phase 2 (YouTube 클라이언트 · `.env` 읽기), Phase 3 (판별 · 정확도 러너), Phase 5 (작성 · 자체 검사)
+- Unlocks: Phase 6B (사람 실행 뒤)
+
+Open questions
+- none
+
+---
+
+## Phase 6B — 진짜 결과 반영 · 정확도 기록 · 기준값 조정
+- Status: Not started
+- Slug: live-check-apply
+- After: Phase 6A
+- Goal: 사람이 커밋한 `docs/live-check/` 결과로 계약서의 정확도 기록을 채우고, 판별 기준값과 자체 검사 통과 하한을 잰 값으로 바꿔 테스트로 잠근다.
+
+Decisions
+- 첫 단계에서 `docs/live-check/`에 사람이 돌린 결과 파일이 커밋돼 있는지 본다. 없으면 아무것도 고치지 않고 `unmeasured`로 멈춘다 — 가짜 결과로 기준값을 바꾸지 않는다.
+- 정확도 기록: 계약 '주제 판별' 절의 정확도 칸(`docs/contracts.md`, 지금 "아직 재지 않음 — 2026-10-13 키 없음")에 언어별 결과 두 줄을 적는다 (H-011이 사람에게 맡겼던 기록).
+- 정확도에 따른 길은 기존 결정 그대로: ko 통과면 그대로 · en만 통과면 질문 문구를 영어로(`QUESTION_LANGUAGE`) · 둘 다 미달이면 drift로 인터뷰에 돌아온다 (판단 AI 교체는 사람 결정, Cross-cutting).
+- Claude 모델 id: 결과 파일에 `claude-sonnet-5-5` 거절(404)이 있으면 Phase 5의 다른 후보 `claude-haiku-5-5`로 `config.yaml`을 바꾼다 (Phase 5 "The plan decides"의 후보 안).
+- **The plan decides** — 새 기준값(`noul_yes_min` 0.8 · `noul_no_max` 0.2 · `choice_min_confidence` 0.5 · 자체 검사 통과 하한 0.7 · `REPEAT_MIN_CHARS` 12)을 무엇으로 정할지, 표본이 모자라 그대로 두는 값은 무엇인지 · 조건: 예시 22개에서 잘못된 일치 0을 지키고(러너의 통과 조건), 바꾼 값마다 근거 숫자를 계약에 함께 적으며, 설정 테스트가 새 값을 잠근다. 그대로 둔 값은 "표본 부족" 이유를 적는다.
+
+Trade-offs accepted
+- 예시 22개 + 영상 몇 개는 작은 표본이다 — 기준값은 "잰 값"이지만 단단하지 않다. Phase 8의 실제 실행 뒤 다시 볼 수 있다.
+
+Responsibilities & risks to guard against
+- 계약에 적은 숫자와 결과 파일의 숫자가 같아야 한다 — 손으로 옮겨 적지 말고 결과 파일에서 읽은 값을 쓴다.
+- 이 페이즈의 보고서에 H-011 · H-012 · H-018을 닫을 근거를 남긴다 (`status`를 `done`으로 바꾸는 것은 사람).
+
+Dependencies
+- Depends on: Phase 6A, 사람의 진짜 실행과 결과 커밋
+- Unlocks: Phase 7
+
+Open questions
+- none
+
+---
+
 ## Phase 7 — 파이프라인 연결 · 운영 규칙 통합
 - Status: Not started
 - Slug: pipeline-rules
-- After: Phase 2, Phase 3, Phase 4, Phase 5, Phase 6
+- After: Phase 2, Phase 3, Phase 4, Phase 5, Phase 6, Phase 6B, Phase 1A
 - Goal: 다섯 모듈을 한 흐름으로 묶고, 운영 규칙 다섯 가지(영상당 댓글 1개 · 하루 상한 10개 · 채널 대기 24시간 · 허용 목록 강제 · 테스트 모드)가 실제로 작동하는지 확인한다.
 
 Decisions
+- **The plan decides** — (2026-10-14 E-010 인터뷰 질문 4 A — Phase 5 계획서 `.adw/journal/20261013-161439-adw-phase-5-writer-comment/plan.md:465` 에만 있던 넘김) 작성기가 `SKIP` 한 영상(검사 두 번 탈락 · Claude/jev 오류)을 주기 사이에 기억할지 · 후보: 기록에 남겨 다시 쓰지 않음 / 다음 주기에 다시 시도(하루 상한 · 호출 수 안에서) · 테스트: 같은 영상이 한 주기에서 `SKIP` 된 뒤 다음 주기의 Claude 호출 수와 `SKIP` 줄 수로 고정. 정하지 않으면 같은 영상을 주기마다 다시 써 Claude · jev 호출과 `SKIP` 줄이 쌓인다.
 - 영상당 댓글 1개와 채널 대기 시간은 게시 기록 저장소(Phase 1)에서 확인한다.
 - 하루 상한(기본 10개)은 게시 성공 기록만 센다.
-- (2026-10-13, Phase 1 HC1-2 질문 1 A) 로그(`logbook.py`)는 값 속 제어 문자 — 유니코드 범주 Cc(NUL · ESC · DEL · C1 등)와 Cf(U+202E 같은 양방향 제어, U+200B 등) — 를 언제나 따옴표 값 안의 `\uXXXX` 이스케이프로 쓴다. 공백이 없어도 이런 글자가 든 값은 따옴표 없이 쓰지 않는다. 계약 7절 "값 쓰는 법" 표와 그 아래 문단을 함께 고친다(이미 있는 이름의 뜻은 그대로, 이스케이프 대상만 넓어짐 — 계약 10절). 근거: Phase 1 은 줄 바꿈 글자 10개만 이스케이프해서, 제목 속 NUL 하나로 GNU grep 이 로그 전체를 `binary file matches` 로 가리고 ESC 는 터미널에 가짜 `mode=live result=posted` 줄을 그렸다(Phase 1 세 번째 ship-report R1, 인터뷰에서 재현). 이 페이즈는 Phase 2–6 이 모두 끝난 뒤 혼자 돌아 다른 레인과 부딪히지 않고, 평가자가 읽는 `logs/sample.log`(Phase 8)보다 앞선다 — 제출 증명을 어떤 도구로 읽어도 같게 하는 쪽을 최적화.
-- **The plan decides** — 위 로그 고침의 세부 · 후보: 이스케이프 범위(Cc · Cf 전부 vs Cc 와 양방향 제어만) · `parse_line` 이 고치기 전에 쓰인 날 제어 문자 줄을 계속 읽을지 거부할지 · `tests/mutants.py` 에 이 고침을 되돌리는 변이를 더할지 · 조건: Phase 1 ship-report R1 의 재현 입력(제목 `x\x00y\x00z`, `a\x1b[2Kb`)이 테스트의 실제 입력이어야 하고, 그 제목들과 `POST … result=posted` 줄을 쓴 파일에서 GNU grep `posted` 가 게시 줄을 보여 주며(binary 판정 없음) 파일에 날 제어 문자가 0개이고 `parse_line` 이 원래 값을 되돌림을 테스트가 잠근다.
-- (2026-10-13, Phase 2 HC1 질문 1 A) 탐지기(`watcher.py`)가 깨진 구글 응답에도 계약 11절대로 `ERROR` 한 줄을 남기고 추적을 이어 가게 고친다 — ① `Watcher._page_ids` 는 `nextPageToken` 을 `[A-Za-z0-9_-]+` 일 때만 받고, 그 밖의 비어 있지 않은 값은 `YouTubeError("search.list", …)` 로 바꾼다 → `ERROR where=search.list … keyword=…` 줄이 남고, 남은 검색은 그만두고 추적은 계속한다. ② `_published` · `_views` 의 오류 문구는 값이 str 이 아니면 `{value!r:.40}` 대신 `type(value).__name__` 을 쓴다. ③ (2026-10-14 다시 씀, Phase 2 인터뷰 슬롯 2 질문 2 A) 두 가지를 모두 한다 — (가) `YouTubeClient._call`(`youtube.py:246`)은 `self._fetch` 에서 난 예외를 **무엇이든**(`except Exception` — Ctrl+C 같은 인터럽트는 `BaseException` 이라 빠진다) `YouTubeError(call, "network <종류>: …")` 로 바꾼다 → `ERROR` 한 줄. 이 한 줄로 R11 · R11′ · B1(음수 덩어리 크기) · R-N5 가 함께 닫힌다. (나) `http_get`(`youtube.py:181-188`)은 301 · 302 · 303 · 307 · 308 **다섯 코드 모두** 리다이렉트를 따라가지 않고 3xx 를 그대로 돌려준다 → `HTTP 3xx` `ERROR` 한 줄 — R18(다른 호스트 · http · ftp 로 따라감)이 닫힌다. 다섯 코드를 모두 덮어쓰거나 리다이렉트 처리기가 없는 opener 를 쓴다: `http_error_302` 만 고치면 301 · 303 · 307 · 308 은 별칭이라 계속 따라가고, `redirect_request` 가 None 을 돌려주게 하면 `http://[` 는 그보다 먼저 `urlparse` 에서 `ValueError` 가 난다(Phase 2 네 번째 ship-report R-③ — 둘 다 302 테스트는 통과한다). 근거: Phase 2 ship-report R1 · R2 · R11 — 이 셋이 예외를 `Watcher.run` 밖으로 내보내 그 주기의 새 영상 · 조회수 표본 · `ERROR` 줄이 모두 사라졌다(인터뷰에서 재현). 이 페이즈가 `run.py` 로 주기를 처음 실제로 돌리므로 그보다 앞서고, Phase 2–6 이 끝난 뒤 혼자 돌아 `watcher.py` 를 고쳐도 레인 충돌이 없다.
+- (2026-10-14 E-005 인터뷰 질문 3 · 4 A — 2026-10-13 HC1-2 질문 1 A 의 로그 제어 문자 고침을 Phase 1A 로 옮김) 로그 값 글자 규칙(제어 · 서식 글자 포함)은 Phase 1A 가 "남길 글자 목록"(L · M · N · P · S 와 U+0020 만 날 글자, 나머지 `\uXXXX`)으로 고친다 — 이 페이즈는 다시 고치지 않는다. 허용 목록 밖 영상이 게시되지 않았다는 로그 증명은 Phase 1A 의 `read_log` 로만 읽는다(UTF-8 로 엄격히 풀고 `\n` 에서만 나누며, 비지 않은 모든 줄이 `parse_line` 을 통과해야 하고, 한 줄이라도 실패하면 증명 실패). 근거: latin-1 + `splitlines()` 로 읽으면 한글 제목 하나가 가짜 `POST … result=posted` 줄로 해석된다(Phase 1 ship-report R1 · Human checks 5 = H-005).
+- (2026-10-13, Phase 2 HC1 질문 1 A) 탐지기(`watcher.py`)가 깨진 구글 응답에도 계약 '탐지 · 조회수 추적' 절대로 `ERROR` 한 줄을 남기고 추적을 이어 가게 고친다 — ① `Watcher._page_ids` 는 `nextPageToken` 을 `[A-Za-z0-9_-]+` 일 때만 받고, 그 밖의 비어 있지 않은 값은 `YouTubeError("search.list", …)` 로 바꾼다 → `ERROR where=search.list … keyword=…` 줄이 남고, 남은 검색은 그만두고 추적은 계속한다. ② `_published` · `_views` 의 오류 문구는 값이 str 이 아니면 `{value!r:.40}` 대신 `type(value).__name__` 을 쓴다. ③ (2026-10-14 다시 씀, Phase 2 인터뷰 슬롯 2 질문 2 A) 두 가지를 모두 한다 — (가) `YouTubeClient._call`(`youtube.py:246`)은 `self._fetch` 에서 난 예외를 **무엇이든**(`except Exception` — Ctrl+C 같은 인터럽트는 `BaseException` 이라 빠진다) `YouTubeError(call, "network <종류>: …")` 로 바꾼다 → `ERROR` 한 줄. 이 한 줄로 R11 · R11′ · B1(음수 덩어리 크기) · R-N5 가 함께 닫힌다. (나) `http_get`(`youtube.py:181-188`)은 301 · 302 · 303 · 307 · 308 **다섯 코드 모두** 리다이렉트를 따라가지 않고 3xx 를 그대로 돌려준다 → `HTTP 3xx` `ERROR` 한 줄 — R18(다른 호스트 · http · ftp 로 따라감)이 닫힌다. 다섯 코드를 모두 덮어쓰거나 리다이렉트 처리기가 없는 opener 를 쓴다: `http_error_302` 만 고치면 301 · 303 · 307 · 308 은 별칭이라 계속 따라가고, `redirect_request` 가 None 을 돌려주게 하면 `http://[` 는 그보다 먼저 `urlparse` 에서 `ValueError` 가 난다(Phase 2 네 번째 ship-report R-③ — 둘 다 302 테스트는 통과한다). 근거: Phase 2 ship-report R1 · R2 · R11 — 이 셋이 예외를 `Watcher.run` 밖으로 내보내 그 주기의 새 영상 · 조회수 표본 · `ERROR` 줄이 모두 사라졌다(인터뷰에서 재현). 이 페이즈가 `run.py` 로 주기를 처음 실제로 돌리므로 그보다 앞서고, Phase 2–6 이 끝난 뒤 혼자 돌아 `watcher.py` 를 고쳐도 레인 충돌이 없다.
 - **The plan decides** — 위 탐지기 고침의 테스트 모양 · 조건: Phase 2 ship-report 의 재현 입력이 테스트의 실제 입력이어야 함 — `"nextPageToken": "\ud800"` 인 검색 응답에서 `run` 이 예외 없이 `CycleReport(failed=True)` 를 돌려주고 `ERROR where=search.list` 한 줄과 아는 영상의 `VIEWS` 줄이 남음, `publishedAt` 이 47,500단 중첩 목록인 응답에서 주기가 예외 없이 끝남(Python 3.14 에서는 `SKIP … reason=invalid_item`, 3.10 에서는 `json.loads` 가 먼저 실패해 `ERROR` 한 줄). ③의 테스트 입력(2026-10-14): 루프백 서버가 날 바이트로 답하는 실제 `http_get` 으로 — 덩어리 크기 `-2` 인 chunked 응답(200 검색 · 403 · `videos.list`)에서 `ERROR` 한 줄과 아는 영상의 `VIEWS` 줄이 남음, 301 · 302 · 303 · 307 · 308 다섯 코드 × `Location` `ftp://%00/` · `http://[` · 다른 호스트에서 모두 `HTTP 3xx` `ERROR` 한 줄이고 다른 호스트가 받은 요청은 0건. 쪽지 허용 글자 검사를 되돌리는 변이를 `tests/mutants.py` 에 더할지는 plan 이 정한다.
-- (2026-10-14, Phase 2 인터뷰 슬롯 2 질문 3 A) **한 일꾼 규칙** — `run.py` 는 다섯 단계(탐지 → 판별 → 타이밍 → 작성 → 게시)를 주기 루프 하나, 한 스레드에서 차례로 돌린다. `Store` 와 `QuotaLedger` 는 두 스레드(또는 asyncio 작업 · 하위 프로세스)에서 부르지 않는다. 동시 실행이 필요해지면 그 전에 잠금 결정을 따로 한다(이 인터뷰에서 고르지 않은 쪽: `reserve` 와 `Store` 쓰기에 스레드 잠금 + 겹치지 않는 임시 파일 이름). 계약 11절 진입점 예시에도 "한 스레드"를 적는다. 근거: `reserve`(`youtube.py:102-114`)의 "세고 적기"와 `Store` 쓰기에는 잠금이 없고 임시 파일 이름이 고정(`quota.json.tmp`, `store.py:156`)이라, 장부 한 벌을 두 스레드가 쓰면 상한 90 에 126회(16 스레드면 339회)를 허락하고 `FileNotFoundError` 가 났다(Phase 2 네 번째 ship-report R-N2, 3.14 · 3.10). 저장소도 같은 꼴이라 게시 기록이 사라지면 "영상당 댓글 1개"가 깨진다(코드를 읽어 봄, 돌려 보지 않음). Phase 1 의 "프로세스 안 루프 하나"(`scheduler.run_loop`)와 그대로 맞고 코드 0줄 — 하루 10개 게시 · 120분 주기라 게시가 느려도 주기당 몇 분이다. Phase 7 의 짐을 늘리지 않고 Phase 1 소유 `store.py` 를 열지 않는 쪽을 최적화.
+- (2026-10-14, Phase 2 인터뷰 슬롯 2 질문 3 A) **한 일꾼 규칙** — `run.py` 는 다섯 단계(탐지 → 판별 → 타이밍 → 작성 → 게시)를 주기 루프 하나, 한 스레드에서 차례로 돌린다. `Store` 와 `QuotaLedger` 는 두 스레드(또는 asyncio 작업 · 하위 프로세스)에서 부르지 않는다. 동시 실행이 필요해지면 그 전에 잠금 결정을 따로 한다(이 인터뷰에서 고르지 않은 쪽: `reserve` 와 `Store` 쓰기에 스레드 잠금 + 겹치지 않는 임시 파일 이름). 계약 '탐지 · 조회수 추적' 절 진입점 예시에도 "한 스레드"를 적는다. 근거: `reserve`(`youtube.py:102-114`)의 "세고 적기"와 `Store` 쓰기에는 잠금이 없고 임시 파일 이름이 고정(`quota.json.tmp`, `store.py:156`)이라, 장부 한 벌을 두 스레드가 쓰면 상한 90 에 126회(16 스레드면 339회)를 허락하고 `FileNotFoundError` 가 났다(Phase 2 네 번째 ship-report R-N2, 3.14 · 3.10). 저장소도 같은 꼴이라 게시 기록이 사라지면 "영상당 댓글 1개"가 깨진다(코드를 읽어 봄, 돌려 보지 않음). Phase 1 의 "프로세스 안 루프 하나"(`scheduler.run_loop`)와 그대로 맞고 코드 0줄 — 하루 10개 게시 · 120분 주기라 게시가 느려도 주기당 몇 분이다. Phase 7 의 짐을 늘리지 않고 Phase 1 소유 `store.py` 를 열지 않는 쪽을 최적화.
 
 Trade-offs accepted
 - 실패 후 재시도는 하지 않고 다음 영상으로 넘어간다 (과제 ⑤).
-- (2026-10-13, Phase 1 HC1-2) 로그 제어 문자 고침이 이 페이즈로 와서 일이 조금 늘어난다(코드 몇 줄 · 테스트 행 · 계약 7절 표). Phase 2–6 이 도는 동안 쓰인 `logs/agent.log` 는 이 고침 전 모양이다 — 실행 로그는 git 무시이고 실행마다 쌓이는 파일이라 제출물(`sample.log`)에는 영향이 없다.
+- (2026-10-14) 로그 제어 문자 고침은 Phase 1A 로 옮겼다(E-005 인터뷰 질문 4 A) — 이 페이즈의 일이 그만큼 준다. Phase 1A 착지 전에 쓰인 `logs/agent.log` 는 옛 모양이다 — 실행 로그는 git 무시이고 실행마다 쌓이는 파일이라 제출물(`sample.log`)에는 영향이 없다.
 
 Responsibilities & risks to guard against
+- (2026-10-14, E-010 · 헌법 10조) 이 페이즈의 understand 는 장부 `.adw/human-checks.md` 에서 제목에 "Phase 7" 이 있는 열린 항목을 모두 가져오고(2026-10-14 기준 8개 — H-005 · H-007 · H-008 · H-009 · H-017 · H-021 · H-023 · H-027, 그중 H-005 는 Phase 1A 결정으로 풀림 · H-023 은 병합 뒤 사람 확인), plan 이 항목마다 `Inherited H-###:` 한 줄로 닫는다. H-009 의 Phase 2 몫(최소 기록 간격 · 한 번 튀거나 꺼진 조회수 읽기 · 나이 창이 닫힌 영상의 추적 중단)은 Phase 2 사이클이 헌법 10조 전에 시작해(레인 base 에 H-009 없음) 보지 못했다 — 이 페이즈가 가져올 때 그 몫까지 분류한다. 하루 한도를 넘길 것 같으면 혼자 받아들이지 말고 `→ Phase M` 이나 `→ human` 으로.
 - 허용 목록 밖 영상이 게시되지 않았다는 증거를 코드와 기록으로 보여줄 수 있어야 함 (과제 체크리스트).
 - (2026-10-13, Phase 1 HC1-2) 로그를 사람이 grep · 터미널로 읽어도 `parse_line` 과 같은 내용이 보여야 한다 — 이 페이즈의 리뷰에서 로그 파일에 날 제어 문자가 남지 않는지 확인.
 - (2026-10-13, Phase 2 HC1) Phase 2 ship-report 의 R5 · R6 · R7 · R9(저장소 쓰기 순서)가 이 페이즈 몫이다. R6: `on_error` 를 만들 때 예외의 `__context__` 를 따라가거나 traceback 지역 변수를 남기지 않는다 — `raise … from None` 뒤에도 원래 예외와 프레임의 `url` 에 API 키가 있고, `env.py` 가 이어 붙이는 `UnicodeDecodeError.object` 에는 `.env` 바이트 전체가 있다. R5: `http_get` 이 `HTTPError` 를 닫고, 오류 본문 읽기가 실패해도 상태 코드를 남기고(지금은 본문이 잘린 403 이 `network IncompleteRead` 로 적힘), 요청 전체에 시간 상한을 둔다. R7 · R9: 영상마다 `Store.put` 이 저장소 파일 전체를 다시 쓰는 것(기록 5,000개에서 `put` 1회 80 ms, 주기마다 300개면 약 24초)과, 쓰기가 실패해도 기록이 메모리에 먼저 들어가 다음 주기에 `DETECT` 가 영영 남지 않는 것을 함께 본다 — Phase 1 저장소 API(계약 3절)를 건드리면 계약 변경이다.
@@ -281,7 +423,7 @@ Responsibilities & risks to guard against
 - (2026-10-13, Phase 2 ship-check 민감 줄) Phase 2 R12(Phase 1 줄의 R12 — 결과 모르는 게시 — 와 다른 위험): 저장소(`Store`)와 쿼터 장부(`QuotaLedger`)는 데이터 폴더마다 하나만 만들어 탐지기 · 게시기가 함께 쓴다 — 주인은 이 페이즈(`run.py` 가 한 벌만 만들고, 계약 11절 진입점 예시도 그렇게 적는다). 한 프로세스 안의 두 벌은 단일 실행 잠금이 막지 못한다. (2026-10-14) 같은 저장소 · 장부를 동시에 쓰는 일은 위 Decisions 의 한 일꾼 규칙이 막는다 — 이 페이즈 리뷰에서 `src/` 에 `threading` · `concurrent` · `asyncio` · `multiprocessing` · `subprocess` 로 단계를 나눠 돌리는 코드가 없는지 확인한다. 그런 코드가 필요해 보이면 구현하지 말고 인터뷰로 돌아온다(잠금은 사람 결정).
 
 Dependencies
-- Depends on: Phase 2, Phase 3, Phase 4, Phase 5, Phase 6
+- Depends on: Phase 2, Phase 3, Phase 4, Phase 5, Phase 6, Phase 6B (잰 기준값 — 2026-10-13 질문 1 A), Phase 1A (`read_log` · 로그 글자 규칙 — 2026-10-14 E-005 질문 4 A)
 - Unlocks: Phase 8
 
 Open questions
@@ -303,6 +445,7 @@ Decisions
 
 Responsibilities & risks to guard against
 - 키 노출 여부를 마지막에 확인 (과제 평가 항목).
+- (2026-10-14, Phase 1A) README 의 허용 목록 안내: youtu.be · shorts 주소는 맨 ID 나 공유 버튼 주소 그대로(`?si=` · `?t=` · `?feature=` 만) 적는다 — 다른 꼬리가 붙으면 그 영상은 오류 없이 테스트 모드로만 돈다. `logs/sample.log` 로 허용 목록 밖 게시가 없음을 보일 때는 `read_log` 로 읽는다.
 - (2026-10-13, Phase 1 HC1 질문 2) 로그의 테스트 저장 이유에 가드의 네 이유(`invalid_video` · `not_in_allowlist` · `dry_run` · `allowlisted`) 밖의 `page_mismatch` 가 있다 — README 의 테스트 모드 결과 설명이나 PROCESS.md 에 한 줄로 뜻을 적는다.
 
 Dependencies
@@ -310,13 +453,13 @@ Dependencies
 - Unlocks: none
 
 Open questions
-- none
+- (2026-10-13 질문 3 B — "Phase 8은 그때 정한다") `logs/sample.log`의 실제 실행은 누가 돌리나: Phase 6A · 6B처럼 사람이 셸에서 돌리고(로그인된 크롬 · 허용 목록 영상) 사이클은 커밋된 기록만 읽을지, 다른 방법을 쓸지. 사이클은 지금 진짜로 부를 수 없다 — 레인에 `.env`가 없고(`.gitignore:2`) 헌법 Never 절이 승인 없는 외부 전송을 막으며, 로그인된 크롬은 사람만 준비할 수 있다. 정하면 Phase 8을 사람 실행 앞뒤로 나눌지도 함께 정한다. 이 질문이 열려 있으면 Phase 8 사이클은 계획 전 첫 관문(미결 질문 판정)에서 멈추고 사람에게 묻는다 — 결정문에 답이 없어 판정자가 대신 풀 수 없다. 실행 단계에서 멈춰 반나절을 잃는 것보다 시작할 때 정하는 쪽.
 
 ---
 
 ## Cross-cutting open questions
 - 병렬 진행 설정: 현재 `.adw/cycle.yml:83`의 `lane.max`는 1이라 페이즈가 한 번에 하나씩 돈다. Phase 2–6을 동시에 돌리려면 허브 ⚙ Settings → Cycle에서 5 이상으로 올려야 한다 (최대 9). 사용자가 설정한다. 막히는 항목은 아님 — 1이어도 순서대로 진행된다.
-- 판단 AI 교체는 사람 결정: Phase 3에서 jev의 한국어 정확도가 낮게 나와도 jev를 다른 모델로 바꾸는 것은 사용자 원칙("내용 판단은 jev")을 바꾸는 일이라 사이클이 혼자 정하지 않는다. 막히는 항목은 아님 — 발생하면 drift로 이 인터뷰에 돌아온다.
+- 판단 AI 교체는 사람 결정: Phase 6B가 잰 jev의 한국어 정확도가 낮게 나와도 jev를 다른 모델로 바꾸는 것은 사용자 원칙("내용 판단은 jev")을 바꾸는 일이라 사이클이 혼자 정하지 않는다. 막히는 항목은 아님 — 발생하면 drift로 이 인터뷰에 돌아온다.
 
 ## Decision log
 | Date | Phase | Decision | Why |
@@ -344,3 +487,22 @@ Open questions
 | 2026-10-13 | 2, 7 | Phase 2 ship-check(`READY WITH RISKS`) 민감 줄 2개 확인: R11′(깨진 리다이렉트 · `TypeError` · `OverflowError`)는 고침 ③을 "리다이렉트를 따라가지 않고 3xx 는 `HTTP 3xx` `ERROR`"로 넓혀 Phase 7 에 넘기고 출하 · Phase 2 R12(저장소 · 장부 두 벌)는 주인을 Phase 7 로 정함 · `human_checks.py confirm` 으로 민감 줄을 닫음, ship-check 는 다시 돌리지 않음 | 코드 · 테스트 · 계약은 그대로 · 입력은 깨진 구글 응답뿐 · 피해는 그 주기 하나 · 실제 실행(`run.py`)은 Phase 7 전에는 없음 · 고침 사이클 한 번을 아낌 (허브 자동 응답 에이전트 🤖 `hub:attn-agent` 가 권장안으로 고름 — 2026-10-14 인터뷰 슬롯 2 질문 1 에서 사람이 A 로 유지. 이 줄은 처음에 "사람 선택"으로 잘못 적혔다) |
 | 2026-10-14 | 2, 7 | Phase 2 네 번째 ship-check(`BLOCKED`, `drift`) B1(음수 덩어리 크기 → `ValueError` 가 `_call` 을 빠져나감): 받아들이고 Phase 2 출하 · 받아들일 셋째 예외를 입력이 아니라 자리(`_call` 에서 `self._fetch` 가 낸 예외는 무엇이든)로 적음 · Phase 7 ③을 (가) `except Exception` 넓히기 + (나) `http_get` 다섯 코드 리다이렉트 끊기로 다시 씀 · R18 받아들임 줄 추가 | 같은 `except` 한 줄에서 세 번째 정지(R11 → R11′ → B1) — 입력으로 적으면 다음 입력이 또 정지, `e265dbf` 처럼 문구를 고치다 덮개가 빠짐 · 입력은 깨진 구글 응답뿐, 피해는 한 주기, `run.py` 전에는 실제 실행 없음 · 고침 사이클(약 2시간) 아낌 (인터뷰 슬롯 2 질문 2 A, 사람 답) |
 | 2026-10-14 | 7 | Phase 2 네 번째 ship-check 민감 줄 2(R-N2, 장부 한 벌을 두 스레드가 쓰면 상한 90 에 126회): 한 일꾼 규칙 — `run.py` 는 다섯 단계를 한 루프 · 한 스레드에서 차례로, `Store` · `QuotaLedger` 를 두 스레드에서 부르지 않음, 동시 실행 전엔 잠금 결정을 따로 | 코드 0줄 · Phase 1 의 프로세스 안 루프 하나와 일치 · 저장소 경합도 함께 막힘 · 하루 10개 · 120분 주기라 차례 실행 비용은 주기당 몇 분 · 큰 Phase 7 에 일을 더하지 않음 (인터뷰 슬롯 2 질문 3 A, 사람 답) |
+| 2026-10-13 | 6A, 6B, 7 | Phase 7 앞에 '진짜로 붙여 보기'(6A 준비 · 6B 반영)를 끼움. Phase 7은 6B 뒤 | jev · Claude는 키 · SDK 없이 공식 문서 · SDK 소스 · 가짜로만 만들고 테스트됐고 계약 정확도 칸은 "아직 재지 않음". 2026-10-12 인터뷰가 접속 방법만 닫고 키 보유 여부를 묻지 않은 빈틈. 다섯 모듈을 묶기 전이 고칠 곳이 한 군데인 마지막 시점 (사용자 "jev api 제공한 적 없는데" · 질문 1 A) |
+| 2026-10-13 | 6A, 6B | 진짜 외부 호출은 사람이 셸에서 돌리고, 사이클은 실행기를 만들어 가짜로 테스트 · 커밋된 결과 파일만 읽음 | 외부 전송 버튼은 늘 사람이, 키는 사이클 손에 안 감 · 헌법 Never 절과 레인에 `.env` 없음에 맞음. 대가로 사람 실행을 사이에 두고 두 페이즈로 나뉨 (질문 2 C) |
+| 2026-10-13 | 8 | 위 규칙을 Phase 8(`sample.log` 실제 실행)에 쓸지는 Phase 8 시작 전에 정함 → Phase 8 Open questions | 지금 바꾸는 범위를 좁게. Open question으로 두어 Phase 8이 실행 단계에서 멈추기 전에 인터뷰로 오게 함 (질문 3 B) |
+| 2026-10-14 | 1A | 가드: youtu.be · shorts 쿼리 이름은 `si` · `t` · `feature` 만 받음(받는 이름 목록), 그 밖은 `invalid_video` · watch 는 그대로 | 막는 이름 `v` 하나로는 `v\x01` · `V=` · `%56=` · `+v=` · 전각 `ｖ=` 가 A 로 읽혀 열린 채였음(인터뷰에서 재현) — 출하 점검 네 번 연속 목록 밖 꼴(E-005). watch 는 크롬 `page.url` 꼬리가 미측정이라 정상 게시가 `page_mismatch` 로 빠질까 봐 제외 (E-005 인터뷰 질문 1 A, H-001) |
+| 2026-10-14 | 1A | 설정 정수 `_int` 는 상한을 필수 인자로, 키마다 상한을 계약 2절 표에 · "비교와 셈에만 쓰인다" 문장 바로잡음 | 16진수 · 60진수가 파이썬 4,300자리 한도를 비켜 읽기를 통과한 뒤 `START` 줄 · Claude 지시문에서 `ValueError` → "잘못 고친 설정 유지"가 깨짐(인터뷰에서 재현). 정수 키를 더할 뒤 페이즈가 상한을 빼먹지 못하게. 모두 같은 자릿수 상한은 뜻 없는 값을 통과시켜 택하지 않음 (질문 2 A, H-006) |
+| 2026-10-14 | 1A, 7 | 로그 쓰기: 날 글자는 L · M · N · P · S 와 U+0020 뿐, 나머지는 `\uXXXX` (Phase 7 의 Cc · Cf 결정을 대신) · 로그 읽기: 증명은 `read_log`(UTF-8 엄격 · `\n` 만 · 모든 줄 `parse_line`, 실패는 증명 실패)로만 | latin-1 + `splitlines()` 로 한글 제목이 가짜 `POST … posted` 로 해석됨(R1) · 짝 없는 서로게이트 제목이 로그 쓰기를 터뜨림 · 막을 무리 대신 남길 무리를 적어 새 글자도 바꿔 쓰는 쪽에 떨어지게. 로그 전부 ASCII 는 `sample.log` 의 한글을 못 읽게 해 택하지 않음 (질문 3 A, H-005) |
+| 2026-10-14 | 1A, 7 | 세 고침을 새 Phase 1A(After: Phase 2)로 묶고, Phase 7 의 로그 제어 문자 고침을 1A 로 옮김 · Phase 7 은 1A 뒤 | 세 파일 모두 Phase 1 소유 · 진짜 영상 제목이 처음 들어오는 6A 사람 실행보다 먼저 착지할 수 있음 · 넘칠 듯한 Phase 7 이 한 항목 줄어듦 · Phase 2 레인과 같은 파일(계약 · 설정 테스트 · 변이) 충돌 회피. Phase 7 에 모두 얹는 쪽은 가드 · 설정 고침이 jev 키 도착 이후로 밀려 택하지 않음 (질문 4 A) |
+| 2026-10-14 | 전체 (헌법 9조) | 계약 약속 문장 규칙은 이 프로젝트 헌법 `.adw/constitution.md` 9조에 둠 | 백로그 줄이 가리킨 `.claude/skills/verify-plan/SKILL.md` 는 하네스 파일(`.adw/harness-paths:4`)이라 다음 설치가 덮음 · 헌법은 설치가 보존하고 plan · verify-plan · ship-check 가 읽음. ADWS 원본 고침은 낱말 넷이 한국어 계약 전용이라 택하지 않음 (E-009 인터뷰 질문 1 A · 6 A) |
+| 2026-10-14 | 전체 (헌법 9조) | 약속을 재는 검사가 빨강이면 사이클 안에서 문장을 코드가 하는 만큼으로 줄임 — 코드는 안 바꾸고, ship-check 는 `## Risks` 에 원래 글과 함께 적을 뿐 사람 확인으로 올리지 않음. 약속을 넓히려 코드를 바꾸는 일은 사람 결정 | 두 목격(Phase 1 · 4) 모두 코드는 결정대로이고 문장만 넓었음 · 사이클 안에서는 그 문장을 믿은 쪽이 아직 없음. 멈춤(drift)은 사람 호출 횟수를 줄이지 못해 택하지 않음 (E-009 질문 2 A) |
+| 2026-10-14 | 전체 (헌법 9조) | 약속 줄은 낱말 넷(뿐 · 않 · 될 수 있 · 에만) 그물로 줍고, 걸린 줄마다 테스트 · 검사 · "약속 아님 — 이유" 중 하나로 정리 | 두 목격을 모두 잡은 그물이고 "걸린 줄 = 정리한 줄"로 빠뜨림을 셀 수 있음. 넓은 그물은 11절 기준 10 → 15줄인데 늘어난 줄이 대부분 잡음 (E-009 질문 3 A) |
+| 2026-10-14 | 전체 (헌법 9조) | 계획이 약속 줄마다 `## Test plan` 에 스위트 테스트를 짝짓고, 빨강이면 구현이 plan-miss 로 `.adw/plan-repairs.md` 에서 문장을 줄임 · verify-plan 그물은 안전망 | 틀린 문장은 두 번 다 계획서에서 태어남(Phase 4 plan.md:391-393 · Phase 1 plan.md:84-85) · `.adw/verify.sh` 는 커밋되지 않아(`.adw/.gitignore:23`) 한 번 잰 약속은 Phase 7 이 코드를 바꾸면 다시 거짓이 될 수 있음 (E-009 질문 4 A) |
+| 2026-10-14 | 전체 (헌법 9조), 1A | 규칙은 앞으로 더하거나 고치는 계약 줄에만 · 기존 줄은 고치는 페이즈가 생길 때 걸림 · 2절 "비교와 셈에만" 은 Phase 1A, 트리거 11절 세 문장은 H-008 이 맡음 | 실제 틀렸던 두 문장은 이미 주인이 있고 나머지 약 62줄은 틀렸다는 증거가 없음 · 계약서는 Phase 2 · 1A 레인이 함께 고쳐 전체 쓸기가 지금 가장 비쌈 (E-009 질문 5 A) |
+| 2026-10-14 | 1B | 계약 10절 뒤에 덧붙이는 절은 번호 없이 제목만 달고 제목으로 가리킴 · 스위트 테스트가 10절 뒤 번호 제목과 10보다 큰 "N절" 인용을 빨강으로 | 레인마다 출발 사본의 마지막 + 1 로 `## 11.` 을 매겨 main 에 11절이 둘(댓글 작성 · 트리거 판정), "11절" 인용 8곳이 두 번(Phase 5 · Phase 2 레인). 규칙 글만으로는 동시에 출발한 레인에 닿지 않음 (E-014 인터뷰 질문 1 · 2 A) |
+| 2026-10-14 | 1B | 새 Phase 1B 를 Phase 2 착지 뒤에 두고 Phase 2 의 제목과 8곳까지 한 레인에서 고침 | 다섯 번째 출하 점검 중인 Phase 2 를 한 번 더 세우지 않음 · 1A 에 얹으면 파일 상한(~10개)을 넘고 주제가 다름 (E-014 질문 3 A) |
+| 2026-10-14 | 1B | 옛 기록은 계약 10절의 풀이 한 줄("옛 11 · 12절 = 그 기록을 남긴 페이즈가 더한 절")로 읽고, 열린 장부 E-007 · E-012 만 지금 이름으로 고침 · H-008 · H-009 는 human-checks 머리 규칙(사람은 status 줄만)대로 그대로 | 같은 "11절" 이 쓴 페이즈마다 다른 절 · 트래커는 사이클이 못 고치고 Phase 2 의 트래커 줄은 아직 레인에 있음 (E-014 질문 4 A) |
+| 2026-10-14 | 전체 (헌법 10조) | 다른 페이즈에 넘긴 일은 사람 확인 장부 `.adw/human-checks.md` 를 거쳐 가고, 받는 페이즈가 직접 가져감 — understand 가 notes.md `## Inherited` 로 옮기고 plan 이 항목마다 닫음. 규칙은 하네스가 아니라 헌법에 | 넘긴 일은 이미 ship-check → Human checks → 장부로 오는데(H-007 · H-009 · H-017 · H-021 · H-027 모두 open), understand · plan 이 장부를 안 읽어 트래커 Phase 2 · 7 절에 하나도 없었음. 백로그 줄의 고칠 자리 `.claude/skills/plan/SKILL.md:161` 은 하네스라 다음 설치가 덮고, 보내는 쪽만 고치면 같은 장부에 쌓일 뿐. ADWS 의 다른 프로젝트는 고쳐지지 않음을 받아들임 (E-010 질문 1 A) |
+| 2026-10-14 | 전체 (헌법 10조) | 받는 몫 = 제목 줄에 `Phase N` 이 낱말로 있는(뒤에 숫자 · 영문자 없음, 1 ≠ 1A) `open` 항목 전부 · 보내는 쪽은 받는 페이즈를 늘 번호로 · ship-check 가 "가져온 수 = 닫은 수" 를 셈 | 오늘 장부에서 넘긴 일을 하나도 놓치지 않음(Phase 2 → 2개, Phase 7 → 넘긴 일 6 + 잡음 2). "트래커 Phase N 절" 같은 좁은 꼴은 H-007 · H-009("트래커 Phase 2 · Phase 7 절")를 놓쳐 Phase 2 가 0개. 판단에 맡기면 빠뜨림을 셀 수 없음 (E-010 질문 2 A) |
+| 2026-10-14 | 전체 (헌법 10조) | 가져온 일을 안 하면 늘 새 주인 — `→ Phase M`(ship-check 가 번호를 달아 Human checks → 장부 새 줄) 또는 `→ human`(받아들일지 · 주인을 정할지) · 계획이 혼자 받아들이지 않음 · 닫는 줄이 빠진 항목도 `→ human` 처럼 | `gates: auto` 라 `## Risks` 에만 적은 것은 병합 전에 아무도 안 읽음 = 주인 없이 받아들인 위험(E-010 의 절반). "안 함" 금지는 Phase 7(넘겨받을 일 6개)을 하루 한도 밖으로 밀어 택하지 않음. 7 → 8 → … 로 계속 미루는 것은 이 규칙만으로 못 막음 (E-010 질문 3 A) |
+| 2026-10-14 | 전체 (헌법 10조), 7 | 계획서의 넘김은 `- Handed to Phase M: <무엇>`, 계약에도 적은 것은 `(contract: <절 제목>)` 을 붙이고 ship-check 는 괄호 없는 줄만 장부로 나름(괄호 줄은 그 절이 `Phase M` 을 부르는지 확인) · 빠진 한 줄("`SKIP` 한 영상 기억", Phase 5 → 7)은 Phase 7 결정으로 옮김 | 지난 계획서 넷의 넘김 8개 중 6개는 계약에, 1개는 트래커에 있었고 1개만 계획서에만 — 계약에 함께 적는 것은 습관일 뿐 규칙이 아니었음. 전부 나르면 계약과 6개가 겹쳐 Phase 7 이 가져올 항목이 8 → 약 14. 절은 번호가 아니라 제목으로(Phase 1B · E-014 와 같은 방향) (E-010 질문 4 A) |

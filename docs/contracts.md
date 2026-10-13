@@ -2,15 +2,18 @@
 
 Phase 2–7 의 모든 단계가 기대는 계약입니다. 설정 읽기, 영상 기록 모양, 저장소 규칙,
 허용 목록 가드, 게시 흐름, 로그 형식, 주기 실행을 여기서 정합니다. 코드는
-`src/agent/` 패키지(`config.py` · `models.py` · `store.py` · `guard.py` · `logbook.py` ·
-`scheduler.py`)에 있습니다.
+`src/agent/` 패키지에 있고, 모듈을 다루는 절은 제목이 그 모듈을 적습니다.
 
 ## 1. 실행
 
 - Python 3.10 이상. 3.11 이후에만 있는 기능(`datetime.UTC`, `enum.StrEnum`, `tomllib`,
   `typing.Self`, `except*`)은 쓰지 않습니다.
-- 의존성 설치: `pip install -r requirements.txt` — 지금은 `PyYAML>=6.0` 한 줄입니다.
-  Phase 6 이 Playwright 를 더합니다.
+- 의존성 설치: `pip install -r requirements.txt` — `PyYAML>=6.0`(설정 읽기), jev 판별(Phase 3)의
+  `typesafe-sdk>=0.7.4,<0.8`, 댓글 작성기(Phase 5, '댓글 작성' 절)의 Claude SDK `anthropic>=0.40`,
+  게시 단계(Phase 6)의 `playwright>=1.40` 네 줄입니다. 게시 단계는 이미 설치된 크롬에 `connect_over_cdp` 로 붙으므로
+  `playwright install`(브라우저 내려받기)은 필요 없습니다. 테스트는 SDK 와 Playwright 없이 돕니다 —
+  판별 테스트는 가짜 jev 를, 작성기 테스트는 가짜 클라이언트를 씁니다. `agent.chrome` 이 크롬에
+  연결할 때에만 Playwright 를 불러옵니다.
 - 테스트(저장소 뿌리에서, 설치 없이):
 
   ```
@@ -43,6 +46,14 @@ Phase 2–7 의 모든 단계가 기대는 계약입니다. 설정 읽기, 영�
 | `limits.daily_max_searches` | 정수 | ≥ 0 | `90` (과제 밖에서 더한 키) |
 | `comment.min_chars` | 정수 | ≥ 1 | `40` |
 | `comment.max_chars` | 정수 | ≥ `min_chars` | `120` |
+| `comment.writer_model` | 글자 | 비어 있지 않음 — 댓글을 쓰는 Claude 모델 이름 ('댓글 작성' 절) | `claude-sonnet-5-5` |
+| `comment.check_min_probability` | 숫자 | ≥ 0, ≤ 1 — jev 자체 검사 통과 하한 ('댓글 작성' 절) | `0.7` |
+| `classifier.model` | 글자 | 비어 있지 않음 — jev 모델 이름 | `jev-latest` |
+| `classifier.noul_yes_min` | 숫자 | > 0.5, ≤ 1 — 주제 일치 확률이 이 값 이상이어야 일치 | `0.8` |
+| `classifier.noul_no_max` | 숫자 | ≥ 0, < `noul_yes_min` — 이 값 이하여야 불일치, 사이는 보류 | `0.2` |
+| `classifier.choice_min_confidence` | 숫자 | ≥ 0, ≤ 1 — 이유 보기 확신이 이보다 낮으면 보류 | `0.5` |
+| `classifier.on_topic_reasons` | 글자 목록 | 1개 이상, 각 1–40자, 두 목록 합쳐 50개 이하, 이름 겹침 금지 | 4개 (config.yaml) |
+| `classifier.off_topic_reasons` | 글자 목록 | 같은 규칙 — jev 에 먼저 보임 | 4개 (config.yaml) |
 | `chrome_debug_url` | 글자 | `http://` 또는 `https://` 로 시작 | `http://localhost:9222` |
 | `allowed_videos` | 글자 목록 | 비워 두면 `()`; 항목은 쓴 그대로 보관 | `- https://youtu.be/내-테스트-영상-ID` |
 
@@ -57,7 +68,7 @@ Phase 2–7 의 모든 단계가 기대는 계약입니다. 설정 읽기, 영�
   대기는 9절이 묶습니다.
 - `limits.daily_max_searches` 는 과제 예시에 없는 키로, 최근 24시간(굴러가는 창) 안의
   `search.list` 호출 수 — 페이지 넘김 한 번도 한 번 — 의 상한입니다. 닿으면 호출하지 않고
-  `QUOTA` 를 남깁니다(11절). 기본 90 은 90 × 100 = 9,000 단위라 하루 10,000 단위 중 1,000
+  `QUOTA` 를 남깁니다('탐지 · 조회수 추적' 절). 기본 90 은 90 × 100 = 9,000 단위라 하루 10,000 단위 중 1,000
   단위를 조회수 호출(`videos.list`, 1단위)에 남깁니다. 90 을 넘기면 한 회마다 조회수 몫이 100
   단위씩 줄고, 100 이면 남지 않아 조회수 호출이 `QUOTA … counter=units` 로 막힙니다. 0 이면
   검색하지 않습니다.
@@ -66,7 +77,10 @@ Phase 2–7 의 모든 단계가 기대는 계약입니다. 설정 읽기, 영�
   2개로 줄이고(96회/일) `daily_max_searches` 를 96 이상으로 올려야 합니다 — 그러면 조회수 몫이
   400 단위 이하로 줄고 페이지 넘김 여유는 거의 없습니다.
 - `trigger.max_age_hours` 는 Phase 2 에서 검색 기간(`publishedAfter`)과 조회수 추적 기간도
-  정합니다(11절).
+  정합니다('탐지 · 조회수 추적' 절).
+- `comment.writer_model` · `comment.check_min_probability` 는 과제 예시에 없는 키로, Phase 5 가
+  댓글 작성 · 자체 검사를 위해 더했습니다('댓글 작성' 절). `check_min_probability` 의 상한 1 은 확률의
+  끝입니다.
 - **YAML 1.1 함정 — 글자 자리에서는 크게 실패합니다.** 따옴표 없는 `yes`/`no`/`on`/`off` 는
   bool, `2026-10-12` 는 날짜, `12345678901` 은 정수로 읽히므로 글자 자리에 오면 오류입니다
   (예: `keywords: [연애, no]`, `topic: yes`, `allowed_videos: [12345678901]`). 이런 값은
@@ -74,6 +88,9 @@ Phase 2–7 의 모든 단계가 기대는 계약입니다. 설정 읽기, 영�
 - **숫자 자리에서는 YAML 1.1 숫자 표기가 그대로 읽힙니다** — `017` 은 8진수 15, `1:30` 은
   60진수 90, `0x1F` 는 31, `1_000` 은 1000 이 되고 위 범위 검사만 받습니다. 숫자는 앞자리 0 ·
   `:` · `_` 없이 10진수로 쓰세요.
+- 보기 이름에 `: ` 가 들어가면 따옴표로 감싸세요 — 따옴표 없는 `- 키워드만 겹침: 게임` 은
+  YAML 이 '키: 값' 묶음으로 읽어
+  `비어 있지 않은 글자여야 합니다: classifier.off_topic_reasons[0]` 오류입니다.
 - 같은 키가 두 번 나오면 두 번째 줄 번호와 함께 오류입니다. 윈도우 메모장이 붙이는 BOM 은
   떼어 내고 읽습니다. UTF-8 이 아닌 저장(메모장의 ANSI·Unicode)은 `ConfigError` 입니다.
 - 읽는 중 나는 그 밖의 모든 오류도 `ConfigError` 입니다 — 날짜 모양의 틀린 값
@@ -310,6 +327,65 @@ Phase 3–5 가 정합니다.)
   테스트 저장 이유입니다. 유튜브가 중간 화면(로그인 · 동의)을 띄우면 정상 게시도 테스트 모드로
   빠질 수 있습니다 — 안전한 쪽 실패로 받아들입니다. Phase 6 이 지킵니다.
 
+### 게시 단계 구현 — poster.py · chrome.py (Phase 6)
+
+```python
+post_video(record, *, config, dry_run, store, logbook, open_page, clock,
+           repo_root) -> PostOutcome
+```
+
+위 순서를 그대로 따릅니다. `video_ref` 는 `record.video_id` 입니다. `PostOutcome.result` 는
+`skipped` · `saved` · `stopped` · `reserved` · `posted` · `failed` 중 하나입니다.
+
+- **댓글 없음.** 댓글이 없는 기록은 `SKIP reason=no_comment` 입니다.
+- **테스트 모드는 크롬을 열지 않습니다.** `--dry-run` 의 "게시 직전까지"는 탐지 · 분류 ·
+  트리거 · 댓글 작성까지라는 뜻입니다.
+- **3.2 앞에서 멈춤** (크롬 연결, 영상 열기, 댓글 칸 준비, 입력, 버튼 확인) — 아무것도 누르지
+  않았으므로 저장소는 그대로이고 결과는 `stopped` 입니다. 남는 기록은
+  `ERROR where=poster reason=<원인> detail=… screenshot=… stage=before_click video=<ID>` 한
+  줄뿐이고, 다음 사이클이 다시 시도합니다.
+- **3.2 의 되돌림**은 전처럼 4(테스트 모드)로 갑니다. 이때 `POST … mode=test result=saved` 줄에
+  `screenshot=` 과 `page_url=` 이 붙습니다(저장소 기록에는 캡처 칸이 없습니다).
+- **예약 뒤:**
+  - 클릭 전에 게시 버튼이 없음 → `resolve_live(…, "failed", reason, screenshot)` 과
+    `POST … result=failed`.
+  - 클릭 중 예외, 확인 중 예외, "댓글이 보이지 않음" → 결과를 모르므로 `reserved` 를 그대로 두고
+    `ERROR where=poster reason=<이유> detail=… screenshot=… stage=after_click video=<ID>` 를
+    남깁니다(`detail=` 은 예외일 때만). 확정되지 않은 예약은 게시로 칩니다(4절).
+  - 댓글이 보임 → `resolve_live(…, "posted", reason="allowlisted")`.
+  - 예약 뒤의 Ctrl-C 도 `reserved` 로 남깁니다.
+- **시계 읽기.** 실패 갈래마다 시계를 한 번 읽습니다. 저장된 시도의 `at` 과 그 캡처 파일 이름은
+  같은 시각입니다.
+- **원인 표.** 로그와 결과의 `reason` 에 남는 원인 이름입니다.
+
+  | 이유 | 자리 | 뜻 |
+  |---|---|---|
+  | `no_comment` | 시작 | 기록에 댓글이 없음 — `SKIP` |
+  | `playwright_missing` | 연결 | Playwright 가 설치되어 있지 않음 (`pip install -r requirements.txt`) |
+  | `chrome_unreachable` | 연결 | `chrome_debug_url` 의 크롬에 붙지 못했거나, 붙은 크롬에 기본 컨텍스트가 없음 |
+  | `login_required` | 준비 | 유튜브에 로그인되어 있지 않음 |
+  | `comments_disabled` | 준비 | 이 영상은 댓글을 막아 둠 |
+  | `comment_box_missing` | 준비 | 댓글 영역이나 입력 칸을 찾지 못함 |
+  | `post_button_missing` | 준비 · 클릭 | 게시 버튼이 없거나 눌리지 않음 — 준비에서는 `stopped`, 클릭 직전이면 `failed` |
+  | `page_error` | 연결 · 준비 | 그 밖의 예외 (탭 열기 · 영상 열기 시간 초과 등) |
+  | `page_mismatch` | 다시 확인 | 크롬이 다른 영상에 있음 — 테스트 저장 |
+  | `click_unknown` | 클릭 | 누르는 중 예외 — 결과를 모름, `reserved` |
+  | `confirm_error` | 확인 | 게시 확인 중 예외 — 결과를 모름, `reserved` |
+  | `not_confirmed` | 확인 | 기다리는 동안 댓글이 보이지 않음 — 결과를 모름, `reserved` |
+
+- **캡처.**
+  - 경로는 `logs/screenshots/<영상 ID>-<UTC YYYYMMDDTHHMMSSZ>.png` 입니다. 저장소 뿌리 기준
+    상대 경로이고 `logs/*` 로 git 이 무시합니다.
+  - 캡처가 실패하면 로그 줄에서 `screenshot=` 을 빼고 기록에는 `null` 을 저장하며, 나머지는
+    모두 그대로 씁니다.
+- **크롬 세션.** `ChromeSession(config.chrome_debug_url)` 은 `connect_over_cdp` 로
+  `browser.contexts[0]`(로그인 쿠키가 있는 기본 컨텍스트)에 붙고, 영상마다 새 탭을 엽니다.
+  `close()` 는 연결만 끊습니다.
+- **선택자.** 유튜브 선택자는 `chrome.py` 맨 위의 상수입니다. 화면 구성이 바뀌면 여기를
+  고칩니다(트래커 Trade-off).
+- `post_video` · `check_profile_dir` 본문을 고칠 때도 10절의 음성 대조가 계속 1 로 끝나는지 함께
+  확인합니다.
+
 ## 7. 로그 형식 — `logbook.py`
 
 사건 하나에 한 줄입니다:
@@ -375,11 +451,33 @@ Phase 3–5 가 정합니다.)
 ## 8. 비밀 값
 
 - API 키는 `.env` 에만 둡니다. `.gitignore` 가 `.env`, `.env.*` 를 막고 `.env.example` 만
-  커밋합니다. `.env.example` 에는 `YOUTUBE_API_KEY=` 가 있고, AI 접속 키 이름은 Phase 3 이
-  더합니다. `.env` 를 읽는 코드는 비밀 값을 처음 읽는 Phase 2 가 더합니다.
+  커밋합니다. `.env.example` 에는 `YOUTUBE_API_KEY=` 와 `TYPESAFE_API_KEY=`(jev 판별 —
+  `typesafe-sdk` 가 환경 변수에서 읽음)가 있고 값은 비워 둡니다. 댓글 작성 AI 의 키는 그것을
+  쓰는 단계가 더합니다. `.env` 를 읽는 코드는 비밀 값을 처음 읽는 Phase 2 가 더합니다.
 - 크롬 전용 프로필은 `chrome-profile/`(통째로 무시됩니다) 또는 저장소 밖에만 둡니다 — 저장소
   안의 다른 폴더는 금지입니다. Phase 6 · 8 의 실행 안내는 이 두 위치만 예시로 보입니다. 이 위치
   규칙이 첫 방어입니다.
+- 크롬은 전용 프로필로 켭니다(`--user-data-dir` 를 기본 데이터 폴더가 아닌 곳으로) — Chrome
+  136+ 는 기본 데이터 폴더에서 `--remote-debugging-port` 를 무시합니다.
+  `python3 -m agent.chrome --profile <폴더>`(저장소 뿌리에서 `PYTHONPATH=src`, 윈도우
+  PowerShell 은 먼저 `$env:PYTHONPATH = "src"`)가 켜기 전에 위치를 검사(`check_profile_dir`)하고
+  켤 명령을 보여 줍니다 — 크롬을 직접 켜지는 않습니다. 기본 데이터 폴더(그 안 포함)와, 저장소
+  안이면서 `chrome-profile/` 밖인 곳은 거부합니다(종료 코드 2). 상대 경로는 저장소 뿌리
+  기준이고, 심볼릭 링크는 따라간 실제 위치로 봅니다. **이 검사는 켤 때의 안내입니다** — 에이전트는
+  붙은 크롬의 프로필 위치를 실행 중에 확인하지 않습니다. 실행 중 방어는 둘입니다: 기본 데이터
+  폴더로 켠 크롬은 포트가 열리지 않아 게시가 `chrome_unreachable` 로 멈추고, 저장소 안 다른
+  폴더의 비밀 파일은 아래 둘째 방어(이름 목록)가 막습니다.
+
+  ```
+  PYTHONPATH=src python3 -m agent.chrome --profile chrome-profile
+  PYTHONPATH=src python3 -m agent.chrome --profile ~/marketing-agent-chrome
+  ```
+
+  보여 준 명령으로 크롬을 켠 뒤 그 창에서 유튜브에 한 번 로그인합니다. **디버깅 포트의 위험:**
+  포트가 열려 있는 동안 이 컴퓨터의 어떤 프로그램이든 인증 없이 그 크롬에 붙어 로그인된 계정의
+  쿠키(HttpOnly 포함)를 읽을 수 있습니다 — Chrome 136 이 기본 프로필에서 포트를 막은 까닭이
+  이것입니다. 그래서 이 프로필에는 본 구글 계정이 아닌 전용 유튜브(브랜드) 계정으로만 로그인하고,
+  에이전트를 쓰지 않을 때는 그 크롬을 닫습니다.
 - 둘째 방어 — 사람이 위치 규칙을 어겨도, 프로필 안의 비밀 파일은 폴더 이름과 상관없이 어느
   깊이에서든 이름으로 막습니다: `Cookies`, `Cookies-journal`, `Login Data*`, `Web Data*`,
   `Local State`, `Local Storage/`, `Session Storage/`, `Preferences`, `Secure Preferences`,
@@ -392,6 +490,8 @@ Phase 3–5 가 정합니다.)
   목록을 임의 폴더 아래에서 `git check-ignore` 로 확인합니다.
 - `data/` 와 `logs/` 는 폴더만(`.gitkeep`) 커밋합니다. `logs/sample.log` 는 제출물이라 커밋할
   수 있습니다.
+- `.env.example` 에는 댓글 작성 Claude 키 `ANTHROPIC_API_KEY=` 도 있습니다(Phase 5).
+  `anthropic_client()` 에 키를 넘기지 않으면 `anthropic` 패키지가 이 환경 변수를 읽습니다('댓글 작성' 절).
 
 ## 9. 주기 실행 — `scheduler.py`
 
@@ -426,11 +526,22 @@ run_loop(cycle, reload, initial, *, on_error, sleep=time.sleep,
   인자와 이유, 로그 사건과 필수 필드)은 고정입니다.
 - 더하는 것은 그 필드를 쓰는 단계(Phase)가 `models.py` · `config.py` 에서, 테스트와 함께, 이
   문서도 함께 고칩니다. 이미 있는 이름의 뜻을 바꾸거나 지우지 않습니다.
-- 가드 · 저장소 · 설정 읽기 · 로그 한 줄 규칙 · 쿼터 가드 · 탐지 입력 검사가 테스트로 지켜지는지는 음성 대조로 확인합니다. 각 명령은 가드 한 줄을
+- 가드 · 저장소 · 설정 읽기 · 로그 한 줄 규칙 · 판별 규칙 · 쿼터 가드 · 탐지 입력 검사가 테스트로 지켜지는지는 음성 대조로 확인합니다. 각 명령은 가드 한 줄을
   메모리에서만 망가뜨리고 테스트를 돌리며, **종료 코드 1(테스트가 잡음)** 이어야 합니다. 2 는
   바꿀 글자를 찾지 못했다는 뜻이라 실패입니다:
 
   ```
+  python3 -m tests.mutants poster-open-received-ref
+  python3 -m tests.mutants poster-recheck-before-prepare
+  python3 -m tests.mutants poster-no-recheck
+  python3 -m tests.mutants poster-no-page-mismatch
+  python3 -m tests.mutants poster-skip-reserve
+  python3 -m tests.mutants poster-click-error-as-failed
+  python3 -m tests.mutants poster-unconfirmed-as-posted
+  python3 -m tests.mutants poster-ignore-check
+  python3 -m tests.mutants poster-test-mode-opens-chrome
+  python3 -m tests.mutants chrome-allow-default-profile
+  python3 -m tests.mutants chrome-allow-repo-folder
   python3 -m tests.mutants guard-allow-all
   python3 -m tests.mutants guard-ignore-dry-run
   python3 -m tests.mutants guard-dry-run-truthy
@@ -463,14 +574,45 @@ run_loop(cycle, reload, initial, *, on_error, sleep=time.sleep,
   python3 -m tests.mutants watcher-keeps-surrogates
   python3 -m tests.mutants watcher-unicode-digits
   python3 -m tests.mutants watcher-published-any-shape
+  python3 -m tests.mutants writer-hardcoded-model
+  python3 -m tests.mutants writer-no-rewrite
+  python3 -m tests.mutants writer-third-try
+  python3 -m tests.mutants writer-ignore-self-check
+  python3 -m tests.mutants writer-threshold-strict
+  python3 -m tests.mutants writer-no-float-tolerance
+  python3 -m tests.mutants writer-ad-not-inverted
+  python3 -m tests.mutants writer-trusts-jev-answer
+  python3 -m tests.mutants writer-no-length
+  python3 -m tests.mutants writer-length-in-bytes
+  python3 -m tests.mutants writer-no-link
+  python3 -m tests.mutants writer-link-no-nfkc
+  python3 -m tests.mutants writer-link-view-keeps-all
+  python3 -m tests.mutants writer-link-ascii-separators-only
+  python3 -m tests.mutants writer-link-latin-left-only
+  python3 -m tests.mutants writer-link-no-handle
+  python3 -m tests.mutants writer-no-repeat
+  python3 -m tests.mutants writer-repeat-keeps-punctuation
+  python3 -m tests.mutants writer-repeat-all-history
+  python3 -m tests.mutants writer-unescaped-material
+  python3 -m tests.mutants writer-api-error-unlogged
+  python3 -m tests.mutants classifier-error-yes
+  python3 -m tests.mutants classifier-malformed-yes
+  python3 -m tests.mutants classifier-unchecked-probability
+  python3 -m tests.mutants classifier-no-confidence-floor
+  python3 -m tests.mutants classifier-keyword-only-passes
+  python3 -m tests.mutants classifier-no-truncation
+  python3 -m tests.mutants classifier-error-hold-unmarked
+  python3 -m tests.mutants classifier-swallows-faults
   ```
 
+  `classify` · `read_answers` · `build_state` · `is_error_hold` · `sdk_ask` ·
   `decide_post` · `video_id_from_ref` · `put` · `reserve_live` · `check_post` · `load_config` ·
   `config_from_mapping` · `run_loop` · `format_line` · `QuotaLedger.reserve` ·
-  `YouTubeClient._call` · `Watcher.run` 의 본문을 고칠 때는 이 명령들이 계속 1 로 끝나는지
-  함께 확인합니다.
+  `YouTubeClient._call` · `Watcher.run` · `write_comment` · `code_failures` ·
+  `self_check_failure` · `link_fragment` · `repeated_run` 의 본문을 고칠 때는 이 명령들이 계속
+  1 로 끝나는지 함께 확인합니다.
 
-## 11. 탐지 · 조회수 추적 — env.py · youtube.py · watcher.py (Phase 2)
+## 탐지 · 조회수 추적 — env.py · youtube.py · watcher.py (Phase 2)
 
 **진입점**
 
@@ -590,3 +732,233 @@ watcher = Watcher(Store(Path("data/videos.json")), logbook, client, clock)
 2026-10-12T23:00:00+09:00 ERROR where=search.list reason="HTTP 403 quotaExceeded" keyword=연애
 2026-10-12T23:00:00+09:00 SKIP video=zyxwvutsrqp reason=unavailable call=videos.list
 ```
+
+## 11. 댓글 작성 — `writer.py` (Phase 5)
+
+Phase 7 이 영상마다 부르는 모양:
+
+```python
+result = write_comment(record, config=config.comment, claude=anthropic_client(),
+                       check=<Phase 3 의 jev 검사>, previous=store.comments(),
+                       logbook=logbook, now=now, transcript=…, top_comments=…)
+if result.draft is not None:
+    record.comment = result.draft
+    store.put(record)
+```
+
+- `WriteResult(draft, skip_reason)` 는 둘 중 정확히 하나를 담습니다(둘 다 있거나 둘 다 없으면
+  `ValueError`). `write_comment` 는 `COMMENT` · `SKIP` · `ERROR` 줄을 직접 남기고 저장소는
+  건드리지 않습니다 — 초안을 `record.comment` 에 넣고 `store.put` 하는 것은 Phase 7 의
+  몫입니다.
+- **주제 판별 문** — `record.classification` 이 없거나 `verdict` 가 `yes` 가 아니면
+  `ValueError("주제 판별이 yes 인 영상에만 댓글을 씁니다: <영상 ID>")` 이고 Claude 를 부르지
+  않습니다.
+- **`claude` 포트** — `anthropic.Anthropic` 과 같은 모양
+  (`messages.create(model=, max_tokens=, system=, messages=)`). `anthropic_client(api_key=None)`
+  가 실제 클라이언트를 만듭니다. `anthropic` 패키지는 이 함수 안에서만 가져오므로 테스트는 설치
+  없이 돕니다. 제한 시간은 60초(`CLAUDE_TIMEOUT_S` — SDK 기본값 10분이면 한 줄로 도는 루프가
+  멈춥니다)이고, 429/529 재시도는 SDK 기본값 그대로입니다. 모델 이름은 `comment.writer_model`
+  (2절)에서 읽습니다.
+- **`check` 포트** — `check(state, questions) -> {질문 이름: P(예)}`. 초안 한 개에 `noul` 질문
+  세 개(`CHECK_QUESTIONS`: `mentions_scene` · `reads_like_ad` · `follows_concern`)를 **한
+  요청**으로 묻습니다. 접속(키 `TYPESAFE_API_KEY` · jev 모델 · `typesafe-sdk`)은 Phase 3 의
+  것이고, Phase 7 이 Phase 3 의 클라이언트를 이 자리에 이어 붙입니다.
+
+**흐름** — 시도마다(최대 두 번):
+
+1. Claude 가 JSON `{"concern": "고민 한 줄", "comment": "댓글"}` 으로 답합니다. 읽을 수 없으면
+   jev 를 부르지 않고 그 시도는 `JSON 으로 읽을 수 없습니다` 로 떨어집니다.
+2. jev 자체 검사.
+3. 코드 검사 — 글자 수 · 링크 · 반복을 **모두** 돌립니다(코드가 마지막).
+
+떨어진 이유(jev 이유가 먼저, 코드 이유는 위 순서)를 모두 `; ` 로 이어 다시 쓰기 이유 하나로
+만들고, 같은 대화에 Claude 의 원래 답(assistant)과 `REWRITE_PROMPT`(user)를 붙여 한 번 다시
+씁니다. 두 번째도 떨어지면 `SKIP reason="검사 두 번 탈락 — 1차: … / 2차: …"` 입니다. 통과하면
+`COMMENT` 를 남기고 초안을 돌려줍니다.
+
+| 검사 | 통과 규칙 | 떨어질 때 이유 |
+|---|---|---|
+| 답 읽기 | JSON 객체, `concern` · `comment` 가 비어 있지 않은 글자 | `JSON 으로 읽을 수 없습니다` |
+| jev 자체 검사 | 질문마다 점수 + `_TOLERANCE` ≥ `check_min_probability` | `자체 검사 미달 — <이름표> <P(예)>, …` |
+| 글자 수 | `min_chars` ≤ 글자 수 ≤ `max_chars` | `글자 수 <n>자 — <min>–<max>자여야 합니다` |
+| 링크 | 링크 보기에 `_LINK_RE` 조각이 없음 | `링크·주소 모양이 들어 있습니다: <조각>` |
+| 반복 | 최근 댓글과 같지 않고, 겹친 연속 글자 < 12 | `이전 댓글과 겹칩니다: <겹친 글자>` |
+
+- 이름표(`CHECK_LABELS`)는 `영상 속 장면·말 언급` · `광고처럼 읽힘` · `영상 고민과 이어짐`
+  이고, 확률은 소수 둘째 자리입니다(`자체 검사 미달 — 영상 속 장면·말 언급 0.25`).
+- **하한 비교** — 점수는 `mentions_scene` · `follows_concern` 이 P(예), `reads_like_ad` 는
+  1 − P(예)입니다. jev 는 부정을 글자 그대로 읽으므로 광고 질문은 긍정으로 묻고 뒤집습니다.
+  `score + _TOLERANCE < check_min_probability` 이면 떨어집니다(`_TOLERANCE = 1e-9`). 그냥 `<`
+  로 비교하면 1 − P 의 부동소수 오차(`1 - 0.9 = 0.0999…98`) 때문에 두 자리 하한 99개 중 20개에서
+  "하한과 같으면 통과" 가 깨집니다.
+- **글자 수** — NFC 로 맞춘 댓글의 `len()`, 곧 코드 포인트 수이지 바이트가 아닙니다.
+  `parse_output` 이 댓글을 NFC 로 맞추고 앞뒤 공백을 떼며, 고민은 한 줄로 모읍니다.
+  서로게이트(U+D800–U+DFFF)가 든 고민 · 댓글은 읽을 수 없는 답으로 보아 다시 씁니다.
+- **링크** — 링크 보기는 NFKC + casefold 한 글에서 글자 · 숫자(`isalnum`, 한글 포함)와 `@` 는
+  그대로, 유니코드 이름에 `FULL STOP`/`DOT` 이 든 글자는 `.`, `SOLIDUS`/`SLASH` 는 `/`,
+  `COLON` 은 `:` 로 남기고, 나머지(공백 · 괄호 · 보이지 않는 글자 · 다른 문장부호)는 모두
+  버립니다. 링크는 `_LINK_RE` — `[^\W_]\.+[a-z]{2,}|@[^\W_]|:/|[0-9]{1,3}(?:\.[0-9]{1,3}){3}`,
+  곧 글자 뒤 점 뒤 영문(호스트와 끝) · `@이름` · 스킴 · IPv4 입니다. 그래서 `연애사주.com` ·
+  `naver . me` · `ｎａｖｅｒ．ｍｅ` · `naver[.]com` · `youtu·be` · 보이지 않는 글자로 가른 주소도
+  걸리고, `1.5배` · `10:30` · `P.S. 저도` · `A/S` · `장면·말` · `봤는데, MBTI랑` 은 지나갑니다.
+  - 받아들인 오탐: `좋았어요. MBTI도` 는 `요.mbti` 로 걸려 다시 쓰기 하나를 치릅니다(막는 쪽).
+  - 남은 틈: 한글 끝(`연애사주.한국` · `saju.한국` 등)은 호스트 글자와 상관없이 문장 끊김과
+    구분할 수 없어 코드 검사에서 빠지고, 광고 질문에 맡깁니다.
+- **반복** — 두 글을 NFKC + casefold 한 뒤 `isalnum` 글자만 남겨 비교합니다. 최근 댓글과
+  같거나, `difflib.SequenceMatcher(autojunk=False)` 로 찾은 가장 긴 연속 공통 글자가
+  `REPEAT_MIN_CHARS`(12, 코드 상수) 이상이면 반복입니다. 비교 대상은 `previous` 의 마지막
+  `RECENT_WINDOW`(20)개 — Claude 가 `<my_previous_comments>` 에서 보는 바로 그 댓글들입니다.
+- **자료** — 태그 블록 `<video_title>` · `<video_description>` · `<transcript>`(자막이 비었으면
+  대신 `<top_comments>` — 비어 있지 않은 인기 댓글 앞 10개) · `<classification>` ·
+  `<my_previous_comments>`(최근 댓글이 있을 때만). 시스템 프롬프트가 태그 안의 글을 지시가 아닌
+  자료로 선언하고, 자료의 `<` `>` 는 `＜` `＞` 로 바꿔 태그를 닫지 못하게 합니다. 자르는 길이는
+  제목 300 · 설명 2000 · 자막 6000자, 인기 댓글 · 판별 이유 · 이전 댓글 · 검사용 고민과 초안
+  각 300자입니다. jev 상태는 같은 자료 블록에 `<video_concern>` · `<draft_comment>` 를 더한
+  것입니다.
+- **API 오류** — Claude 호출이나 jev 호출이 오류를 내거나 jev 답이 이상하면 다시 쓰지 않고(다시
+  써도 고쳐지지 않음) `ERROR where=writer.claude` 또는 `where=writer.jev` 와, 같은 이유의
+  `SKIP` 을 남깁니다:
+  - `claude 호출 실패: <오류 종류>[ <상태 코드>][: <메시지 200자까지>]` (상태 코드는 있을 때만,
+    메시지가 비면 `: …` 도 뺍니다)
+  - `jev 검사 호출 실패: <오류 종류>[ <상태 코드>][: <메시지 200자까지>]` (상태 코드는 있을 때만,
+    메시지가 비면 `: …` 도 뺍니다; Claude 틀과 같음)
+  - `jev 검사 응답 이상: <질문 이름>` — 묶음이 아니거나, 질문이 빠졌거나, 값이 bool · 숫자
+    아님 · 0–1 밖(NaN 포함)
+
+  잘못된 모델 이름 · 취소된 키 · 크레딧 없음 · jev 포트 모양 불일치 같은 영구 오류도 이렇게
+  원인과 함께 `ERROR` 로 보입니다. 그 `ERROR` 위에 멈춤 정책을 세우는 것은 Phase 7 의
+  몫입니다. `try` 안에는 `messages.create` 와 `check` 호출만 있으므로, 모양이 틀린 Claude
+  응답(작성기 버그)은 건너뛰기로 숨지 않고 그대로 오류가 됩니다.
+- **로그** — `COMMENT` 는 필수 필드 뒤에 `attempt`(1 또는 2)와
+  `check`(`mentions_scene=0.90 reads_like_ad=0.10 follows_concern=0.80`)를 더합니다(7절의
+  "나머지 필드").
+- **`self_check`** — 초안의 `self_check` 는 `Judgement(yes, "<질문>=<P(예)> …", now)` 입니다.
+  `CommentDraft.at` 도 넘겨받은 `now` 이고, 숨은 시계는 없습니다.
+- 프롬프트 원문(`SYSTEM_PROMPT` · `USER_INSTRUCTION` · `REWRITE_PROMPT` · `CHECK_QUESTIONS` ·
+  `CHECK_LABELS`)은 `writer.py` 맨 위에만 있고, Phase 8 의 PROCESS.md 가 옮겨 적습니다.
+
+## 11. 트리거 판정 — `trigger.py`
+
+```python
+judge_trigger(record, config, now) -> Judgement     # config 는 Config.trigger
+```
+
+`judge_trigger` 는 영상 기록 하나를 지금(`now`) 댓글 대상으로 볼지 정해 `Judgement(verdict, reason, at=now)` 를
+돌려줍니다. 기록은 바꾸지 않고, 같은 입력이면 언제나 같은 판정입니다. 기준은 부를 때마다 받은 `config` 에서
+읽으므로 실행 중 고친 설정이 다음 판정부터 적용됩니다. 시간대 없는 `now` 는 `ValueError` 입니다. 저장
+(`record.trigger`)과 `TRIGGER` 로그는 부르는 쪽(Phase 7)이 합니다.
+
+- **최신과 직전:** 조회수 기록을 시각(`at`) 순으로 놓습니다 — 목록 순서는 보지 않고, 시간대가 달라도 같은
+  순간이면 같은 시각이며, 같은 시각끼리는 조회수가 큰 쪽이 뒤입니다. 맨 뒤가 *최신*, 최신보다 시각이 이른
+  기록 중 맨 뒤가 *직전*입니다. 같은 시각의 기록 여럿은 한 번으로 셉니다.
+- **시간당 조회수** = (최신 조회수 − 직전 조회수) ÷ 두 시각 사이의 시간. 조회수가 그대로면 0 입니다.
+  조회수가 줄었으면(삭제 · 비공개 · 조회수 정정) 재지 않습니다 — 음수 속도는 없습니다.
+
+아래 차례대로 보고 처음 걸린 줄의 판정을 돌려줍니다:
+
+| 차례 | 조건 | verdict | reason |
+|---|---|---|---|
+| 1 | 시각이 다른 기록이 둘 미만(기록 없음 포함) | `hold` | `too_few_samples` |
+| 2 | 최신 조회수 < `min_views` | `no` | `views_below_min` |
+| 3 | 최신 조회수 > `max_views` | `no` | `views_above_max` |
+| 4 | `published_at` 이 `now` 보다 뒤 | `hold` | `published_in_future` |
+| 5 | `now − published_at` > `max_age_hours` 시간 | `no` | `too_old` |
+| 6 | 최신 조회수 < 직전 조회수 | `hold` | `views_decreased` |
+| 7 | 시간당 조회수 < `min_views_per_hour` | `no` | `too_slow` |
+| 8 | 그 밖 — 세 조건을 모두 만족 | `yes` | `views_per_hour` |
+
+- 경계는 모두 통과입니다 — 조회수 정확히 `min_views` · `max_views`, 나이 정확히 `max_age_hours`(그리고
+  `published_at` 이 `now` 와 같은 나이 0), 시간당 정확히 `min_views_per_hour` 는 대상입니다(과제의
+  "1,000–5,000 · 12시간 이내 · 150 이상").
+- **판정은 모두 `at` 시각의 판정입니다.** 다시 부르면 바뀌지 않는 것은 `too_old` 뿐입니다(나이는 줄지 않음).
+  `views_above_max` 는 조회수가 정정되어 줄 때만 바뀌고, `views_below_min` · `too_slow` 와 모든 `hold` 는
+  기록이 더 쌓이면 `yes` 가 될 수 있습니다. 그래서 부르는 쪽은 `too_old` 가 아닌 기록을 새 조회수 기록이 생길
+  때마다 다시 판정합니다. `hold` 는 잴 수 없어 미룬 판정(기록 부족 · 미래 업로드 시각 · 줄어든 조회수)이고,
+  `no` 는 재어 보니 지금은 아닌 판정입니다.
+- 기록이 한 번뿐인 영상은 다른 조건과 상관없이 `hold` 입니다(트래커 Phase 4 의 절충). 조회수가 줄면
+  `min_views_per_hour` 가 0 이어도 `hold` 입니다 — 지워졌거나 비공개가 된 영상을 대상으로 올리지 않고, 나이
+  창이 닫히면 `too_old` 로 끝납니다.
+- 나이는 업로드 시각(`published_at`)부터 잽니다(탐지 시각이 아님). `published_at` 이 `now` 보다 뒤이면 이
+  컴퓨터의 시계가 유튜브보다 늦다는 뜻이라 `hold published_in_future` 로 둡니다 — 시계가 따라잡으면 저절로
+  풀리고, 로그에서 찾을 수 있습니다. 시계가 늦으면 다른 영상의 나이도 그만큼 적게 재지만, 이 판정이 그것까지
+  고치지는 않습니다.
+- 기록 사이가 아주 짧으면(재시작 직후 바로 도는 사이클, `poll_interval_min: 1`) 조회수 몇 회 차이도 큰 속도가
+  됩니다 — 예: 20초 사이 1회는 시간당 180회로 `yes`. 최소 간격은 아직 정하지 않았습니다(실제 기록이 생긴 뒤
+  Phase 2 · 7 이 정함). 기록 주기(30분 · 2시간)에 따라 정밀도가 달라지는 것은 트래커가 받아들인 절충입니다.
+- 조건 차례는 과제가 적은 차례(조회수 · 나이 · 시간당 조회수)이고, 두 `hold`(미래 업로드 시각 · 줄어든
+  조회수)는 그것이 망치는 측정만 막습니다.
+- reason 은 모두 로그에 따옴표 없이 쓰이는 글자입니다. 3절 · 7절 예시의 `views_per_hour` 는 `yes` 의
+  reason 입니다.
+- **기준 제안:** 세 기준 값은 과제 값 그대로 둡니다(트래커 Phase 4 결정) — 실제 조회수 기록(Phase 2)이 아직
+  없어 다른 숫자를 뒷받침할 근거가 없습니다. 대신 과제가 정하지 않은 재는 방법을 정했습니다: 시간당 조회수를
+  업로드 뒤 평균(조회수 ÷ 나이)이나 첫 기록부터의 평균이 아니라 *가장 늦은 두 기록* 사이로 잽니다. "뜨기
+  직전"은 지금 빨라지는 영상인데, 업로드 뒤 평균은 이미 끝난 반짝 증가를 대상으로 올리고, 첫 기록부터의
+  평균은 지금의 가속을 느린 시작과 섞어 묽힙니다.
+- 음성 대조 — 각 명령은 판정 한 줄을 메모리에서만 망가뜨리고 `tests.test_trigger` 를 돌리며, **종료 코드
+  1(테스트가 잡음)** 이어야 합니다. `judge_trigger` 의 본문을 고칠 때 함께 확인합니다:
+
+  ```
+  python3 -m tests.mutants trigger-negative-speed
+  python3 -m tests.mutants trigger-flat-is-decrease
+  python3 -m tests.mutants trigger-list-order
+  python3 -m tests.mutants trigger-same-instant
+  python3 -m tests.mutants trigger-min-views-exclusive
+  python3 -m tests.mutants trigger-max-views-exclusive
+  python3 -m tests.mutants trigger-future-publish-passes
+  python3 -m tests.mutants trigger-future-publish-inclusive
+  python3 -m tests.mutants trigger-age-exclusive
+  python3 -m tests.mutants trigger-rate-exclusive
+  ```
+
+## 12. 주제 판별 — `classifier.py` (Phase 3)
+
+- **절 번호.** 다른 갈래가 자기 11절을 먼저 들였으면 이 제목의 번호는 들일 때 고칩니다. 코드와
+  다른 글은 이 절을 번호가 아니라 제목('주제 판별')으로만 가리킵니다.
+- **부르기.**
+
+  ```python
+  classify(record, config, ask, now, *, transcript=None, language=QUESTION_LANGUAGE) -> Judgement
+  ```
+
+  자막은 `transcript` 인자로만 받습니다.
+- **부르는 쪽의 할 일.** 판정마다 `CLASSIFY video=… verdict=… reason=…` 를 씁니다. 오류
+  보류(`is_error_hold(j)` 가 참)이면 `ERROR where=classify reason=<j.reason>` 도 함께 씁니다.
+  오류 보류를 `record.classification` 에 저장할지, 나중에 다시 판정할지는 Phase 7 이 정합니다
+  (트래커 Phase 7: 실패 후 재시도 없이 다음 영상).
+- **보류가 되는 실패.** SDK 가 알린 실패만 보류입니다 — 모든 `TypeSafeError`, 곧 401 · 422 ·
+  429 · 529 · 연결 · 응답 검증. 429/529 의 다시 시도는 SDK 기본 정책을 따릅니다. SDK 가 없거나
+  우리 코드가 잘못된 경우는 예외가 그대로 올라갑니다(9절의 `on_error("cycle")`).
+- **한 요청, 두 질문.** `matches_topic`(noul)과 `reason`(choice). choice 가 첫 보기 쪽으로
+  기우는 경향 때문에 보기는 `off_topic_reasons` 를 먼저, 그다음 `on_topic_reasons` 를 보입니다.
+- **믿지 않는 입력.** 영상 글은 `state` 에만 들어가고 질문에는 들어가지 않습니다. 두 답이 같은
+  state 를 읽으므로 주입은 두 답을 함께 움직일 수 있습니다. 판별만으로는 아무것도 게시하지
+  않으며, Phase 4 · 5 · 7 의 조건이 그대로 적용됩니다.
+- **판정표.** `noul` 은 주제 일치 확률, `confidence` 는 이유 보기(choice) 답의 확신입니다.
+
+  | 판정 | 조건 |
+  |---|---|
+  | `yes` | `confidence ≥ choice_min_confidence` ∧ `noul ≥ noul_yes_min` ∧ 보기 ∈ `on_topic_reasons` |
+  | `no` | `confidence ≥ choice_min_confidence` ∧ `noul ≤ noul_no_max` ∧ 보기 ∈ `off_topic_reasons` |
+  | `hold` | 그 밖의 모든 경우 — SDK 오류 · 응답 모양 오류 · 낮은 확신 · `noul` 이 두 기준값 사이 · 두 답이 엇갈림 |
+
+- **이유 모양.**
+  - 판정: `<보기> (<그 보기 확률>) · 일치 <noul> · 확신 <confidence>`, 숫자는 소수 둘째 자리까지.
+  - 판단 보류: 위 모양 앞에 `확신 낮음: ` 또는 `판단 엇갈림: ` 이 붙습니다.
+  - 오류 보류: `API 오류: <SDK 예외 이름> [<상태 코드>]` 또는
+    `응답 모양 오류: <예외 이름>: <내용>`.
+  - 3절과 7절의 `연애 고민 상담` 은 이 모양의 앞부분입니다.
+- **자르기.** `state` 와 가장 긴 질문(JSON 을 UTF-8 바이트로 잰 것)의 합은 32000 바이트
+  이하입니다 — 토큰 수는 UTF-8 바이트 수를 넘지 않습니다. 자막부터, 그다음 설명, 그다음 제목
+  순으로 끝에서 잘라 내며 글자를 쪼개지 않습니다.
+- 세기와 날짜 비교는 jev 에 묻지 않습니다.
+- **질문 언어.** `QUESTION_LANGUAGE` 상수이고 기본값은 `ko` 입니다.
+- **한국어 정확도.** 예시 묶음은 22개(일치 10 · 불일치 12, 그중 주입 2)입니다.
+  `python3 -m tests.jev_accuracy` 를 돌리면 언어마다 맞음 · 잘못된 일치 · 잘못된 불일치 ·
+  보류 · 오류 수를 찍습니다.
+  - 통과는 잘못된 일치가 없고 22개 중 20개 이상 맞는 것입니다.
+  - 종료 코드: 0 ko 통과 · 1 ko 미달 · 2 재지 않음 · 3 측정 실패(오류가 있음 — 모델 문제가
+    아님).
+  - 기록: 아직 재지 않음 — 2026-10-13 키 없음.
+  - ko 가 미달이고 en 이 통과하면 `QUESTION_LANGUAGE` 를 `"en"` 으로 바꿉니다. 둘 다 미달이면
+    사람이 정합니다(트래커 cross-cutting).
+- **음성 대조.** 음성 대조는 10절 목록.

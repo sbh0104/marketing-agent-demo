@@ -10,7 +10,7 @@ from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from agent.config import CommentConfig, Config, LimitsConfig, TriggerConfig
+from agent.config import ClassifierConfig, CommentConfig, Config, LimitsConfig, TriggerConfig
 from agent.logbook import Event, Logbook, parse_line
 from agent.models import VideoRecord, ViewSample
 from agent.store import Store
@@ -31,7 +31,8 @@ CONFIG = Config(
     poll_interval_min=120,
     trigger=TriggerConfig(1000, 5000, 12.0, 150.0),
     limits=LimitsConfig(10, 24.0, 90),
-    comment=CommentConfig(40, 120),
+    comment=CommentConfig(40, 120, "claude-sonnet-5-5", 0.7),
+    classifier=ClassifierConfig("jev-latest", 0.8, 0.2, 0.5, ("연애 고민 상담",), ("연애와 관계없음",)),
     chrome_debug_url="http://localhost:9222",
     allowed_videos=(),
 )
