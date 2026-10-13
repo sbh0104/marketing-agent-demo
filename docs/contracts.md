@@ -527,6 +527,14 @@ run_loop(cycle, reload, initial, *, on_error, sleep=time.sleep,
 
 ## 10. 계약 변경 규칙
 
+- 1–10절은 번호로, 그 뒤에 더하는 절은 번호 없이 제목만 달고 제목으로 가리킵니다 — 제목은
+  `## 주제 판별 — …` 꼴, 인용은 `'주제 판별' 절` 꼴입니다. 이 문서의 `## <숫자>.` 제목 번호가
+  차례대로 1–10 이 아니거나, `src/` · `tests/` · 이 문서에 10보다 큰 번호를 단 절 인용(ASCII
+  숫자 바로 뒤에 '절')이 있으면 `tests/test_contract_sections.py` 가 빨강입니다.
+- 번호를 뗀 2026-10-14 전의 기록(트래커 · 장부 · 일지)에서 옛 번호 11 · 12 로 가리킨 절은, 기록이
+  그 자리에서 제목이나 함수 · 모듈 이름으로 밝힌 절입니다. 밝힌 것이 없으면 그 기록을 남긴
+  페이즈가 더한 절입니다 — Phase 2 '탐지 · 조회수 추적' · Phase 3 '주제 판별' ·
+  Phase 4 '트리거 판정' · Phase 5 '댓글 작성'.
 - 여기 적은 모양(설정 키, `VideoRecord` 필드, 시도 상태, `check_post` 이유, `decide_post`
   인자와 이유, 로그 사건과 필수 필드)은 고정입니다.
 - 더하는 것은 그 필드를 쓰는 단계(Phase)가 `models.py` · `config.py` 에서, 테스트와 함께, 이
@@ -741,7 +749,7 @@ watcher = Watcher(Store(Path("data/videos.json")), logbook, client, clock)
 2026-10-12T23:00:00+09:00 SKIP video=zyxwvutsrqp reason=unavailable call=videos.list
 ```
 
-## 11. 댓글 작성 — `writer.py` (Phase 5)
+## 댓글 작성 — `writer.py` (Phase 5)
 
 Phase 7 이 영상마다 부르는 모양:
 
@@ -845,7 +853,7 @@ if result.draft is not None:
 - 프롬프트 원문(`SYSTEM_PROMPT` · `USER_INSTRUCTION` · `REWRITE_PROMPT` · `CHECK_QUESTIONS` ·
   `CHECK_LABELS`)은 `writer.py` 맨 위에만 있고, Phase 8 의 PROCESS.md 가 옮겨 적습니다.
 
-## 11. 트리거 판정 — `trigger.py`
+## 트리거 판정 — `trigger.py`
 
 ```python
 judge_trigger(record, config, now) -> Judgement     # config 는 Config.trigger
@@ -918,10 +926,8 @@ judge_trigger(record, config, now) -> Judgement     # config 는 Config.trigger
   python3 -m tests.mutants trigger-rate-exclusive
   ```
 
-## 12. 주제 판별 — `classifier.py` (Phase 3)
+## 주제 판별 — `classifier.py` (Phase 3)
 
-- **절 번호.** 다른 갈래가 자기 11절을 먼저 들였으면 이 제목의 번호는 들일 때 고칩니다. 코드와
-  다른 글은 이 절을 번호가 아니라 제목('주제 판별')으로만 가리킵니다.
 - **부르기.**
 
   ```python

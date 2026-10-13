@@ -1,4 +1,4 @@
-"""탐지 · 조회수 추적 — 한 사이클 = 검색, 그다음 추적 (계약 11절).
+"""탐지 · 조회수 추적 — 한 사이클 = 검색, 그다음 추적 (계약 '탐지 · 조회수 추적' 절).
 
 - 검색: 키워드마다(설정 순서, 중복 한 번) 최신순 검색. 다음 페이지는 그 페이지에
   nextPageToken 이 있고, 사이클 시작 때 저장소에 있던 영상이 없고, 그 키워드에서 받은 페이지가
@@ -49,7 +49,7 @@ def _string(value: object, name: str) -> str:
 
 
 def _published(value: object) -> datetime:
-    # UTC `Z` 모양만 — 다른 시간대 표기는 날짜 끝에서 Store.save 를 넘치게 할 수 있습니다 (계약 11절)
+    # UTC `Z` 모양만 — 다른 시간대 표기는 날짜 끝에서 Store.save 를 넘치게 할 수 있습니다 (계약 '탐지 · 조회수 추적' 절)
     if not isinstance(value, str) or not _PUBLISHED_RE.fullmatch(value):
         raise ValueError(f"snippet.publishedAt: UTC 'YYYY-MM-DDTHH:MM:SSZ' 모양이 아닙니다: {value!r:.40}")
     try:
@@ -133,7 +133,7 @@ class _Tally:
 
 
 class Watcher:
-    """탐지 사이클 — `cycle(config)` 이 run_loop 의 사이클 자리에 맞습니다 (계약 9절 · 11절)."""
+    """탐지 사이클 — `cycle(config)` 이 run_loop 의 사이클 자리에 맞습니다 (계약 9절 · '탐지 · 조회수 추적' 절)."""
 
     def __init__(
         self,
@@ -189,7 +189,7 @@ class Watcher:
                 if token is None or any(video_id in known for video_id in ids):
                     break
             else:
-                # 페이지 상한이 토큰을 남긴 채 끝냄 — 정한 한도도 다른 한도처럼 남깁니다 (계약 11절)
+                # 페이지 상한이 토큰을 남긴 채 끝냄 — 정한 한도도 다른 한도처럼 남깁니다 (계약 '탐지 · 조회수 추적' 절)
                 tally.truncated += 1
                 self._logbook.write(Event.QUOTA, used=MAX_PAGES_PER_KEYWORD, limit=MAX_PAGES_PER_KEYWORD, call="search.list", counter="pages", keyword=query)
 

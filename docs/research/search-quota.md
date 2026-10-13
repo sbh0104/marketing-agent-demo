@@ -16,7 +16,7 @@
 - 후보 (b) 2시간 × 키워드 5개 = 하루 60회 — `poll_interval_min: 120`. (a) 는 페이지 넘김 여유가 하루 4회뿐이라 가드가 하루 후반 탐지를 끊습니다.
 - `limits.daily_max_searches: 90` — 9,000 단위. 남는 1,000 단위는 조회수 호출 몫.
 - `videos.list` = 1 단위, ID 50개까지 한 번에. 비용표는 `src/agent/youtube.py` 의 `UNIT_COST` 한 곳이고, 공식 표 재확인은 사람 확인으로 남깁니다.
-- 하루 = 굴러가는 24시간 (Google 리셋은 태평양 자정 — 계약 11절).
+- 하루 = 굴러가는 24시간 (Google 리셋은 태평양 자정 — 계약 '탐지 · 조회수 추적' 절).
 - 정정 2026-10-14: Google 은 2026-10-08 부터 `search.list` 를 하루 100회짜리 별도 통으로 셉니다
   (https://developers.google.com/youtube/v3/determine_quota_cost, "Last updated 2026-10-08 UTC").
   위 Decision brief 의 쿼터 줄은 그 전 표이고, `daily_max_searches: 90` 줄의 9,000 단위는 이제
