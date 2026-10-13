@@ -68,6 +68,24 @@ MUTANTS: dict[str, tuple[str, str, str, str]] = {
         r'if "\\" in text:',
         "if False:",
     ),
+    "guard-youtu-be-ignores-query-v": (
+        "agent.guard",
+        "tests.test_guard",
+        'if host == "youtu.be" and not names_v:',
+        'if host == "youtu.be":',
+    ),
+    "guard-shorts-ignores-query-v": (
+        "agent.guard",
+        "tests.test_guard",
+        "parts.path.startswith(_SHORTS_PREFIX) and not names_v:",
+        "parts.path.startswith(_SHORTS_PREFIX):",
+    ),
+    "guard-query-ampersand-only": (
+        "agent.guard",
+        "tests.test_guard",
+        'parse_qsl(parts.query.replace(";", "&"), keep_blank_values=True)',
+        "parse_qsl(parts.query, keep_blank_values=True)",
+    ),
     "store-no-dedupe": (
         "agent.store",
         "tests.test_store",

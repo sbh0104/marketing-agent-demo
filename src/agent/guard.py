@@ -40,7 +40,10 @@ def video_id_from_ref(ref: str) -> str | None:
     `/shorts/<ID>`(뒤 `/` 하나 허용), watch 는 `v` 값이 정확히 하나. 호스트 자리는 이름
     그대로여야 하고(사용자 정보 · 포트 없음), `\\` 가 든 주소는 읽지 않습니다. 경로의 `%` ·
     `.`/`..` 칸은 이 모양들을 통과하지 못합니다. 쿼리의 `%` 는 서버처럼 한 번 풀어 읽고,
-    `v` 는 푼 뒤에 셉니다.
+    `v` 는 푼 뒤에 셉니다(`%76` 도 `v`). 쿼리는 `&` 와 `;` 를 모두 매개변수 구분으로 봅니다 —
+    서버가 어느 쪽으로 나누든 숨은 `v` 를 놓치지 않기 위해서입니다. youtu.be · shorts 는 쿼리에
+    `v` 가 하나라도 있으면(빈 `v=` 포함) 읽지 않습니다 — 유튜브가 그 `v` 의 영상을 재생하기
+    때문입니다. `si` · `t` · `feature` 같은 다른 매개변수는 무시합니다.
     """
     text = ref.strip()
     if VIDEO_ID_RE.fullmatch(text):
@@ -54,12 +57,14 @@ def video_id_from_ref(ref: str) -> str | None:
     if parts.scheme not in ("http", "https"):
         return None
     host = parts.netloc.lower()
-    if host == "youtu.be":
+    pairs = parse_qsl(parts.query.replace(";", "&"), keep_blank_values=True)
+    names_v = any(key == "v" for key, _ in pairs)
+    if host == "youtu.be" and not names_v:
         candidate = parts.path[1:]
     elif host in _YOUTUBE_HOSTS and parts.path == "/watch":
-        values = [value for key, value in parse_qsl(parts.query, keep_blank_values=True) if key == "v"]
+        values = [value for key, value in pairs if key == "v"]
         candidate = values[0] if len(values) == 1 else ""
-    elif host in _YOUTUBE_HOSTS and parts.path.startswith(_SHORTS_PREFIX):
+    elif host in _YOUTUBE_HOSTS and parts.path.startswith(_SHORTS_PREFIX) and not names_v:
         rest = parts.path[len(_SHORTS_PREFIX):]
         candidate = rest[:-1] if rest.endswith("/") else rest
     else:
