@@ -3,7 +3,7 @@
 Phase 2–7 의 모든 단계가 기대는 계약입니다. 설정 읽기, 영상 기록 모양, 저장소 규칙,
 허용 목록 가드, 게시 흐름, 로그 형식, 주기 실행을 여기서 정합니다. 코드는
 `src/agent/` 패키지(`config.py` · `models.py` · `store.py` · `guard.py` · `logbook.py` ·
-`scheduler.py` · `classifier.py`)에 있습니다.
+`scheduler.py` · `classifier.py` · `trigger.py`)에 있습니다.
 
 ## 1. 실행
 
