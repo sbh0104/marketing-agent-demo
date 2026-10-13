@@ -357,3 +357,75 @@
 - source: adw/phase-1b-contract-section-names
 - tag: plain
 - status: open
+
+### H-042 — README 를 처음부터 끝까지 돌린다 — H-010 라벨 훑기 → `.env` 키 → `uv venv` · `uv pip install` → 실행 → 판정 줄과 `오류:` 줄 읽기 → `키 검사: 결과 파일에 키 없음` 확인 → 채점 훑고 `human` 칸 → 두 파일 커밋 → `stop` 이면 Phase 6B 대신 인터뷰
+- project: marketing-agent-demo
+- when: 2026-10-14 · plans/interview-marketing-agent.md#phase-6a
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-6a-live-check-prepare
+- tag: plain
+- status: open
+
+### H-043 — Phase 6B 전에 계획의 ① "재지 못함" 읽기(영상 쪽 호출 오류와 `result: "error"` 영상도 ①로 셈, ③은 "검사 두 번 탈락"만)를 받아들일지 정한다 — 받아들이지 않으면 트래커 결정이 필요하다
+- project: marketing-agent-demo
+- when: 2026-10-14 · plans/interview-marketing-agent.md#phase-6a
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-6a-live-check-prepare
+- tag: plain
+- status: open
+
+### H-044 — Phase 6B 전에 영상 쪽 응답 모양 오류(`videos.list` · `search.list` 의 200 모양 이상, 영상 판별 · 채점의 답 모양 오류)를 ①에 셀지 정한다 — 지금은 어디에도 세지 않아 영상 0개로 `6B: go` 가 날 수 있다(R1)
+- project: marketing-agent-demo
+- when: 2026-10-14 · plans/interview-marketing-agent.md#phase-6a
+- from: ship-report.md § Human checks — .adw/ship-report.md § Risks
+- source: adw/phase-6a-live-check-prepare
+- tag: plain
+- status: open
+
+### H-045 — 첫 진짜 실행에서 SDK 동작을 확인한다 — jev `answers[이름].noul` 과 `model`, Claude 모르는 모델 → `status_code == 404`, 400 · 크레딧 오류가 `error`, `max_retries=2` 수락, typesafe 재시도 횟수 · 제한 시간
+- project: marketing-agent-demo
+- when: 2026-10-14 · plans/interview-marketing-agent.md#phase-6a
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-6a-live-check-prepare
+- tag: plain
+- status: open
+
+### H-046 — 커밋 전에 `docs/live-check/result.json` · `summary.md` 에 키 조각이 없는지 확인한다 — `키 검사` 줄은 키의 앞 조각만 보므로, 키마다 끝 8글자로도 두 파일을 `grep -F` 한다(R2)
+- project: marketing-agent-demo
+- when: 2026-10-14 · plans/interview-marketing-agent.md#phase-6a
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-6a-live-check-prepare
+- tag: plain
+- status: open
+
+### H-047 — H-011(Phase 3 에서 온 열린 항목, `tests.jev_accuracy` 결과 두 줄 기록)을 이번 진짜 실행이 닫는지 사람이 정한다
+- project: marketing-agent-demo
+- when: 2026-10-14 · plans/interview-marketing-agent.md#phase-6a
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-6a-live-check-prepare
+- tag: plain
+- status: open
+
+### H-048 — Phase 6B: `docs/live-check/result.json` · `summary.md` 를 읽어 계약 '주제 판별'의 정확도 기록 줄을 적고, 6B 결정대로 기준값을 올리고, `fingerprint` 가 지금 코드와 다를 때 할 일을 정한다
+- project: marketing-agent-demo
+- when: 2026-10-14 · plans/interview-marketing-agent.md#phase-6a
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-6a-live-check-prepare
+- tag: plain
+- status: open
+
+### H-049 — Phase 6B: 계약 `docs/contracts.md:1078-1080` 의 "`untrusted` 칸 안에만" 문장을 코드만큼 줄일지(`fingerprint.jev_models` 는 jev 가 알린 모델 이름, 100자, 검사 없음) 그 칸을 이름 모양으로 검사하게 할지 정하고, 그때까지 `jev_models` 를 믿을 수 없는 글로 읽는다(R3)
+- project: marketing-agent-demo
+- when: 2026-10-14 · plans/interview-marketing-agent.md#phase-6a
+- from: ship-report.md § Human checks — .adw/ship-report.md § Risks
+- source: adw/phase-6a-live-check-prepare
+- tag: plain
+- status: open
+
+### H-050 — Phase 6B: `--verdict` 출력은 종료 코드와 첫 줄만 믿고(둘째 줄은 저장된 글을 그대로 찍음), 예시 행 수가 예시 수와 다른 결과 파일은 다시 세지 않으며, 사람이 고친 `result.json` 이 BOM 없이 저장됐는지 본다(R4)
+- project: marketing-agent-demo
+- when: 2026-10-14 · plans/interview-marketing-agent.md#phase-6a
+- from: ship-report.md § Human checks — .adw/ship-report.md § Risks
+- source: adw/phase-6a-live-check-prepare
+- tag: plain
+- status: open
