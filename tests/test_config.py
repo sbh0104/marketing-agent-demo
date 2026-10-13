@@ -83,7 +83,7 @@ BAD_VALUES: tuple[BadValue, ...] = (
     ),
     BadValue(
         "int_over_4300_digits",
-        "poll_interval_min: 30 ",
+        "poll_interval_min: 120 ",
         "poll_interval_min: " + "1" * 5000 + " ",
         ValueError,
         "설정 값을 읽을 수 없습니다 (ValueError: ",
@@ -198,9 +198,9 @@ class CommittedConfigTest(unittest.TestCase):
             Config(
                 topic="연애",
                 keywords=("연애", "썸", "연애 상담", "이별", "소개팅"),
-                poll_interval_min=30,
+                poll_interval_min=120,
                 trigger=TriggerConfig(1000, 5000, 12.0, 150.0),
-                limits=LimitsConfig(10, 24.0, 100),
+                limits=LimitsConfig(10, 24.0, 90),
                 comment=CommentConfig(40, 120),
                 chrome_debug_url="http://localhost:9222",
                 allowed_videos=("https://youtu.be/내-테스트-영상-ID",),
@@ -372,6 +372,7 @@ class ConfigFromMappingTest(unittest.TestCase):
             ("limits", "channel_cooldown_hours", 0),
             ("trigger", "min_views_per_hour", 0),
             ("limits", "daily_max_comments", 0),
+            ("limits", "daily_max_searches", 0),
         )
         for section, key, value in rows:
             with self.subTest(path=f"{section}.{key}", value=value):

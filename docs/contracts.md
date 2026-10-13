@@ -33,14 +33,14 @@ Phase 2–7 의 모든 단계가 기대는 계약입니다. 설정 읽기, 영�
 |---|---|---|---|
 | `topic` | 글자 | 비어 있지 않음 | `연애` |
 | `keywords` | 글자 목록 | 1개 이상, 각 항목 비어 있지 않음 | `[연애, 썸, 연애 상담, 이별, 소개팅]` |
-| `poll_interval_min` | 정수 | ≥ 1 (상한 없음 — 대기는 9절이 약 100년으로 묶음) | `30` |
+| `poll_interval_min` | 정수 | ≥ 1 (상한 없음 — 대기는 9절이 약 100년으로 묶음) | `120` (과제 예시 `30` — 아래) |
 | `trigger.min_views` | 정수 | ≥ 0 | `1000` |
 | `trigger.max_views` | 정수 | ≥ `min_views` | `5000` |
 | `trigger.max_age_hours` | 숫자 | > 0, ≤ 876000 | `12` |
 | `trigger.min_views_per_hour` | 숫자 | ≥ 0, ≤ 1000000000 | `150` |
 | `limits.daily_max_comments` | 정수 | ≥ 0 | `10` |
 | `limits.channel_cooldown_hours` | 숫자 | ≥ 0, ≤ 876000 | `24` |
-| `limits.daily_max_searches` | 정수 | ≥ 0 | `100` (과제 밖에서 더한 키) |
+| `limits.daily_max_searches` | 정수 | ≥ 0 | `90` (과제 밖에서 더한 키) |
 | `comment.min_chars` | 정수 | ≥ 1 | `40` |
 | `comment.max_chars` | 정수 | ≥ `min_chars` | `120` |
 | `chrome_debug_url` | 글자 | `http://` 또는 `https://` 로 시작 | `http://localhost:9222` |
@@ -55,8 +55,18 @@ Phase 2–7 의 모든 단계가 기대는 계약입니다. 설정 읽기, 영�
   영상이 닿지 않는 값입니다. 넘으면 `<상한> 이하여야 합니다: <키>` 오류이고, 실행 중이면 이전
   설정을 유지합니다. 정수 키에는 상한이 없습니다 — 비교와 셈에만 쓰이고, `poll_interval_min` 의
   대기는 9절이 묶습니다.
-- `limits.daily_max_searches` 는 과제 예시에 없는 키입니다. Phase 2 의 하루 검색 상한을
-  설정 값으로 두기 위해 지금 계약에 넣었습니다(쿼터 약 100회/일). Phase 2 가 값을 조정합니다.
+- `limits.daily_max_searches` 는 과제 예시에 없는 키로, 최근 24시간(굴러가는 창) 안의
+  `search.list` 호출 수 — 페이지 넘김 한 번도 한 번 — 의 상한입니다. 닿으면 호출하지 않고
+  `QUOTA` 를 남깁니다(11절). 기본 90 은 90 × 100 = 9,000 단위라 하루 10,000 단위 중 1,000
+  단위를 조회수 호출(`videos.list`, 1단위)에 남깁니다. 90 을 넘기면 한 회마다 조회수 몫이 100
+  단위씩 줄고, 100 이면 남지 않아 조회수 호출이 `QUOTA … counter=units` 로 막힙니다. 0 이면
+  검색하지 않습니다.
+- `poll_interval_min` 기본값 120 과 키워드 5개는 하루 검색 60회입니다(트래커 Phase 2 후보 b).
+  과제 예시 30분 × 5개 = 240회/일은 쿼터를 넘어 쓰지 않습니다. 30분으로 돌리려면 키워드를
+  2개로 줄이고(96회/일) `daily_max_searches` 를 96 이상으로 올려야 합니다 — 그러면 조회수 몫이
+  400 단위 이하로 줄고 페이지 넘김 여유는 거의 없습니다.
+- `trigger.max_age_hours` 는 Phase 2 에서 검색 기간(`publishedAfter`)과 조회수 추적 기간도
+  정합니다(11절).
 - **YAML 1.1 함정 — 글자 자리에서는 크게 실패합니다.** 따옴표 없는 `yes`/`no`/`on`/`off` 는
   bool, `2026-10-12` 는 날짜, `12345678901` 은 정수로 읽히므로 글자 자리에 오면 오류입니다
   (예: `keywords: [연애, no]`, `topic: yes`, `allowed_videos: [12345678901]`). 이런 값은
