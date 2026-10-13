@@ -9,8 +9,8 @@ Phase 2–7 의 모든 단계가 기대는 계약입니다. 설정 읽기, 영�
 
 - Python 3.10 이상. 3.11 이후에만 있는 기능(`datetime.UTC`, `enum.StrEnum`, `tomllib`,
   `typing.Self`, `except*`)은 쓰지 않습니다.
-- 의존성 설치: `pip install -r requirements.txt` — 지금은 `PyYAML>=6.0` 한 줄입니다.
-  Phase 6 이 Playwright 를 더합니다.
+- 의존성 설치: `pip install -r requirements.txt` — 지금은 `PyYAML>=6.0` 과 Phase 5 가 더한
+  `anthropic>=0.40`(댓글 작성기의 Claude SDK, 11절) 두 줄입니다. Phase 6 이 Playwright 를 더합니다.
 - 테스트(저장소 뿌리에서, 설치 없이):
 
   ```
