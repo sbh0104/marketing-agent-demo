@@ -481,6 +481,7 @@ class ClassifierConfigTest(unittest.TestCase):
             ("noul_no_max", -0.1, "0 이상이어야 합니다"),
             ("noul_no_max", 0.8, "noul_yes_min 보다 작아야 합니다"),
             ("choice_min_confidence", 1.5, "1 이하여야 합니다"),
+            ("choice_min_confidence", -0.1, "0 이상이어야 합니다"),
             ("choice_min_confidence", float("nan"), "유한한 숫자여야 합니다"),
         )
         for key, value, message in rows:
