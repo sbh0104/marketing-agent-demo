@@ -675,6 +675,7 @@ INVALID_ITEMS: tuple[tuple[str, dict[str, object]], ...] = (
     ("publishedAt week date", bad_item(snippet__publishedAt="2026-W41-1T10:00:00+00:00")),
     ("publishedAt no zone", bad_item(snippet__publishedAt="2026-10-12T10:00:00")),
     ("publishedAt month 13", bad_item(snippet__publishedAt="2026-13-01T00:00:00Z")),
+    ("publishedAt Feb 30", bad_item(snippet__publishedAt="2026-02-30T00:00:00Z")),
     ("publishedAt Z junk", bad_item(snippet__publishedAt="2026-10-12T10:00:00Zjunk")),
     ("channelId empty", bad_item(snippet__channelId="")),
     ("no snippet", bad_item(snippet="")),
@@ -682,7 +683,7 @@ INVALID_ITEMS: tuple[tuple[str, dict[str, object]], ...] = (
 )
 
 # INVALID_ITEMS 행마다 SKIP 줄 detail 의 앞부분 — 지금 코드가 내는 글 그대로 (S-047).
-# month 13 은 _PUBLISHED_RE 모양에는 맞아 strptime 에서 떨어지므로 strptime 의 글로 시작합니다.
+# month 13·Feb 30 은 _PUBLISHED_RE 모양에는 맞고 달력에 없어도 칸 이름으로 시작합니다 (S-048).
 INVALID_DETAIL_PREFIX: dict[str, str] = {
     "viewCount -5": "statistics.viewCount:",
     "viewCount 1_000": "statistics.viewCount:",
@@ -699,7 +700,8 @@ INVALID_DETAIL_PREFIX: dict[str, str] = {
     "publishedAt basic": "snippet.publishedAt:",
     "publishedAt week date": "snippet.publishedAt:",
     "publishedAt no zone": "snippet.publishedAt:",
-    "publishedAt month 13": "time data '2026-13-01T00:00:00'",
+    "publishedAt month 13": "snippet.publishedAt:",
+    "publishedAt Feb 30": "snippet.publishedAt:",
     "publishedAt Z junk": "snippet.publishedAt:",
     "channelId empty": "VideoRecord.channel_id:",
     "no snippet": "snippet:",

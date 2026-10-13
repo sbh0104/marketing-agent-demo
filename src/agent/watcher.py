@@ -52,7 +52,11 @@ def _published(value: object) -> datetime:
     # UTC `Z` 모양만 — 다른 시간대 표기는 날짜 끝에서 Store.save 를 넘치게 할 수 있습니다 (계약 11절)
     if not isinstance(value, str) or not _PUBLISHED_RE.fullmatch(value):
         raise ValueError(f"snippet.publishedAt: UTC 'YYYY-MM-DDTHH:MM:SSZ' 모양이 아닙니다: {value!r:.40}")
-    return datetime.strptime(value[:19], "%Y-%m-%dT%H:%M:%S").replace(tzinfo=timezone.utc)
+    try:
+        parsed = datetime.strptime(value[:19], "%Y-%m-%dT%H:%M:%S")
+    except ValueError:
+        raise ValueError(f"snippet.publishedAt: 달력에 없는 날짜·시각입니다: {value!r:.40}") from None
+    return parsed.replace(tzinfo=timezone.utc)
 
 
 def _views(item: Mapping[str, object]) -> int:
