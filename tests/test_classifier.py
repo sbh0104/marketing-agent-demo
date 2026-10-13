@@ -1,9 +1,12 @@
-"""주제 판별 테스트 — 질문 모양 · 32k 자르기 · 판정 가드 · 오류 보류 · SDK 연결 · 저장 왕복.
+"""주제 판별 테스트 — 질문 모양 · 32k 자르기 · 판정 가드 · 오류 보류 · SDK 연결 · 저장 왕복 ·
+한국어 예시 묶음과 정확도 실행기의 판정.
 
 가짜 jev 만 씁니다. 네트워크를 부르지 않고, typesafe_sdk 가 설치되어 있지 않아도 돕니다.
 """
 from __future__ import annotations
 
+import contextlib
+import io
 import json
 import sys
 import tempfile
@@ -28,11 +31,13 @@ from agent.classifier import (
     sdk_ask,
     state_budget,
 )
-from agent.config import Config, config_from_mapping
+from agent.config import Config, config_from_mapping, load_config
 from agent.logbook import Event, format_line, parse_line
 from agent.models import Verdict, VideoRecord
 from agent.store import Store
-from tests.test_config import valid
+from tests.classifier_examples import EXAMPLES
+from tests.jev_accuracy import Tally, example_record, main, measure
+from tests.test_config import REPO_CONFIG, valid
 
 T0 = datetime(2026, 10, 13, 3, 0, tzinfo=timezone.utc)
 ON = "연애 고민 상담"
@@ -552,6 +557,153 @@ class RecordTest(unittest.TestCase):
         self.assertEqual(fields["reason"], judgement.reason)
         for piece in (": ", " (0.91)", " · "):
             self.assertIn(piece, fields["reason"])
+
+
+ANSWERS = {
+    Verdict.YES: response(),
+    Verdict.NO: response(noul=0.04, choice=OFF, probability=0.91, confidence=0.9),
+    Verdict.HOLD: response(noul=0.5),
+}
+
+
+class LabelJev:
+    """예시 제목을 state 에서 찾아 정답대로 답하는 가짜 — overrides 의 예시 번호(1부터)만 다르게
+    답하며, languages 에 든 질문 언어에서만 그렇게 합니다."""
+
+    def __init__(
+        self,
+        overrides: Mapping[int, Verdict] | None = None,
+        languages: tuple[str, ...] = LANGUAGES,
+    ) -> None:
+        self.overrides = dict(overrides or {})
+        committed = load_config(REPO_CONFIG)
+        self.wording = {
+            language: build_questions(committed, language)[MATCH_ID]["instructions"]
+            for language in languages
+        }
+        self.calls = 0
+
+    def __call__(
+        self, model: str, state: str, questions: Mapping[str, Mapping[str, object]]
+    ) -> object:
+        self.calls += 1
+        (number, example), = (
+            (i, ex) for i, ex in enumerate(EXAMPLES, 1) if f"Title: {ex.title}\n\n" in state
+        )
+        verdict = example.label
+        if questions[MATCH_ID]["instructions"] in self.wording.values():
+            verdict = self.overrides.get(number, verdict)
+        return ANSWERS[verdict]
+
+
+def run_main(
+    argv: list[str], env: Mapping[str, str], ask: object
+) -> tuple[int, str, str]:
+    out, err = io.StringIO(), io.StringIO()
+    with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+        code = main(argv, env=env, ask=ask)
+    return code, out.getvalue(), err.getvalue()
+
+
+KEY = {"TYPESAFE_API_KEY": "test-key"}
+
+
+class ExamplesTest(unittest.TestCase):
+    """한국어 예시 묶음의 모양과 정확도 실행기(tests.jev_accuracy)의 판정."""
+
+    def test_examples_are_22_human_labels(self) -> None:
+        self.assertEqual(len(EXAMPLES), 22)
+        labels = [example.label for example in EXAMPLES]
+        self.assertEqual(labels.count(Verdict.YES), 10)
+        self.assertEqual(labels.count(Verdict.NO), 12)
+        self.assertEqual(set(labels), {Verdict.YES, Verdict.NO})
+        self.assertEqual([example.kind for example in EXAMPLES].count("주입"), 2)
+        titles = [example.title for example in EXAMPLES]
+        self.assertEqual(len(set(titles)), 22)
+        self.assertTrue(all(title for title in titles))
+
+    def test_examples_are_sent_whole(self) -> None:
+        cfg = config()
+        for index, example in enumerate(EXAMPLES, 1):
+            with self.subTest(index=index):
+                fake = FakeJev()
+                classify(example_record(index, example, T0), cfg, fake, T0)
+                state = fake.calls[0][1]
+                self.assertIn(example.title, state)
+                self.assertIn(example.description, state)
+
+    def test_measure_counts_each_kind_separately(self) -> None:
+        cfg = config()
+        rows = (
+            ("always yes", FakeJev(ANSWERS[Verdict.YES]), (10, 12, 0, 0, 0)),
+            ("always no", FakeJev(ANSWERS[Verdict.NO]), (12, 0, 10, 0, 0)),
+            ("always middle", FakeJev(ANSWERS[Verdict.HOLD]), (0, 0, 0, 22, 0)),
+            (
+                "always JevError",
+                FakeJev(error=JevError("TypeSafeRateLimitError 429")),
+                (0, 0, 0, 0, 22),
+            ),
+        )
+        for label, fake, counts in rows:
+            with self.subTest(label):
+                tally = measure(EXAMPLES, cfg, fake, T0, "ko")
+                self.assertIsInstance(tally, Tally)
+                self.assertEqual(tally[:5], counts)
+                self.assertEqual(len(tally.misses), 22 - tally.correct)
+
+    def test_runner_without_key_exits_2_without_calling_jev(self) -> None:
+        fake = FakeJev()
+        for env in ({}, {"TYPESAFE_API_KEY": ""}):
+            with self.subTest(env=env):
+                code, out, err = run_main([], env, fake)
+                self.assertEqual(code, 2)
+                self.assertIn("TYPESAFE_API_KEY 가 없어 정확도를 재지 않습니다", err)
+                self.assertEqual(out, "")
+        self.assertEqual(fake.calls, [])
+
+    def test_runner_bad_arguments_exit_2_without_calling_jev(self) -> None:
+        fake = FakeJev()
+        code, out, err = run_main(["--en"], KEY, fake)
+        self.assertEqual(code, 2)
+        self.assertIn("python3 -m tests.jev_accuracy", err)
+        self.assertEqual(out, "")
+        self.assertEqual(fake.calls, [])
+
+    def test_runner_error_holds_exit_3(self) -> None:
+        fake = FakeJev(error=JevError("TypeSafeAuthenticationError 401"))
+        code, out, _ = run_main([], KEY, fake)
+        self.assertEqual(code, 3)
+        self.assertIn("측정 실패", out)
+        self.assertIn("ko: 맞음 0/22 · 잘못된 일치 0 · 잘못된 불일치 0 · 보류 0 · 오류 22", out)
+
+    def test_runner_perfect_labels_exit_0(self) -> None:
+        code, out, _ = run_main([], KEY, LabelJev())
+        self.assertIn("ko: 맞음 22/22 · 잘못된 일치 0 · 잘못된 불일치 0 · 보류 0 · 오류 0", out)
+        self.assertIn("권고: ko 그대로", out)
+        self.assertEqual(code, 0)
+
+    def test_runner_one_injection_false_yes_fails(self) -> None:
+        self.assertEqual(EXAMPLES[20].kind, "주입")
+        code, out, _ = run_main([], KEY, LabelJev({21: Verdict.YES}))
+        self.assertIn("ko: 맞음 21/22 · 잘못된 일치 1 · 잘못된 불일치 0 · 보류 0 · 오류 0", out)
+        self.assertIn(f"  주입 · no → yes: {EXAMPLES[20].title} — ", out)
+        self.assertEqual(code, 1)
+
+    def test_runner_below_20_correct_fails_in_both_languages(self) -> None:
+        holds = {1: Verdict.HOLD, 2: Verdict.HOLD, 3: Verdict.HOLD}
+        code, out, _ = run_main([], KEY, LabelJev(holds))
+        self.assertIn("ko: 맞음 19/22 · 잘못된 일치 0 · 잘못된 불일치 0 · 보류 3 · 오류 0", out)
+        self.assertIn("en: 맞음 19/22 · 잘못된 일치 0 · 잘못된 불일치 0 · 보류 3 · 오류 0", out)
+        self.assertIn("권고: 두 언어 모두 미달", out)
+        self.assertEqual(code, 1)
+
+    def test_runner_ko_fails_en_passes_advises_en(self) -> None:
+        holds = {1: Verdict.HOLD, 2: Verdict.HOLD, 3: Verdict.HOLD}
+        code, out, _ = run_main([], KEY, LabelJev(holds, languages=("ko",)))
+        self.assertIn("ko: 맞음 19/22", out)
+        self.assertIn("en: 맞음 22/22", out)
+        self.assertIn('권고: QUESTION_LANGUAGE 를 "en" 으로 (코드 한 줄, 새 사이클)', out)
+        self.assertEqual(code, 1)
 
 
 if __name__ == "__main__":
