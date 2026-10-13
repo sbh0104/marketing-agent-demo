@@ -1,0 +1,25 @@
+# 실제 호출 실행기 — 실행 안내 (Phase 6A)
+
+1. 예시 22개의 정답 라벨을 훑습니다 — `tests/classifier_examples.py` 의 `EXAMPLES` 에서 `label` 이 제목 · 설명과 맞는지 봅니다(H-010). 틀린 라벨이 있으면 돌리지 말고 인터뷰로 옵니다.
+2. 저장소 main 체크아웃의 뿌리에서 `.env.example` 을 `.env` 로 복사하고 `ANTHROPIC_API_KEY` · `YOUTUBE_API_KEY` · `TYPESAFE_API_KEY` 를 채웁니다. `.env` 는 커밋되지 않습니다(`.gitignore`).
+3. 이 기계에는 `pip` 이 없고 `uv` 가 있습니다. 저장소 뿌리에서:
+
+       ~/.local/bin/uv venv
+       ~/.local/bin/uv pip install -r requirements.txt
+
+4. 실행합니다 — 진짜 jev · Claude · YouTube 를 부릅니다. 크롬 연결 · 게시는 하지 않습니다.
+
+       .venv/bin/python -m tests.live_check
+
+   - YouTube 호출은 운영과 같은 쿼터 장부 `data/quota.json` 을 씁니다. 검색은 많아야 키워드 수 × 2번(지금 10번, 1,000단위)이라 그날 운영 검색 몫이 그만큼 줄어듭니다.
+   - 서비스마다 실행기 호출 천장(jev 120 · Claude 70 · YouTube 50)에 닿으면 그 자리에서 멈추고 결과에 적습니다. 천장은 실행기가 부른 수이고, SDK 안의 다시 시도(Claude 는 호출당 많아야 2번 더, jev 는 SDK 기본 정책)는 따로입니다.
+   - 서비스가 느리면 오래 걸릴 수 있습니다. Ctrl-C 로 멈추면 그때까지의 결과를 쓰고 판정에 `중단` 으로 적습니다.
+   - 키나 SDK 가 없으면 아무것도 부르지 않고 없는 것을 한 줄로 알립니다(종료 코드 2).
+   - 다시 돌리면 결과 두 파일을 덮어씁니다.
+5. 화면 첫 줄이 판정입니다 — `6B: go` 또는 `6B: stop — <경우와 숫자>`. 결과는 `docs/live-check/result.json` 과 `docs/live-check/summary.md` 이고, 요약의 첫 줄도 같은 판정입니다. `재지 못함` 이면 요약의 `오류:` 줄(서비스 · 단계 · 상태)이 원인입니다 — 키 · 크레딧 · API 설정 문제일 수 있습니다.
+6. 화면 마지막 줄이 `키 검사: 결과 파일에 키 없음` 인지 봅니다. 다른 줄이면 커밋하지 말고 인터뷰로 옵니다.
+7. 채점을 훑고, 동의하지 않는 초안만 사람 칸에 적습니다 — 건너뛰어도 됩니다. `result.json` 의 `videos[].drafts[]` 마다 `claude_grade`(`ok` / `bad`)를 보고, 동의하지 않으면 그 초안의 `"human": ""` 을 `"human": "ok"` 또는 `"human": "bad"` 로 고칩니다. 판정 줄은 사람 칸과 무관합니다.
+8. 판정이 `stop` 이면 결과를 커밋하되 Phase 6B 를 시작하지 않고 인터뷰로 옵니다. `go` 면 커밋한 뒤 Phase 6B 를 시작합니다.
+9. 결과 두 파일을 커밋합니다 — 커밋하지 않은 파일은 Phase 6B 의 레인에 보이지 않습니다:
+
+    git add docs/live-check/result.json docs/live-check/summary.md && git commit -m "docs(live-check): 실제 호출 결과 — Phase 6A 실행기"

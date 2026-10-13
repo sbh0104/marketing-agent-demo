@@ -47,6 +47,9 @@ KEPT = (
     "logs/.gitkeep",
     "data/.gitkeep",
     "src/agent/guard.py",
+    "docs/live-check/README.md",
+    "docs/live-check/result.json",
+    "docs/live-check/summary.md",
 )
 
 
