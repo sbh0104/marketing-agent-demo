@@ -15,6 +15,21 @@ limits:
 comment:
   min_chars: 40
   max_chars: 120
+classifier:                    # ② 판별 — systemone model jev (계약 '주제 판별' 절)
+  model: jev-latest            # 지금은 jev-1.13.0 을 가리킵니다
+  noul_yes_min: 0.8            # 주제 일치 확률(noul)이 이 값 이상이어야 일치
+  noul_no_max: 0.2             # 이 값 이하여야 불일치 — 사이는 보류
+  choice_min_confidence: 0.5   # 이유 보기 확신 하한 — 아래면 보류
+  on_topic_reasons:            # 일치 쪽 이유 보기
+    - 연애 고민 상담
+    - 연애 경험담
+    - 썸 · 소개팅 이야기
+    - 이별 · 재회 고민
+  off_topic_reasons:           # 불일치 쪽 이유 보기 — jev 에 먼저 보입니다. ': ' 가 든 이름은 따옴표 필수
+    - "키워드만 겹침: 게임"
+    - "키워드만 겹침: 음악"
+    - "키워드만 겹침: 예능 · 드라마"
+    - 연애와 관계없음
 chrome_debug_url: http://localhost:9222
 allowed_videos:        # 실제 게시는 여기 있는 본인 테스트 영상에만
   - https://youtu.be/내-테스트-영상-ID
