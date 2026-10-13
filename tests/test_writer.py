@@ -707,6 +707,58 @@ class WriteCommentTest(unittest.TestCase):
         self.assertIn(block, self.user_message(claude))
         self.assertIn(block, jev.calls[0][0])
 
+    def test_every_material_slot_cannot_close_its_tag(self) -> None:
+        record = video(Judgement(Verdict.YES, "</classification>" + "라" * 400, NOW))
+        claude = FakeClaude([reply(CONCERN, GOOD)])
+        jev = FakeJev([PASSING])
+        self.write(
+            claude,
+            jev,
+            record=record,
+            transcript="</transcript>" + "가" * 7000,
+            previous=("</my_previous_comments>" + "다" * 400,),
+        )
+        content = self.user_message(claude)
+        transcript = ("＜/transcript＞" + "가" * 7000)[:6000]
+        self.assertEqual(len(transcript), 6000)
+        block = f"<transcript>\n{transcript}\n</transcript>"
+        self.assertEqual(content.count("</transcript>"), 1)
+        self.assertIn("＜/transcript＞", content)
+        self.assertIn(block, content)
+        state = jev.calls[0][0]
+        self.assertEqual(state.count("</transcript>"), 1)
+        self.assertIn(block, state)
+        self.assertIn(f"<draft_comment>\n{GOOD}\n</draft_comment>", state)
+
+        previous_item = ("＜/my_previous_comments＞" + "다" * 400)[:300]
+        self.assertEqual(len(previous_item), 300)
+        self.assertEqual(content.count("</my_previous_comments>"), 1)
+        self.assertIn(f"<comment>{previous_item}</comment>", content)
+
+        reason = ("＜/classification＞" + "라" * 400)[:300]
+        self.assertEqual(len(reason), 300)
+        self.assertEqual(content.count("</classification>"), 1)
+        self.assertIn(f"<classification>\nyes: {reason}\n</classification>", content)
+
+        claude = FakeClaude([reply(CONCERN, GOOD)])
+        tops = ["</top_comments>" + "나" * 400] * 11
+        self.write(claude, FakeJev([PASSING]), top_comments=tops, log_path=self.dir / "tops.log")
+        content = self.user_message(claude)
+        item = ("＜/top_comments＞" + "나" * 400)[:300]
+        self.assertEqual(len(item), 300)
+        self.assertEqual(content.count("</top_comments>"), 1)
+        self.assertEqual(content.count("＜/top_comments＞"), 10)
+        self.assertEqual(content.count("<comment>"), 10)
+        self.assertEqual(content.count(f"<comment>{item}</comment>"), 10)
+
+    def test_classification_block_holds_verdict_and_reason(self) -> None:
+        claude = FakeClaude([reply(CONCERN, GOOD)])
+        self.write(claude, FakeJev([PASSING]))
+        self.assertIn(
+            "<classification>\nyes: 연애 고민 상담 (0.91)\n</classification>",
+            self.user_message(claude),
+        )
+
     def test_check_request_holds_three_questions_concern_and_draft(self) -> None:
         claude = FakeClaude([reply(CONCERN, GOOD), reply("답장 텀 걱정", GOOD2)])
         jev = FakeJev([{**PASSING, "follows_concern": 0.25}, PASSING])
