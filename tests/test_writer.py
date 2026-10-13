@@ -322,6 +322,8 @@ class CheckTest(unittest.TestCase):
             ("non_str_value", '{"concern": "연락 텀", "comment": 5}'),
             ("empty_comment", '{"concern": "연락 텀", "comment": "  "}'),
             ("deep_nesting", '{"concern": ' + "[" * 100_000 + "]" * 100_000 + "}"),
+            ("lone_surrogate_comment", '{"concern": "연락 텀", "comment": "좋아요\\ud800"}'),
+            ("lone_surrogate_concern", '{"concern": "연락\\udfff", "comment": "좋아요"}'),
         )
         for label, raw in cases:
             with self.subTest(label):
@@ -580,6 +582,28 @@ class WriteCommentTest(unittest.TestCase):
             ],
         )
         self.assertEqual(self.events()[0][1]["attempt"], "2")
+
+    def test_whitespace_only_reply_is_a_placeholder_turn(self) -> None:
+        claude = FakeClaude(["   \n", reply(CONCERN, GOOD)])
+        jev = FakeJev([PASSING])
+        result = self.write(claude, jev)
+        self.assertEqual(result.draft.text, GOOD)
+        self.assertEqual(
+            claude.calls[1]["messages"][1], {"role": "assistant", "content": "(빈 응답)"}
+        )
+
+    def test_surrogate_answer_rewrites_without_calling_jev(self) -> None:
+        raw = f'{{"concern": "{CONCERN}", "comment": "{GOOD}\\ud800"}}'
+        claude = FakeClaude([raw, reply(CONCERN, GOOD)])
+        jev = FakeJev([PASSING])
+        result = self.write(claude, jev)
+        self.assertEqual(result.draft.text, GOOD)
+        self.assertEqual(len(jev.calls), 1)
+        events = self.events()
+        self.assertEqual([event for event, _ in events], [Event.COMMENT])
+        self.assertEqual(events[0][1]["attempt"], "2")
+        text = self.log_path.read_bytes().decode("utf-8")
+        self.assertTrue(text)
 
     def test_claude_error_logs_error_and_skips(self) -> None:
         claude = FakeClaude([FakeApiError("model: claude-x not found")])
