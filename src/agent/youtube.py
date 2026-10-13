@@ -1,4 +1,4 @@
-"""YouTube Data API v3 클라이언트와 쿼터 가드 — 쿼터 단위를 아는 유일한 곳 (계약 11절).
+"""YouTube Data API v3 클라이언트와 쿼터 가드 — 쿼터 단위를 아는 유일한 곳 (계약 '탐지 · 조회수 추적' 절).
 
 - 호출마다 드는 단위는 `UNIT_COST` 한 곳에 있고, 모든 HTTP 호출은 `YouTubeClient._call` 에서
   `QuotaLedger.reserve` 를 거칩니다. 페이지 넘김도 search.list 한 번이라 가드를 비켜 가지 못합니다.
