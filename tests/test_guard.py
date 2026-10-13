@@ -1,4 +1,4 @@
-"""허용 목록 가드 테스트 — 행 G1–G7, 영상 주소 읽기, 엄격한 주소 읽기(ship-check 재현 입력)."""
+"""허용 목록 가드 테스트 — 행 G1–G7, 영상 주소 읽기, 엄격한 주소 읽기(ship-check · HC1 재현 입력)."""
 from __future__ import annotations
 
 import inspect
@@ -32,6 +32,21 @@ REJECTED_REFS = (
     f"https://www.youtube.com/watch?v={REPRO_A}&x=a\\b",
     f"https://evil.example@youtu.be/{REPRO_A}",
     f"https://youtu.be:443/{REPRO_A}",
+    # HC1 인터뷰(2026-10-13) 재현 입력 — 유튜브는 쿼리의 v(B)를 재생합니다
+    "https://youtu.be/AAAAAAAAAAA?v=BBBBBBBBBBB",
+    "https://www.youtube.com/shorts/AAAAAAAAAAA?v=BBBBBBBBBBB",
+    "https://youtu.be/AAAAAAAAAAA?%76=BBBBBBBBBBB",
+    "https://youtu.be/AAAAAAAAAAA?si=x&v=BBBBBBBBBBB",
+    f"https://youtu.be/{REPRO_A}?v=",
+    f"https://m.youtube.com/shorts/{REPRO_A}/?feature=share&v={REPRO_B}",
+    # 쿼리의 ; 도 & 처럼 나눕니다 — 서버가 ; 로 나누면 B 가 숨어 있는 모양 (HTML 복사의 &amp; 포함)
+    f"https://youtu.be/{REPRO_A}?x=1;v={REPRO_B}",
+    f"https://youtu.be/{REPRO_A}?si=x&amp;v={REPRO_B}",
+    f"https://www.youtube.com/shorts/{REPRO_A}?feature=share;v={REPRO_B}",
+    f"https://www.youtube.com/watch?x=1;v={REPRO_B}&v={REPRO_A}",
+    # ship-report R7 — 경로가 정확히 /watch 가 아닌 watch 닮은꼴
+    f"https://www.youtube.com/watchx?v={REPRO_A}",
+    f"https://www.youtube.com/watch/?v={REPRO_A}",
 )
 
 # 계약 5절 형식 — 모두 REPRO_A 로 읽혀야 합니다 (양성 대조)
@@ -50,6 +65,11 @@ ACCEPTED_REFS = (
     f"https://www.youtube.com/shorts/{REPRO_A}",
     f"https://www.youtube.com/shorts/{REPRO_A}/",
     f"http://youtube.com/shorts/{REPRO_A}?feature=share",
+    # HC1 — v 가 아닌 매개변수는 계속 무시하고, ; 는 & 와 같은 구분
+    "https://youtu.be/AAAAAAAAAAA?si=xYz12",
+    f"https://youtu.be/{REPRO_A}?si=x&t=30&feature=shared",
+    f"https://www.youtube.com/shorts/{REPRO_A}?si=x&feature=share",
+    f"https://www.youtube.com/watch?v={REPRO_A};x=1",
 )
 
 
