@@ -530,6 +530,6 @@ other line is required on every item.
 - evidence: src/agent/watcher.py:55 — 모양 검사(`_PUBLISHED_RE`, watcher.py:32)를 통과한 `"2026-02-30T00:00:00Z"` 가 `strptime` 에서 떨어져 detail 이 3.14 에서 `day 30 must be in range 1..28 for month 2 in year 2026`, 3.10 에서 `day is out of range for month`(값도 칸 이름도 없음); 13월은 두 판 모두 `time data '2026-13-01T00:00:00' does not match format …` — 다른 invalid_item detail 은 모두 칸 이름으로 시작(watcher.py:54, :62)(.adw/ship-report.md § Risks R1)
 - direction: `_published` 에서 `strptime` 이 낸 `ValueError` 를 `snippet.publishedAt:` 로 시작하고 값(`{value!r:.40}`)을 담은 고정 문구로 바꿔 다시 내고, tests/test_watcher.py 의 `INVALID_DETAIL_PREFIX` 13월 행을 `snippet.publishedAt:` 로 바꾸고 2월 30일 행(INVALID_ITEMS 와 함께)을 더한다
 - touches: src/agent/watcher.py, tests/test_watcher.py
-- status: open
+- status: resolved
 - attempts: 0 · last failure: —
 - first seen: 2026-10-14 · last seen: 2026-10-14
