@@ -529,6 +529,16 @@ class SdkAskTest(unittest.TestCase):
         with self.assertRaises(TypeError):
             classify(record(), config(), sdk_ask, T0)
 
+    def test_non_sdk_error_from_system_one_propagates(self) -> None:
+        # try 안(with 블록의 system_one)에서 난 SDK 밖 오류도 JevError · 보류가 되지 않습니다
+        error = TypeError("호출 중 잘못")
+        self.sdk.raises = error
+        with self.assertRaises(TypeError) as caught:
+            classify(record(), config(), sdk_ask, T0)
+        self.assertIs(caught.exception, error)
+        (client,) = self.sdk.clients
+        self.assertEqual(len(client.calls), 1)
+
     def test_missing_sdk_raises(self) -> None:
         sys.modules["typesafe_sdk"] = None
         with self.assertRaises(ModuleNotFoundError):
