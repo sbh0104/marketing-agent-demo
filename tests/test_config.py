@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import copy
+import inspect
 import tempfile
 import unittest
 from datetime import datetime, timedelta, timezone
@@ -9,6 +10,7 @@ from pathlib import Path
 from typing import NamedTuple
 from unittest import mock
 
+from agent import config as config_module
 from agent.config import (
     ClassifierConfig,
     CommentConfig,
@@ -20,7 +22,12 @@ from agent.config import (
     load_config,
     parse_yaml,
 )
+from agent.logbook import Event, format_line, parse_line
+from agent.models import VideoRecord, ViewSample
+from agent.scheduler import run_loop
 from agent.store import Store
+from agent.trigger import judge_trigger
+from agent.writer import SYSTEM_PROMPT, code_failures
 
 REPO_CONFIG = Path(__file__).resolve().parent.parent / "config.yaml"
 NOW = datetime(2026, 10, 12, 12, 0, tzinfo=timezone.utc)
@@ -219,6 +226,61 @@ OUT_OF_RANGE_VALUES: tuple[RangeValue, ...] = (
         "check_min_probability: 0.7 ",
         "check_min_probability: .nan ",
         "유한한 숫자여야 합니다: comment.check_min_probability",
+    ),
+    # Phase 1 ship-report R4 · Phase 1A 인터뷰 재현 입력 — 16진수 표기는 4,300자리 한도를 거치지 않고 읽히므로 상한이 막습니다
+    RangeValue(
+        "interval_hex_3700_f",
+        "poll_interval_min: 120 ",
+        "poll_interval_min: 0x" + "F" * 3700 + " ",
+        "52560000 이하여야 합니다: poll_interval_min",
+    ),
+    RangeValue(
+        "max_chars_hex_3700_f",
+        "  max_chars: 120\n",
+        "  max_chars: 0x" + "F" * 3700 + "\n",
+        "10000 이하여야 합니다: comment.max_chars",
+    ),
+    RangeValue(
+        "interval_over_ceiling",
+        "poll_interval_min: 120 ",
+        "poll_interval_min: 52560001 ",
+        "52560000 이하여야 합니다: poll_interval_min",
+    ),
+    RangeValue(
+        "min_views_over_ceiling",
+        "  min_views: 1000\n",
+        "  min_views: 1000000000001\n",
+        "1000000000000 이하여야 합니다: trigger.min_views",
+    ),
+    RangeValue(
+        "max_views_over_ceiling",
+        "  max_views: 5000\n",
+        "  max_views: 1000000000001\n",
+        "1000000000000 이하여야 합니다: trigger.max_views",
+    ),
+    RangeValue(
+        "daily_max_comments_over_ceiling",
+        "daily_max_comments: 10 ",
+        "daily_max_comments: 86401 ",
+        "86400 이하여야 합니다: limits.daily_max_comments",
+    ),
+    RangeValue(
+        "daily_max_searches_over_ceiling",
+        "daily_max_searches: 90 ",
+        "daily_max_searches: 86401 ",
+        "86400 이하여야 합니다: limits.daily_max_searches",
+    ),
+    RangeValue(
+        "min_chars_over_ceiling",
+        "  min_chars: 40\n",
+        "  min_chars: 10001\n",
+        "10000 이하여야 합니다: comment.min_chars",
+    ),
+    RangeValue(
+        "max_chars_over_ceiling",
+        "  max_chars: 120\n",
+        "  max_chars: 10001\n",
+        "10000 이하여야 합니다: comment.max_chars",
     ),
 )
 
@@ -473,6 +535,11 @@ class ConfigFromMappingTest(unittest.TestCase):
                 data[section][key] = value
                 self.assert_rejected(data, f"{message}: {section}.{key}")
 
+    def test_int_takes_a_required_maximum(self) -> None:
+        # 결정 2 — 상한에 기본값이 없어 정수 키를 더하는 단계가 빠뜨릴 수 없습니다
+        maximum = inspect.signature(config_module._int).parameters["maximum"]
+        self.assertIs(maximum.default, inspect.Parameter.empty)
+
 
 class ClassifierConfigTest(unittest.TestCase):
     """classifier 절 — 판별 모델 이름 · 기준값 · 이유 보기 목록의 검사."""
@@ -695,6 +762,79 @@ class RangeFailureTest(unittest.TestCase):
         )
         self.assertEqual((check.allowed, check.reason), (True, "ok"))
         self.assertLess(NOW - timedelta(hours=config.trigger.max_age_hours), NOW)
+
+    def test_integer_ceilings_load_and_stay_usable_downstream(self) -> None:
+        text = variant("poll_interval_min: 120 ", "poll_interval_min: 52560000 ")
+        text = text.replace("  min_views: 1000\n", "  min_views: 1000000000000\n")
+        text = text.replace("  max_views: 5000\n", "  max_views: 1000000000000\n")
+        text = text.replace("daily_max_comments: 10 ", "daily_max_comments: 86400 ")
+        text = text.replace("daily_max_searches: 90 ", "daily_max_searches: 86400 ")
+        text = text.replace("  min_chars: 40\n", "  min_chars: 10000\n")
+        text = text.replace("  max_chars: 120\n", "  max_chars: 10000\n")
+        config = load_config(write_config(self.dir, text))
+        ints = (
+            config.poll_interval_min,
+            config.trigger.min_views,
+            config.trigger.max_views,
+            config.limits.daily_max_comments,
+            config.limits.daily_max_searches,
+            config.comment.min_chars,
+            config.comment.max_chars,
+        )
+        self.assertEqual(ints, (52560000, 10**12, 10**12, 86400, 86400, 10000, 10000))
+        # 정수가 글자로 쓰이는 자리 — START · QUOTA 로그 줄
+        start = format_line(
+            NOW,
+            Event.START,
+            {"mode": "test", "allowed": 0, "interval_min": config.poll_interval_min},
+        )
+        self.assertEqual(parse_line(start)[2]["interval_min"], "52560000")
+        for value in ints:
+            with self.subTest(quota=value):
+                parse_line(format_line(NOW, Event.QUOTA, {"used": value, "limit": value}))
+        # 댓글 작성 지시문과 코드 검사의 글자 수
+        prompt = SYSTEM_PROMPT.format(
+            min_chars=config.comment.min_chars, max_chars=config.comment.max_chars
+        )
+        self.assertIn("10000자 이상 10000자 이하", prompt)
+        self.assertEqual(code_failures("가" * 10000, [], config.comment), [])
+        self.assertNotEqual(code_failures("가", [], config.comment), [])
+        # 하루 상한 · 조회수 판정 · 주기 대기
+        check = Store(self.dir / "videos.json").check_post(
+            "abcdefghijk", "UC1", NOW, config.limits, live=True
+        )
+        self.assertEqual((check.allowed, check.reason), (True, "ok"))
+        record = VideoRecord(
+            video_id="abcdefghijk",
+            channel_id="UC1",
+            title="제목",
+            description="",
+            published_at=NOW - timedelta(hours=1),
+            detected_at=NOW - timedelta(hours=1),
+            keyword="썸",
+            view_history=[
+                ViewSample(NOW - timedelta(minutes=30), 10**12 - 10),
+                ViewSample(NOW, 10**12),
+            ],
+        )
+        verdict = judge_trigger(record, config.trigger, NOW)
+        self.assertEqual((verdict.verdict.value, verdict.reason), ("no", "too_slow"))
+        errors: list[tuple[str, Exception]] = []
+        sleeps: list[float] = []
+        ticks = iter([0.0, 10.0, 20.0])
+        done = run_loop(
+            lambda c: None,
+            lambda: config,
+            config,
+            on_error=lambda where, exc: errors.append((where, exc)),
+            sleep=sleeps.append,
+            monotonic=lambda: next(ticks),
+            max_cycles=2,
+        )
+        self.assertEqual(done, 2)
+        self.assertEqual(errors, [])
+        self.assertLessEqual(max(sleeps), 86400.0)
+        self.assertEqual(sum(sleeps), 100 * 365 * 86400 - 10.0)
 
 
 if __name__ == "__main__":
