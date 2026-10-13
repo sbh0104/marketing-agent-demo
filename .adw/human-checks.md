@@ -197,3 +197,83 @@
 - source: adw/phase-5-writer-comment
 - tag: plain
 - status: open
+
+### H-022 — 크롬을 `PYTHONPATH=src python3 -m agent.chrome --profile chrome-profile`(또는 저장소 밖 폴더)이 찍어 주는 명령으로 켜고, 전용 유튜브(브랜드) 계정으로 한 번 로그인한 뒤 `http://localhost:9222/json/version` 이 `webSocketDebuggerUrl` 을 돌려주는지 보기 — 그 전에 계약 8절의 디버깅 포트 경고를 읽고 노출을 받아들일지 정하고, 에이전트를 안 쓸 때는 그 크롬을 닫기
+- project: marketing-agent-demo
+- when: 2026-10-13 · plans/interview-marketing-agent.md#phase-6
+- from: ship-report.md § Human checks — .adw/verify-plan.md § Checks (V12) · .adw/plan.md § Out of scope
+- source: adw/phase-6-poster-chrome
+- tag: plain
+- status: open
+
+### H-023 — Phase 7 이 진입점을 이은 뒤, 본인 허용 목록 테스트 영상에서만 첫 실제 게시를 하고 네 가지를 보기: 댓글이 보이는지, `data/videos.json` 이 `live/posted` 인지, 로그가 `POST … result=reserved` 다음 `result=posted` 인지, `chrome.py` 선택자 상수가 실제 화면과 맞는지(R8)
+- project: marketing-agent-demo
+- when: 2026-10-13 · plans/interview-marketing-agent.md#phase-6
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-6-poster-chrome
+- tag: plain
+- status: open
+
+### H-024 — 실제 사이트에서 로그아웃된 프로필 · 댓글이 막힌 영상 · 화면 배치가 다른 경우마다 `ERROR … stage=before_click` 줄이 맞는 원인과 `logs/screenshots/` 캡처로 남고, 다음 영상으로 넘어가는지 보기
+- project: marketing-agent-demo
+- when: 2026-10-13 · plans/interview-marketing-agent.md#phase-6
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-6-poster-chrome
+- tag: plain
+- status: open
+
+### H-025 — Phase 8 제출 직전에 `git ls-files` 로 프로필 · 쿠키 · 스크린샷이 추적되지 않는지 확인하기(H-004 와 같은 일) — 저장소 폴더를 통째로 압축해 낼 경우 git 이 무시하는 `chrome-profile/` · `logs/screenshots/` 를 묶음에서 빼기
+- project: marketing-agent-demo
+- when: 2026-10-13 · plans/interview-marketing-agent.md#phase-6
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-6-poster-chrome
+- tag: plain
+- status: open
+
+### H-026 — `--dry-run`(테스트 모드)이 크롬을 아예 열지 않는다는 해석이 뜻한 바와 맞는지 확인하기 — 트래커의 "게시 직전까지만 실행"을 탐지 · 판별 · 타이밍 · 작성까지로 읽었고(계약 6절 4), 그래서 시험 실행은 로그인과 선택자를 한 번도 거치지 않음
+- project: marketing-agent-demo
+- when: 2026-10-13 · plans/interview-marketing-agent.md#phase-6
+- from: ship-report.md § Human checks — .adw/ship-report.md § Risks
+- source: adw/phase-6-poster-chrome
+- tag: plain
+- status: open
+
+### H-027 — Phase 7 계획 때 `ChromeSession` 의 수명을 정하기 — 주기마다 붙고 닫을지, 크롬이 꺼졌다 켜지면 다시 붙도록 고칠지(지금은 크롬을 재시작하면 `page_error` 로 계속 멈춤, R3)
+- project: marketing-agent-demo
+- when: 2026-10-13 · plans/interview-marketing-agent.md#phase-6
+- from: ship-report.md § Human checks — .adw/ship-report.md § Risks
+- source: adw/phase-6-poster-chrome
+- tag: plain
+- status: open
+
+### H-028 — Windows 에서 CLI 가 찍는 실행 줄을 PowerShell 과 cmd.exe 에 붙여 넣어 보고, PowerShell 용 모양(`& '…' '…'`)으로 바꾸거나 경로의 셸 특수 문자를 거절할지 정하기(R4)
+- project: marketing-agent-demo
+- when: 2026-10-13 · plans/interview-marketing-agent.md#phase-6
+- from: ship-report.md § Human checks — .adw/ship-report.md § Risks
+- source: adw/phase-6-poster-chrome
+- tag: plain
+- status: open
+
+### H-029 — 프로필 위치 점검의 빈틈을 메울지 정하기 — macOS · WSL `/mnt/c` 에서 대소문자만 다른 경로, Chrome Beta · Dev · Canary · Edge 의 기본 폴더(R5)
+- project: marketing-agent-demo
+- when: 2026-10-13 · plans/interview-marketing-agent.md#phase-6
+- from: ship-report.md § Human checks — .adw/ship-report.md § Risks
+- source: adw/phase-6-poster-chrome
+- tag: plain
+- status: open
+
+### H-030 — 다시 확인과 클릭 사이의 틈을 줄일지 정하기 — `submit()` 안에서 누르기 직전 `page.url` 을 다시 읽어 영상이 바뀌었으면 누르지 않기, 게시 뒤 줄에 `page_url=` 남기기(R1)
+- project: marketing-agent-demo
+- when: 2026-10-13 · plans/interview-marketing-agent.md#phase-6
+- from: ship-report.md § Human checks — .adw/ship-report.md § Risks
+- source: adw/phase-6-poster-chrome
+- tag: plain
+- status: open
+
+### H-031 — `pip-audit` 이 있는 기계에서 `pip-audit -r requirements.txt` 를 돌리고, CVE-2025-59288 이 PyPI `playwright` 에도 해당하면 하한을 `playwright>=1.55.1` 로 올릴지 정하기(R6)
+- project: marketing-agent-demo
+- when: 2026-10-13 · plans/interview-marketing-agent.md#phase-6
+- from: ship-report.md § Human checks — .adw/ship-report.md § Risks
+- source: adw/phase-6-poster-chrome
+- tag: plain
+- status: open
