@@ -2,7 +2,8 @@
 
     python3 -m tests.mutants <이름>
 
-agent.guard / agent.store / agent.config / agent.scheduler / agent.logbook 의 소스에서 정확한 글자 하나를 바꿔 메모리에서만 모듈을 다시
+agent.guard / agent.store / agent.config / agent.scheduler / agent.logbook / agent.poster /
+agent.chrome 의 소스에서 정확한 글자 하나를 바꿔 메모리에서만 모듈을 다시
 만들고(파일은 건드리지 않음), 해당 테스트 모듈을 돌립니다. 종료 코드 1 은 테스트가
 망가짐을 잡았다는 뜻, 2 는 이름을 모르거나 바꿀 글자가 정확히 한 번 나오지 않았다는
 뜻입니다. 이 파일은 test*.py 가 아니라서 discover 가 줍지 않습니다.
@@ -20,6 +21,72 @@ import agent
 _SRC = Path(__file__).resolve().parent.parent / "src"
 
 MUTANTS: dict[str, tuple[str, str, str, str]] = {
+    "poster-open-received-ref": (
+        "agent.poster",
+        "tests.test_poster",
+        "page.open(WATCH_URL.format(video_id=decision.video_id))",
+        "page.open(decision.video_id)",
+    ),
+    "poster-recheck-before-prepare": (
+        "agent.poster",
+        "tests.test_poster",
+        "page.prepare_comment(text)\n            page_url = page.url",
+        "page_url = page.url\n            page.prepare_comment(text)",
+    ),
+    "poster-no-recheck": (
+        "agent.poster",
+        "tests.test_poster",
+        "recheck = decide_post(page_url, config.allowed_videos, dry_run)",
+        "recheck = decision",
+    ),
+    "poster-no-page-mismatch": (
+        "agent.poster",
+        "tests.test_poster",
+        "if recheck.video_id != decision.video_id:",
+        "if False:",
+    ),
+    "poster-skip-reserve": (
+        "agent.poster",
+        "tests.test_poster",
+        "store.reserve_live(video_id, clock())",
+        "None",
+    ),
+    "poster-click-error-as-failed": (
+        "agent.poster",
+        "tests.test_poster",
+        "except PageError as exc:",
+        "except Exception as exc:",
+    ),
+    "poster-unconfirmed-as-posted": (
+        "agent.poster",
+        "tests.test_poster",
+        "if confirmed is True:",
+        "if True:",
+    ),
+    "poster-ignore-check": (
+        "agent.poster",
+        "tests.test_poster",
+        "if not check.allowed:",
+        "if False:",
+    ),
+    "poster-test-mode-opens-chrome": (
+        "agent.poster",
+        "tests.test_poster",
+        "if not decision.live:",
+        "if False:",
+    ),
+    "chrome-allow-default-profile": (
+        "agent.chrome",
+        "tests.test_chrome",
+        "if _same_or_inside(path, Path(default).expanduser().resolve()):",
+        "if False:",
+    ),
+    "chrome-allow-repo-folder": (
+        "agent.chrome",
+        "tests.test_chrome",
+        "if _same_or_inside(path, repo) and not _same_or_inside(path, repo / PROFILE_DIR_NAME):",
+        "if False:",
+    ),
     "guard-allow-all": (
         "agent.guard",
         "tests.test_guard",
