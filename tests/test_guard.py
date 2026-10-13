@@ -1,4 +1,4 @@
-"""허용 목록 가드 테스트 — 행 G1–G7, 영상 주소 읽기, 엄격한 주소 읽기(ship-check · HC1 재현 입력)."""
+"""허용 목록 가드 테스트 — 행 G1–G7, 영상 주소 읽기, 엄격한 주소 읽기(ship-check · HC1 재현 입력), youtu.be · shorts 쿼리 이름 허용 목록(Phase 1A)."""
 from __future__ import annotations
 
 import inspect
@@ -73,6 +73,18 @@ ACCEPTED_REFS = (
     f"https://www.youtube.com/shorts/{REPRO_A}?si=x&feature=share",
     f"https://www.youtube.com/watch?v={REPRO_A};x=1",
 )
+
+# Phase 1A 인터뷰(2026-10-14) · Phase 1 ship-report R2 재현 입력 — youtu.be · shorts 쿼리는
+# 이름이 모두 si · t · feature 일 때만 읽습니다(대소문자 정확히, 값은 보지 않음)
+SHARE_FORMS = (f"https://youtu.be/{REPRO_A}", f"https://www.youtube.com/shorts/{REPRO_A}")
+REJECTED_SHARE_QUERIES = (
+    "?v\x01", "?v\x00", "?V=BBBBBBBBBBB", "?%56=BBBBBBBBBBB", "?+v=BBBBBBBBBBB",
+    "?" + chr(0xFF56) + "=BBBBBBBBBBB",
+    "?list=PLx", "?SI=x", "?Feature=share", "?=x", "?si=x&utm_source=share",
+    f"?si=x;v={REPRO_B}", "?v=", "?%76=BBBBBBBBBBB", "?pp=x",
+)
+ACCEPTED_SHARE_QUERIES = ("", "?", "?si=xYz12", "?si=x&t=42", "?feature=share", "?t=1;si=x", "?si=x&&t=1")
+SHARE_VALUES_NOT_EXAMINED = ("?si", "?si=", "?si=a=b", "?t=BBBBBBBBBBB", "?feature=%00")
 
 
 class GuardRowsTest(unittest.TestCase):
@@ -226,6 +238,53 @@ class StrictAddressTest(unittest.TestCase):
             with self.subTest(url=url):
                 self.assertEqual(video_id_from_ref(url), vid)
                 self.assertIs(decide_post(url, [vid], False).live, True)
+
+
+class ShareQueryNamesTest(unittest.TestCase):
+    """Phase 1A 결정 1 — youtu.be · shorts 쿼리의 받는 이름 목록."""
+
+    def test_share_query_reads_only_when_every_name_is_si_t_or_feature(self) -> None:
+        for form in SHARE_FORMS:
+            for query in REJECTED_SHARE_QUERIES:
+                with self.subTest(ref=form + query):
+                    self.assertIsNone(video_id_from_ref(form + query))
+                    decision = decide_post(form + query, [REPRO_A], False)
+                    self.assertIs(decision.live, False)
+                    self.assertEqual(decision.reason, "invalid_video")
+            for query in ACCEPTED_SHARE_QUERIES:
+                with self.subTest(ref=form + query):
+                    self.assertEqual(video_id_from_ref(form + query), REPRO_A)
+                    decision = decide_post(form + query, [REPRO_A], False)
+                    self.assertIs(decision.live, True)
+                    self.assertEqual(decision.reason, "allowlisted")
+
+    def test_share_query_values_are_not_examined(self) -> None:
+        for form in SHARE_FORMS:
+            for query in SHARE_VALUES_NOT_EXAMINED:
+                with self.subTest(ref=form + query):
+                    self.assertEqual(video_id_from_ref(form + query), REPRO_A)
+
+    def test_allowlist_entry_with_unknown_tail_matches_nothing(self) -> None:
+        entries = (
+            f"https://youtu.be/{REPRO_A}?list=PLx",
+            f"https://www.youtube.com/shorts/{REPRO_A}?list=PLx",
+        )
+        for entry in entries:
+            with self.subTest(entry=entry):
+                self.assertEqual(allowed_video_ids([entry]), frozenset())
+                decision = decide_post(REPRO_A, [entry], False)
+                self.assertIs(decision.live, False)
+                self.assertEqual(decision.reason, "not_in_allowlist")
+
+    def test_watch_tail_still_ignores_other_names(self) -> None:
+        refs = (
+            f"https://www.youtube.com/watch?v={REPRO_A}&pp=ygUJ7Jew7JWg%3D%3D&ab_channel=%EC%97%B0%EC%95%A0",
+            f"https://www.youtube.com/watch?v={REPRO_A}&list=PLx&index=2",
+            f"https://www.youtube.com/watch?v={REPRO_A}&si=x&feature=share",
+        )
+        for ref in refs:
+            with self.subTest(ref=ref):
+                self.assertEqual(video_id_from_ref(ref), REPRO_A)
 
 
 if __name__ == "__main__":
