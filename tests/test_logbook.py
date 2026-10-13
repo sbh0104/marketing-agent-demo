@@ -178,6 +178,8 @@ class ParseLineTest(unittest.TestCase):
             "2026-10-12T21:30:00+09:00 STOP reason=x reason=y",
             "2026-10-12T21:30:00+09:00 STOP Reason=x",
             good + " ",
+            '2026-10-12T21:30:00+09:00 STOP reason="a"_x=y',
+            good + "\n\n",
         )
         for line in bad:
             with self.subTest(line=line):
