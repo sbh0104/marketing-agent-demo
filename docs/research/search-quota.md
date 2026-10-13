@@ -17,3 +17,9 @@
 - `limits.daily_max_searches: 90` — 9,000 단위. 남는 1,000 단위는 조회수 호출 몫.
 - `videos.list` = 1 단위, ID 50개까지 한 번에. 비용표는 `src/agent/youtube.py` 의 `UNIT_COST` 한 곳이고, 공식 표 재확인은 사람 확인으로 남깁니다.
 - 하루 = 굴러가는 24시간 (Google 리셋은 태평양 자정 — 계약 11절).
+- 정정 2026-10-14: Google 은 2026-10-08 부터 `search.list` 를 하루 100회짜리 별도 통으로 셉니다
+  (https://developers.google.com/youtube/v3/determine_quota_cost, "Last updated 2026-10-08 UTC").
+  위 Decision brief 의 쿼터 줄은 그 전 표이고, `daily_max_searches: 90` 줄의 9,000 단위는 이제
+  Google 의 셈이 아니라 장부의 셈입니다. 장부는 트래커 Phase 2 결정 HC1 질문 2 A 대로 일부러
+  엄격한 옛 계산(10,000 단위 통에서 검색 1회 100)을 유지합니다 — 옛 규칙과 새 규칙 모두에서
+  넘치지 않습니다.

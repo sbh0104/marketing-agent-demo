@@ -285,13 +285,11 @@ class LedgerTest(YouTubeCase):
             with self.subTest(label):
                 self.path.parent.mkdir(parents=True, exist_ok=True)
                 self.path.write_bytes(raw)
-                fetch = FakeFetch()
                 with self.assertRaises(QuotaError) as caught:
-                    YouTubeClient(KEY, QuotaLedger(self.path), fetch)
+                    QuotaLedger(self.path)
                 message = str(caught.exception)
                 self.assertIn("쿼터 기록 파일을 믿을 수 없습니다", message)
                 self.assertIn(str(self.path), message)
-                self.assertEqual(fetch.urls, [])
                 self.assertEqual(self.path.read_bytes(), raw)
 
     def test_naive_now_is_rejected(self) -> None:

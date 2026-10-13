@@ -440,8 +440,8 @@ other line is required on every item.
 - evidence: docs/contracts.md:3-6 — 코드 위치로 Phase 1 파일 6개만 나열하고 11절의 env.py · youtube.py · watcher.py 를 빠뜨림. config.yaml:1 — "과제 안내의 예시 값입니다" 인데 poll_interval_min · daily_max_searches 는 과제와 다름(.adw/verify-plan.md § Out of scope (b), .adw/ship-report.md § Smoke candidates)
 - direction: docs/contracts.md:3-6 의 모듈 목록에 `env.py` · `youtube.py` · `watcher.py`(11절)를 더하고, config.yaml:1 주석을 "과제 예시 값이 기본이고, 주기와 검색 상한은 계약 2절대로 바꿈" 으로 고친다 — 값과 계약 조항은 그대로
 - touches: docs/contracts.md, config.yaml
-- status: open
-- attempts: 0 · last failure: —
+- status: reverted
+- attempts: 1 · last failure: reverted d7ca76f — own check red (스윕 20261014-031024-adw/smoke-sweep-s038-s042)
 - first seen: 2026-10-13 · last seen: 2026-10-13
 
 ### S-039 — 검색 쿼터 비용을 "구글의 계산"이 아니라 "우리 장부의 일부러 엄격한 계산"으로 바로 적음
@@ -449,7 +449,7 @@ other line is required on every item.
 - evidence: docs/contracts.md:58-67, docs/contracts.md:535-536, docs/contracts.md:553-554, config.yaml:14, docs/research/search-quota.md:8, docs/research/search-quota.md:17 — 검색 1회를 "Google 의 100 단위(하루 10,000 단위 한 통)"로 적음. 구글 공식 표는 2026-10-08 부터 `search.list` 를 하루 100회 별도 통(1회 1), `videos.list` 를 나머지 10,000 단위 통에서 1로 셈(https://developers.google.com/youtube/v3/determine_quota_cost "Last updated 2026-10-08 UTC", .adw/ship-report.md § Risks R3). 장부(src/agent/youtube.py:32-33, :107-111)는 트래커 Phase 2 결정(HC1 질문 2 A)대로 옛 계산을 일부러 유지 — 코드는 맞고 문서의 이유가 틀림
 - direction: 계약 2절 · 11절과 config.yaml:14 주석을 "구글은 검색을 하루 100회 별도 통으로 센다 · 우리 장부는 더 엄격하게 검색 1회를 10,000 단위 통에서 100씩 깎는다(옛 규칙과 새 규칙 모두에서 넘치지 않게) · 그래서 기본 90회면 조회수 몫은 1,000 단위 이상이고, daily_max_searches 를 95–100 으로 올려 조회수가 막히는 것은 구글이 아니라 우리 장부 때문(그때는 장부를 두 통으로 나누는 결정이 따로 필요)"으로 고친다(출처 URL · 갱신일 포함). docs/research/search-quota.md 는 조사 기록이라 :8 · :17 을 지우지 않고 `## Decision` 아래에 날짜 붙은 정정 줄을 더한다 — 값 · 코드 · 장부 파일 모양 · 계약 조항의 동작은 그대로
 - touches: docs/contracts.md, config.yaml, docs/research/search-quota.md
-- status: open
+- status: resolved
 - attempts: 0 · last failure: —
 - first seen: 2026-10-13 · last seen: 2026-10-13
 
@@ -458,7 +458,7 @@ other line is required on every item.
 - evidence: src/agent/watcher.py:274 (`view_history[-2]`→`[0]` 변이 초록), src/agent/watcher.py:220 (표본 2개 이상인 기록을 추적에서 빼는 변이 초록), src/agent/watcher.py:229 (`_track` 의 `tally.held = True` 를 지운 변이 초록)(.adw/ship-report.md § Test integrity)
 - direction: tests/test_watcher.py 에 창 안 저장 영상의 view_history 가 [1000, 1300] 일 때 새 조회수 1450 이면 `VIEWS prev=1300 delta=150` 인지, 장부를 검색 99회(9,900단위)로 채우고 daily_max_searches 200 에서 검색 1회는 통과 · videos.list 는 막히면 `CycleReport.held is True` 와 `QUOTA … call=videos.list counter=units` 한 줄인지 단언한다 — 코드 변경 없음
 - touches: tests/test_watcher.py
-- status: open
+- status: resolved
 - attempts: 0 · last failure: —
 - first seen: 2026-10-13 · last seen: 2026-10-13
 
@@ -467,7 +467,7 @@ other line is required on every item.
 - evidence: tests/test_youtube.py:276 (`QuotaLedger(...)` 가 먼저 QuotaError 를 내서 `fetch.urls == []` 는 늘 참), tests/test_watcher.py:613-617 (src/agent/watcher.py:150-151 을 지워도 src/agent/youtube.py:211 의 다른 ValueError 로 통과)(.adw/ship-report.md § Test integrity)
 - direction: tests/test_youtube.py:276 의 단언을 지우거나 장부 거부를 직접 단언하는 것으로 바꾸고, tests/test_watcher.py ClockTest.test_naive_now_is_rejected 는 `assertRaisesRegex(ValueError, "now 에 시간대가 없습니다")` 로 문구까지 단언한다 — 코드 변경 없음
 - touches: tests/test_youtube.py, tests/test_watcher.py
-- status: open
+- status: resolved
 - attempts: 0 · last failure: —
 - first seen: 2026-10-13 · last seen: 2026-10-13
 
@@ -476,7 +476,7 @@ other line is required on every item.
 - evidence: src/agent/watcher.py:213 (`isinstance(token, str)` 제거 초록), src/agent/watcher.py:207 (SKIP 의 `raw[:40]`→`raw` 초록), src/agent/watcher.py:74 (description 기본값 `""` 제거 초록), src/agent/watcher.py:202 (검색 ID `fullmatch`→`match` 초록), src/agent/watcher.py:53 (publishedAt `fullmatch`→`match` 초록), src/agent/watcher.py:55 (`.replace(tzinfo=utc)`→`.astimezone(utc)` 는 TZ=UTC 호스트에서 초록)(.adw/ship-report.md § Test integrity)
 - direction: tests/test_watcher.py 에 nextPageToken 이 str 이 아니면(예: 5) 다음 페이지를 부르지 않음 · 40자보다 긴 잘못된 검색 ID 의 SKIP video 값이 40자 · description 이 없는 영상은 description "" 로 저장 · 12자 검색 ID 는 search.list 단계에서 SKIP 되고 videos.list 로 가지 않음 · INVALID_ITEMS 에 publishedAt "2026-10-12T10:00:00Zjunk" 행 · publishedAt 고정 테스트를 로컬 시간대가 UTC 가 아닐 때(TZ=Asia/Seoul + time.tzset, 끝나면 되돌림, tzset 이 없는 곳은 skip)도 돌림 을 더한다 — 코드 변경 없음
 - touches: tests/test_watcher.py
-- status: open
+- status: resolved
 - attempts: 0 · last failure: —
 - first seen: 2026-10-13 · last seen: 2026-10-13
 
