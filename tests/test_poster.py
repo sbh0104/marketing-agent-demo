@@ -251,6 +251,36 @@ class PosterSkipTest(PosterCase):
         self.assertEqual(self.attempts(), [("live", "posted", "allowlisted", None)])
         self.assertEqual(self.log(), [(Event.SKIP, {"video": VID, "reason": "duplicate_video"})])
 
+    def test_channel_cooldown_blocks_other_allowed_video(self) -> None:
+        self.put(OTHER_ALLOWED)
+        earlier = NOW - timedelta(minutes=5)
+        self.store.reserve_live(OTHER_ALLOWED, earlier)
+        self.store.resolve_live(OTHER_ALLOWED, "posted", earlier, "allowlisted")
+        outcome = self.post(self.put(VID))
+        self.assertEqual(self.opens, 0)
+        self.assertEqual(outcome, PostOutcome(VID, "live", "skipped", "channel_cooldown"))
+        self.assertEqual(self.log(), [(Event.SKIP, {"video": VID, "reason": "channel_cooldown"})])
+
+    def test_daily_cap_blocks(self) -> None:
+        self.config = dataclasses.replace(self.config, limits=LimitsConfig(1, 24.0, 100))
+        other = dataclasses.replace(make_record(OTHER_ALLOWED), channel_id="UCother")
+        self.store.put(other)
+        earlier = NOW - timedelta(minutes=5)
+        self.store.reserve_live(OTHER_ALLOWED, earlier)
+        self.store.resolve_live(OTHER_ALLOWED, "posted", earlier, "allowlisted")
+        outcome = self.post(self.put(VID))
+        self.assertEqual(outcome, PostOutcome(VID, "live", "skipped", "daily_cap"))
+        self.assertEqual(self.opens, 0)
+
+    def test_second_post_of_non_allowlisted_video_is_duplicate(self) -> None:
+        record = self.put(NOT_ALLOWED)
+        self.post(record)
+        outcome = self.post(record)
+        self.assertEqual(outcome, PostOutcome(NOT_ALLOWED, "test", "skipped", "duplicate_video"))
+        self.assertEqual(
+            self.reloaded_attempts(NOT_ALLOWED), [("test", "saved", "not_in_allowlist", None)]
+        )
+
 
 class PosterLiveTest(PosterCase):
     # 여는 주소와 정상 게시
@@ -280,6 +310,16 @@ class PosterLiveTest(PosterCase):
         )
         self.assertEqual(outcome, PostOutcome(VID, "live", "posted", "allowlisted"))
         self.assertTrue(self.page.closed)
+
+    def test_earlier_test_attempt_does_not_block_live_post(self) -> None:
+        record = self.put(VID)
+        self.store.save_test(VID, NOW - timedelta(hours=1), "page_mismatch")
+        outcome = self.post(record)
+        self.assertEqual(outcome, PostOutcome(VID, "live", "posted", "allowlisted"))
+        self.assertEqual(
+            self.attempts(),
+            [("test", "saved", "page_mismatch", None), ("live", "posted", "allowlisted", None)],
+        )
 
     # 클릭 직전 다시 확인 (계약 6절 3.2)
 
@@ -498,6 +538,13 @@ class PosterLiveTest(PosterCase):
 
     def test_keyboard_interrupt_after_reserve_stays_reserved(self) -> None:
         self.page.confirm_error = KeyboardInterrupt()
+        with self.assertRaises(KeyboardInterrupt):
+            self.post(self.put())
+        self.assertEqual(self.reloaded_attempts(), [("live", "reserved", "", None)])
+        self.assertTrue(self.page.closed)
+
+    def test_keyboard_interrupt_in_submit_stays_reserved(self) -> None:
+        self.page.submit_error = KeyboardInterrupt()
         with self.assertRaises(KeyboardInterrupt):
             self.post(self.put())
         self.assertEqual(self.reloaded_attempts(), [("live", "reserved", "", None)])
