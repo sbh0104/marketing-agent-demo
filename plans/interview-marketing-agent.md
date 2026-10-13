@@ -149,7 +149,7 @@ Open questions
 ---
 
 ## Phase 4 — ③ 타이밍 · 뜨기 직전 판단 (trigger)
-- Status: Not started
+- Status: Done
 - Slug: trigger-timing
 - After: Phase 1
 - Goal: 조회수 1,000–5,000, 업로드 후 12시간 이내, 시간당 조회수 150 이상 — 세 조건을 모두 만족하면 대상으로 표시한다. 세 값은 `config.yaml`에서 바꾼다.
