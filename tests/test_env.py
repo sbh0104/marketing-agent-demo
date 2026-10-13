@@ -88,6 +88,27 @@ class ReadEnvFileTest(EnvCase):
             read_env_file(self.path)
         self.assertIn("UTF-8", str(caught.exception))
 
+    def test_blank_and_indented_comment_lines_are_skipped_s044(self) -> None:
+        self.write("FIRST=1\n   \n\t\n  # 들여 쓴 주석\n\t# 탭 주석\nSECOND=2\n")
+        self.assertEqual(read_env_file(self.path), {"FIRST": "1", "SECOND": "2"})
+
+    def test_name_without_equals_names_the_line_never_the_text_s044(self) -> None:
+        self.write("YOUTUBE_API_KEY=abc\nJUSTNAME\n")
+        with self.assertRaises(EnvError) as caught:
+            read_env_file(self.path)
+        message = str(caught.exception)
+        self.assertIn("2번째 줄", message)
+        self.assertIn(str(self.path), message)
+        self.assertNotIn("JUSTNAME", message)
+
+    def test_directory_at_the_env_path_is_env_error_s044(self) -> None:
+        # 폴더를 읽으면 IsADirectoryError(OSError) — 날것으로 새지 않고 EnvError 가 됩니다
+        self.path.mkdir()
+        with self.assertRaises(EnvError) as caught:
+            read_env_file(self.path)
+        self.assertEqual(str(caught.exception), f".env 를 읽을 수 없습니다: {self.path}")
+        self.assertIsInstance(caught.exception.__cause__, OSError)
+
 
 class RequireSecretTest(EnvCase):
     def test_environment_variable_wins_over_file(self) -> None:
