@@ -139,13 +139,13 @@ MUTANTS: dict[str, tuple[str, str, str, str]] = {
     "guard-youtu-be-ignores-query-v": (
         "agent.guard",
         "tests.test_guard",
-        'if host == "youtu.be" and not names_v:',
+        'if host == "youtu.be" and share_query:',
         'if host == "youtu.be":',
     ),
     "guard-shorts-ignores-query-v": (
         "agent.guard",
         "tests.test_guard",
-        "parts.path.startswith(_SHORTS_PREFIX) and not names_v:",
+        "parts.path.startswith(_SHORTS_PREFIX) and share_query:",
         "parts.path.startswith(_SHORTS_PREFIX):",
     ),
     "guard-query-ampersand-only": (
@@ -153,6 +153,18 @@ MUTANTS: dict[str, tuple[str, str, str, str]] = {
         "tests.test_guard",
         'parse_qsl(parts.query.replace(";", "&"), keep_blank_values=True)',
         "parse_qsl(parts.query, keep_blank_values=True)",
+    ),
+    "guard-share-names-blocklist": (
+        "agent.guard",
+        "tests.test_guard",
+        "share_query = all(key in _SHARE_QUERY_NAMES for key, _ in pairs)",
+        'share_query = not any(key == "v" for key, _ in pairs)',
+    ),
+    "guard-share-names-ignore-case": (
+        "agent.guard",
+        "tests.test_guard",
+        "key in _SHARE_QUERY_NAMES",
+        "key.lower() in _SHARE_QUERY_NAMES",
     ),
     "store-no-dedupe": (
         "agent.store",

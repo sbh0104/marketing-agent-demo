@@ -273,25 +273,31 @@ Phase 3–5 가 정합니다.)
 - 허용 목록 항목과 영상 주소는 모두 11자 영상 ID 로 바꿔 비교합니다(`video_id_from_ref`).
   받는 형식은 아래뿐이고 정확히 이 모양이어야 합니다:
   - 맨 ID `abcdefghijk`
-  - `https://youtu.be/abcdefghijk` — 경로가 정확히 `/<ID>` (뒤에 `?si=…` 등 매개변수는
-    붙어도 됨, 단 `v` 는 안 됨)
+  - `https://youtu.be/abcdefghijk` — 경로가 정확히 `/<ID>` (쿼리가 붙으면 이름이 모두 `si` ·
+    `t` · `feature` 중 하나 — 아래)
   - `https://www.youtube.com/watch?v=abcdefghijk` — 경로가 정확히 `/watch`, `v` 값이 정확히
     하나 (`&t=…` 등 다른 매개변수 무시)
-  - `https://www.youtube.com/shorts/abcdefghijk` — 뒤 `/` 하나까지 (`?feature=…` 등 매개변수는
-    붙어도 됨, 단 `v` 는 안 됨)
+  - `https://www.youtube.com/shorts/abcdefghijk` — 뒤 `/` 하나까지 (쿼리는 youtu.be 와 같은
+    규칙 — 아래)
   - 호스트는 `youtu.be` · `youtube.com` · `www.youtube.com` · `m.youtube.com` 그대로(대소문자
     무시) — 사용자 정보(`…@`)나 포트(`:443`)가 붙으면 읽지 않습니다. 스킴은 `http`/`https` 만.
 - 쿼리의 `%` 인코딩은 서버처럼 한 번 풀어 읽습니다 — `v` 의 수는 푼 뒤에 세므로
-  `?%76=B&v=A` 는 `v` 가 두 개라 읽을 수 없고, `&pp=…%3D%3D` · `&ab_channel=%EC…` 같은 다른
-  매개변수는 무시됩니다.
-- youtu.be · shorts 주소의 쿼리에 `v` 가 있으면 읽을 수 없습니다 — `v` 는 쿼리를 푼 뒤에
-  세므로 `?%76=…` 도, 빈 `?v=` 도 `v` 입니다. 유튜브는 `youtu.be/A?v=B` 를 `watch?v=B&v=A` 로,
-  `/shorts/A?v=B` 를 `watch?v=B` 로 보내 B 를 재생하기 때문입니다. 쿼리는 `&` 와 `;` 를 모두
-  매개변수 구분으로 봅니다 — 서버가 `;` 로도 나눌 때 숨는 `v` 를 놓치지 않기 위해서이고
-  (`?x=1;v=B`, HTML 에서 복사한 `?si=x&amp;v=B`), 그래서 `watch?v=<ID>;t=…` 도 `&` 와 같이
-  읽힙니다. 막는 이름은 `v` 하나이고 `si` · `t` · `feature` 같은 다른 매개변수는 무시합니다 —
-  유튜브가 다른 이름(대소문자 · 공백 · 전각 변형 포함)으로 재생 영상을 바꾸는 경우가 발견되면
-  그때 더합니다.
+  `?%76=B&v=A` 는 `v` 가 두 개라 읽을 수 없고, watch 주소의 `&pp=…%3D%3D` · `&ab_channel=%EC…`
+  같은 다른 매개변수는 무시됩니다.
+- youtu.be · shorts 주소의 쿼리에서 받는 이름은 `si` · `t` · `feature` 셋뿐입니다. 쿼리를 한 번
+  푼 뒤 `&` 와 `;` 로 나눈 이름이 모두 이 셋 중 하나와 대소문자까지 같을 때 읽고, 값은 보지
+  않습니다 — `?si`, 빈 `?si=` 도 받습니다. 그 밖의 이름이 하나라도 있으면 읽을 수 없습니다:
+  `v`, 풀면 `v` 인 `%76`, 빈 `?v=`, 대소문자가 다른 `V` · `SI`, 풀면 공백이 붙는 `+v`, 전각 `ｖ`,
+  제어 문자가 붙은 `v\x01`, `list` 같은 다른 매개변수, 빈 이름(`?=x`), 처음 보는 이름 모두.
+  유튜브는 `youtu.be/A?v=B` 를 `watch?v=B&v=A` 로, `/shorts/A?v=B` 를 `watch?v=B` 로 보내 B 를
+  재생합니다 — 막을 이름 대신 받을 이름을 적어, 유튜브가 어떤 이름으로 재생 영상을 바꾸든 처음
+  보는 꼴은 읽을 수 없는 쪽에 떨어집니다. 그래서 재생목록에서 복사한 `?list=…` 처럼 셋 밖의 꼬리가
+  붙은 허용 목록 항목은 어떤 영상과도 맞지 않아 테스트 모드로만 돕니다 — 맨 ID 나 공유 버튼 주소를
+  그대로 적으세요.
+- 쿼리는 `&` 와 `;` 를 모두 매개변수 구분으로 봅니다 — 서버가 `;` 로도 나눌 때 숨는 이름을
+  놓치지 않으려는 것이고(`?x=1;v=B`, HTML 에서 복사한 `?si=x&amp;v=B`), 그래서 `watch?v=<ID>;t=…`
+  도 `&` 와 같이 읽힙니다. watch 주소는 `v` 값이 정확히 하나인지를 보고 다른 이름은 무시합니다 —
+  클릭 직전 다시 묻기가 읽는 크롬 주소의 꼬리를 아직 재기 전이라서입니다(H-023).
 - 그 밖의 호스트(`youtube.com.evil.example`, `youtube.com@evil.example` 같은 닮은꼴 포함),
   `ftp:` 같은 다른 스킴, 11자가 아닌 ID 는 읽을 수 없는 것으로 칩니다.
 - 형식에서 벗어난 이웃 모양도 읽을 수 없는 것입니다: ID 뒤의 다른 경로 칸(`/<ID>/x`,
@@ -558,6 +564,8 @@ run_loop(cycle, reload, initial, *, on_error, sleep=time.sleep,
   python3 -m tests.mutants guard-youtu-be-ignores-query-v
   python3 -m tests.mutants guard-shorts-ignores-query-v
   python3 -m tests.mutants guard-query-ampersand-only
+  python3 -m tests.mutants guard-share-names-blocklist
+  python3 -m tests.mutants guard-share-names-ignore-case
   python3 -m tests.mutants store-no-dedupe
   python3 -m tests.mutants store-no-cap
   python3 -m tests.mutants store-no-cooldown
