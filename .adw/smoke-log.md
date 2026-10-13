@@ -138,7 +138,7 @@ other line is required on every item.
 - touches: tests/test_guard.py
 - base: adw/phase-1-foundation-contracts
 - phase: plans/interview-marketing-agent.md#phase-1
-- status: open
+- status: resolved
 - attempts: 0 · last failure: —
 - first seen: 2026-10-13 · last seen: 2026-10-13
 
@@ -174,7 +174,88 @@ other line is required on every item.
 - evidence: src/agent/logbook.py:143, src/agent/logbook.py:109 — `if rest[end] != " ":` → `if False:` 변이와 줄 끝 `\n` 하나 대신 모두 떼는 변이가 초록. 앞 변이에서 `parse_line('2026-10-12T21:30:00+09:00 STOP reason="a"_extra=y')` 가 `_` 를 버리고 `{'reason': 'a', 'extra': 'y'}` 를 돌려줌(.adw/ship-report.md § Test integrity)
 - direction: tests/test_logbook.py 의 test_malformed_lines 나쁜 줄 목록(157-172행)에 `2026-10-12T21:30:00+09:00 STOP reason="a"_x=y` 와 정상 STOP 줄 + `"\n\n"` 을 더한다 — 코드 변경 없음, 지금 코드는 둘 다 ValueError(ship-check 에서 확인)
 - touches: tests/test_logbook.py
-- status: open
+- status: resolved
+- attempts: 0 · last failure: —
+- first seen: 2026-10-13 · last seen: 2026-10-13
+
+### S-008 — 트리거 판정에서 나이 창 검사가 줄어든 조회수 · 속도 검사보다 먼저인 차례를 테스트로 고정
+- source: cycle 20261013-161358-adw/phase-4-trigger-timing · tracker plans/interview-marketing-agent.md#phase-4 · deferred by ship-check
+- evidence: src/agent/trigger.py:56-62 — `too_old` 검사를 `views_decreased` 검사 뒤로 옮긴 변이와 `too_slow` 검사 뒤로 옮긴 변이가 둘 다 스위트에서 초록(`Ran 35 tests` · `OK`). 지금 코드는 20시간 된 1450→1300 영상을 `no too_old` 로 판정하지만 앞 변이는 `hold views_decreased` 로 영원히 미룸(.adw/ship-report.md § Test integrity)
+- direction: tests/test_trigger.py 의 NoTests 에 ① `video((19*H+30*M, 1450), (20*H, 1300))` 를 `20*H` 에 → `("no", "too_old")` ② `video((19*H+30*M, 1200), (20*H, 1274))` 를 `20*H` 에 → `("no", "too_old")` 행을 더한다 — 코드 변경 없음, 지금 코드는 둘 다 too_old(ship-check 에서 확인)
+- touches: tests/test_trigger.py
+- status: resolved
+- attempts: 0 · last failure: —
+- first seen: 2026-10-13 · last seen: 2026-10-13
+
+### S-009 — 계약 11절이 약속하지만 테스트가 잡지 않는 네 가지(at=now · 기록 안 바꿈 · 직전 시각의 큰 조회수 · 소수 기준값)를 테스트로 고정
+- source: cycle 20261013-161358-adw/phase-4-trigger-timing · tracker plans/interview-marketing-agent.md#phase-4 · deferred by ship-check
+- evidence: src/agent/trigger.py:23-63 — 일곱 갈래의 `Judgement(..., now)` 를 `latest.at` 으로 바꾼 변이 7개, `history.sort(...)` 로 받은 목록을 제자리 정렬하는 변이, 직전 시각에서 작은 조회수를 고르는 변이, `_rate` 의 `/` → `//` 변이가 모두 스위트에서 초록. tests/test_trigger.py:229 는 최신 기록 시각에 판정해 `at=now` 와 `at=latest.at` 을 가르지 못하고, :240 은 이미 정렬된 기록을 씀(.adw/ship-report.md § Test integrity)
+- direction: tests/test_trigger.py 에 ① test_every_reason_logs_unquoted 의 여덟 장면마다 `j.at == now` 를 확인하고, 판정 시각이 최신 기록보다 늦은 장면(`video(*GOOD)` 을 `3*H` 에 → yes)을 하나 더함 ② test_record_is_not_changed 에 순서가 뒤섞인 기록을 씀 ③ `video((2*H, 1200), (2*H, 1300), (2*H+30*M, 1450))` 이 `min_views_per_hour=300.0` 에서 yes · `301.0` 에서 `too_slow` ④ `video((1*H, 1000), (11*H, 2505))` 를 `11*H` 에(시간당 150.5) `150.5` 에서 yes · `150.6` 에서 `too_slow` 행을 더한다 — 코드 변경 없음, 지금 코드는 넷 다 이렇게 동작(ship-check 에서 확인)
+- touches: tests/test_trigger.py
+- status: resolved
+- attempts: 0 · last failure: —
+- first seen: 2026-10-13 · last seen: 2026-10-13
+
+### S-010 — 트리거 판정이 같은 시간대 객체의 일광 절약 시각을 벽시계로 비교하는 것을 UTC 비교로 고침
+- source: cycle 20261013-161358-adw/phase-4-trigger-timing · tracker plans/interview-marketing-agent.md#phase-4 · deferred by ship-check
+- evidence: src/agent/trigger.py:23, :27, :39, :54, :56 — 파이썬은 tzinfo 가 같은 두 시각을 벽시계로 비교 · 뺄셈함. `ZoneInfo("America/New_York")` 의 2026-11-01 01:30 fold 0 · fold 1(실제 1시간 차) 두 기록이 `hold too_few_samples`, 같은 두 순간을 UTC 로 주면 `yes views_per_hour`(ship-check 에서 재현). 계약 11절 "같은 순간이면 같은 시각" · "목록 순서는 보지 않고" 와 어긋남
+- direction: `_latest_pair` · `_rate` · 미래 업로드 검사 · 나이 검사가 `.astimezone(timezone.utc)` 로 바꾼 순간끼리 비교 · 뺄셈하게 한다(`Judgement.at` 은 받은 `now` 그대로). tests/mutants.py 의 `trigger-*` 고정 문자열이 trigger.py 에 한 번씩 남는지 확인하고 바뀐 줄이면 고정 문자열도 맞춘다. 테스트는 zoneinfo 대신 손으로 쓴 일광 절약 tzinfo 로(Windows 에 tzdata 가 없어도 돌게) 가을 겹침(fold) · 봄 당김 두 행을 더한다
+- touches: src/agent/trigger.py, tests/test_trigger.py, tests/mutants.py
+- status: resolved
+- attempts: 0 · last failure: —
+- first seen: 2026-10-13 · last seen: 2026-10-13
+
+### S-011 — sdk_ask 의 좁은 catch 를 테스트로 고정 — try 안에서 난 TypeError 가 그대로 올라가는지
+- source: cycle 20261013-161343-adw/phase-3-classifier-topic · tracker plans/interview-marketing-agent.md#phase-3 · deferred by ship-check
+- evidence: src/agent/classifier.py:198 — `except typesafe_sdk.TypeSafeError as exc:` → `except Exception as exc:` 변이가 tests.test_classifier 39개 모두 초록. test_non_sdk_error_inside_sdk_ask_propagates(tests/test_classifier.py:524)는 try 바깥의 `Noul(...)`(classifier.py:184)에서 오류를 내 이 자리에 닿지 않음(.adw/ship-report.md § Test integrity, R1)
+- direction: tests/test_classifier.py SdkAskTest 에 가짜 TypeSafeClient.system_one 이 TypeError 를 내면 classify(…, sdk_ask, …) 가 같은 TypeError 를 올리는지(보류가 아님) 보는 테스트를 더한다 — 코드 변경 없음, 지금 코드는 이렇게 동작
+- touches: tests/test_classifier.py
+- status: resolved
+- attempts: 0 · last failure: —
+- first seen: 2026-10-13 · last seen: 2026-10-13
+
+### S-012 — 설정의 classifier.model 이 ask · system_one 까지 가는지 테스트로 고정
+- source: cycle 20261013-161343-adw/phase-3-classifier-topic · tracker plans/interview-marketing-agent.md#phase-3 · deferred by ship-check
+- evidence: src/agent/classifier.py:160, src/agent/classifier.py:197 — `ask(config.classifier.model, …)` → `ask("jev-latest", …)` 와 `system_one(model=model, …)` → `system_one(model="jev-latest", …)` 변이가 초록. tests/test_classifier.py:199, :493 이 고정 설정의 유일한 값 `"jev-latest"` 만 확인(.adw/ship-report.md § Test integrity, R2)
+- direction: tests/test_classifier.py 에 classifier.model 을 `jev-test-x` 로 바꾼 설정으로 classify 를 불러 FakeJev 의 model 인자와 가짜 system_one 의 `model=` 이 `jev-test-x` 인지 보는 테스트를 더한다 — 코드 변경 없음
+- touches: tests/test_classifier.py
+- status: resolved
+- attempts: 0 · last failure: —
+- first seen: 2026-10-13 · last seen: 2026-10-13
+
+### S-013 — 정확도 러너의 경계(오류가 일부만 · 정확히 20/22)를 테스트로 고정
+- source: cycle 20261013-161343-adw/phase-3-classifier-topic · tracker plans/interview-marketing-agent.md#phase-3 · deferred by ship-check
+- evidence: tests/jev_accuracy.py:28, tests/jev_accuracy.py:81-82, tests/jev_accuracy.py:108 — `any(t.error > 0 …)` → `all(…)` · ko 만 보기, `t.correct >= PASS_CORRECT` → `>`, `PASS_CORRECT = 21` 변이가 모두 초록. test_runner_error_holds_exit_3(tests/test_classifier.py:672)는 22개 × 두 언어 모두 오류인 경우만 돌림(.adw/ship-report.md § Test integrity, R3)
+- direction: tests/test_classifier.py ExamplesTest 에 ① en 의 예시 하나만 JevError 를 내는 가짜로 main 이 3 과 `측정 실패` 줄을 내는지 ② 잘못된 일치 0 · 정확히 20/22(YES 라벨 둘을 NO 로 답하는 가짜)로 main 이 0 과 `권고: ko 그대로` 를 내는지 보는 테스트를 더한다 — 코드 변경 없음
+- touches: tests/test_classifier.py
+- status: resolved
+- attempts: 0 · last failure: —
+- first seen: 2026-10-13 · last seen: 2026-10-13
+
+### S-014 — 가짜 SDK 의 응답 검증 오류를 진짜 typesafe-sdk 0.7.4 계보로 맞추기
+- source: cycle 20261013-161343-adw/phase-3-classifier-topic · tracker plans/interview-marketing-agent.md#phase-3 · deferred by ship-check
+- evidence: tests/test_classifier.py:147 `class TypeSafeAPIResponseValidationError(TypeSafeError)` — 진짜 0.7.4 휠 `_core/errors.py:176` 은 `class TypeSafeAPIResponseValidationError(TypeSafeAPIError)` 라 `.status` 가 있어 실제 이유는 `API 오류: TypeSafeAPIResponseValidationError 200` 꼴. docs/research/jev.md 오류 항목에 이 계보가 없음(.adw/ship-report.md § Risks R4)
+- direction: 가짜 TypeSafeAPIResponseValidationError 를 TypeSafeAPIError 의 자식(.status 있음)으로 바꾸고 그 행의 기대 이유에 상태 코드를 넣으며, docs/research/jev.md 'SDK 확인' 절 오류 항목에 "응답 검증 오류도 TypeSafeAPIError 의 자식이라 .status 를 가진다" 한 줄을 더한다 — 코드 변경 없음, 계약의 `[<상태 코드>]` 모양 안
+- touches: tests/test_classifier.py, docs/research/jev.md
+- status: resolved
+- attempts: 0 · last failure: —
+- first seen: 2026-10-13 · last seen: 2026-10-13
+
+### S-015 — 계약 문서 머리 문단 · 10절 머리 문장에 판별 모듈 반영
+- source: cycle 20261013-161343-adw/phase-3-classifier-topic · tracker plans/interview-marketing-agent.md#phase-3 · deferred by ship-check
+- evidence: docs/contracts.md:5-6 — `src/agent/` 목록에 `classifier.py` 없음; docs/contracts.md:430 — 음성 대조 대상 "가드 · 저장소 · 설정 읽기 · 로그 한 줄 규칙"에 판별 없음(verify-plan § Out of scope 의 RISK 메모, .adw/ship-report.md § Risks R5)
+- direction: 머리 문단 `src/agent/` 목록에 `classifier.py` 를, 10절 머리 문장 대상 목록에 `판별` 을 더한다 — 계약 내용(키 · 판정 토큰 · 형식 · CLI 인자) 변경 없음
+- touches: docs/contracts.md
+- status: resolved
+- attempts: 0 · last failure: —
+- first seen: 2026-10-13 · last seen: 2026-10-13
+
+### S-018 — 계약 문서 머리 문단의 `src/agent/` 모듈 목록을 실제 패키지와 맞추기
+- source: retro 20261013-161343-adw/phase-3-classifier-topic · E-013
+- evidence: docs/contracts.md:5-6 의 목록에 `trigger.py`(main, Phase 4)가 없고 이 레인이 착지하면 `classifier.py` 도 없다 — `git ls-tree --name-only main src/agent/` 와 다름. 두 페이즈 연속(20261013-161358-adw/phase-4-trigger-timing · 20261013-161343-adw/phase-3-classifier-topic)
+- direction: 머리 문단 목록을 `git ls-tree --name-only HEAD src/agent/` 의 `.py` 파일(`__init__.py` 제외)과 같게 맞춘다 — S-017 가 먼저 `classifier.py` 를 넣었으면 `trigger.py` 만 더한다. 계약 내용(키 · 판정 토큰 · 형식 · CLI 인자) 변경 없음
+- touches: docs/contracts.md
+- status: resolved
 - attempts: 0 · last failure: —
 - first seen: 2026-10-13 · last seen: 2026-10-13
 

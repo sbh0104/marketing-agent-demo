@@ -3,14 +3,16 @@
 Phase 2–7 의 모든 단계가 기대는 계약입니다. 설정 읽기, 영상 기록 모양, 저장소 규칙,
 허용 목록 가드, 게시 흐름, 로그 형식, 주기 실행을 여기서 정합니다. 코드는
 `src/agent/` 패키지(`config.py` · `models.py` · `store.py` · `guard.py` · `logbook.py` ·
-`scheduler.py`)에 있습니다.
+`scheduler.py` · `classifier.py` · `trigger.py`)에 있습니다.
 
 ## 1. 실행
 
 - Python 3.10 이상. 3.11 이후에만 있는 기능(`datetime.UTC`, `enum.StrEnum`, `tomllib`,
   `typing.Self`, `except*`)은 쓰지 않습니다.
-- 의존성 설치: `pip install -r requirements.txt` — 지금은 `PyYAML>=6.0` 과 Phase 5 가 더한
-  `anthropic>=0.40`(댓글 작성기의 Claude SDK, 11절) 두 줄입니다. Phase 6 이 Playwright 를 더합니다.
+- 의존성 설치: `pip install -r requirements.txt` — `PyYAML>=6.0`(설정 읽기), jev 판별(Phase 3)의
+  `typesafe-sdk>=0.7.4,<0.8`, 댓글 작성기(Phase 5, 11절)의 Claude SDK `anthropic>=0.40` 세 줄입니다.
+  테스트는 SDK 없이 돕니다 — 판별 테스트는 가짜 jev 를, 작성기 테스트는 가짜 클라이언트를 씁니다.
+  Phase 6 이 Playwright 를 더합니다.
 - 테스트(저장소 뿌리에서, 설치 없이):
 
   ```
@@ -45,6 +47,12 @@ Phase 2–7 의 모든 단계가 기대는 계약입니다. 설정 읽기, 영�
 | `comment.max_chars` | 정수 | ≥ `min_chars` | `120` |
 | `comment.writer_model` | 글자 | 비어 있지 않음 — 댓글을 쓰는 Claude 모델 이름 (11절) | `claude-sonnet-5-5` |
 | `comment.check_min_probability` | 숫자 | ≥ 0, ≤ 1 — jev 자체 검사 통과 하한 (11절) | `0.7` |
+| `classifier.model` | 글자 | 비어 있지 않음 — jev 모델 이름 | `jev-latest` |
+| `classifier.noul_yes_min` | 숫자 | > 0.5, ≤ 1 — 주제 일치 확률이 이 값 이상이어야 일치 | `0.8` |
+| `classifier.noul_no_max` | 숫자 | ≥ 0, < `noul_yes_min` — 이 값 이하여야 불일치, 사이는 보류 | `0.2` |
+| `classifier.choice_min_confidence` | 숫자 | ≥ 0, ≤ 1 — 이유 보기 확신이 이보다 낮으면 보류 | `0.5` |
+| `classifier.on_topic_reasons` | 글자 목록 | 1개 이상, 각 1–40자, 두 목록 합쳐 50개 이하, 이름 겹침 금지 | 4개 (config.yaml) |
+| `classifier.off_topic_reasons` | 글자 목록 | 같은 규칙 — jev 에 먼저 보임 | 4개 (config.yaml) |
 | `chrome_debug_url` | 글자 | `http://` 또는 `https://` 로 시작 | `http://localhost:9222` |
 | `allowed_videos` | 글자 목록 | 비워 두면 `()`; 항목은 쓴 그대로 보관 | `- https://youtu.be/내-테스트-영상-ID` |
 
@@ -69,6 +77,9 @@ Phase 2–7 의 모든 단계가 기대는 계약입니다. 설정 읽기, 영�
 - **숫자 자리에서는 YAML 1.1 숫자 표기가 그대로 읽힙니다** — `017` 은 8진수 15, `1:30` 은
   60진수 90, `0x1F` 는 31, `1_000` 은 1000 이 되고 위 범위 검사만 받습니다. 숫자는 앞자리 0 ·
   `:` · `_` 없이 10진수로 쓰세요.
+- 보기 이름에 `: ` 가 들어가면 따옴표로 감싸세요 — 따옴표 없는 `- 키워드만 겹침: 게임` 은
+  YAML 이 '키: 값' 묶음으로 읽어
+  `비어 있지 않은 글자여야 합니다: classifier.off_topic_reasons[0]` 오류입니다.
 - 같은 키가 두 번 나오면 두 번째 줄 번호와 함께 오류입니다. 윈도우 메모장이 붙이는 BOM 은
   떼어 내고 읽습니다. UTF-8 이 아닌 저장(메모장의 ANSI·Unicode)은 `ConfigError` 입니다.
 - 읽는 중 나는 그 밖의 모든 오류도 `ConfigError` 입니다 — 날짜 모양의 틀린 값
@@ -370,8 +381,9 @@ Phase 3–5 가 정합니다.)
 ## 8. 비밀 값
 
 - API 키는 `.env` 에만 둡니다. `.gitignore` 가 `.env`, `.env.*` 를 막고 `.env.example` 만
-  커밋합니다. `.env.example` 에는 `YOUTUBE_API_KEY=` 가 있고, AI 접속 키 이름은 Phase 3 이
-  더합니다. `.env` 를 읽는 코드는 비밀 값을 처음 읽는 Phase 2 가 더합니다.
+  커밋합니다. `.env.example` 에는 `YOUTUBE_API_KEY=` 와 `TYPESAFE_API_KEY=`(jev 판별 —
+  `typesafe-sdk` 가 환경 변수에서 읽음)가 있고 값은 비워 둡니다. 댓글 작성 AI 의 키는 그것을
+  쓰는 단계가 더합니다. `.env` 를 읽는 코드는 비밀 값을 처음 읽는 Phase 2 가 더합니다.
 - 크롬 전용 프로필은 `chrome-profile/`(통째로 무시됩니다) 또는 저장소 밖에만 둡니다 — 저장소
   안의 다른 폴더는 금지입니다. Phase 6 · 8 의 실행 안내는 이 두 위치만 예시로 보입니다. 이 위치
   규칙이 첫 방어입니다.
@@ -423,7 +435,7 @@ run_loop(cycle, reload, initial, *, on_error, sleep=time.sleep,
   인자와 이유, 로그 사건과 필수 필드)은 고정입니다.
 - 더하는 것은 그 필드를 쓰는 단계(Phase)가 `models.py` · `config.py` 에서, 테스트와 함께, 이
   문서도 함께 고칩니다. 이미 있는 이름의 뜻을 바꾸거나 지우지 않습니다.
-- 가드 · 저장소 · 설정 읽기 · 로그 한 줄 규칙이 테스트로 지켜지는지는 음성 대조로 확인합니다. 각 명령은 가드 한 줄을
+- 가드 · 저장소 · 설정 읽기 · 로그 한 줄 · 판별 규칙이 테스트로 지켜지는지는 음성 대조로 확인합니다. 각 명령은 가드 한 줄을
   메모리에서만 망가뜨리고 테스트를 돌리며, **종료 코드 1(테스트가 잡음)** 이어야 합니다. 2 는
   바꿀 글자를 찾지 못했다는 뜻이라 실패입니다:
 
@@ -471,8 +483,17 @@ run_loop(cycle, reload, initial, *, on_error, sleep=time.sleep,
   python3 -m tests.mutants writer-repeat-all-history
   python3 -m tests.mutants writer-unescaped-material
   python3 -m tests.mutants writer-api-error-unlogged
+  python3 -m tests.mutants classifier-error-yes
+  python3 -m tests.mutants classifier-malformed-yes
+  python3 -m tests.mutants classifier-unchecked-probability
+  python3 -m tests.mutants classifier-no-confidence-floor
+  python3 -m tests.mutants classifier-keyword-only-passes
+  python3 -m tests.mutants classifier-no-truncation
+  python3 -m tests.mutants classifier-error-hold-unmarked
+  python3 -m tests.mutants classifier-swallows-faults
   ```
 
+  `classify` · `read_answers` · `build_state` · `is_error_hold` · `sdk_ask` ·
   `decide_post` · `video_id_from_ref` · `put` · `reserve_live` · `check_post` · `load_config` ·
   `config_from_mapping` · `run_loop` · `format_line` · `write_comment` · `code_failures` ·
   `self_check_failure` · `link_fragment` · `repeated_run` 의 본문을 고칠 때는 이 명령들이 계속
@@ -578,3 +599,129 @@ if result.draft is not None:
   `CommentDraft.at` 도 넘겨받은 `now` 이고, 숨은 시계는 없습니다.
 - 프롬프트 원문(`SYSTEM_PROMPT` · `USER_INSTRUCTION` · `REWRITE_PROMPT` · `CHECK_QUESTIONS` ·
   `CHECK_LABELS`)은 `writer.py` 맨 위에만 있고, Phase 8 의 PROCESS.md 가 옮겨 적습니다.
+
+## 11. 트리거 판정 — `trigger.py`
+
+```python
+judge_trigger(record, config, now) -> Judgement     # config 는 Config.trigger
+```
+
+`judge_trigger` 는 영상 기록 하나를 지금(`now`) 댓글 대상으로 볼지 정해 `Judgement(verdict, reason, at=now)` 를
+돌려줍니다. 기록은 바꾸지 않고, 같은 입력이면 언제나 같은 판정입니다. 기준은 부를 때마다 받은 `config` 에서
+읽으므로 실행 중 고친 설정이 다음 판정부터 적용됩니다. 시간대 없는 `now` 는 `ValueError` 입니다. 저장
+(`record.trigger`)과 `TRIGGER` 로그는 부르는 쪽(Phase 7)이 합니다.
+
+- **최신과 직전:** 조회수 기록을 시각(`at`) 순으로 놓습니다 — 목록 순서는 보지 않고, 시간대가 달라도 같은
+  순간이면 같은 시각이며, 같은 시각끼리는 조회수가 큰 쪽이 뒤입니다. 맨 뒤가 *최신*, 최신보다 시각이 이른
+  기록 중 맨 뒤가 *직전*입니다. 같은 시각의 기록 여럿은 한 번으로 셉니다.
+- **시간당 조회수** = (최신 조회수 − 직전 조회수) ÷ 두 시각 사이의 시간. 조회수가 그대로면 0 입니다.
+  조회수가 줄었으면(삭제 · 비공개 · 조회수 정정) 재지 않습니다 — 음수 속도는 없습니다.
+
+아래 차례대로 보고 처음 걸린 줄의 판정을 돌려줍니다:
+
+| 차례 | 조건 | verdict | reason |
+|---|---|---|---|
+| 1 | 시각이 다른 기록이 둘 미만(기록 없음 포함) | `hold` | `too_few_samples` |
+| 2 | 최신 조회수 < `min_views` | `no` | `views_below_min` |
+| 3 | 최신 조회수 > `max_views` | `no` | `views_above_max` |
+| 4 | `published_at` 이 `now` 보다 뒤 | `hold` | `published_in_future` |
+| 5 | `now − published_at` > `max_age_hours` 시간 | `no` | `too_old` |
+| 6 | 최신 조회수 < 직전 조회수 | `hold` | `views_decreased` |
+| 7 | 시간당 조회수 < `min_views_per_hour` | `no` | `too_slow` |
+| 8 | 그 밖 — 세 조건을 모두 만족 | `yes` | `views_per_hour` |
+
+- 경계는 모두 통과입니다 — 조회수 정확히 `min_views` · `max_views`, 나이 정확히 `max_age_hours`(그리고
+  `published_at` 이 `now` 와 같은 나이 0), 시간당 정확히 `min_views_per_hour` 는 대상입니다(과제의
+  "1,000–5,000 · 12시간 이내 · 150 이상").
+- **판정은 모두 `at` 시각의 판정입니다.** 다시 부르면 바뀌지 않는 것은 `too_old` 뿐입니다(나이는 줄지 않음).
+  `views_above_max` 는 조회수가 정정되어 줄 때만 바뀌고, `views_below_min` · `too_slow` 와 모든 `hold` 는
+  기록이 더 쌓이면 `yes` 가 될 수 있습니다. 그래서 부르는 쪽은 `too_old` 가 아닌 기록을 새 조회수 기록이 생길
+  때마다 다시 판정합니다. `hold` 는 잴 수 없어 미룬 판정(기록 부족 · 미래 업로드 시각 · 줄어든 조회수)이고,
+  `no` 는 재어 보니 지금은 아닌 판정입니다.
+- 기록이 한 번뿐인 영상은 다른 조건과 상관없이 `hold` 입니다(트래커 Phase 4 의 절충). 조회수가 줄면
+  `min_views_per_hour` 가 0 이어도 `hold` 입니다 — 지워졌거나 비공개가 된 영상을 대상으로 올리지 않고, 나이
+  창이 닫히면 `too_old` 로 끝납니다.
+- 나이는 업로드 시각(`published_at`)부터 잽니다(탐지 시각이 아님). `published_at` 이 `now` 보다 뒤이면 이
+  컴퓨터의 시계가 유튜브보다 늦다는 뜻이라 `hold published_in_future` 로 둡니다 — 시계가 따라잡으면 저절로
+  풀리고, 로그에서 찾을 수 있습니다. 시계가 늦으면 다른 영상의 나이도 그만큼 적게 재지만, 이 판정이 그것까지
+  고치지는 않습니다.
+- 기록 사이가 아주 짧으면(재시작 직후 바로 도는 사이클, `poll_interval_min: 1`) 조회수 몇 회 차이도 큰 속도가
+  됩니다 — 예: 20초 사이 1회는 시간당 180회로 `yes`. 최소 간격은 아직 정하지 않았습니다(실제 기록이 생긴 뒤
+  Phase 2 · 7 이 정함). 기록 주기(30분 · 2시간)에 따라 정밀도가 달라지는 것은 트래커가 받아들인 절충입니다.
+- 조건 차례는 과제가 적은 차례(조회수 · 나이 · 시간당 조회수)이고, 두 `hold`(미래 업로드 시각 · 줄어든
+  조회수)는 그것이 망치는 측정만 막습니다.
+- reason 은 모두 로그에 따옴표 없이 쓰이는 글자입니다. 3절 · 7절 예시의 `views_per_hour` 는 `yes` 의
+  reason 입니다.
+- **기준 제안:** 세 기준 값은 과제 값 그대로 둡니다(트래커 Phase 4 결정) — 실제 조회수 기록(Phase 2)이 아직
+  없어 다른 숫자를 뒷받침할 근거가 없습니다. 대신 과제가 정하지 않은 재는 방법을 정했습니다: 시간당 조회수를
+  업로드 뒤 평균(조회수 ÷ 나이)이나 첫 기록부터의 평균이 아니라 *가장 늦은 두 기록* 사이로 잽니다. "뜨기
+  직전"은 지금 빨라지는 영상인데, 업로드 뒤 평균은 이미 끝난 반짝 증가를 대상으로 올리고, 첫 기록부터의
+  평균은 지금의 가속을 느린 시작과 섞어 묽힙니다.
+- 음성 대조 — 각 명령은 판정 한 줄을 메모리에서만 망가뜨리고 `tests.test_trigger` 를 돌리며, **종료 코드
+  1(테스트가 잡음)** 이어야 합니다. `judge_trigger` 의 본문을 고칠 때 함께 확인합니다:
+
+  ```
+  python3 -m tests.mutants trigger-negative-speed
+  python3 -m tests.mutants trigger-flat-is-decrease
+  python3 -m tests.mutants trigger-list-order
+  python3 -m tests.mutants trigger-same-instant
+  python3 -m tests.mutants trigger-min-views-exclusive
+  python3 -m tests.mutants trigger-max-views-exclusive
+  python3 -m tests.mutants trigger-future-publish-passes
+  python3 -m tests.mutants trigger-future-publish-inclusive
+  python3 -m tests.mutants trigger-age-exclusive
+  python3 -m tests.mutants trigger-rate-exclusive
+  ```
+
+## 12. 주제 판별 — `classifier.py` (Phase 3)
+
+- **절 번호.** 다른 갈래가 자기 11절을 먼저 들였으면 이 제목의 번호는 들일 때 고칩니다. 코드와
+  다른 글은 이 절을 번호가 아니라 제목('주제 판별')으로만 가리킵니다.
+- **부르기.**
+
+  ```python
+  classify(record, config, ask, now, *, transcript=None, language=QUESTION_LANGUAGE) -> Judgement
+  ```
+
+  자막은 `transcript` 인자로만 받습니다.
+- **부르는 쪽의 할 일.** 판정마다 `CLASSIFY video=… verdict=… reason=…` 를 씁니다. 오류
+  보류(`is_error_hold(j)` 가 참)이면 `ERROR where=classify reason=<j.reason>` 도 함께 씁니다.
+  오류 보류를 `record.classification` 에 저장할지, 나중에 다시 판정할지는 Phase 7 이 정합니다
+  (트래커 Phase 7: 실패 후 재시도 없이 다음 영상).
+- **보류가 되는 실패.** SDK 가 알린 실패만 보류입니다 — 모든 `TypeSafeError`, 곧 401 · 422 ·
+  429 · 529 · 연결 · 응답 검증. 429/529 의 다시 시도는 SDK 기본 정책을 따릅니다. SDK 가 없거나
+  우리 코드가 잘못된 경우는 예외가 그대로 올라갑니다(9절의 `on_error("cycle")`).
+- **한 요청, 두 질문.** `matches_topic`(noul)과 `reason`(choice). choice 가 첫 보기 쪽으로
+  기우는 경향 때문에 보기는 `off_topic_reasons` 를 먼저, 그다음 `on_topic_reasons` 를 보입니다.
+- **믿지 않는 입력.** 영상 글은 `state` 에만 들어가고 질문에는 들어가지 않습니다. 두 답이 같은
+  state 를 읽으므로 주입은 두 답을 함께 움직일 수 있습니다. 판별만으로는 아무것도 게시하지
+  않으며, Phase 4 · 5 · 7 의 조건이 그대로 적용됩니다.
+- **판정표.** `noul` 은 주제 일치 확률, `confidence` 는 이유 보기(choice) 답의 확신입니다.
+
+  | 판정 | 조건 |
+  |---|---|
+  | `yes` | `confidence ≥ choice_min_confidence` ∧ `noul ≥ noul_yes_min` ∧ 보기 ∈ `on_topic_reasons` |
+  | `no` | `confidence ≥ choice_min_confidence` ∧ `noul ≤ noul_no_max` ∧ 보기 ∈ `off_topic_reasons` |
+  | `hold` | 그 밖의 모든 경우 — SDK 오류 · 응답 모양 오류 · 낮은 확신 · `noul` 이 두 기준값 사이 · 두 답이 엇갈림 |
+
+- **이유 모양.**
+  - 판정: `<보기> (<그 보기 확률>) · 일치 <noul> · 확신 <confidence>`, 숫자는 소수 둘째 자리까지.
+  - 판단 보류: 위 모양 앞에 `확신 낮음: ` 또는 `판단 엇갈림: ` 이 붙습니다.
+  - 오류 보류: `API 오류: <SDK 예외 이름> [<상태 코드>]` 또는
+    `응답 모양 오류: <예외 이름>: <내용>`.
+  - 3절과 7절의 `연애 고민 상담` 은 이 모양의 앞부분입니다.
+- **자르기.** `state` 와 가장 긴 질문(JSON 을 UTF-8 바이트로 잰 것)의 합은 32000 바이트
+  이하입니다 — 토큰 수는 UTF-8 바이트 수를 넘지 않습니다. 자막부터, 그다음 설명, 그다음 제목
+  순으로 끝에서 잘라 내며 글자를 쪼개지 않습니다.
+- 세기와 날짜 비교는 jev 에 묻지 않습니다.
+- **질문 언어.** `QUESTION_LANGUAGE` 상수이고 기본값은 `ko` 입니다.
+- **한국어 정확도.** 예시 묶음은 22개(일치 10 · 불일치 12, 그중 주입 2)입니다.
+  `python3 -m tests.jev_accuracy` 를 돌리면 언어마다 맞음 · 잘못된 일치 · 잘못된 불일치 ·
+  보류 · 오류 수를 찍습니다.
+  - 통과는 잘못된 일치가 없고 22개 중 20개 이상 맞는 것입니다.
+  - 종료 코드: 0 ko 통과 · 1 ko 미달 · 2 재지 않음 · 3 측정 실패(오류가 있음 — 모델 문제가
+    아님).
+  - 기록: 아직 재지 않음 — 2026-10-13 키 없음.
+  - ko 가 미달이고 en 이 통과하면 `QUESTION_LANGUAGE` 를 `"en"` 으로 바꿉니다. 둘 다 미달이면
+    사람이 정합니다(트래커 cross-cutting).
+- **음성 대조.** 음성 대조는 10절 목록.

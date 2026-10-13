@@ -10,6 +10,7 @@ from typing import NamedTuple
 from unittest import mock
 
 from agent.config import (
+    ClassifierConfig,
     CommentConfig,
     Config,
     ConfigError,
@@ -44,6 +45,14 @@ VALID = {
         "max_chars": 120,
         "writer_model": "claude-sonnet-5-5",
         "check_min_probability": 0.7,
+    },
+    "classifier": {
+        "model": "jev-latest",
+        "noul_yes_min": 0.8,
+        "noul_no_max": 0.2,
+        "choice_min_confidence": 0.5,
+        "on_topic_reasons": ["연애 고민 상담", "연애 경험담"],
+        "off_topic_reasons": ["키워드만 겹침: 게임", "연애와 관계없음"],
     },
     "chrome_debug_url": "http://localhost:9222",
     "allowed_videos": ["https://youtu.be/abcdefghijk"],
@@ -225,6 +234,19 @@ class CommittedConfigTest(unittest.TestCase):
                 trigger=TriggerConfig(1000, 5000, 12.0, 150.0),
                 limits=LimitsConfig(10, 24.0, 100),
                 comment=CommentConfig(40, 120, "claude-sonnet-5-5", 0.7),
+                classifier=ClassifierConfig(
+                    "jev-latest",
+                    0.8,
+                    0.2,
+                    0.5,
+                    ("연애 고민 상담", "연애 경험담", "썸 · 소개팅 이야기", "이별 · 재회 고민"),
+                    (
+                        "키워드만 겹침: 게임",
+                        "키워드만 겹침: 음악",
+                        "키워드만 겹침: 예능 · 드라마",
+                        "연애와 관계없음",
+                    ),
+                ),
                 chrome_debug_url="http://localhost:9222",
                 allowed_videos=("https://youtu.be/내-테스트-영상-ID",),
             ),
@@ -449,6 +471,125 @@ class ConfigFromMappingTest(unittest.TestCase):
                 data = valid()
                 data[section][key] = value
                 self.assert_rejected(data, f"{message}: {section}.{key}")
+
+
+class ClassifierConfigTest(unittest.TestCase):
+    """classifier 절 — 판별 모델 이름 · 기준값 · 이유 보기 목록의 검사."""
+
+    def assert_rejected(self, data: dict[str, object], needle: str) -> None:
+        with self.assertRaises(ConfigError) as caught:
+            config_from_mapping(data)
+        self.assertIn(needle, str(caught.exception))
+
+    def test_classifier_section_loads(self) -> None:
+        classifier = config_from_mapping(valid()).classifier
+        self.assertEqual(
+            classifier,
+            ClassifierConfig(
+                "jev-latest",
+                0.8,
+                0.2,
+                0.5,
+                ("연애 고민 상담", "연애 경험담"),
+                ("키워드만 겹침: 게임", "연애와 관계없음"),
+            ),
+        )
+        for number in (
+            classifier.noul_yes_min,
+            classifier.noul_no_max,
+            classifier.choice_min_confidence,
+        ):
+            self.assertIsInstance(number, float)
+        self.assertIsInstance(classifier.on_topic_reasons, tuple)
+        self.assertIsInstance(classifier.off_topic_reasons, tuple)
+
+    def test_missing_classifier_key_names_dotted_path(self) -> None:
+        data = valid()
+        del data["classifier"]["noul_no_max"]
+        self.assert_rejected(data, "필수 설정이 없습니다: classifier.noul_no_max")
+
+    def test_unknown_classifier_key_names_dotted_path(self) -> None:
+        data = valid()
+        data["classifier"]["question_language"] = "en"
+        self.assert_rejected(data, "알 수 없는 설정입니다: classifier.question_language")
+
+    def test_probability_keys_out_of_range_are_rejected(self) -> None:
+        rows = (
+            ("noul_yes_min", 0.5, "0.5 보다 커야 합니다"),
+            ("noul_yes_min", 1.01, "1 이하여야 합니다"),
+            ("noul_yes_min", True, "숫자여야 합니다"),
+            ("noul_no_max", -0.1, "0 이상이어야 합니다"),
+            ("noul_no_max", 0.8, "noul_yes_min 보다 작아야 합니다"),
+            ("choice_min_confidence", 1.5, "1 이하여야 합니다"),
+            ("choice_min_confidence", -0.1, "0 이상이어야 합니다"),
+            ("choice_min_confidence", float("nan"), "유한한 숫자여야 합니다"),
+        )
+        for key, value, message in rows:
+            with self.subTest(key=key, value=value):
+                data = valid()
+                data["classifier"][key] = value
+                self.assert_rejected(data, f"{message}: classifier.{key}")
+
+    def test_probability_bounds_are_accepted(self) -> None:
+        data = valid()
+        data["classifier"]["noul_yes_min"] = 1
+        classifier = config_from_mapping(data).classifier
+        self.assertEqual(classifier.noul_yes_min, 1.0)
+        self.assertIsInstance(classifier.noul_yes_min, float)
+        for key, value in (
+            ("noul_no_max", 0),
+            ("choice_min_confidence", 0),
+            ("choice_min_confidence", 1),
+        ):
+            with self.subTest(key=key, value=value):
+                data = valid()
+                data["classifier"][key] = value
+                self.assertEqual(getattr(config_from_mapping(data).classifier, key), value)
+
+    def test_reason_list_rules(self) -> None:
+        on = "classifier.on_topic_reasons"
+        off = "classifier.off_topic_reasons"
+        rows = (
+            ("on_topic_reasons", [], f"보기가 하나 이상 필요합니다: {on}"),
+            ("on_topic_reasons", "연애", f"보기가 하나 이상 필요합니다: {on}"),
+            ("on_topic_reasons", ["연애 고민 상담", ""], f"비어 있지 않은 글자여야 합니다: {on}[1]"),
+            ("on_topic_reasons", ["가" * 41], f"40자 이하여야 합니다: {on}[0]"),
+            (
+                "on_topic_reasons",
+                ["연애 고민 상담", "연애 고민 상담"],
+                f"보기 이름이 겹칩니다: {on}[1]",
+            ),
+            (
+                "off_topic_reasons",
+                ["키워드만 겹침: 게임", "연애 고민 상담"],
+                f"보기 이름이 겹칩니다: {off}[1]",
+            ),
+        )
+        for key, value, needle in rows:
+            with self.subTest(key=key, value=value):
+                data = valid()
+                data["classifier"][key] = value
+                self.assert_rejected(data, needle)
+        with self.subTest("26 + 25"):
+            data = valid()
+            data["classifier"]["on_topic_reasons"] = [f"일치 {i}" for i in range(26)]
+            data["classifier"]["off_topic_reasons"] = [f"불일치 {i}" for i in range(25)]
+            self.assert_rejected(data, "보기는 모두 50개 이하여야 합니다: classifier")
+
+    def test_unquoted_colon_reason_is_rejected(self) -> None:
+        data = valid()
+        data["classifier"].update(parse_yaml("off_topic_reasons:\n  - 키워드만 겹침: 게임\n"))
+        self.assertEqual(data["classifier"]["off_topic_reasons"], [{"키워드만 겹침": "게임"}])
+        self.assert_rejected(
+            data, "비어 있지 않은 글자여야 합니다: classifier.off_topic_reasons[0]"
+        )
+
+    def test_empty_model_is_rejected(self) -> None:
+        for value in ("", None):
+            with self.subTest(value=value):
+                data = valid()
+                data["classifier"]["model"] = value
+                self.assert_rejected(data, "비어 있지 않은 글자여야 합니다: classifier.model")
 
 
 class LoadConfigTest(unittest.TestCase):

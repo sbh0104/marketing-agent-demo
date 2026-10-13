@@ -24,7 +24,7 @@ Parallel shape: Phase 1 → (Phase 2 ‖ 3 ‖ 4 ‖ 5 ‖ 6) → Phase 7 → Ph
 ---
 
 ## Phase 1 — 뼈대와 계약 (설정 · 데이터 모양 · 저장 · 운영 가드)
-- Status: Done
+- Status: Done (스모크 스윕이 페이즈 브랜치를 병합 · 2026-10-13)
 - Slug: foundation-contracts
 - Goal: 다섯 모듈이 같은 약속(설정 값, 영상 한 건의 데이터 모양, 처리 기록 저장소, 허용 목록 가드, 테스트 모드 플래그, 로그 형식)을 쓰도록 뼈대를 만든다. 이후 Phase 2–6은 이 계약에만 의존한다.
 
@@ -116,7 +116,7 @@ Open questions
 ---
 
 ## Phase 3 — ② 판별 · 주제 일치 (classifier)
-- Status: Not started
+- Status: Done
 - Slug: classifier-topic
 - After: Phase 1
 - Goal: 영상의 제목 · 설명 · 자막(있을 경우)을 읽고 주제 일치 여부와 이유를 기록한다. 키워드만 겹치는 영상(예: '연애'가 들어간 게임 영상)을 걸러낸다.
@@ -149,7 +149,7 @@ Open questions
 ---
 
 ## Phase 4 — ③ 타이밍 · 뜨기 직전 판단 (trigger)
-- Status: Not started
+- Status: Done
 - Slug: trigger-timing
 - After: Phase 1
 - Goal: 조회수 1,000–5,000, 업로드 후 12시간 이내, 시간당 조회수 150 이상 — 세 조건을 모두 만족하면 대상으로 표시한다. 세 값은 `config.yaml`에서 바꾼다.
