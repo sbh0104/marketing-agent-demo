@@ -381,7 +381,7 @@ other line is required on every item.
 - attempts: 0 · last failure: —
 - first seen: 2026-10-13 · last seen: 2026-10-13
 
-### S-NEW-1 — 계약 '댓글 작성' 절의 Claude 오류 이유 틀에 빈 메시지 모양 적기
+### S-032 — 계약 '댓글 작성' 절의 Claude 오류 이유 틀에 빈 메시지 모양 적기
 - source: sweep 20261013-180850-adw/smoke-sweep-s019-s023 · cycle 20261013-180850-adw/smoke-sweep-s019-s023 · tracker plans/interview-marketing-agent.md#phase-5 · deferred by ship-check
 - evidence: docs/contracts.md:680 `claude 호출 실패: <오류 종류> <상태 코드>: <메시지 200자까지>` 는 콜론이 늘 붙는 것처럼 적었지만 src/agent/writer.py:260-265 `_error_detail` 은 메시지가 비면 `: …` 를 뺌(재현: `claude 호출 실패: E 429`). 바로 아래 :681-682 jev 틀은 `[ <상태 코드>][: …]` 로 적고 "Claude 틀과 같음"이라 해 두 줄이 서로 다르게 읽힘(.adw/ship-report.md § Risks R2)
 - direction: docs/contracts.md:680 의 Claude 틀을 jev 틀과 같은 `claude 호출 실패: <오류 종류>[ <상태 코드>][: <메시지 200자까지>]` 표기로 바꾸고 괄호 설명에 "메시지가 비면 `: …` 도 뺍니다"를 더한다 — 코드 동작 · 로그 형식 변경 없음
