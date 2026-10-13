@@ -237,6 +237,11 @@ class ContractTests(unittest.TestCase):
         self.assertIs(judgement.verdict, Verdict.YES)
         self.assertEqual(judgement.at, T0 + 2 * H + 30 * M)
 
+    def test_judgement_at_is_now_when_later_than_latest_sample(self) -> None:
+        judgement = judge_trigger(video(*GOOD), DEFAULTS, T0 + 3 * H)
+        self.assertIs(judgement.verdict, Verdict.YES)
+        self.assertEqual(judgement.at, T0 + 3 * H)
+
     def test_same_input_same_judgement(self) -> None:
         now = T0 + AT
         first = judge_trigger(video(*GOOD), DEFAULTS, now)
@@ -249,6 +254,24 @@ class ContractTests(unittest.TestCase):
         judge_trigger(rec, DEFAULTS, T0 + AT)
         self.assertEqual(rec, before)
         self.assertIsNone(rec.trigger)
+        shuffled = video((2 * H + 30 * M, 1450), (2 * H, 1200))
+        before = copy.deepcopy(shuffled)
+        judge_trigger(shuffled, DEFAULTS, T0 + AT)
+        self.assertEqual(shuffled, before)
+
+    def test_earlier_sample_is_the_largest_at_the_previous_instant(self) -> None:
+        record = video((2 * H, 1200), (2 * H, 1300), (2 * H + 30 * M, 1450))
+        at_300 = dataclasses.replace(DEFAULTS, min_views_per_hour=300.0)
+        at_301 = dataclasses.replace(DEFAULTS, min_views_per_hour=301.0)
+        self.assertEqual(judged(record, AT, at_300), ("yes", "views_per_hour"))
+        self.assertEqual(judged(record, AT, at_301), ("no", "too_slow"))
+
+    def test_rate_is_not_floored(self) -> None:
+        record = video((1 * H, 1000), (11 * H, 2505))  # 시간당 150.5회
+        at_150_5 = dataclasses.replace(DEFAULTS, min_views_per_hour=150.5)
+        at_150_6 = dataclasses.replace(DEFAULTS, min_views_per_hour=150.6)
+        self.assertEqual(judged(record, 11 * H, at_150_5), ("yes", "views_per_hour"))
+        self.assertEqual(judged(record, 11 * H, at_150_6), ("no", "too_slow"))
 
     def test_naive_now_is_rejected(self) -> None:
         now = datetime(2026, 10, 12, 5, 30)
@@ -275,7 +298,8 @@ class ContractTests(unittest.TestCase):
             verdict, reason = j.verdict.value, j.reason
             seen.add((verdict, reason))
             with self.subTest(verdict=verdict, reason=reason):
-                fields = {"video": rec.video_id, "verdict": j.verdict, "reason": j.reason}
+                self.assertEqual(j.at, now)
+                fields ={"video": rec.video_id, "verdict": j.verdict, "reason": j.reason}
                 line = format_line(now, Event.TRIGGER, fields)
                 self.assertTrue(line.endswith(f"verdict={verdict} reason={reason}"), line)
         self.assertEqual(seen, REASONS)
