@@ -317,3 +317,11 @@
 - source: adw/phase-2-watcher-detect
 - tag: plain
 - status: open
+
+### H-037 — S-038 이 되돌려진 뒤 다음 스윕 전에, 통의 S-038 방향에서 "계약 머리 문단의 모듈 목록에 더함"을 빼고 config.yaml 1행 주석만 남길지 정하기 — 머리 문단에는 S-029(2026-10-13) 이후 목록이 없음
+- project: marketing-agent-demo
+- when: 2026-10-14 · adw/smoke-sweep-s038-s042
+- from: ship-report.md § Human checks — .adw/verify-report.md § Handoff
+- source: adw/smoke-sweep-s038-s042
+- tag: plain
+- status: open
