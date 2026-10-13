@@ -88,7 +88,7 @@ Open questions
 ---
 
 ## Phase 2 — ① 탐지 · 조회수 추적 (watcher)
-- Status: Not started
+- Status: In progress
 - Slug: watcher-detect
 - After: Phase 1
 - Goal: YouTube Data API v3로 키워드별 최신순 검색(한국 지역 · 한국어 · 최근 12시간 업로드)을 주기마다 실행하고, 찾은 영상의 조회수를 주기마다 다시 기록한다. 하루 검색 호출 수를 설정으로 제한한다.
@@ -97,14 +97,22 @@ Decisions
 - 검색 쿼터 가드를 이 모듈에 둔다 — 하루 검색 호출이 설정 한도를 넘으면 호출하지 않고 기록만 남긴다 (`docs/research/search-quota.md`).
 - **The plan decides** — 주기와 키워드 수 조합. 조건: 하루 검색 호출 ≤ 100회 (쿼터 약 100회/일). 후보: (a) 30분 × 키워드 2개 = 96회/일 · (b) 2시간 × 키워드 5개 = 60회/일 (키워드 5개는 과제 예시 그대로 유지). 근거는 `docs/research/search-quota.md`. 어느 쪽이든 `config.yaml`에서 바꿀 수 있어야 함.
 - **The plan decides** — YouTube 클라이언트: 공식 Google 클라이언트 라이브러리 vs 직접 HTTP 호출 · 조건: 쿼터 단위 계산이 한 곳에 모여야 함.
+- 2026-10-13 ship-check(`READY WITH RISKS`, 민감 확인 줄 2개로 머지 전 정지) 뒤 인터뷰 — 분류: 확인(코드는 계획대로이고, 위험을 받아들이고 주인을 정함). 이 브랜치는 더 고치지 않고 출하한다 (HC1 질문 1 · 2, 모두 A):
+  - R1 · R2(깨진 구글 응답이 탐지 주기를 `ERROR` 줄 없이 끝냄)는 받아들이고, 고침은 Phase 7 이 맡는다(아래 Phase 7 결정). R1: `nextPageToken` 이 짝 없는 서로게이트(`"\ud800"`)면 다음 페이지 주소를 만드는 `urlencode`(`youtube.py:242`)가 `UnicodeEncodeError` 를 낸다. `Watcher._search` 는 `QuotaExhausted` · `YouTubeError` 만 잡으므로(`watcher.py:174-181`) 예외가 `run_loop` 의 `on_error("cycle", …)` 로 나간다 — 그 주기의 새 영상 · 조회수 표본 · `ERROR` 줄이 모두 없고, 검색 1회(100단위)는 이미 쓰였다(인터뷰에서 재현: `ESCAPED UnicodeEncodeError … <no log file> Usage(searches=1, units=100)`). R2: `publishedAt` · `viewCount` 가 수만 단 중첩 목록이면 오류 문구의 `{value!r:.40}`(`watcher.py:54`, `:62`)이 Python 3.14 에서 `RecursionError` 를 내고, `_record` 는 `ValueError` 만 잡는다(`watcher.py:262`). 근거: 입력은 TLS 로 받은 구글 응답이 깨진 날뿐이고(실제 토큰은 `CAIQAA` 같은 ASCII), 피해는 그 주기 하나다 — 저장소 · 장부 · 키는 무사하다. 주기를 실제로 돌리는 `run.py` 는 Phase 7 이 만들므로 고침이 첫 실제 실행보다 앞선다. 고침 사이클 한 번(약 2시간)과 ship-check 재심사를 아끼고, Phase 1 HC1-2 처럼 주인을 정해 같은 위험이 다음 ship-check 에 정지로 돌아오지 않게 한다 (HC1 질문 1 A).
+  - R3(구글 쿼터 표 2026-10-08 갱신): 쿼터 장부는 옛 계산 — 하루 10,000단위 한 통에서 `search.list` 1회 = 100, `videos.list` 1회 = 1(`youtube.py:32-33`) — 을 **일부러 유지한다**. 구글은 이제 `search.list` 를 하루 100회짜리 별도 통(1회 1)으로, `videos.list` 를 나머지 호출이 함께 쓰는 10,000단위 통에서 1로 센다(`https://developers.google.com/youtube/v3/determine_quota_cost`, "Last updated 2026-10-08 UTC" — ship-check 이 두 번, 인터뷰가 한 번, 2026-10-13 에 읽었고 세 번 모두 같았다). 옛 계산은 옛 규칙과 새 규칙 모두에서 구글보다 엄격하다 — 검색은 90회에서 막혀 구글의 100회 안이고, 조회수는 1,000–4,000단위만 허락해 구글의 10,000 안이다. 틀린 것은 문서뿐이므로, 계약 2 · 11절 · `config.yaml:14` 주석 · 조사 문서가 검색 비용을 "구글의 계산"으로 적은 곳을 "우리 장부의 일부러 엄격한 계산"으로 바로잡는 일은 스모크 통 S-NEW-7 로 보낸다(같은 두 파일을 고치는 S-NEW-6 과 한 스윕). 근거: 5일 전 바뀐 규칙이 되돌려지거나 프로젝트마다 다르게 적용돼도 넘쳐 쓰지 않는다. 실제 쓰임(영상 300개 추적 시 하루 72단위, 조회수만 30분마다 재도 288단위)은 1,000단위 몫(하루 조회수 표본 50,000개) 안에 넉넉하다. 코드 · 테스트를 다시 열지 않아 오늘 출하한다 (HC1 질문 2 A).
+  - 아래 Trade-offs 의 "조회수 추적 호출의 쿼터 단위 재확인": `videos.list` = 1단위로 확인됨 (2026-10-13, 위 공식 표).
 
 Trade-offs accepted
 - 키워드 5개를 30분마다 돌리는 과제 예시는 쿼터를 넘으므로 그대로 쓰지 않음.
 - 조회수 추적 호출의 정확한 쿼터 단위는 구현 전에 공식 표로 재확인 (이번 조사에서 미확인).
+- (2026-10-13 HC1) Phase 7 이 고칠 때까지 계약 11절의 "API 오류는 `ERROR` 한 줄, 추적은 계속"에 예외가 둘 남는다 — 깨진 `nextPageToken`(R1), Python 3.14 의 수만 단 중첩 값(R2). 그 주기는 `run_loop` 의 `on_error("cycle", …)` 로만 알려진다.
+- (2026-10-13 HC1) 조회수 호출은 구글이 주는 10,000단위가 아니라 우리 장부의 1,000–4,000단위로 묶인다. `daily_max_searches` 를 95–100 으로 올리면 조회수 몫이 500–0 으로 줄어 추적이 멈춘다 — 그런 필요가 생기면(키워드를 늘리거나 Phase 4 가 조회수를 훨씬 자주 재려 할 때) 장부를 구글처럼 두 통(검색 하루 100회 · 단위 10,000)으로 나누는 결정을 따로 한다. 나눈 장부는 구글이 옛 규칙으로 돌아가면 구글보다 느슨해진다(넘친 호출은 구글의 403 → `ERROR` 줄, 돈은 나가지 않음).
+- (2026-10-13 HC1) 스모크 스윕이 S-NEW-7 을 고칠 때까지 메인의 계약 2 · 11절과 `config.yaml:14` 주석은 검색 비용을 "구글의 100단위"로 적은 채로 남는다 — 이 기간에 쿼터 숫자를 읽는 페이즈는 위 Decisions 의 R3 줄을 따른다.
 
 Responsibilities & risks to guard against
 - 쿼터 초과 시 조용히 빈 결과를 내면 안 됨 — 한도 도달을 로그에 남긴다.
 - 페이지 넘김(pagination)도 쿼터를 쓴다 — 가드에 포함한다.
+- (2026-10-13 HC1) ship-report 의 나머지 위험과 주인: R4(테스트가 고정하지 않는 약속 여섯)는 `.adw/smoke-log.md` S-NEW-1–6. R5(네트워크 코드 다듬기) · R6(오류에 붙은 원래 예외 속 키) · R7(영상마다 저장소 파일 전체를 다시 씀)과 R9 의 저장소 쓰기 실패 순서는 Phase 7 몫(아래 Phase 7 Responsibilities). R8(장부의 이상한 경우 — 모두 닫힌 쪽 실패)과 R9 의 나머지(응답 · 로그 크기 상한 없음, 먼 미래 `publishedAt` 영상은 계속 추적)는 받아들인 위험이다. R10(실제 키로 한 주기 · 실제 `publishedAt` 모양 · Windows · macOS)과 공식 쿼터 표를 사람이 직접 한 번 보는 일은 사람 확인으로 `.adw/human-checks.md` 에 넘어간다.
 
 Dependencies
 - Depends on: Phase 1
@@ -163,6 +171,7 @@ Trade-offs accepted
 
 Responsibilities & risks to guard against
 - 조회수가 줄어드는 기록(삭제·비공개 등)을 음수 속도로 계산하지 않는다.
+- (2026-10-13, Phase 2 HC1) 조회수 표본을 검색 주기(2시간)와 따로 더 자주 잴지(Phase 2 plan 의 선택지 c)는 이 페이즈가 필요한 해상도를 정한 뒤 다시 본다. 쿼터가 막지는 않는다 — 우리 장부의 조회수 몫은 최소 1,000단위(하루 표본 50,000개)이고, 영상 300개를 30분마다 재도 하루 288단위다. 쿼터 숫자는 계약 문서가 아니라 Phase 2 Decisions 의 R3 줄을 따른다(스모크 S-NEW-7 스윕 전까지 계약 2 · 11절은 검색 비용을 "구글의 100단위"로 적고 있음).
 
 Dependencies
 - Depends on: Phase 1 (영상 데이터 모양). 조회수 기록 자체는 Phase 2 결과를 입력으로 받지만, 입력 모양은 Phase 1 계약으로 고정.
@@ -253,6 +262,8 @@ Decisions
 - 하루 상한(기본 10개)은 게시 성공 기록만 센다.
 - (2026-10-13, Phase 1 HC1-2 질문 1 A) 로그(`logbook.py`)는 값 속 제어 문자 — 유니코드 범주 Cc(NUL · ESC · DEL · C1 등)와 Cf(U+202E 같은 양방향 제어, U+200B 등) — 를 언제나 따옴표 값 안의 `\uXXXX` 이스케이프로 쓴다. 공백이 없어도 이런 글자가 든 값은 따옴표 없이 쓰지 않는다. 계약 7절 "값 쓰는 법" 표와 그 아래 문단을 함께 고친다(이미 있는 이름의 뜻은 그대로, 이스케이프 대상만 넓어짐 — 계약 10절). 근거: Phase 1 은 줄 바꿈 글자 10개만 이스케이프해서, 제목 속 NUL 하나로 GNU grep 이 로그 전체를 `binary file matches` 로 가리고 ESC 는 터미널에 가짜 `mode=live result=posted` 줄을 그렸다(Phase 1 세 번째 ship-report R1, 인터뷰에서 재현). 이 페이즈는 Phase 2–6 이 모두 끝난 뒤 혼자 돌아 다른 레인과 부딪히지 않고, 평가자가 읽는 `logs/sample.log`(Phase 8)보다 앞선다 — 제출 증명을 어떤 도구로 읽어도 같게 하는 쪽을 최적화.
 - **The plan decides** — 위 로그 고침의 세부 · 후보: 이스케이프 범위(Cc · Cf 전부 vs Cc 와 양방향 제어만) · `parse_line` 이 고치기 전에 쓰인 날 제어 문자 줄을 계속 읽을지 거부할지 · `tests/mutants.py` 에 이 고침을 되돌리는 변이를 더할지 · 조건: Phase 1 ship-report R1 의 재현 입력(제목 `x\x00y\x00z`, `a\x1b[2Kb`)이 테스트의 실제 입력이어야 하고, 그 제목들과 `POST … result=posted` 줄을 쓴 파일에서 GNU grep `posted` 가 게시 줄을 보여 주며(binary 판정 없음) 파일에 날 제어 문자가 0개이고 `parse_line` 이 원래 값을 되돌림을 테스트가 잠근다.
+- (2026-10-13, Phase 2 HC1 질문 1 A) 탐지기(`watcher.py`)가 깨진 구글 응답에도 계약 11절대로 `ERROR` 한 줄을 남기고 추적을 이어 가게 고친다 — ① `Watcher._page_ids` 는 `nextPageToken` 을 `[A-Za-z0-9_-]+` 일 때만 받고, 그 밖의 비어 있지 않은 값은 `YouTubeError("search.list", …)` 로 바꾼다 → `ERROR where=search.list … keyword=…` 줄이 남고, 남은 검색은 그만두고 추적은 계속한다. ② `_published` · `_views` 의 오류 문구는 값이 str 이 아니면 `{value!r:.40}` 대신 `type(value).__name__` 을 쓴다. 근거: Phase 2 ship-report R1 · R2 — 이 둘이 예외를 `Watcher.run` 밖으로 내보내 그 주기의 새 영상 · 조회수 표본 · `ERROR` 줄이 모두 사라졌다(인터뷰에서 재현). 이 페이즈가 `run.py` 로 주기를 처음 실제로 돌리므로 그보다 앞서고, Phase 2–6 이 끝난 뒤 혼자 돌아 `watcher.py` 를 고쳐도 레인 충돌이 없다.
+- **The plan decides** — 위 탐지기 고침의 테스트 모양 · 조건: Phase 2 ship-report 의 재현 입력이 테스트의 실제 입력이어야 함 — `"nextPageToken": "\ud800"` 인 검색 응답에서 `run` 이 예외 없이 `CycleReport(failed=True)` 를 돌려주고 `ERROR where=search.list` 한 줄과 아는 영상의 `VIEWS` 줄이 남음, `publishedAt` 이 47,500단 중첩 목록인 응답에서 주기가 예외 없이 끝남(Python 3.14 에서는 `SKIP … reason=invalid_item`, 3.10 에서는 `json.loads` 가 먼저 실패해 `ERROR` 한 줄). 쪽지 허용 글자 검사를 되돌리는 변이를 `tests/mutants.py` 에 더할지는 plan 이 정한다.
 
 Trade-offs accepted
 - 실패 후 재시도는 하지 않고 다음 영상으로 넘어간다 (과제 ⑤).
@@ -261,6 +272,8 @@ Trade-offs accepted
 Responsibilities & risks to guard against
 - 허용 목록 밖 영상이 게시되지 않았다는 증거를 코드와 기록으로 보여줄 수 있어야 함 (과제 체크리스트).
 - (2026-10-13, Phase 1 HC1-2) 로그를 사람이 grep · 터미널로 읽어도 `parse_line` 과 같은 내용이 보여야 한다 — 이 페이즈의 리뷰에서 로그 파일에 날 제어 문자가 남지 않는지 확인.
+- (2026-10-13, Phase 2 HC1) Phase 2 ship-report 의 R5 · R6 · R7 · R9(저장소 쓰기 순서)가 이 페이즈 몫이다. R6: `on_error` 를 만들 때 예외의 `__context__` 를 따라가거나 traceback 지역 변수를 남기지 않는다 — `raise … from None` 뒤에도 원래 예외와 프레임의 `url` 에 API 키가 있고, `env.py` 가 이어 붙이는 `UnicodeDecodeError.object` 에는 `.env` 바이트 전체가 있다. R5: `http_get` 이 `HTTPError` 를 닫고, 오류 본문 읽기가 실패해도 상태 코드를 남기고(지금은 본문이 잘린 403 이 `network IncompleteRead` 로 적힘), 요청 전체에 시간 상한을 둔다. R7 · R9: 영상마다 `Store.put` 이 저장소 파일 전체를 다시 쓰는 것(기록 5,000개에서 `put` 1회 80 ms, 주기마다 300개면 약 24초)과, 쓰기가 실패해도 기록이 메모리에 먼저 들어가 다음 주기에 `DETECT` 가 영영 남지 않는 것을 함께 본다 — Phase 1 저장소 API(계약 3절)를 건드리면 계약 변경이다.
+- (2026-10-13) 이 페이즈에 모인 고침이 늘었다 — 파이프라인 연결 · 운영 규칙에 더해 로그 제어 문자(Phase 1 HC1-2), 탐지기 깨진 응답(Phase 2 HC1), 위 R5 · R6 · R7 · R9. 페이즈 하나의 상한은 하루치 일(파일 10개 안팎)이므로, 시작 전에 크기를 재고 넘으면 "오류 처리 · 운영 고침"을 형제 페이즈로 나눈다.
 
 Dependencies
 - Depends on: Phase 2, Phase 3, Phase 4, Phase 5, Phase 6
@@ -320,3 +333,5 @@ Open questions
 | 2026-10-13 | 1, 6 | 계약 6절 3.2 같은 영상 확인 조항 확정(`recheck.video_id != decision.video_id` → 클릭 안 함, `page_mismatch` 테스트 저장) | 자동 재생 · 사람 조작으로 크롬이 다른 허용 영상으로 옮겨 가면 기록은 A, 댓글은 A2 → 영상당 1개 · 기록 증명이 깨짐. plan 이 트래커보다 넓게 적은 것을 사람이 확인 (HC1 질문 2 A) |
 | 2026-10-13 | 1 | 지난 R3(로그 줄 바꿈류 글자 위조) · R6(`.inf` · 큰 수 설정) 과 ship-report R7 테스트 행을 이번 고침 사이클에 포함 | 두 파일 모두 Phase 1 소유 · Phase 2–6 다섯 레인이 동시에 출발하기 전이 가장 쌈 · 주인 없이 두 번 다시 나옴 (HC1 질문 3 A) |
 | 2026-10-13 | 1, 7 | 세 번째 ship-check(`READY WITH RISKS`)의 민감 줄 확인: 로그 값 속 제어 문자는 Phase 1 에서 받아들이고 출하, 고침(Cc · Cf 는 언제나 따옴표 안 `\uXXXX`, 계약 7절 표 함께)은 Phase 7 이 맡음 · `human_checks.py confirm` 으로 민감 줄을 닫음 | 코드는 결정대로이고 `parse_line` 은 정확 · 고침 사이클 한 번(약 1시간 50분)과 네 번째 ship-check 를 아낌 · Phase 7 은 혼자 돌아 레인 충돌이 없고 `sample.log`(Phase 8)보다 앞섬 · 주인 없는 위험이 다시 정지로 돌아온 선례를 피함 (HC1-2 질문 1 A) |
+| 2026-10-13 | 2, 7 | Phase 2 ship-check(`READY WITH RISKS`) 민감 줄 1: R1 · R2(깨진 `nextPageToken` · 수만 단 중첩 값이 탐지 주기를 `ERROR` 줄 없이 끝냄)를 받아들이고 Phase 2 출하, 고침(쪽지는 `[A-Za-z0-9_-]+` 만 · str 아닌 값은 타입 이름만)은 Phase 7 | 입력은 깨진 구글 응답뿐 · 피해는 그 주기 하나 · `run.py`(Phase 7) 전에는 실제 실행이 없음 · 고침 사이클(약 2시간)과 ship-check 재심사를 아낌 · Phase 1 선례처럼 주인을 정해 정지 반복을 막음 (HC1 질문 1 A) |
+| 2026-10-13 | 2 | 민감 줄 2: 구글 쿼터 표 갱신(2026-10-08, `search.list` 하루 100회 별도 통)에도 장부는 옛 계산(한 통, 검색 1회 100단위)을 일부러 유지하고, 문서만 스모크 통 S-NEW-7 로 바로잡음 · `human_checks.py confirm` 으로 민감 줄 둘을 닫음 | 옛 계산은 두 규칙 모두에서 구글보다 엄격해 넘쳐 쓰지 않음 · 실제 쓰임(하루 수십–수백 단위)이 몫(1,000단위 이상) 안 · 코드 · 테스트를 다시 열지 않고 오늘 출하 (HC1 질문 2 A) |
