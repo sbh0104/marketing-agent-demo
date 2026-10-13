@@ -56,6 +56,30 @@
      fix) goes under `## Risks` with its original wording, not `## Human checks`.
      Widening a promise — changing code so a broader sentence holds — is a
      decision and stays with a person.
+10. **Work handed to a later phase travels through `.adw/human-checks.md`, and the
+    receiving phase pulls it.** An entry whose `status:` is `open` and whose
+    `### H-###` title names `Phase N` as a word (no digit or letter right after it, so
+    `Phase 1` never matches `Phase 1A`) is inherited by Phase N. Phase cycles only;
+    smoke sweeps are exempt. Entry statuses stay a person's edit (the ledger's rules).
+   - **understand** — copy every inherited entry into `.adw/notes.md` under
+     `## Inherited`, one line `H-### — <title>`, or write `## Inherited: none`.
+   - **plan** — `## Out of scope` closes every inherited entry with one line:
+     `- Inherited H-###: step <n>` (done here) ·
+     `- Inherited H-###: settled — <tracker or contract cite>` (already decided, or a
+     person's check that is not this cycle's work) ·
+     `- Inherited H-###: → Phase M — <why>` · `- Inherited H-###: → human — <why>`.
+     A plan never accepts an inherited risk on its own. Work this plan hands to a
+     later phase is `- Handed to Phase M: <what>`; when the contract already assigns
+     it, `- Handed to Phase M (contract: <section title>): <what>`.
+   - **ship-check** — count: every `## Inherited` line in notes.md has its
+     `Inherited H-###` line in plan.md. Into `## Human checks`, one line each: every
+     `→ Phase M` and every `Handed to Phase M:` line without `(contract: …)` — the
+     todo names `Phase M` by number, never "the next phase"; every `→ human` and
+     every uncounted entry — the todo asks the person to accept it or name an owner.
+     A `(contract: …)` line is checked: the titled section names `Phase M`, else it
+     is carried like a bare line. A hand-off ship-check finds on its own also names
+     its receiving phase by number. Never write a Human checks line only to close an
+     entry — landing turns every line into a new entry.
 
 ## Never
 
