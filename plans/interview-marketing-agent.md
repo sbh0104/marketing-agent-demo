@@ -7,19 +7,21 @@
 - Overall status: In progress
 
 ## Summary
-유튜브 댓글 에이전트 (과제 안내: `docs/marketing-agent.pdf`). 주제 키워드로 새 영상을 찾고(탐지), AI가 주제 일치를 판별하고(판별), 조회수 조건으로 '뜨기 직전' 영상을 고르고(타이밍), 영상 고민에 맞춘 댓글을 쓰고(작성), 로그인된 크롬에 자동 게시합니다(게시). 빠른 제작이 목표라 뼈대(Phase 1)를 먼저 만들고, Phase 2–6은 뼈대의 계약만 따르므로 동시에 진행합니다. 실제 게시는 허용 목록 영상에만, 코드에서 강제합니다. 언어는 Python + Playwright입니다. 판단(주제 판별 · 댓글 자체 검사)은 `systemone model jev`(TypeSafe)가 하고, 글쓰기(고민 한 줄 정리 · 댓글 작성)는 Claude가 합니다 — jev는 글을 생성하지 않기 때문입니다 (`docs/research/jev.md`).
+유튜브 댓글 에이전트 (과제 안내: `docs/marketing-agent.pdf`). 주제 키워드로 새 영상을 찾고(탐지), AI가 주제 일치를 판별하고(판별), 조회수 조건으로 '뜨기 직전' 영상을 고르고(타이밍), 영상 고민에 맞춘 댓글을 쓰고(작성), 로그인된 크롬에 자동 게시합니다(게시). 빠른 제작이 목표라 뼈대(Phase 1)를 먼저 만들고, Phase 2–6은 뼈대의 계약만 따르므로 동시에 진행합니다. 실제 게시는 허용 목록 영상에만, 코드에서 강제합니다. 언어는 Python + Playwright입니다. 판단(주제 판별 · 댓글 자체 검사)은 `systemone model jev`(TypeSafe)가 하고, 글쓰기(고민 한 줄 정리 · 댓글 작성)는 Claude가 합니다 — jev는 글을 생성하지 않기 때문입니다 (`docs/research/jev.md`). Phase 3 · 5는 키 없이 공식 문서 · SDK 소스 · 가짜 jev/Claude로만 만들고 테스트했으므로, Phase 7 전에 진짜 키로 한 번 붙여 봅니다 — 진짜 호출은 사람이 셸에서 돌리고 사이클은 커밋된 결과 파일만 읽습니다 (Phase 6A · 6B, 2026-10-13).
 
 ## Phases
-- [ ] Phase 1 — 뼈대와 계약 (설정 · 데이터 모양 · 저장 · 운영 가드)
+- [x] Phase 1 — 뼈대와 계약 (설정 · 데이터 모양 · 저장 · 운영 가드)
 - [ ] Phase 2 — ① 탐지 · 조회수 추적 (watcher)
-- [ ] Phase 3 — ② 판별 · 주제 일치 (classifier)
-- [ ] Phase 4 — ③ 타이밍 · 뜨기 직전 판단 (trigger)
-- [ ] Phase 5 — ④ 댓글 작성 · 자체 검사 (writer)
-- [ ] Phase 6 — ⑤ 크롬 연결 · 게시 · 확인 (poster)
+- [x] Phase 3 — ② 판별 · 주제 일치 (classifier)
+- [x] Phase 4 — ③ 타이밍 · 뜨기 직전 판단 (trigger)
+- [x] Phase 5 — ④ 댓글 작성 · 자체 검사 (writer)
+- [x] Phase 6 — ⑤ 크롬 연결 · 게시 · 확인 (poster)
+- [ ] Phase 6A — 진짜 호출 준비 · 사람이 돌릴 실행기 (live check)
+- [ ] Phase 6B — 진짜 결과 반영 · 정확도 기록 · 기준값 조정
 - [ ] Phase 7 — 파이프라인 연결 · 운영 규칙 통합
 - [ ] Phase 8 — 제출물 (README · PROCESS.md · sample.log · 시연)
 
-Parallel shape: Phase 1 → (Phase 2 ‖ 3 ‖ 4 ‖ 5 ‖ 6) → Phase 7 → Phase 8. Phases 2–6 run at the same time only when `lane.max` ≥ 5 (see Cross-cutting open questions).
+Parallel shape: Phase 1 → (Phase 2 ‖ 3 ‖ 4 ‖ 5 ‖ 6) → Phase 6A → [사람이 진짜 실행 · 결과 커밋] → Phase 6B → Phase 7 → Phase 8. Phases 2–6 run at the same time only when `lane.max` ≥ 5 (see Cross-cutting open questions).
 
 ---
 
@@ -144,7 +146,7 @@ Dependencies
 - Unlocks: Phase 5, Phase 7
 
 Open questions
-- none (2026-10-12: jev 접속 방법은 공식 문서로 확인 — `docs/research/jev.md`. 키는 `.env`의 `TYPESAFE_API_KEY`.)
+- none (2026-10-12: jev 접속 방법은 공식 문서로 확인 — `docs/research/jev.md`. 키는 `.env`의 `TYPESAFE_API_KEY`.) (2026-10-13 메모, 결정 변경 아님: 이 페이즈는 키 · SDK 없이 가짜 jev로만 검증됐다 — 키 보유 여부를 인터뷰가 묻지 않았음. 진짜 정확도 측정과 기준값 조정은 Phase 6A · 6B가 맡는다.)
 
 ---
 
@@ -205,7 +207,7 @@ Dependencies
 - Unlocks: Phase 6, Phase 7
 
 Open questions
-- none (2026-10-12: 작성은 Claude, 검사는 jev로 확정. jev 접속은 Phase 3과 같다.)
+- none (2026-10-12: 작성은 Claude, 검사는 jev로 확정. jev 접속은 Phase 3과 같다.) (2026-10-13 메모, 결정 변경 아님: 이 페이즈는 가짜 Claude · 가짜 jev로만 검증됐다. 모델 id 확인과 통과 하한 조정은 Phase 6A · 6B가 맡는다.)
 
 ---
 
@@ -242,10 +244,74 @@ Open questions
 
 ---
 
+## Phase 6A — 진짜 호출 준비 · 사람이 돌릴 실행기 (live check)
+- Status: Not started
+- Slug: live-check-prepare
+- After: Phase 2, Phase 3, Phase 5
+- Goal: 사람이 셸에서 한 번 돌리면 진짜 jev · Claude · YouTube를 부르고 결과를 `docs/live-check/` 아래 파일로 남기는 실행기와 실행 안내를 만든다. 이 사이클 안에서는 진짜 호출을 하지 않는다.
+
+Decisions
+- (2026-10-13 인터뷰 질문 2 C) 진짜 외부 호출(jev · Claude · YouTube)은 사람이 셸에서 돌리고, 사이클은 실행기를 만들어 가짜로만 테스트한다 — 외부 전송 버튼은 언제나 사람이 누르고 키는 사이클 손에 들어가지 않는 쪽을 최적화. 헌법 Never 절(자동 승인은 계획 · 배포 승인만 대신함)과 레인에 `.env`가 없다는 사실(`.gitignore:2`, 레인은 커밋된 main으로 만들어짐)에 맞춘다.
+- 실행기가 하는 일 두 가지: (1) 정확도 측정 — 기존 러너 `tests/jev_accuracy.py`의 측정(한국어 예시 22개 × 질문 언어 2개)을 진짜 jev로 · (2) 실제 영상 한 바퀴 — 설정 키워드로 YouTube 공개 영상 몇 개를 검색 → jev 판별 → Claude 고민 정리 · 댓글 초안 → jev 자체 검사 → 코드 검사. **크롬 연결 · 게시는 하지 않는다** (되돌릴 수 없는 일은 이 페이즈 밖).
+- 결과는 `docs/live-check/` 아래 파일로 쓰고 사람이 커밋한다 — 커밋하지 않은 파일은 Phase 6B의 레인에 보이지 않는다. 실행 안내 마지막 줄에 커밋 명령을 적는다.
+- 서비스마다 호출 수 천장을 두고, 닿으면 그 자리에서 멈추며 결과 파일에 천장 도달을 적는다 — 사람이 돌려도 반복 버그로 호출이 끝없이 나가지 않게.
+- 키 문자열은 결과 파일 · 화면 출력 · 오류 메시지 어디에도 나오지 않는다 — 결과 파일은 커밋되기 때문. 테스트가 가짜 키 문자열로 잠근다.
+- 키나 SDK가 없으면 아무것도 부르지 않고 무엇이 없는지 한 줄로 알리고 끝난다 (러너의 기존 "키 없으면 부르지 않음"과 같음). 키 읽기는 Phase 2가 더하는 `.env` 읽기를 쓴다.
+- 실행 안내는 이 기계 기준으로 쓴다: `pip`이 없고 `uv`가 있다(`~/.local/bin/uv`) — `uv venv` → `uv pip install -r requirements.txt` → 실행 → 커밋. 실행 전에 사람이 예시 22개의 정답 라벨을 훑는 단계(H-010)를 첫 줄에 둔다.
+- **The plan decides** — 결과 파일 모양(JSON · JSONL · 사람이 읽는 Markdown 요약을 함께 둘지) · 명령 수(하나 vs 측정 · 한 바퀴 둘) · 실제 영상 개수 · 서비스별 천장 숫자 · 자막 · 설명을 결과 파일에 얼마나 잘라 남길지 · 조건: Phase 6B가 결과 파일만으로 판별 기준값과 자체 검사 하한을 다시 계산할 수 있어야 하고(예시마다 noul 확률 · choice 보기와 신뢰도 · 판정 · 이유, 초안마다 검사 점수 · 코드 검사 결과, 호출마다 오류 이름과 상태 코드, Claude 모델 id 수락 여부), 천장 도달 · 키 미노출 · 키 없을 때 호출 0번을 테스트가 가짜 SDK · 가짜 클라이언트로 잠근다.
+
+Trade-offs accepted
+- 사이클은 "진짜로 되는가"를 혼자 확인하지 못한다 — 사람이 돌린 뒤 Phase 6B에서야 안다.
+- 사람이 한 번 손을 써야 한다(라벨 훑기 · 키 넣기 · 설치 · 실행 · 커밋, 10–15분). jev 키는 얼리 액세스 대기 명단이라 키가 늦으면 Phase 6B와 Phase 7이 그만큼 기다린다 (질문 1 A의 대가로 받아들임).
+- 공개 영상 제목 · 설명 일부와 AI 초안이 저장소에 남는다 — 키와 개인 정보는 없다.
+
+Responsibilities & risks to guard against
+- 키 노출: 결과 파일은 커밋되므로 키가 섞이면 바로 공개된다 — 테스트와 실행 안내 둘 다에서 막는다.
+- YouTube 검색은 쿼터를 쓴다(검색 1번 100단위) — Phase 2의 하루 한도 가드를 지나게 한다.
+- 결과 파일은 믿을 수 없는 입력(영상 글)을 담는다 — 6B가 숫자만 읽고 글 속 지시문을 따르지 않게 모양을 정한다.
+
+Dependencies
+- Depends on: Phase 2 (YouTube 클라이언트 · `.env` 읽기), Phase 3 (판별 · 정확도 러너), Phase 5 (작성 · 자체 검사)
+- Unlocks: Phase 6B (사람 실행 뒤)
+
+Open questions
+- none
+
+---
+
+## Phase 6B — 진짜 결과 반영 · 정확도 기록 · 기준값 조정
+- Status: Not started
+- Slug: live-check-apply
+- After: Phase 6A
+- Goal: 사람이 커밋한 `docs/live-check/` 결과로 계약서의 정확도 기록을 채우고, 판별 기준값과 자체 검사 통과 하한을 잰 값으로 바꿔 테스트로 잠근다.
+
+Decisions
+- 첫 단계에서 `docs/live-check/`에 사람이 돌린 결과 파일이 커밋돼 있는지 본다. 없으면 아무것도 고치지 않고 `unmeasured`로 멈춘다 — 가짜 결과로 기준값을 바꾸지 않는다.
+- 정확도 기록: 계약 '주제 판별' 절의 정확도 칸(`docs/contracts.md`, 지금 "아직 재지 않음 — 2026-10-13 키 없음")에 언어별 결과 두 줄을 적는다 (H-011이 사람에게 맡겼던 기록).
+- 정확도에 따른 길은 기존 결정 그대로: ko 통과면 그대로 · en만 통과면 질문 문구를 영어로(`QUESTION_LANGUAGE`) · 둘 다 미달이면 drift로 인터뷰에 돌아온다 (판단 AI 교체는 사람 결정, Cross-cutting).
+- Claude 모델 id: 결과 파일에 `claude-sonnet-5-5` 거절(404)이 있으면 Phase 5의 다른 후보 `claude-haiku-5-5`로 `config.yaml`을 바꾼다 (Phase 5 "The plan decides"의 후보 안).
+- **The plan decides** — 새 기준값(`noul_yes_min` 0.8 · `noul_no_max` 0.2 · `choice_min_confidence` 0.5 · 자체 검사 통과 하한 0.7 · `REPEAT_MIN_CHARS` 12)을 무엇으로 정할지, 표본이 모자라 그대로 두는 값은 무엇인지 · 조건: 예시 22개에서 잘못된 일치 0을 지키고(러너의 통과 조건), 바꾼 값마다 근거 숫자를 계약에 함께 적으며, 설정 테스트가 새 값을 잠근다. 그대로 둔 값은 "표본 부족" 이유를 적는다.
+
+Trade-offs accepted
+- 예시 22개 + 영상 몇 개는 작은 표본이다 — 기준값은 "잰 값"이지만 단단하지 않다. Phase 8의 실제 실행 뒤 다시 볼 수 있다.
+
+Responsibilities & risks to guard against
+- 계약에 적은 숫자와 결과 파일의 숫자가 같아야 한다 — 손으로 옮겨 적지 말고 결과 파일에서 읽은 값을 쓴다.
+- 이 페이즈의 보고서에 H-011 · H-012 · H-018을 닫을 근거를 남긴다 (`status`를 `done`으로 바꾸는 것은 사람).
+
+Dependencies
+- Depends on: Phase 6A, 사람의 진짜 실행과 결과 커밋
+- Unlocks: Phase 7
+
+Open questions
+- none
+
+---
+
 ## Phase 7 — 파이프라인 연결 · 운영 규칙 통합
 - Status: Not started
 - Slug: pipeline-rules
-- After: Phase 2, Phase 3, Phase 4, Phase 5, Phase 6
+- After: Phase 2, Phase 3, Phase 4, Phase 5, Phase 6, Phase 6B
 - Goal: 다섯 모듈을 한 흐름으로 묶고, 운영 규칙 다섯 가지(영상당 댓글 1개 · 하루 상한 10개 · 채널 대기 24시간 · 허용 목록 강제 · 테스트 모드)가 실제로 작동하는지 확인한다.
 
 Decisions
@@ -263,7 +329,7 @@ Responsibilities & risks to guard against
 - (2026-10-13, Phase 1 HC1-2) 로그를 사람이 grep · 터미널로 읽어도 `parse_line` 과 같은 내용이 보여야 한다 — 이 페이즈의 리뷰에서 로그 파일에 날 제어 문자가 남지 않는지 확인.
 
 Dependencies
-- Depends on: Phase 2, Phase 3, Phase 4, Phase 5, Phase 6
+- Depends on: Phase 2, Phase 3, Phase 4, Phase 5, Phase 6, Phase 6B (잰 기준값 — 2026-10-13 질문 1 A)
 - Unlocks: Phase 8
 
 Open questions
@@ -292,13 +358,13 @@ Dependencies
 - Unlocks: none
 
 Open questions
-- none
+- (2026-10-13 질문 3 B — "Phase 8은 그때 정한다") `logs/sample.log`의 실제 실행은 누가 돌리나: Phase 6A · 6B처럼 사람이 셸에서 돌리고(로그인된 크롬 · 허용 목록 영상) 사이클은 커밋된 기록만 읽을지, 다른 방법을 쓸지. 사이클은 지금 진짜로 부를 수 없다 — 레인에 `.env`가 없고(`.gitignore:2`) 헌법 Never 절이 승인 없는 외부 전송을 막으며, 로그인된 크롬은 사람만 준비할 수 있다. 정하면 Phase 8을 사람 실행 앞뒤로 나눌지도 함께 정한다. 이 질문이 열려 있으면 Phase 8 사이클은 계획 전 첫 관문(미결 질문 판정)에서 멈추고 사람에게 묻는다 — 결정문에 답이 없어 판정자가 대신 풀 수 없다. 실행 단계에서 멈춰 반나절을 잃는 것보다 시작할 때 정하는 쪽.
 
 ---
 
 ## Cross-cutting open questions
 - 병렬 진행 설정: 현재 `.adw/cycle.yml:83`의 `lane.max`는 1이라 페이즈가 한 번에 하나씩 돈다. Phase 2–6을 동시에 돌리려면 허브 ⚙ Settings → Cycle에서 5 이상으로 올려야 한다 (최대 9). 사용자가 설정한다. 막히는 항목은 아님 — 1이어도 순서대로 진행된다.
-- 판단 AI 교체는 사람 결정: Phase 3에서 jev의 한국어 정확도가 낮게 나와도 jev를 다른 모델로 바꾸는 것은 사용자 원칙("내용 판단은 jev")을 바꾸는 일이라 사이클이 혼자 정하지 않는다. 막히는 항목은 아님 — 발생하면 drift로 이 인터뷰에 돌아온다.
+- 판단 AI 교체는 사람 결정: Phase 6B가 잰 jev의 한국어 정확도가 낮게 나와도 jev를 다른 모델로 바꾸는 것은 사용자 원칙("내용 판단은 jev")을 바꾸는 일이라 사이클이 혼자 정하지 않는다. 막히는 항목은 아님 — 발생하면 drift로 이 인터뷰에 돌아온다.
 
 ## Decision log
 | Date | Phase | Decision | Why |
@@ -320,3 +386,6 @@ Open questions
 | 2026-10-13 | 1, 6 | 계약 6절 3.2 같은 영상 확인 조항 확정(`recheck.video_id != decision.video_id` → 클릭 안 함, `page_mismatch` 테스트 저장) | 자동 재생 · 사람 조작으로 크롬이 다른 허용 영상으로 옮겨 가면 기록은 A, 댓글은 A2 → 영상당 1개 · 기록 증명이 깨짐. plan 이 트래커보다 넓게 적은 것을 사람이 확인 (HC1 질문 2 A) |
 | 2026-10-13 | 1 | 지난 R3(로그 줄 바꿈류 글자 위조) · R6(`.inf` · 큰 수 설정) 과 ship-report R7 테스트 행을 이번 고침 사이클에 포함 | 두 파일 모두 Phase 1 소유 · Phase 2–6 다섯 레인이 동시에 출발하기 전이 가장 쌈 · 주인 없이 두 번 다시 나옴 (HC1 질문 3 A) |
 | 2026-10-13 | 1, 7 | 세 번째 ship-check(`READY WITH RISKS`)의 민감 줄 확인: 로그 값 속 제어 문자는 Phase 1 에서 받아들이고 출하, 고침(Cc · Cf 는 언제나 따옴표 안 `\uXXXX`, 계약 7절 표 함께)은 Phase 7 이 맡음 · `human_checks.py confirm` 으로 민감 줄을 닫음 | 코드는 결정대로이고 `parse_line` 은 정확 · 고침 사이클 한 번(약 1시간 50분)과 네 번째 ship-check 를 아낌 · Phase 7 은 혼자 돌아 레인 충돌이 없고 `sample.log`(Phase 8)보다 앞섬 · 주인 없는 위험이 다시 정지로 돌아온 선례를 피함 (HC1-2 질문 1 A) |
+| 2026-10-13 | 6A, 6B, 7 | Phase 7 앞에 '진짜로 붙여 보기'(6A 준비 · 6B 반영)를 끼움. Phase 7은 6B 뒤 | jev · Claude는 키 · SDK 없이 공식 문서 · SDK 소스 · 가짜로만 만들고 테스트됐고 계약 정확도 칸은 "아직 재지 않음". 2026-10-12 인터뷰가 접속 방법만 닫고 키 보유 여부를 묻지 않은 빈틈. 다섯 모듈을 묶기 전이 고칠 곳이 한 군데인 마지막 시점 (사용자 "jev api 제공한 적 없는데" · 질문 1 A) |
+| 2026-10-13 | 6A, 6B | 진짜 외부 호출은 사람이 셸에서 돌리고, 사이클은 실행기를 만들어 가짜로 테스트 · 커밋된 결과 파일만 읽음 | 외부 전송 버튼은 늘 사람이, 키는 사이클 손에 안 감 · 헌법 Never 절과 레인에 `.env` 없음에 맞음. 대가로 사람 실행을 사이에 두고 두 페이즈로 나뉨 (질문 2 C) |
+| 2026-10-13 | 8 | 위 규칙을 Phase 8(`sample.log` 실제 실행)에 쓸지는 Phase 8 시작 전에 정함 → Phase 8 Open questions | 지금 바꾸는 범위를 좁게. Open question으로 두어 Phase 8이 실행 단계에서 멈추기 전에 인터뷰로 오게 함 (질문 3 B) |
