@@ -404,6 +404,34 @@ class QuotaTest(WatcherCase):
         self.assertEqual(self.counts(K), [1000])
         self.assertEqual(report, CycleReport(0, (), 0, 0, True, False))
 
+    def test_search_hold_stops_the_remaining_keywords_s034(self) -> None:
+        # 검색 상한 1 — 첫 키워드의 다음 페이지에서 막히면 둘째 키워드는 묻지도 않습니다
+        config = dataclasses.replace(with_cap(1), keywords=("연애", "썸"))
+        self.api.pages[("연애", None)] = search_page([A], "P1")
+        self.api.videos[A] = video_item(A, 1200)
+        report = self.run_cycle(config)
+        self.assertEqual(self.api.searches(), [("연애", None)])
+        self.assertEqual(
+            self.events(),
+            [quota(1, 1, "search.list", "searches", keyword="연애"), detect(A), views(A, 1200)],
+        )
+        self.assertEqual(report, CycleReport(1, (A,), 1, 0, True, False))
+
+    def test_videos_hold_stops_the_remaining_batches_s034(self) -> None:
+        # 9,800 단위 + 검색 둘(200) = 10,000 — 첫 videos 묶음부터 막히고 둘째 묶음은 묻지 않습니다
+        config = dataclasses.replace(with_cap(100), keywords=("연애", "썸"))
+        tracked = [f"t{n:010d}" for n in range(51)]
+        for video_id in tracked:
+            self.seed(video_id)
+            self.api.videos[video_id] = video_item(video_id, 2000)
+        self.seed_quota(98, NOW - HOUR)
+        report = self.run_cycle(config)
+        self.assertEqual(self.api.searches(), [("연애", None), ("썸", None)])
+        self.assertEqual(self.api.video_batches(), [])
+        self.assertEqual(self.events(), [quota(10000, 10000, "videos.list", "units")])
+        self.assertEqual([self.counts(video_id) for video_id in tracked], [[1000]] * 51)
+        self.assertEqual(report, CycleReport(2, (), 0, 0, True, False))
+
 
 class ApiErrorTest(WatcherCase):
     def test_search_error_is_logged_and_views_are_still_tracked(self) -> None:
@@ -433,6 +461,21 @@ class ApiErrorTest(WatcherCase):
             self.assertEqual(self.api.searches(), [("연애", None), ("연애", "P1")])
             self.assertEqual(self.events(), [error, detect(A), views(A, 1200)])
             self.assertEqual(report, CycleReport(1, (A,), 1, 0, False, True))
+
+    def test_search_error_stops_the_remaining_keywords_s034(self) -> None:
+        self.api.status["search"] = 403
+        report = self.run_cycle(with_keywords("연애", "썸"))
+        self.assertEqual(self.api.searches(), [("연애", None)])
+        self.assertEqual(
+            self.events(),
+            [
+                (
+                    Event.ERROR,
+                    {"where": "search.list", "reason": "HTTP 403 quotaExceeded", "keyword": "연애"},
+                )
+            ],
+        )
+        self.assertEqual(report, CycleReport(0, (), 0, 0, False, True))
 
     def test_videos_error_stops_tracking(self) -> None:
         tracked = [f"t{n:010d}" for n in range(51)]
