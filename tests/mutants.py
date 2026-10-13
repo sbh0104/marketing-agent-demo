@@ -3,9 +3,10 @@
     python3 -m tests.mutants <이름>
 
 agent.guard / agent.store / agent.config / agent.scheduler / agent.logbook / agent.poster /
-agent.chrome / agent.classifier / agent.writer / agent.youtube / agent.watcher 의 소스에서
-정확한 글자 하나를 바꿔 메모리에서만 모듈을 다시
-만들고(파일은 건드리지 않음), 해당 테스트 모듈을 돌립니다. 종료 코드 1 은 테스트가
+agent.chrome / agent.classifier / agent.writer / agent.youtube / agent.watcher /
+tests.live_check 의 소스에서 정확한 글자 하나를 바꿔 메모리에서만 모듈을 다시
+만들고(파일은 건드리지 않음), 해당 테스트 모듈을 돌립니다. agent.* 모듈은 src/ 에서,
+tests.* 모듈은 저장소 뿌리에서 읽습니다. 종료 코드 1 은 테스트가
 망가짐을 잡았다는 뜻, 2 는 이름을 모르거나 바꿀 글자가 정확히 한 번 나오지 않았다는
 뜻입니다. 이 파일은 test*.py 가 아니라서 discover 가 줍지 않습니다.
 """
@@ -19,7 +20,8 @@ from pathlib import Path
 import tests  # noqa: F401 — src/ 를 sys.path 에 넣는 준비
 import agent
 
-_SRC = Path(__file__).resolve().parent.parent / "src"
+_ROOT = Path(__file__).resolve().parent.parent
+_SRC = _ROOT / "src"
 
 MUTANTS: dict[str, tuple[str, str, str, str]] = {
     "poster-open-received-ref": (
@@ -516,6 +518,114 @@ MUTANTS: dict[str, tuple[str, str, str, str]] = {
         "if rate < config.min_views_per_hour:",
         "if rate <= config.min_views_per_hour:",
     ),
+    "youtube-comments-free": (
+        "agent.youtube",
+        "tests.test_youtube",
+        '"commentThreads.list": 1}',
+        '"commentThreads.list": 0}',
+    ),
+    "youtube-comments-any-403-disabled": (
+        "agent.youtube",
+        "tests.test_youtube",
+        "if exc.reason == COMMENTS_DISABLED:",
+        'if exc.reason.startswith("HTTP 403"):',
+    ),
+    "live-check-ceiling-plus-one": (
+        "tests.live_check",
+        "tests.test_live_check",
+        "if self.counts[service] >= self.ceilings[service]:",
+        "if self.counts[service] > self.ceilings[service]:",
+    ),
+    "live-check-ceiling-swallowed": (
+        "tests.live_check",
+        "tests.test_live_check",
+        "class CeilingReached(BaseException):",
+        "class CeilingReached(Exception):",
+    ),
+    "live-check-key-unredacted": (
+        "tests.live_check",
+        "tests.test_live_check",
+        "return self._pattern.sub(self._mask, text)",
+        "return text",
+    ),
+    "live-check-views-exclusive": (
+        "tests.live_check",
+        "tests.test_live_check",
+        "if trigger.min_views <= views <= trigger.max_views:",
+        "if trigger.min_views < views < trigger.max_views:",
+    ),
+    "live-check-calls-without-key": (
+        "tests.live_check",
+        "tests.test_live_check",
+        "if problems:",
+        "if False:",
+    ),
+    "live-check-unmeasured-ignored": (
+        "tests.live_check",
+        "tests.test_live_check",
+        "if example_errors:",
+        "if False:",
+    ),
+    "live-check-call-errors-ignored": (
+        "tests.live_check",
+        "tests.test_live_check",
+        "if call_errors:",
+        "if False:",
+    ),
+    "live-check-video-errors-ignored": (
+        "tests.live_check",
+        "tests.test_live_check",
+        "if video_errors:",
+        "if False:",
+    ),
+    "live-check-api-failure-as-skip": (
+        "tests.live_check",
+        "tests.test_live_check",
+        'video["result"] = "error" if error_cause is not None else "skip"',
+        'video["result"] = "skip"',
+    ),
+    "live-check-no-margin": (
+        "tests.live_check",
+        "tests.test_live_check",
+        "MARGIN = 0.05",
+        "MARGIN = 0.0",
+    ),
+    "live-check-floor-above-one": (
+        "tests.live_check",
+        "tests.test_live_check",
+        "if current < x <= 1.0",
+        "if current < x",
+    ),
+    "live-check-skip-half-stops": (
+        "tests.live_check",
+        "tests.test_live_check",
+        "if 2 * skipped > written:",
+        "if 2 * skipped >= written:",
+    ),
+    "live-check-one-model-stops": (
+        "tests.live_check",
+        "tests.test_live_check",
+        'if all(_model_status(result, name) == "rejected" for name in MODEL_NAMES):',
+        'if any(_model_status(result, name) == "rejected" for name in MODEL_NAMES):',
+    ),
+    "live-check-grader-in-agent": (
+        "agent.writer",
+        "tests.test_live_check",
+        "MAX_TOKENS = 1024",
+        'MAX_TOKENS = 1024\nGRADE_SYSTEM = "채점"',
+    ),
+    "live-check-cli-exception-only": (
+        "tests.live_check",
+        "tests.test_live_check",
+        "except BaseException as exc:",
+        "except Exception as exc:",
+    ),
+    "live-check-entry-skips-cli": (
+        "tests.live_check",
+        "tests.test_live_check",
+        "raise SystemExit(cli(sys.argv[1:]))",
+        "raise SystemExit(main(sys.argv[1:]))",
+    ),
 }
 
 
@@ -527,7 +637,8 @@ def main(argv: list[str]) -> int:
     name = argv[0]
     module_name, test_module, old, new = MUTANTS[name]
 
-    path = _SRC.joinpath(*module_name.split(".")).with_suffix(".py")
+    root = _SRC if module_name.split(".")[0] == "agent" else _ROOT
+    path = root.joinpath(*module_name.split(".")).with_suffix(".py")
     source = path.read_text(encoding="utf-8")
     if source.count(old) != 1:
         print(f"anchor not found exactly once: {name}: {old}", file=sys.stderr)
@@ -537,7 +648,8 @@ def main(argv: list[str]) -> int:
     module = types.ModuleType(module_name)
     module.__file__ = str(path)
     sys.modules[module_name] = module
-    setattr(agent, module_name.rpartition(".")[2], module)
+    package_name, _, attribute = module_name.rpartition(".")
+    setattr(sys.modules[package_name], attribute, module)
     exec(compile(mutated, str(path), "exec"), module.__dict__)
 
     print(f"mutant {name}: {old} -> {new}", flush=True)

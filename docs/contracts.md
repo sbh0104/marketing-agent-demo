@@ -539,7 +539,7 @@ run_loop(cycle, reload, initial, *, on_error, sleep=time.sleep,
   인자와 이유, 로그 사건과 필수 필드)은 고정입니다.
 - 더하는 것은 그 필드를 쓰는 단계(Phase)가 `models.py` · `config.py` 에서, 테스트와 함께, 이
   문서도 함께 고칩니다. 이미 있는 이름의 뜻을 바꾸거나 지우지 않습니다.
-- 가드 · 저장소 · 설정 읽기 · 로그 한 줄 규칙 · 판별 규칙 · 쿼터 가드 · 탐지 입력 검사가 테스트로 지켜지는지는 음성 대조로 확인합니다. 각 명령은 가드 한 줄을
+- 가드 · 저장소 · 설정 읽기 · 로그 한 줄 규칙 · 판별 규칙 · 쿼터 가드 · 탐지 입력 검사 · 인기 댓글 · 실제 호출 실행기가 테스트로 지켜지는지는 음성 대조로 확인합니다. 각 명령은 가드 한 줄을
   메모리에서만 망가뜨리고 테스트를 돌리며, **종료 코드 1(테스트가 잡음)** 이어야 합니다. 2 는
   바꿀 글자를 찾지 못했다는 뜻이라 실패입니다:
 
@@ -616,14 +616,34 @@ run_loop(cycle, reload, initial, *, on_error, sleep=time.sleep,
   python3 -m tests.mutants classifier-no-truncation
   python3 -m tests.mutants classifier-error-hold-unmarked
   python3 -m tests.mutants classifier-swallows-faults
+  python3 -m tests.mutants youtube-comments-free
+  python3 -m tests.mutants youtube-comments-any-403-disabled
+  python3 -m tests.mutants live-check-ceiling-plus-one
+  python3 -m tests.mutants live-check-ceiling-swallowed
+  python3 -m tests.mutants live-check-key-unredacted
+  python3 -m tests.mutants live-check-views-exclusive
+  python3 -m tests.mutants live-check-calls-without-key
+  python3 -m tests.mutants live-check-unmeasured-ignored
+  python3 -m tests.mutants live-check-call-errors-ignored
+  python3 -m tests.mutants live-check-video-errors-ignored
+  python3 -m tests.mutants live-check-api-failure-as-skip
+  python3 -m tests.mutants live-check-no-margin
+  python3 -m tests.mutants live-check-floor-above-one
+  python3 -m tests.mutants live-check-skip-half-stops
+  python3 -m tests.mutants live-check-one-model-stops
+  python3 -m tests.mutants live-check-grader-in-agent
+  python3 -m tests.mutants live-check-cli-exception-only
+  python3 -m tests.mutants live-check-entry-skips-cli
   ```
 
   `classify` · `read_answers` · `build_state` · `is_error_hold` · `sdk_ask` ·
   `decide_post` · `video_id_from_ref` · `put` · `reserve_live` · `check_post` · `load_config` ·
   `config_from_mapping` · `run_loop` · `format_line` · `QuotaLedger.reserve` ·
-  `YouTubeClient._call` · `Watcher.run` · `write_comment` · `code_failures` ·
-  `self_check_failure` · `link_fragment` · `repeated_run` 의 본문을 고칠 때는 이 명령들이 계속
-  1 로 끝나는지 함께 확인합니다.
+  `YouTubeClient._call` · `Watcher.run` · `YouTubeClient.top_comments` · `tests/live_check.py` 의
+  `Calls.take` · `Redactor` · `best_correct` · `verdict_line` · `cli` · `main` · `write_comment` ·
+  `code_failures` · `self_check_failure` · `link_fragment` · `repeated_run` 의 본문을 고칠 때는 이
+  명령들이 계속 1 로 끝나는지 함께 확인합니다. 음성 대조 실행기는 `agent.*` 모듈과
+  `tests.live_check` 를 메모리에서 바꿉니다.
 
 ## 탐지 · 조회수 추적 — env.py · youtube.py · watcher.py (Phase 2)
 
@@ -687,8 +707,9 @@ watcher = Watcher(Store(Path("data/videos.json")), logbook, client, clock)
 
 **쿼터 가드** — `youtube.py` 가 쿼터 단위를 아는 유일한 곳입니다.
 
-- `UNIT_COST = {"search.list": 100, "videos.list": 1}`, `DAILY_QUOTA_UNITS = 10_000`(Google 기본
-  프로젝트 쿼터). Google 쿼터를 늘린 프로젝트는 이 상수 하나만 바꿉니다.
+- `UNIT_COST = {"search.list": 100, "videos.list": 1, "commentThreads.list": 1}`,
+  `DAILY_QUOTA_UNITS = 10_000`(Google 기본 프로젝트 쿼터). Google 쿼터를 늘린 프로젝트는 이 상수
+  하나만 바꿉니다.
 - 모든 호출이 `YouTubeClient._call` 에서 `QuotaLedger.reserve(call, now, limits)` 를 거칩니다.
   하루는 굴러가는 24시간이고 경계는 `>` 입니다 — 정확히 24시간 전의 호출은 세지 않습니다
   (`check_post` 와 같음). 막는 조건은 둘입니다:
@@ -724,6 +745,21 @@ watcher = Watcher(Store(Path("data/videos.json")), logbook, client, clock)
   추적을 그만둡니다.
 - 오류 글 속 API 키는 `<YOUTUBE_API_KEY>` 로 가리고, 원래 예외(키가 든 URL)는 덧붙이지 않습니다.
 
+**인기 댓글** — `YouTubeClient.top_comments(video_id, now, limits, max_results) -> tuple[str, ...] | None`
+
+- `commentThreads.list` 한 번(1단위, 쿼터 가드를 지남) — `part=snippet` · `videoId` · `order=relevance` ·
+  `maxResults=<max_results>` · `textFormat=plainText`. `max_results` 가 1–100 밖이면 부르기 전에
+  `ValueError` 입니다. 부르는 쪽은 `TOP_COMMENTS_MAX`(10, '댓글 작성' 절)를 넘깁니다.
+- 돌려주는 것은 항목마다 `snippet.topLevelComment.snippet.textDisplay` 글뿐이고, 작성자 이름 ·
+  채널 ID 는 읽지 않습니다. 모양이 다른 항목은 건너뛰고, 외톨이 서로게이트는 U+FFFD 로 바꿉니다.
+  `items` 가 목록이 아니면 `YouTubeError("commentThreads.list", "HTTP 200 items 가 목록이 아닙니다")`.
+- 오류 이유가 정확히 `HTTP 403 commentsDisabled` 이면 `None` 입니다 — 그 영상 하나의 일이고, 부르는
+  쪽은 제목 · 설명으로 이어 갑니다. 다른 403(`quotaExceeded` 등)과 그 밖의 오류는 `YouTubeError`
+  그대로 올라갑니다.
+- `search(…, published_before=None)` — 주면 `publishedBefore=<UTC …Z>` 가 더해집니다(실제 호출 실행기의
+  넓힌 창). 시간대가 없거나 `published_after` 와 같거나 이르면 `ValueError` 입니다. 탐지 사이클은
+  기본값 `None` 으로 부릅니다.
+
 **외부 글자**
 
 - 밖에서 온 글자(제목 · 설명 · 채널 ID · 검색어 · 오류 이유)의 외톨이 서로게이트는 U+FFFD 로
@@ -756,7 +792,7 @@ Phase 7 이 영상마다 부르는 모양:
 ```python
 result = write_comment(record, config=config.comment, claude=anthropic_client(),
                        check=<Phase 3 의 jev 검사>, previous=store.comments(),
-                       logbook=logbook, now=now, transcript=…, top_comments=…)
+                       logbook=logbook, now=now, transcript="", top_comments=<top_comments 또는 ()>)
 if result.draft is not None:
     record.comment = result.draft
     store.put(record)
@@ -779,6 +815,11 @@ if result.draft is not None:
   세 개(`CHECK_QUESTIONS`: `mentions_scene` · `reads_like_ad` · `follows_concern`)를 **한
   요청**으로 묻습니다. 접속(키 `TYPESAFE_API_KEY` · jev 모델 · `typesafe-sdk`)은 Phase 3 의
   것이고, Phase 7 이 Phase 3 의 클라이언트를 이 자리에 이어 붙입니다.
+- **자료의 출처** — 자막은 공식 API 로 남의 영상에서 받을 수 없어 비어 있습니다.
+  `captions.download` 는 OAuth 와 그 영상의 편집 권한(200단위)을 요구하고, 비공식 긁기는 약관 · 차단
+  위험이라 이 저장소의 방법이 아닙니다. 그래서 `transcript` 는 늘 `""` 이고, 인기 댓글은 탐지 절의
+  `YouTubeClient.top_comments(video_id, now, limits, TOP_COMMENTS_MAX)` 가 가져옵니다. 댓글이 막힌
+  영상(`None`)은 `top_comments=()` 로 제목 · 설명만 씁니다.
 
 **흐름** — 시도마다(최대 두 번):
 
@@ -935,6 +976,7 @@ judge_trigger(record, config, now) -> Judgement     # config 는 Config.trigger
   ```
 
   자막은 `transcript` 인자로만 받습니다.
+  자막은 공식 API 로 남의 영상에서 받을 수 없어 비어 있습니다 — 운영과 실제 호출 실행기는 `transcript=None` 으로 부릅니다.
 - **부르는 쪽의 할 일.** 판정마다 `CLASSIFY video=… verdict=… reason=…` 를 씁니다. 오류
   보류(`is_error_hold(j)` 가 참)이면 `ERROR where=classify reason=<j.reason>` 도 함께 씁니다.
   오류 보류를 `record.classification` 에 저장할지, 나중에 다시 판정할지는 Phase 7 이 정합니다
@@ -975,4 +1017,125 @@ judge_trigger(record, config, now) -> Judgement     # config 는 Config.trigger
   - 기록: 아직 재지 않음 — 2026-10-13 키 없음.
   - ko 가 미달이고 en 이 통과하면 `QUESTION_LANGUAGE` 를 `"en"` 으로 바꿉니다. 둘 다 미달이면
     사람이 정합니다(트래커 cross-cutting).
+  - 실제 호출 실행기('실제 호출 실행기' 절)가 같은 측정(`tests/jev_accuracy.py` 의 `judge_examples` · `tally`)을 진짜 jev 로 돌려 예시마다 `docs/live-check/result.json` 에 남기고, 기록 줄은 Phase 6B 가 그 파일로 씁니다.
 - **음성 대조.** 음성 대조는 10절 목록.
+
+## 실제 호출 실행기 — `tests/live_check.py` (Phase 6A)
+
+사람이 셸에서 한 번 돌려 진짜 jev · Claude · YouTube 를 부르고 결과를 `docs/live-check/` 의 두
+파일로 남기는 측정 도구입니다. 실행 안내는 `docs/live-check/README.md` 입니다. ADW 사이클은 이
+실행기를 가짜 클라이언트로 테스트하고, 진짜 실행은 사람이 합니다. 크롬 연결 · 게시는 이 실행기의
+일이 아닙니다.
+
+```
+python3 -m tests.live_check                         # 실행 — 결과를 docs/live-check/ 에 씁니다
+python3 -m tests.live_check --verdict <결과 파일>     # 호출 없이 판정 줄을 다시 셉니다
+```
+
+- **차례.** ① 모델 이름 — `comment.writer_model` · `claude-sonnet-5-5` · `claude-haiku-5-5` 를 이름마다
+  한 번(겹치면 한 번) `max_tokens=1` 로 부릅니다. 답하면 `accepted`, 상태 404 면 `rejected`, 그 밖의
+  오류는 `error` 입니다. 작성 모델은 `comment.writer_model` 이 `accepted` 면 그것, 아니면 처음
+  `accepted` 인 이름이고, 채점 모델은 작성 모델이 아닌 처음 `accepted` 이름(없으면 작성 모델)입니다.
+  `accepted` 가 하나도 없으면 ③ 을 건너뜁니다. ② 정확도 — 예시 묶음 × `LANGUAGES` 를
+  `tests/jev_accuracy.py` 의 `judge_examples` 로 판정하고 `tally` 로 셉니다. ③ 영상 한 바퀴 — 아래.
+- **영상 고르기.** 운영 창은 키워드마다 `search.list` 한 페이지(탐지 절의 매개변수,
+  `publishedAfter = now − trigger.max_age_hours`)입니다. 처음 보는 영상 ID 를 `videos.list` 로 읽어
+  `trigger.min_views ≤ 조회수 ≤ trigger.max_views` 인 영상을 판별합니다.
+  범위 밖 영상은 jev 에 보내지 않습니다.
+  시간당 조회수는 표본이 둘 필요해 고르기 조건이 아닙니다.
+- **넓힌 창.** 운영 창을 다 돈 뒤 채점할 초안이 `TARGET_DRAFTS`(10)개보다 적으면 키워드마다 한
+  페이지를 `publishedAfter = now − WIDE_WINDOW_HOURS`(72시간) · `publishedBefore = now −
+  trigger.max_age_hours` 로 한 번 더 찾습니다. 세 번째 창은 없습니다. 영상마다 `window` 칸에
+  `operation` 또는 `widened` 를 적습니다.
+- **한도.** 판별은 실행마다 `CLASSIFY_MAX`(40)개, 댓글 작성은 `WRITE_MAX`(15)개 영상까지입니다.
+  초안이 `TARGET_DRAFTS` 에 닿으면 새 영상을 고르지 않습니다.
+- **재료.** 판별이 `yes` 인 영상마다 `top_comments(video_id, now, limits, TOP_COMMENTS_MAX)` 로 인기
+  댓글을 받아 `write_comment(…, transcript="", top_comments=…)` 에 넘깁니다. 댓글이 막힌
+  영상(`None`)과 댓글이 하나도 없는 영상은 제목 · 설명으로 이어 씁니다(`material =
+  "title_description"`). 영상마다 `material` · `top_comment_count` · `comments_disabled` 를 적습니다.
+  자막은 공식 API 로 남의 영상에서 받을 수 없어 비어 있습니다.
+- **jev 자체 검사 어댑터.** `jev_self_check(ask, model)` 이 '댓글 작성' 절의 `check` 포트를 채웁니다 —
+  질문마다 `noul`(`criteria = {"true": "Yes, it does", "false": "No, it does not"}`)을 한 요청으로 묻고
+  `answers[이름].noul` 을 돌려줍니다. 운영(Phase 7)이 이어 붙일 때 이 모양을 옮겨 씁니다.
+- **영상의 끝.** `result` 는 `comment`(통과) · `skip`(검사 두 번 탈락) · `error`(인기 댓글을 못 받음,
+  또는 `write_comment` 가 Claude 호출 오류 · jev 검사 호출 오류 · jev 답 모양 이상으로 끝남 — 실행기의
+  감싸개가 보고 `error_cause` 에 `comments` · `claude` · `jev` · `jev_answer` 로 적음) · `not_written`
+  (판별이 `yes` 가 아님)입니다.
+- **천장.** 실행 한 번의 서비스별 호출 수 천장은 실행기 상수 `CEILINGS`(jev 120 · claude 70 ·
+  youtube 50)이고 설정 키가 아닙니다.
+  천장이 세는 것은 실행기의 호출(감싸개 한 번)이고, SDK 안의 다시 시도는 그 밖입니다 — anthropic 은
+  `max_retries=2`(호출당 요청 많아야 3번), typesafe 는 SDK 기본 정책입니다.
+  천장에 닿은 다음 호출은 보내지 않고 실행 전체가 그 자리에서 멈춥니다.
+  `CeilingReached` 는 `BaseException` 이라 `write_comment` 의 `except Exception` 이 삼키지 않습니다.
+  결과에는 `stopped = {"kind": "ceiling", "service": …, "limit": …}` 를 적습니다. 쿼터 장부가 막으면
+  (`QuotaExhausted`) `"kind": "quota"`, 그 밖의 예외와 Ctrl-C 는 `"kind": "aborted"` 와 예외 이름입니다.
+  YouTube 호출은 운영과 같은 쿼터 장부 `data/quota.json` 을 지납니다.
+- **키.** 키는 `require_secret`(환경 변수, 없으면 `.env`)으로 읽습니다.
+  키 셋 중 하나라도 없거나 `typesafe-sdk` · `anthropic` 이 없으면 아무 서비스도 부르지 않고, 없는 것을
+  한 줄로 알린 뒤 종료 코드 2 로 끝납니다.
+  키 값과 그 앞 8글자 이상의 조각은 결과 파일 · 요약 · 화면 · 오류 줄 어디에도 쓰지 않습니다.
+  내보내는 글은 모두 `<YOUTUBE_API_KEY>` · `<TYPESAFE_API_KEY>` · `<ANTHROPIC_API_KEY>` 로 가립니다.
+  traceback 과 이어진 예외(`__context__`)는 찍지 않고 예외 이름만 찍습니다.
+  `python3 -m tests.live_check` 의 진입은 `cli` 를 거치고, `cli` 는 `BaseException` 모두를 잡습니다.
+  두 파일을 쓴 뒤 다시 읽어 키 조각이 보이면 두 파일을 지우고 종료 코드 3 입니다.
+- **결과 파일.** `result.json` 은 6B 가 읽는 기계용(키 정렬, 2칸 들여쓰기, UTF-8, `os.replace`),
+  `summary.md` 는 사람용 숫자 요약이고 같은 실행이 둘을 덮어씁니다.
+  `summary.md` 에는 영상 · 인기 댓글 · 초안의 글이 들어가지 않습니다.
+  밖에서 온 글과 모델이 쓴 글은 `untrusted` 칸 안에만 둡니다(제목 · 설명 · 인기 댓글 · 고민 · 초안 ·
+  판정 이유 · 건너뛴 이유 · 코드 검사 이유). `untrusted` 밖의 칸은 숫자 · 참거짓 · 정해진 낱말과
+  실행기가 만든 글(오류 이름)이고, 6B 는 판정과 기준값 계산에 이 칸들을 씁니다. 댓글 작성자 이름 ·
+  채널 ID 는 어느 칸에도 없습니다. 제목은 300자, 설명은 2000자, 인기 댓글은 하나에 300자까지입니다.
+
+  | 칸 | 뜻 |
+  |---|---|
+  | `schema_version` · `notice` · `run_at` · `example_count` | 모양 버전 · `untrusted` 칸 안내 · 실행 시각(UTC) · 예시 수 |
+  | `verdict` | 판정 줄(아래) |
+  | `stopped` | `null` · 천장 · 쿼터 · 중단 |
+  | `calls` · `ceilings` | 서비스별 실행기 호출 수와 천장 |
+  | `models` · `writer_model` · `grader_model` | 이름마다 `accepted` · `rejected` · `error`(오류 이름 · 상태) |
+  | `accuracy.<언어>[]` | 예시마다 `index` · `kind` · `label` · `verdict` · `error` · `noul` · `choice` · `probability` · `confidence` |
+  | `accuracy_tally.<언어>` | 지금 기준값의 맞음 · 잘못된 일치 · 잘못된 불일치 · 보류 · 오류(`tally`) |
+  | `windows.<창>` | 검색 수 · 찾은 영상 · 조회수 범위 안 · 판별한 영상 |
+  | `videos[]` | `window` · `views` · `published_at` · `age_hours` · `classification` · `material` · `top_comment_count` · `comments_disabled` · `result` · `error_cause` · `drafts[]` |
+  | `drafts[]` | `attempt` · `parsed` · `scores`(질문 → P(예)) · `self_check_pass` · `code_pass` · `passed` · `grade` · `claude_grade` · `grade_error` · `human` |
+  | `errors[]` | 실패한 호출마다 `service` · `stage` · `error`(예외 이름) · `status` · `video_id` |
+  | `fingerprint` | 판별 질문 문구(ko · en) · 예시 묶음 SHA-256 · 판별 설정 값 · jev 가 알린 모델 · 자체 검사 질문 · 통과선 · 트리거 조회수 범위 · 채점 프롬프트 · `MARGIN` · `PASS_CORRECT` · `claude_max_retries` |
+
+- **Claude 채점.** 초안마다(다시 쓴 초안 포함) 채점 모델을 한 번 부릅니다(`GRADE_SYSTEM`). 세 질문
+  `scene_in_material`(초안이 짚은 장면이 재료에 있나) · `reads_like_ad` · `follows_concern` 의
+  true/false 가 `grade` 이고, `scene_in_material` 이 참 · `reads_like_ad` 가 거짓 · `follows_concern` 이
+  참이면 `claude_grade = "ok"`, 아니면 `"bad"` 입니다. 답 모양이 다르면 `grade_error = "응답 모양"`.
+  채점은 이 실행기 안의 측정 도구입니다.
+  `src/agent/` 의 모듈은 채점을 부르거나 담지 않습니다.
+- **사람 칸.** 실행기는 `human` 을 빈 글자로 둡니다. 사람은 채점에 동의하지 못하는 초안의 `human` 에
+  `ok` 또는 `bad` 를 적습니다(건너뛰어도 됨).
+  판정 줄은 `human` 을 읽지 않습니다.
+- **판정 줄.** `verdict_line(result)` 이 결과 하나로 셉니다. `summary.md` 의 첫 줄, 화면의 첫 줄,
+  `result.json` 의 `verdict` 가 같은 줄입니다. 걸린 경우를 아래 차례로 `; ` 로 이어
+  `6B: stop — <경우들>` 을, 하나도 없으면 `6B: go` 를 씁니다.
+
+  | 경우 | 걸리는 조건 | 모양 |
+  |---|---|---|
+  | 재지 못함 | 예시 판정에 오류 보류가 있음 · 예시 밖 호출 오류가 있음(404 로 답한 모델 확인은 뺌) · `result: "error"` 인 영상이 있음 · `stopped` 가 있음 — 하나라도 | `재지 못함(예시 오류 <n> · 호출 오류 <n> · 영상 오류 <n> · 천장 <서비스> <천장> · 쿼터 <호출> <counter> <사용>/<한도> · 중단 <예외 이름>)` — 있는 것만 |
+  | 판별 미달 | 어느 언어도 "올리기만" 범위에서 잘못된 일치 0 · 맞음 `PASS_CORRECT`(20) 이상을 이루지 못함 | `판별 미달(ko <최다 맞음>/<예시 수> · en …)`, 잘못된 일치를 막을 설정이 없는 언어는 `<언어> 잘못된 일치 못 막음` |
+  | 작성 막힘 | `skip`(검사 두 번 탈락) × 2 > 쓴 영상(`comment` + `skip`, 두 창 모두) | `작성 막힘(SKIP <s>/<w>)` |
+  | 모델 이름 | `claude-sonnet-5-5` · `claude-haiku-5-5` 가 둘 다 `rejected` | `모델 이름(claude-sonnet-5-5 · claude-haiku-5-5 둘 다 거절)` |
+
+  API 실패로 끝난 영상(`result: "error"`)은 작성 막힘에 세지 않고 재지 못함에 셉니다.
+  쓴 영상이 0 이고 오류도 없으면 `go` 쪽이고, 6B 가 "표본 없음" 으로 다룹니다. 재지 못함의 예시 밖
+  오류 · 영상 오류는 이 계약의 읽기입니다 — 트래커 Phase 6A 의 ① 은 예시 오류와 천장을 적습니다.
+- **"올리기만" 범위.** 기준값의 출발점은 `fingerprint.classifier` 이고 판정은 `classifier._decide`
+  그대로입니다. `noul_yes_min` 후보는 지금 값과, 정답이 `no` 인 예시마다 `noul + MARGIN`(0.05, 소수
+  여섯째 자리 반올림) 가운데 지금 값보다 크고 1 이하인 값입니다. `choice_min_confidence` 도
+  `confidence + MARGIN` 으로 같습니다. `noul_no_max` 는 자유 — 지금 값 · 0 · 정답이 `no` 인 예시의
+  `noul` 가운데 `noul_yes_min` 후보보다 작은 값입니다. 1 을 넘는 하한은 후보가 아니므로, 그 하한으로
+  막아야 하는 잘못된 일치가 남은 언어는 미달입니다. 오류 보류 예시는 어느 설정에서도 맞음이
+  아닙니다.
+- **종료 코드.** 실행: 0 `go` · 1 `stop` · 2 시작 전 멈춤(인자 · 설정 · 키 · SDK · 키 모양 — 호출 0번,
+  파일 없음) · 3 결과 파일을 쓰지 못함, 키 조각이 보여 지움, 또는 실행기 오류(예: 결과 파일을 읽다
+  `RecursionError`). `--verdict`: 0 `go` · 1 `stop` · 2 파일을 읽을 수 없음. 판정 줄과 다르게 저장된
+  `verdict` 는 한 줄 더 알립니다.
+- **알려진 한계.** jev 응답의 `answers[이름].noul` · `model`, Claude 의 404 `status_code`, typesafe 의
+  다시 시도 · 제한 시간 정책은 문서와 SDK 소스로 맞춘 모양이고 첫 진짜 실행이 처음 확인합니다.
+  Claude 채점은 정답이 아니라 또 하나의 의견입니다(트래커 Phase 6A).
+- **음성 대조.** 10절 목록의 `youtube-comments-*` · `live-check-*` 명령.
