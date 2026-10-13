@@ -27,7 +27,7 @@
 
 ## To do
 
-- [~] Phase 1 — 뼈대와 계약 (plans/interview-marketing-agent.md#phase-1)
+- [x] Phase 1 — 뼈대와 계약 (plans/interview-marketing-agent.md#phase-1)
 - [ ] Phase 2 — ① 탐지 · 조회수 추적 (plans/interview-marketing-agent.md#phase-2)
 - [ ] Phase 3 — ② 판별 · 주제 일치 (plans/interview-marketing-agent.md#phase-3)
 - [ ] Phase 4 — ③ 타이밍 · 뜨기 직전 판단 (plans/interview-marketing-agent.md#phase-4)
@@ -38,6 +38,10 @@
 - [ ] (example) Add social login buttons to the login screen
 - [ ] (example) Add retry logic on payment failure
 - [ ] (example) [ui] Redesign the product card grid (plans/interview-shop.md#phase-4)
+
+- [ ] (retro 후보 · T4 경보) plan 설계 예산·꾸러미 규칙 재검토 — ⑶ 계획서 수리: 0 · ⑷ 계획 밖(트래커 plans/interview-*.md 제외): 13 — .env.example, .gitignore, config.yaml, data/.gitkeep, logs/.gitkeep … (cycle: 20261013-062542-adw/phase-1-foundation-contracts ⑷ 13)
+- [ ] (retro 후보 · E-005) Phase 1 파서의 열거형 방어를 ship-check 마다 새 꼴이 뚫음 — 최소 계약 고침: 트래커 Phase 1 · 7 결정을 허용 쪽 규칙으로 — 가드 쿼리 이름 허용 목록(ship-report Human checks 1) · 로그 증명은 UTF-8 로만 읽고 `\n` 으로만 나눔(Human checks 5) · 정수 설정 자릿수 상한(Human checks 6) (sightings: 20261013-033250-stop-1 · 20261013-075734-stop-1 · 20261013-122544-stop-1 · 20261013-062542-adw/phase-1-foundation-contracts)
+- [ ] (retro 후보 · E-006) 민감 확인 줄로 머지 전 멈춘 ship-check 가 정지 부류 표에 없어 `unknown` 으로 남음 — 최소 계약 고침: 하네스 정지 부류 표에 "ship-check sensitive human checks — confirm in the interview before merge" 행 하나(stale harness: yes — 이미 있으면 닫음) (sightings: 20261013-075734-stop-1 · 20261013-122544-stop-1)
 
 ## Done
 
