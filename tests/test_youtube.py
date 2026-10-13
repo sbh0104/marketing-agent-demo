@@ -16,6 +16,7 @@ from unittest import mock
 
 from agent.config import LimitsConfig
 from agent.youtube import (
+    COMMENTS_DISABLED,
     DAILY_QUOTA_UNITS,
     QuotaError,
     QuotaExhausted,
@@ -55,6 +56,40 @@ def seed(path: Path, entries: list[Entry]) -> None:
     calls = [{"at": at.isoformat(), "call": call, "units": units} for at, call, units in entries]
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps({"calls": calls, "schema_version": 1}), encoding="utf-8")
+
+
+def thread(
+    text: object, author: str = "작성자이름", channel: str = "UCauthor0000000000000000"
+) -> dict[str, object]:
+    """commentThreads.list 항목 하나 — 작성자 이름 · 채널 ID 까지 갖춘 실제 모양."""
+    return {
+        "kind": "youtube#commentThread",
+        "id": "thread0001",
+        "snippet": {
+            "videoId": "abcdefghijk",
+            "topLevelComment": {
+                "kind": "youtube#comment",
+                "snippet": {
+                    "textDisplay": text,
+                    "textOriginal": text,
+                    "authorDisplayName": author,
+                    "authorChannelId": {"value": channel},
+                    "likeCount": 7,
+                },
+            },
+            "totalReplyCount": 0,
+        },
+    }
+
+
+def threads(*items: object) -> tuple[int, bytes]:
+    return 200, json.dumps({"items": list(items)}).encode("utf-8")
+
+
+def google_error(reason: str) -> bytes:
+    """403 본문 — error.errors[0].reason 에 Google 의 이유를 담습니다."""
+    body = {"error": {"code": 403, "errors": [{"reason": reason}]}}
+    return json.dumps(body).encode("utf-8")
 
 
 class FakeFetch:
@@ -421,6 +456,189 @@ class ClientTest(YouTubeCase):
                 self.assertEqual(
                     str(caught.exception), "API 키 형식이 아닙니다 — 영문자 · 숫자 · _ · - 만 씁니다"
                 )
+
+    def test_search_sends_published_before_when_given(self) -> None:
+        # 넓힌 창: 72시간 전부터 운영 창(12시간)이 시작되기 전까지
+        fetch = FakeFetch()
+        client = self.client(fetch)
+        after = NOW - timedelta(hours=72)
+        client.search("연애", after, None, NOW, limits(90), WINDOW_START.astimezone(KST))
+        client.search("연애", after, None, NOW, limits(90))
+        widened, plain = query_of(fetch.urls[0]), query_of(fetch.urls[1])
+        self.assertEqual(widened["publishedBefore"], "2026-10-12T00:00:00Z")
+        self.assertEqual(widened["publishedAfter"], "2026-10-09T12:00:00Z")
+        self.assertNotIn("publishedBefore", plain)
+        self.assertEqual({k: v for k, v in widened.items() if k != "publishedBefore"}, plain)
+        self.assertEqual(
+            set(plain),
+            {
+                "part", "type", "order", "q", "regionCode", "relevanceLanguage",
+                "maxResults", "publishedAfter", "key",
+            },
+        )
+
+    def test_search_published_before_must_be_aware_and_later(self) -> None:
+        fetch = FakeFetch()
+        client = self.client(fetch)
+        rows = (
+            ("naive", datetime(2026, 10, 12, 0, 0)),
+            ("equal", WINDOW_START),
+            ("earlier", WINDOW_START - SECOND),
+        )
+        for label, before in rows:
+            with self.subTest(label):
+                with self.assertRaises(ValueError):
+                    client.search("연애", WINDOW_START, None, NOW, limits(90), before)
+        self.assertEqual(fetch.urls, [])
+        self.assertFalse(self.path.exists())
+
+
+class CommentsTest(YouTubeCase):
+    """top_comments — commentThreads.list 한 번, 관련도순, 댓글 글만."""
+
+    def comments(
+        self, client: YouTubeClient, max_results: int = 10
+    ) -> tuple[str, ...] | None:
+        return client.top_comments("abcdefghijk", NOW, limits(90), max_results)
+
+    def test_comment_threads_url_carries_relevance_order_and_count(self) -> None:
+        fetch = FakeFetch()
+        client = self.client(fetch)
+        self.comments(client)
+        parts = urllib.parse.urlsplit(fetch.urls[0])
+        self.assertEqual(
+            (parts.scheme, parts.netloc, parts.path),
+            ("https", "www.googleapis.com", "/youtube/v3/commentThreads"),
+        )
+        self.assertEqual(
+            query_of(fetch.urls[0]),
+            {
+                "part": "snippet",
+                "videoId": "abcdefghijk",
+                "order": "relevance",
+                "maxResults": "10",
+                "textFormat": "plainText",
+                "key": "test-key",
+            },
+        )
+
+    def test_comment_threads_cost_one_unit_through_ledger(self) -> None:
+        fetch = FakeFetch()
+        client = self.client(fetch, searches(1, NOW - SECOND))
+        self.assertEqual(self.ledger.usage(NOW), Usage(1, 100))
+        self.comments(client)
+        self.assertEqual(self.ledger.usage(NOW), Usage(1, 101))
+        self.assertEqual(
+            self.stored()[-1],
+            {"at": "2026-10-12T12:00:00+00:00", "call": "commentThreads.list", "units": 1},
+        )
+        self.assertEqual(len(fetch.urls), 1)
+
+    def test_comment_threads_held_by_unit_ceiling(self) -> None:
+        fetch = FakeFetch()
+        client = self.client(fetch, searches(99, NOW - SECOND) + videos(100, NOW - SECOND))
+        with self.assertRaises(QuotaExhausted) as caught:
+            self.comments(client)
+        self.assert_held(
+            caught.exception, "commentThreads.list", "units", 10000, DAILY_QUOTA_UNITS
+        )
+        self.assertEqual(fetch.urls, [])
+        self.assertEqual(len(self.stored()), 199)
+
+    def test_comments_disabled_returns_none_and_still_counts(self) -> None:
+        fetch = FakeFetch((403, google_error("commentsDisabled")))
+        client = self.client(fetch)
+        self.assertIsNone(self.comments(client))
+        self.assertEqual(COMMENTS_DISABLED, "HTTP 403 commentsDisabled")
+        self.assertEqual(self.ledger.usage(NOW), Usage(0, 1))
+        self.assertEqual([entry["call"] for entry in self.stored()], ["commentThreads.list"])
+
+    def test_other_403_on_comments_raises(self) -> None:
+        client = self.client(FakeFetch((403, google_error("quotaExceeded"))))
+        with self.assertRaises(YouTubeError) as caught:
+            self.comments(client)
+        exc = caught.exception
+        self.assertEqual((exc.call, exc.reason), ("commentThreads.list", "HTTP 403 quotaExceeded"))
+        self.assertEqual(self.ledger.usage(NOW), Usage(0, 1))
+
+    def test_top_comments_returns_texts_only(self) -> None:
+        fetch = FakeFetch(
+            threads(
+                thread("첫 댓글", author="가나다", channel="UCfirst00000000000000000"),
+                thread("둘째 댓글", author="라마바", channel="UCsecond0000000000000000"),
+            )
+        )
+        result = self.comments(self.client(fetch))
+        self.assertEqual(result, ("첫 댓글", "둘째 댓글"))
+        self.assertIsInstance(result, tuple)
+        flat = repr(result)
+        for hidden in ("가나다", "라마바", "UCfirst", "UCsecond", "작성자이름", "UCauthor"):
+            self.assertNotIn(hidden, flat)
+
+    def test_malformed_comment_items_are_skipped(self) -> None:
+        no_top = thread("x")
+        no_top["snippet"] = {"videoId": "abcdefghijk"}
+        top_not_dict = thread("x")
+        top_not_dict["snippet"] = {"topLevelComment": "글"}
+        inner_not_dict = thread("x")
+        inner_not_dict["snippet"] = {"topLevelComment": {"snippet": ["글"]}}
+        fetch = FakeFetch(
+            threads(
+                thread("하나"),
+                "항목이 글자",
+                {"snippet": None},
+                no_top,
+                top_not_dict,
+                inner_not_dict,
+                thread(42),
+                thread(None),
+                thread(["목록"]),
+                thread("둘"),
+            )
+        )
+        self.assertEqual(self.comments(self.client(fetch)), ("하나", "둘"))
+
+    def test_comment_items_not_a_list_raise(self) -> None:
+        body = json.dumps({"items": {"0": thread("하나")}}).encode("utf-8")
+        client = self.client(FakeFetch((200, body)))
+        with self.assertRaises(YouTubeError) as caught:
+            self.comments(client)
+        exc = caught.exception
+        self.assertEqual(
+            (exc.call, exc.reason), ("commentThreads.list", "HTTP 200 items 가 목록이 아닙니다")
+        )
+
+    def test_comment_lone_surrogate_becomes_replacement(self) -> None:
+        fetch = FakeFetch(threads(thread("앞\ud800뒤")))
+        self.assertEqual(self.comments(self.client(fetch)), ("앞�뒤",))
+
+    def test_max_results_out_of_bounds_calls_nothing(self) -> None:
+        fetch = FakeFetch()
+        client = self.client(fetch)
+        for bad in (0, 101, True):
+            with self.subTest(max_results=bad):
+                with self.assertRaises(ValueError):
+                    self.comments(client, bad)
+        self.assertEqual(fetch.urls, [])
+        self.assertFalse(self.path.exists())
+        self.comments(client, 100)
+        self.assertEqual(query_of(fetch.urls[0])["maxResults"], "100")
+
+    def test_comment_network_error_hides_key(self) -> None:
+        client = self.client(FakeFetch(lambda url: OSError(f"연결 실패: {url}")))
+        with self.assertRaises(YouTubeError) as caught:
+            self.comments(client)
+        exc = caught.exception
+        self.assertEqual(exc.call, "commentThreads.list")
+        self.assertIn("key=<YOUTUBE_API_KEY>", exc.reason)
+        self.assertNotIn(KEY, exc.reason)
+        self.assertNotIn(KEY, str(exc))
+        self.assertIsNone(exc.__cause__)
+        self.assertTrue(exc.__suppress_context__)
+
+    def test_ledger_file_with_comment_calls_loads(self) -> None:
+        seed(self.path, [(NOW - SECOND, "commentThreads.list", 1)] + searches(1, NOW - SECOND))
+        self.assertEqual(QuotaLedger(self.path).usage(NOW), Usage(1, 101))
 
 
 GET_URL = "https://www.googleapis.com/youtube/v3/videos?id=abcdefghijk&key=test-key"

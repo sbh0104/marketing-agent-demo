@@ -10,6 +10,8 @@
   잊고 한도를 넘겨 부르게 되기 때문입니다.
 - 전송은 표준 라이브러리 `urllib` 뿐입니다. API 키는 `[A-Za-z0-9_-]+` 만 받고, 오류 글에서는
   키를 `<YOUTUBE_API_KEY>` 로 가립니다.
+- 인기 댓글(commentThreads.list)은 댓글 글만 돌려주고 작성자 이름 · 채널 ID 는 읽지 않습니다.
+  댓글이 막힌 영상(403 commentsDisabled)은 None 입니다 — 계약 '탐지 · 조회수 추적' 절.
 - Google 쿼터를 늘린 프로젝트는 `DAILY_QUOTA_UNITS` 하나만 바꿉니다.
 """
 from __future__ import annotations
@@ -29,17 +31,22 @@ from pathlib import Path
 from agent.config import LimitsConfig
 
 API_ROOT = "https://www.googleapis.com/youtube/v3/"
-UNIT_COST: dict[str, int] = {"search.list": 100, "videos.list": 1}
+UNIT_COST: dict[str, int] = {"search.list": 100, "videos.list": 1, "commentThreads.list": 1}
 DAILY_QUOTA_UNITS = 10_000
 REGION_CODE = "KR"
 RELEVANCE_LANGUAGE = "ko"
 PAGE_SIZE = 50
 MAX_IDS_PER_CALL = 50
+MAX_COMMENTS_PER_CALL = 100
+COMMENTS_DISABLED = "HTTP 403 commentsDisabled"
 LEDGER_SCHEMA_VERSION = 1
 _WINDOW = timedelta(hours=24)
 _TIMEOUT_S = 30.0
 _KEY_RE = re.compile(r"[A-Za-z0-9_-]+")
 _KEY_MASK = "<YOUTUBE_API_KEY>"
+_SURROGATE_RE = re.compile(r"[\ud800-\udfff]")
+_REPLACEMENT = chr(0xFFFD)
+_TEXT_PATH = ("snippet", "topLevelComment", "snippet", "textDisplay")
 
 Fetch = Callable[[str, float], tuple[int, bytes]]
 
@@ -189,7 +196,7 @@ def http_get(url: str, timeout: float) -> tuple[int, bytes]:
 
 
 class YouTubeClient:
-    """search.list · videos.list 를 부르는 클라이언트. 모든 호출이 쿼터 가드를 거칩니다."""
+    """search.list · videos.list · commentThreads.list 를 부르는 클라이언트. 모든 호출이 쿼터 가드를 거칩니다."""
 
     def __init__(self, api_key: str, ledger: QuotaLedger, fetch: Fetch = http_get) -> None:
         if not (isinstance(api_key, str) and _KEY_RE.fullmatch(api_key)):
@@ -205,10 +212,16 @@ class YouTubeClient:
         page_token: str | None,
         now: datetime,
         limits: LimitsConfig,
+        published_before: datetime | None = None,
     ) -> dict[str, object]:
         """검색 한 페이지 — 최신순, 한국 · 한국어, published_after 이후 올라온 영상."""
         if published_after.utcoffset() is None:
             raise ValueError("published_after 에 시간대가 없습니다")
+        if published_before is not None:
+            if published_before.utcoffset() is None:
+                raise ValueError("published_before 에 시간대가 없습니다")
+            if published_before <= published_after:
+                raise ValueError("published_before 는 published_after 보다 늦어야 합니다")
         params = {
             "part": "snippet",
             "type": "video",
@@ -221,6 +234,10 @@ class YouTubeClient:
                 "%Y-%m-%dT%H:%M:%SZ"
             ),
         }
+        if published_before is not None:
+            params["publishedBefore"] = published_before.astimezone(timezone.utc).strftime(
+                "%Y-%m-%dT%H:%M:%SZ"
+            )
         if page_token is not None:
             params["pageToken"] = page_token
         return self._call("search.list", params, now, limits)
@@ -235,6 +252,32 @@ class YouTubeClient:
             )
         params = {"part": "snippet,statistics", "id": ",".join(video_ids)}
         return self._call("videos.list", params, now, limits)
+
+    def top_comments(
+        self, video_id: str, now: datetime, limits: LimitsConfig, max_results: int
+    ) -> tuple[str, ...] | None:
+        """인기 댓글 글 — 관련도순 앞 max_results 개. 댓글이 막힌 영상(403 commentsDisabled)은 None.
+
+        작성자 이름 · 채널 ID 는 읽지 않습니다. 그 밖의 오류는 YouTubeError 그대로 올라갑니다.
+        """
+        if isinstance(max_results, bool) or not isinstance(max_results, int) or not (
+            1 <= max_results <= MAX_COMMENTS_PER_CALL
+        ):
+            raise ValueError(f"인기 댓글은 한 번에 1–{MAX_COMMENTS_PER_CALL}개입니다: {max_results!r}")
+        params = {
+            "part": "snippet",
+            "videoId": video_id,
+            "order": "relevance",
+            "maxResults": str(max_results),
+            "textFormat": "plainText",
+        }
+        try:
+            data = self._call("commentThreads.list", params, now, limits)
+        except YouTubeError as exc:
+            if exc.reason == COMMENTS_DISABLED:
+                return None
+            raise
+        return _comment_texts(data, max_results)
 
     def _call(
         self, call: str, params: dict[str, str], now: datetime, limits: LimitsConfig
@@ -271,3 +314,21 @@ def _google_reason(data: object) -> str:
         return ""
     reason = errors[0].get("reason")
     return reason if isinstance(reason, str) else ""
+
+
+def _comment_texts(data: dict[str, object], max_results: int) -> tuple[str, ...]:
+    """commentThreads.list 답에서 최상위 댓글 글만 — 모양이 다른 항목은 건너뜁니다."""
+    items = data.get("items", [])
+    if not isinstance(items, list):
+        raise YouTubeError("commentThreads.list", "HTTP 200 items 가 목록이 아닙니다")
+    texts: list[str] = []
+    for item in items:
+        node: object = item
+        for key in _TEXT_PATH:
+            if not isinstance(node, dict):
+                break
+            node = node.get(key)
+        else:
+            if isinstance(node, str):
+                texts.append(_SURROGATE_RE.sub(_REPLACEMENT, node))
+    return tuple(texts[:max_results])
