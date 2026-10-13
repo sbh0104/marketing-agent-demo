@@ -172,7 +172,8 @@ class PostAttempt:
     """게시 시도 한 번.
 
     live: reserved(클릭 전 예약, 결과 모름) → posted | failed.  test: saved.
-    reason 은 실패 원인이나 PostDecision.reason, screenshot 은 저장소 기준 상대 경로입니다.
+    reason 은 실패 원인이나 테스트 저장 이유 — PostDecision.reason 이거나, 게시 직전 다시 확인에서
+    왔으면 그 이유(다른 영상이면 page_mismatch) — 이고, screenshot 은 저장소 기준 상대 경로입니다.
     """
 
     at: datetime

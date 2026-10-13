@@ -98,7 +98,7 @@ Phase 2–7 의 모든 단계가 기대는 계약입니다. 설정 읽기, 영�
   | `live` | `reserved` | 클릭 *전에* 남긴 예약. 결과를 모름 — 게시로 셉니다 |
   | `live` | `posted` | 게시 성공 확인 |
   | `live` | `failed` | 게시 실패 — `reason` 에 원인, `screenshot` 에 캡처 경로 |
-  | `test` | `saved` | 테스트 모드 저장 — `reason` 에 `PostDecision.reason` |
+  | `test` | `saved` | 테스트 모드 저장 — `reason` 에 `PostDecision.reason`, 6절 3.2 에서 왔으면 그 이유(다른 영상이면 `page_mismatch`) |
 
 - 시각은 모두 시간대가 있어야 하고(없으면 `ValueError`), JSON 에는 UTC ISO 8601 로 씁니다.
   `from_dict` 는 모르는 키나 빠진 필수 키에 `ValueError` 를 냅니다.
