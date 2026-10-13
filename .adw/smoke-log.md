@@ -359,7 +359,7 @@ other line is required on every item.
 - evidence: docs/contracts.md:5-6 의 나열에 `writer.py` 가 없음(ship-report R9). S-018 은 나열을 한 번 맞췄지만(resolved) 다음 페이즈를 막지 못해 세 페이즈 연속 빠짐 — Phase 4 `trigger.py` · Phase 3 `classifier.py` · Phase 5 `writer.py`. 각 절 제목이 이미 제 모듈을 적는다(`## 3. 영상 기록 — \`models.py\`` … `## 11. 댓글 작성 — \`writer.py\``)
 - direction: 머리 문단의 모듈 나열을 "`src/agent/` 패키지에 있고, 각 절 제목이 그 절의 모듈을 적습니다" 한 문장으로 바꾼다 — 계약 내용(키 · 판정 토큰 · 형식 · CLI 인자) 변경 없음
 - touches: docs/contracts.md
-- status: open
+- status: resolved
 - attempts: 0 · last failure: —
 - first seen: 2026-10-13 · last seen: 2026-10-13
 
@@ -368,7 +368,7 @@ other line is required on every item.
 - evidence: src/agent/poster.py:139 — `record.channel_id` → `""` 변이가 스위트에서 초록(218개 OK, ship-check 가 따로 다시 잼). 이 변이에서 같은 채널의 허용 영상 둘이 5분 간격으로 둘 다 `live/posted`. `live=decision.live` → `True` · `False` 변이와 src/agent/poster.py:214 `except Exception` → `except BaseException` 변이도 초록(.adw/ship-report.md § Test integrity)
 - direction: tests/test_poster.py 에 ① 같은 채널 다른 허용 영상이 5분 전 `live/posted` → `SKIP reason=channel_cooldown`, open_page 0회 ② `LimitsConfig(1, 24.0, 100)` 에 다른 채널 1건 게시 → `SKIP reason=daily_cap` ③ 허용 목록 밖 영상을 두 번 → 두 번째는 `test/skipped/duplicate_video`, 시도 1건 ④ 허용 영상에 앞선 `test/saved`(page_mismatch) 1건 → live 게시가 `posted` ⑤ `submit` 이 `KeyboardInterrupt` → 그대로 올라가고 시도는 `reserved`, 탭 닫힘 행을 더한다 — 코드 변경 없음. 다섯 행 모두 지금 코드에서 초록이고, ①③④⑤ 가 각각 위 변이 j · k1 · k2 · q2 를 빨갛게 만듦(ship-check 프로브에서 확인)
 - touches: tests/test_poster.py
-- status: open
+- status: resolved
 - attempts: 0 · last failure: —
 - first seen: 2026-10-13 · last seen: 2026-10-13
 
@@ -377,7 +377,7 @@ other line is required on every item.
 - evidence: src/agent/chrome.py:231 `or not button.first.is_enabled()` 를 뺀 변이, src/agent/chrome.py:239 `==` → `in`(부분 일치) 변이와 `texts[:CONFIRM_SCAN]` → `texts` 변이가 스위트에서 초록(.adw/ship-report.md § Test integrity)
 - direction: tests/test_chrome.py 의 YouTubePageTest 에 ① `full_page(submit={"enabled": False})` 에서 `submit()` → `PageError(post_button_missing)`, click 0회 ② `texts` 가 `(TEXT + " 그리고 덧붙인 말",)` → `confirm_posted` 가 False ③ `texts` 가 `("다른 사람 댓글",) * CONFIRM_SCAN + (TEXT,)` → False 행을 더한다 — 코드 변경 없음. 세 행 모두 지금 코드에서 초록이고, 각각 위 세 변이를 빨갛게 만듦(ship-check 프로브에서 확인)
 - touches: tests/test_chrome.py
-- status: open
+- status: resolved
 - attempts: 0 · last failure: —
 - first seen: 2026-10-13 · last seen: 2026-10-13
 
@@ -386,6 +386,6 @@ other line is required on every item.
 - evidence: docs/contracts.md:680 `claude 호출 실패: <오류 종류> <상태 코드>: <메시지 200자까지>` 는 콜론이 늘 붙는 것처럼 적었지만 src/agent/writer.py:260-265 `_error_detail` 은 메시지가 비면 `: …` 를 뺌(재현: `claude 호출 실패: E 429`). 바로 아래 :681-682 jev 틀은 `[ <상태 코드>][: …]` 로 적고 "Claude 틀과 같음"이라 해 두 줄이 서로 다르게 읽힘(.adw/ship-report.md § Risks R2)
 - direction: docs/contracts.md:680 의 Claude 틀을 jev 틀과 같은 `claude 호출 실패: <오류 종류>[ <상태 코드>][: <메시지 200자까지>]` 표기로 바꾸고 괄호 설명에 "메시지가 비면 `: …` 도 뺍니다"를 더한다 — 코드 동작 · 로그 형식 변경 없음
 - touches: docs/contracts.md
-- status: open
+- status: resolved
 - attempts: 0 · last failure: —
 - first seen: 2026-10-13 · last seen: 2026-10-13
