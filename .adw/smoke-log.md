@@ -390,7 +390,7 @@ other line is required on every item.
 - attempts: 0 · last failure: —
 - first seen: 2026-10-13 · last seen: 2026-10-13
 
-### S-NEW-1 — 추적 영상이 50개를 넘을 때 두 번째 videos.list 묶음까지 표본이 붙는지 테스트로 고정
+### S-033 — 추적 영상이 50개를 넘을 때 두 번째 videos.list 묶음까지 표본이 붙는지 테스트로 고정
 - source: cycle 20261013-161159-adw/phase-2-watcher-detect · tracker plans/interview-marketing-agent.md#phase-2 · deferred by ship-check
 - evidence: src/agent/watcher.py:222 — `range(0, len(queue), MAX_IDS_PER_CALL)` → `range(0, min(len(queue), MAX_IDS_PER_CALL), MAX_IDS_PER_CALL)`(처음 50개만 추적) 변이가 스위트에서 초록(201개 OK). 50개 넘는 테스트는 tests/test_watcher.py:421-433 하나뿐이고 첫 묶음이 500(.adw/ship-report.md § Test integrity). 지금 코드는 맞음 — 새 영상 120개 → `['videos:50', 'videos:50', 'videos:20']`, sampled 120(ship-check 에서 확인)
 - direction: tests/test_watcher.py 에 창 안 영상 51개(새 ID 51개 또는 저장 영상 51개)와 두 묶음 모두 200 인 행을 더해 videos 호출 2번(50 · 1), `sampled == 51`, VIEWS 51줄을 단언한다 — 코드 변경 없음
@@ -399,7 +399,7 @@ other line is required on every item.
 - attempts: 0 · last failure: —
 - first seen: 2026-10-13 · last seen: 2026-10-13
 
-### S-NEW-2 — 검색어 둘 이상에서 오류·보류 뒤 남은 검색과 남은 묶음을 멈추는지 테스트로 고정
+### S-034 — 검색어 둘 이상에서 오류·보류 뒤 남은 검색과 남은 묶음을 멈추는지 테스트로 고정
 - source: cycle 20261013-161159-adw/phase-2-watcher-detect · tracker plans/interview-marketing-agent.md#phase-2 · deferred by ship-check
 - evidence: src/agent/watcher.py:181, src/agent/watcher.py:177, src/agent/watcher.py:230 — 검색 오류 뒤 `return`→`break`, 검색 보류 뒤 `return`→`break`, videos 보류 뒤 `return`→`continue` 변이가 모두 초록. ApiErrorTest · QuotaTest 는 키워드 하나(tests/test_watcher.py:30 CONFIG)라 "남은 검색을 그만둠"(계약 11절)이 안 걸림(.adw/ship-report.md § Test integrity)
 - direction: tests/test_watcher.py 에 키워드 2개 Config 로 (a) 첫 검색 403 → search 호출 1번 · ERROR 1줄, (b) daily_max_searches 1 + 첫 키워드가 다음 페이지 토큰 → search 1번 · QUOTA 1줄, (c) 추적 51개 + 단위 한도로 첫 videos 묶음 보류 → QUOTA 1줄 · videos 호출 0번 을 단언한다 — 코드 변경 없음
@@ -408,7 +408,7 @@ other line is required on every item.
 - attempts: 0 · last failure: —
 - first seen: 2026-10-13 · last seen: 2026-10-13
 
-### S-NEW-3 — 제목·설명 밖 외부 글자 다섯 자리의 서로게이트 정리를 테스트로 고정
+### S-035 — 제목·설명 밖 외부 글자 다섯 자리의 서로게이트 정리를 테스트로 고정
 - source: cycle 20261013-161159-adw/phase-2-watcher-detect · tracker plans/interview-marketing-agent.md#phase-2 · deferred by ship-check
 - evidence: src/agent/watcher.py:72, src/agent/watcher.py:167, src/agent/watcher.py:207, src/agent/watcher.py:268, src/agent/watcher.py:296 — 각 자리의 `_clean` 을 뺀 변이가 tests.test_watcher 에서 초록. `Logbook.write(Event.ERROR, reason="HTTP 400 \ud800bad")` 는 UnicodeEncodeError 를 내므로 :296 이 깨지면 주기가 ERROR 줄 없이 끝남(.adw/ship-report.md § Test integrity)
 - direction: tests/test_watcher.py IntakeTest/ApiErrorTest 에 channelId `"UC\ud800"`, 키워드 `"연애\ud800"`, search videoId `"x\ud800"`, 잘못된 viewCount 의 detail, 403 본문 reason `"bad\ud800"` 행을 더해 run 이 CycleReport 를 돌려주고 로그 값이 U+FFFD 로 parse_line 되는지 단언한다 — 코드 변경 없음
@@ -417,7 +417,7 @@ other line is required on every item.
 - attempts: 0 · last failure: —
 - first seen: 2026-10-13 · last seen: 2026-10-13
 
-### S-NEW-4 — 경계값 넷(publishedAt 초 · 추적 창 경계와 설정값 · 단위 한도 경계 · 빈 nextPageToken)을 테스트로 고정
+### S-036 — 경계값 넷(publishedAt 초 · 추적 창 경계와 설정값 · 단위 한도 경계 · 빈 nextPageToken)을 테스트로 고정
 - source: cycle 20261013-161159-adw/phase-2-watcher-detect · tracker plans/interview-marketing-agent.md#phase-2 · deferred by ship-check
 - evidence: src/agent/watcher.py:55 (`value[:16]` 변이 초록), src/agent/watcher.py:220 (`>`→`>=` 초록), src/agent/watcher.py:152 (`timedelta(hours=12)` 로 박은 변이 초록), src/agent/youtube.py:110 (`>`→`>=` 초록), src/agent/watcher.py:213 (빈 토큰을 따라가는 변이 초록)(.adw/ship-report.md § Test integrity)
 - direction: tests/test_watcher.py 에 `publishedAt "2026-10-12T10:00:37Z"` → `published_at` 초 37, `max_age_hours 6` 에서 정확히 NOW−6h 영상은 비추적 · NOW−5h 는 추적, `nextPageToken: ""` 이면 다음 페이지를 부르지 않음 을, tests/test_youtube.py 에 9,999 단위에서 videos.list 1회 허용 뒤 다음 호출 보류(units 10000/10000) 를 더한다 — 코드 변경 없음
@@ -426,7 +426,7 @@ other line is required on every item.
 - attempts: 0 · last failure: —
 - first seen: 2026-10-13 · last seen: 2026-10-13
 
-### S-NEW-5 — http_get 의 HTTPError → (code, body) 변환을 단위 테스트로 고정
+### S-037 — http_get 의 HTTPError → (code, body) 변환을 단위 테스트로 고정
 - source: cycle 20261013-161159-adw/phase-2-watcher-detect · tracker plans/interview-marketing-agent.md#phase-2 · deferred by ship-check
 - evidence: src/agent/youtube.py:181-188 — `grep -n -e http_get -e HTTPError -e urlopen tests/*.py` 결과 없음. 지금 증명은 verify 러너 V9(실제 루프백 403)뿐이라 스위트 밖(.adw/ship-report.md § Spec compliance)
 - direction: tests/test_youtube.py 에 `urllib.request.urlopen` 을 patch 한 테스트를 더해 HTTPError(403, 본문) → `(403, 본문)`, 200 응답 → `(200, 본문)`, 요청의 `Accept: application/json` 헤더와 timeout 전달을 단언한다 — 코드 변경 없음
@@ -435,7 +435,7 @@ other line is required on every item.
 - attempts: 0 · last failure: —
 - first seen: 2026-10-13 · last seen: 2026-10-13
 
-### S-NEW-6 — 계약 첫 문단의 모듈 목록과 config.yaml 첫 주석을 지금 코드에 맞춤
+### S-038 — 계약 첫 문단의 모듈 목록과 config.yaml 첫 주석을 지금 코드에 맞춤
 - source: cycle 20261013-161159-adw/phase-2-watcher-detect · tracker plans/interview-marketing-agent.md#phase-2 · deferred by ship-check
 - evidence: docs/contracts.md:3-6 — 코드 위치로 Phase 1 파일 6개만 나열하고 11절의 env.py · youtube.py · watcher.py 를 빠뜨림. config.yaml:1 — "과제 안내의 예시 값입니다" 인데 poll_interval_min · daily_max_searches 는 과제와 다름(.adw/verify-plan.md § Out of scope (b), .adw/ship-report.md § Smoke candidates)
 - direction: docs/contracts.md:3-6 의 모듈 목록에 `env.py` · `youtube.py` · `watcher.py`(11절)를 더하고, config.yaml:1 주석을 "과제 예시 값이 기본이고, 주기와 검색 상한은 계약 2절대로 바꿈" 으로 고친다 — 값과 계약 조항은 그대로
@@ -444,7 +444,7 @@ other line is required on every item.
 - attempts: 0 · last failure: —
 - first seen: 2026-10-13 · last seen: 2026-10-13
 
-### S-NEW-7 — 검색 쿼터 비용을 "구글의 계산"이 아니라 "우리 장부의 일부러 엄격한 계산"으로 바로 적음
+### S-039 — 검색 쿼터 비용을 "구글의 계산"이 아니라 "우리 장부의 일부러 엄격한 계산"으로 바로 적음
 - source: cycle 20261013-161159-adw/phase-2-watcher-detect · tracker plans/interview-marketing-agent.md#phase-2 · deferred by deep-interview (ship-check R3 → HC1 질문 2 A)
 - evidence: docs/contracts.md:58-67, docs/contracts.md:535-536, docs/contracts.md:553-554, config.yaml:14, docs/research/search-quota.md:8, docs/research/search-quota.md:17 — 검색 1회를 "Google 의 100 단위(하루 10,000 단위 한 통)"로 적음. 구글 공식 표는 2026-10-08 부터 `search.list` 를 하루 100회 별도 통(1회 1), `videos.list` 를 나머지 10,000 단위 통에서 1로 셈(https://developers.google.com/youtube/v3/determine_quota_cost "Last updated 2026-10-08 UTC", .adw/ship-report.md § Risks R3). 장부(src/agent/youtube.py:32-33, :107-111)는 트래커 Phase 2 결정(HC1 질문 2 A)대로 옛 계산을 일부러 유지 — 코드는 맞고 문서의 이유가 틀림
 - direction: 계약 2절 · 11절과 config.yaml:14 주석을 "구글은 검색을 하루 100회 별도 통으로 센다 · 우리 장부는 더 엄격하게 검색 1회를 10,000 단위 통에서 100씩 깎는다(옛 규칙과 새 규칙 모두에서 넘치지 않게) · 그래서 기본 90회면 조회수 몫은 1,000 단위 이상이고, daily_max_searches 를 95–100 으로 올려 조회수가 막히는 것은 구글이 아니라 우리 장부 때문(그때는 장부를 두 통으로 나누는 결정이 따로 필요)"으로 고친다(출처 URL · 갱신일 포함). docs/research/search-quota.md 는 조사 기록이라 :8 · :17 을 지우지 않고 `## Decision` 아래에 날짜 붙은 정정 줄을 더한다 — 값 · 코드 · 장부 파일 모양 · 계약 조항의 동작은 그대로
@@ -453,7 +453,7 @@ other line is required on every item.
 - attempts: 0 · last failure: —
 - first seen: 2026-10-13 · last seen: 2026-10-13
 
-### S-NEW-8 — 표본 2개 이상인 기록의 VIEWS prev/delta 와, 조회수 호출만 막혔을 때의 held 를 테스트로 고정
+### S-040 — 표본 2개 이상인 기록의 VIEWS prev/delta 와, 조회수 호출만 막혔을 때의 held 를 테스트로 고정
 - source: cycle 20261013-161159-adw/phase-2-watcher-detect · tracker plans/interview-marketing-agent.md#phase-2 · deferred by ship-check
 - evidence: src/agent/watcher.py:274 (`view_history[-2]`→`[0]` 변이 초록), src/agent/watcher.py:220 (표본 2개 이상인 기록을 추적에서 빼는 변이 초록), src/agent/watcher.py:229 (`_track` 의 `tally.held = True` 를 지운 변이 초록)(.adw/ship-report.md § Test integrity)
 - direction: tests/test_watcher.py 에 창 안 저장 영상의 view_history 가 [1000, 1300] 일 때 새 조회수 1450 이면 `VIEWS prev=1300 delta=150` 인지, 장부를 검색 99회(9,900단위)로 채우고 daily_max_searches 200 에서 검색 1회는 통과 · videos.list 는 막히면 `CycleReport.held is True` 와 `QUOTA … call=videos.list counter=units` 한 줄인지 단언한다 — 코드 변경 없음
@@ -462,7 +462,7 @@ other line is required on every item.
 - attempts: 0 · last failure: —
 - first seen: 2026-10-13 · last seen: 2026-10-13
 
-### S-NEW-9 — 실패할 수 없는 단언 둘을 고침
+### S-041 — 실패할 수 없는 단언 둘을 고침
 - source: cycle 20261013-161159-adw/phase-2-watcher-detect · tracker plans/interview-marketing-agent.md#phase-2 · deferred by ship-check
 - evidence: tests/test_youtube.py:276 (`QuotaLedger(...)` 가 먼저 QuotaError 를 내서 `fetch.urls == []` 는 늘 참), tests/test_watcher.py:613-617 (src/agent/watcher.py:150-151 을 지워도 src/agent/youtube.py:211 의 다른 ValueError 로 통과)(.adw/ship-report.md § Test integrity)
 - direction: tests/test_youtube.py:276 의 단언을 지우거나 장부 거부를 직접 단언하는 것으로 바꾸고, tests/test_watcher.py ClockTest.test_naive_now_is_rejected 는 `assertRaisesRegex(ValueError, "now 에 시간대가 없습니다")` 로 문구까지 단언한다 — 코드 변경 없음
@@ -471,7 +471,7 @@ other line is required on every item.
 - attempts: 0 · last failure: —
 - first seen: 2026-10-13 · last seen: 2026-10-13
 
-### S-NEW-10 — 탐지 입력 가장자리 여섯 가지를 테스트로 고정
+### S-042 — 탐지 입력 가장자리 여섯 가지를 테스트로 고정
 - source: cycle 20261013-161159-adw/phase-2-watcher-detect · tracker plans/interview-marketing-agent.md#phase-2 · deferred by ship-check
 - evidence: src/agent/watcher.py:213 (`isinstance(token, str)` 제거 초록), src/agent/watcher.py:207 (SKIP 의 `raw[:40]`→`raw` 초록), src/agent/watcher.py:74 (description 기본값 `""` 제거 초록), src/agent/watcher.py:202 (검색 ID `fullmatch`→`match` 초록), src/agent/watcher.py:53 (publishedAt `fullmatch`→`match` 초록), src/agent/watcher.py:55 (`.replace(tzinfo=utc)`→`.astimezone(utc)` 는 TZ=UTC 호스트에서 초록)(.adw/ship-report.md § Test integrity)
 - direction: tests/test_watcher.py 에 nextPageToken 이 str 이 아니면(예: 5) 다음 페이지를 부르지 않음 · 40자보다 긴 잘못된 검색 ID 의 SKIP video 값이 40자 · description 이 없는 영상은 description "" 로 저장 · 12자 검색 ID 는 search.list 단계에서 SKIP 되고 videos.list 로 가지 않음 · INVALID_ITEMS 에 publishedAt "2026-10-12T10:00:00Zjunk" 행 · publishedAt 고정 테스트를 로컬 시간대가 UTC 가 아닐 때(TZ=Asia/Seoul + time.tzset, 끝나면 되돌림, tzset 이 없는 곳은 skip)도 돌림 을 더한다 — 코드 변경 없음
@@ -480,7 +480,7 @@ other line is required on every item.
 - attempts: 0 · last failure: —
 - first seen: 2026-10-13 · last seen: 2026-10-13
 
-### S-NEW-11 — 쿼터 장부 · 클라이언트 가장자리 일곱 가지를 테스트로 고정
+### S-043 — 쿼터 장부 · 클라이언트 가장자리 일곱 가지를 테스트로 고정
 - source: cycle 20261013-161159-adw/phase-2-watcher-detect · tracker plans/interview-marketing-agent.md#phase-2 · deferred by ship-check
 - evidence: src/agent/youtube.py:148 (`utf-8-sig`→`utf-8` 초록), src/agent/youtube.py:130-135 (장부 `indent=None` · `sort_keys=False` 초록), src/agent/youtube.py:124 (`astimezone(utc)` 없는 `isoformat()` 초록), src/agent/youtube.py:242-243 (URL 만들기와 reserve 순서 바꾸기 초록), src/agent/youtube.py:104-105 (모르는 호출 ValueError 제거 초록), src/agent/youtube.py:259 (`replace(key, mask, 1)` 초록), src/agent/youtube.py:252 (`status != 200`→`status >= 400` 초록)(.adw/ship-report.md § Test integrity)
 - direction: tests/test_youtube.py 에 BOM 붙은 유효한 quota.json 을 읽음 · 쓴 장부 파일이 키 정렬 · 2칸 들여쓰기 · KST 인 now 로 reserve 해도 저장된 at 이 `+00:00` · page_token="\ud800" 처럼 URL 을 못 만드는 호출은 장부에 안 적히고 fetch 0회 · `reserve("comments.list", …)` 는 ValueError · URL 을 두 번 담은 OSError 문구에서 키가 둘 다 가려짐 · `(302, b'{"items": []}')` 은 `YouTubeError` 의 reason `"HTTP 302"` 를 단언한다 — 코드 변경 없음
@@ -489,7 +489,7 @@ other line is required on every item.
 - attempts: 0 · last failure: —
 - first seen: 2026-10-13 · last seen: 2026-10-13
 
-### S-NEW-12 — .env 읽기 가장자리 셋을 테스트로 고정
+### S-044 — .env 읽기 가장자리 셋을 테스트로 고정
 - source: cycle 20261013-161159-adw/phase-2-watcher-detect · tracker plans/interview-marketing-agent.md#phase-2 · deferred by ship-check
 - evidence: src/agent/env.py:34 (`raw.strip()`→`raw` 초록), src/agent/env.py:39 (`not sep` 제거 초록), src/agent/env.py:28-29 (`except OSError` 제거 초록)(.adw/ship-report.md § Test integrity)
 - direction: tests/test_env.py 에 공백만 있는 줄과 들여 쓴 `# 주석` 줄은 건너뜀 · `=` 없는 `JUSTNAME` 줄은 줄 번호를 대고 값은 말하지 않는 `EnvError` · `.env` 자리가 폴더면 `EnvError` 를 단언한다 — 코드 변경 없음
@@ -498,7 +498,7 @@ other line is required on every item.
 - attempts: 0 · last failure: —
 - first seen: 2026-10-13 · last seen: 2026-10-13
 
-### S-NEW-13 — 쿼터 장부의 임시 파일 쓰기와 구글 reason 이 글자가 아닐 때를 테스트로 고정
+### S-045 — 쿼터 장부의 임시 파일 쓰기와 구글 reason 이 글자가 아닐 때를 테스트로 고정
 - source: cycle 20261013-161159-adw/phase-2-watcher-detect · tracker plans/interview-marketing-agent.md#phase-2 · deferred by ship-check
 - evidence: src/agent/youtube.py:136 (`tmp = self.path` 로 바꿔 임시 파일 없이 바로 쓰는 변이 초록), src/agent/youtube.py:273 (`return str(reason)` 변이 초록 — 오류 줄이 `HTTP 404 None` 이 됨)(.adw/ship-report.md § Test integrity)
 - direction: tests/test_youtube.py 에 reserve 하는 동안 `os.replace` 를 가로채 첫 인자가 `quota.json.tmp` 이고 둘째가 `quota.json` 인지 · 404 본문의 `error.errors[0].reason` 이 `5` 나 `null` 이면 `YouTubeError` reason 이 정확히 `"HTTP 404"` 인지 단언한다 — 코드 변경 없음
@@ -507,7 +507,7 @@ other line is required on every item.
 - attempts: 0 · last failure: —
 - first seen: 2026-10-14 · last seen: 2026-10-14
 
-### S-NEW-14 — 저장소 쓰기 오류 전파 · publishedAt 소수 자릿수 · 글자 아닌 id · 다음 페이지의 publishedAfter 를 테스트로 고정
+### S-046 — 저장소 쓰기 오류 전파 · publishedAt 소수 자릿수 · 글자 아닌 id · 다음 페이지의 publishedAfter 를 테스트로 고정
 - source: cycle 20261013-161159-adw/phase-2-watcher-detect · tracker plans/interview-marketing-agent.md#phase-2 · deferred by ship-check
 - evidence: src/agent/watcher.py:271 (`self._store.put(record)` 를 `try/except: return` 으로 감싼 변이 초록 — 계약 11절 "저장소 쓰기 오류는 run_loop 로 올라감"), src/agent/watcher.py:32 (소수 `{1,9}`→`{1,3}` 변이 초록), src/agent/watcher.py:89 (`isinstance(item.get("id"), str)` 제거 변이 초록), src/agent/youtube.py:220-225 (pageToken 이 있을 때 publishedAfter 를 빼는 변이 초록)(.adw/ship-report.md § Test integrity)
 - direction: tests/test_watcher.py 에 `put` 이 `OSError` 를 내는 Store 하위 클래스를 넣으면 `Watcher.run` 이 그 `OSError` 를 그대로 내는지 · publishedAt `"2026-10-12T10:00:00.123456789Z"` 가 저장되고 10자리 소수는 SKIP 인지 · videos.list 응답에 `{"id": {"x": 1}}` 항목이 섞여도 주기가 끝나고 그 항목이 무시되는지 · 다음 페이지 요청에도 첫 페이지와 같은 publishedAfter 가 실리는지 단언한다 — 코드 변경 없음
@@ -516,9 +516,9 @@ other line is required on every item.
 - attempts: 0 · last failure: —
 - first seen: 2026-10-14 · last seen: 2026-10-14
 
-### S-NEW-15 — SKIP 줄의 detail 내용과 200 이 아닌 2xx 상태를 테스트로 고정
+### S-047 — SKIP 줄의 detail 내용과 200 이 아닌 2xx 상태를 테스트로 고정
 - source: cycle 20261013-161159-adw/phase-2-watcher-detect · tracker plans/interview-marketing-agent.md#phase-2 · deferred by ship-check
-- evidence: src/agent/watcher.py:268 (`detail=_clean(str(exc))` 를 `detail=None` · `detail="x"` 로 바꾼 변이 둘 다 초록 — tests/test_watcher.py:518 이 `assertTrue(fields.pop("detail"))` 로 참/거짓만 봄), src/agent/youtube.py:186 (`response.status` 를 `200` 으로 박은 변이 초록 — S-NEW-5 가 요구한 403 · 200 행으로는 잡히지 않음)(.adw/ship-report.md § Test integrity)
+- evidence: src/agent/watcher.py:268 (`detail=_clean(str(exc))` 를 `detail=None` · `detail="x"` 로 바꾼 변이 둘 다 초록 — tests/test_watcher.py:518 이 `assertTrue(fields.pop("detail"))` 로 참/거짓만 봄), src/agent/youtube.py:186 (`response.status` 를 `200` 으로 박은 변이 초록 — S-037 가 요구한 403 · 200 행으로는 잡히지 않음)(.adw/ship-report.md § Test integrity)
 - direction: tests/test_watcher.py IntakeTest 의 INVALID_ITEMS 행마다 SKIP 줄 detail 의 앞부분을 지금 코드가 내는 글 그대로 단언하고(예: viewCount `-5` 행은 `statistics.viewCount:` 로 시작), tests/test_youtube.py 에 `urllib.request.urlopen` 을 patch 해 204 응답이 `http_get` 에서 `(204, b"")` 로 돌아오는지 단언한다 — 코드 변경 없음
 - touches: tests/test_watcher.py, tests/test_youtube.py
 - status: open

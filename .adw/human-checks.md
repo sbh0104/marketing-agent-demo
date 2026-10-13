@@ -285,3 +285,35 @@
 - source: adw/smoke-sweep-s024-s028
 - tag: plain
 - status: open
+
+### H-033 — 조회수 표본 주기를 검색 주기와 나눌지(선택지 c, 예: 표본 30분 · 검색 120분)는 Phase 4가 필요한 해상도를 정한 뒤 다시 보기
+- project: marketing-agent-demo
+- when: 2026-10-14 · plans/interview-marketing-agent.md#phase-2
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-2-watcher-detect
+- tag: plain
+- status: open
+
+### H-034 — https://developers.google.com/youtube/v3/determine_quota_cost 를 사람이 직접 열어 `videos.list` = 1단위와 `search.list` 별도 통(2026-10-08 갱신)을 눈으로 확인하기(지금까지는 요약 모델을 거쳐 읽음)
+- project: marketing-agent-demo
+- when: 2026-10-14 · plans/interview-marketing-agent.md#phase-2
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-2-watcher-detect
+- tag: plain
+- status: open
+
+### H-035 — 실제 `YOUTUBE_API_KEY`로 한 주기를 돌려 `DETECT`/`VIEWS` 줄, `data/quota.json` 항목, 실제 `publishedAt`의 `…Z` 모양, 요청 매개변수가 받아들여지는지 확인하기(Phase 7 `--once`가 생긴 뒤)
+- project: marketing-agent-demo
+- when: 2026-10-14 · plans/interview-marketing-agent.md#phase-2
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-2-watcher-detect
+- tag: plain
+- status: open
+
+### H-036 — Windows와 macOS에서 실행해 보기(메모장으로 BOM 붙여 저장한 `.env`, python.org macOS 빌드의 HTTPS 인증서)
+- project: marketing-agent-demo
+- when: 2026-10-14 · plans/interview-marketing-agent.md#phase-2
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-2-watcher-detect
+- tag: plain
+- status: open
