@@ -27,6 +27,7 @@
 
 ## To do
 
+- [~] [smoke] 스모크 스윕 — S-007
 - [x] [smoke] 스모크 스윕 — S-003
 - [x] [smoke] 스모크 스윕 — S-001, S-002, S-004, S-005, S-006
 - [x] Phase 1 — 뼈대와 계약 (plans/interview-marketing-agent.md#phase-1)
