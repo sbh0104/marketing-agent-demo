@@ -12,21 +12,64 @@
 """
 from __future__ import annotations
 
+import hashlib
+import importlib.util
 import json
 import os
 import re
 import sys
+import tempfile
 from collections import Counter
-from collections.abc import Callable, Mapping, Sequence
-from dataclasses import replace
+from collections.abc import Callable, Iterable, Mapping, Sequence
+from dataclasses import dataclass, replace
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import TextIO
 
 import tests  # noqa: F401 — src/ 를 sys.path 에 넣는 준비
-from agent.classifier import LANGUAGES, _decide
-from agent.config import ClassifierConfig
-from agent.models import Verdict
-from tests.jev_accuracy import PASS_CORRECT
+from agent.classifier import (
+    LANGUAGES,
+    Ask,
+    JevError,
+    _decide,
+    build_questions,
+    classify,
+    is_error_hold,
+    read_answers,
+    sdk_ask,
+)
+from agent.config import ClassifierConfig, Config, ConfigError, LimitsConfig, load_config
+from agent.env import EnvError, require_secret
+from agent.logbook import Logbook
+from agent.models import VIDEO_ID_RE, Judgement, Verdict, VideoRecord
+from agent.watcher import _items_by_id, _new_record
+from agent.writer import (
+    CHECK_QUESTIONS,
+    CLAUDE_TIMEOUT_S,
+    DESCRIPTION_LIMIT,
+    ITEM_LIMIT,
+    TITLE_LIMIT,
+    TOP_COMMENTS_MAX,
+    ClaudeClient,
+    SelfCheck,
+    _clean,
+    _invalid_answer,
+    _material,
+    _reply_text,
+    code_failures,
+    parse_output,
+    self_check_failure,
+    write_comment,
+)
+from agent.youtube import (
+    MAX_IDS_PER_CALL,
+    QuotaExhausted,
+    QuotaLedger,
+    YouTubeClient,
+    YouTubeError,
+)
+from tests.classifier_examples import EXAMPLES
+from tests.jev_accuracy import PASS_CORRECT, REPO_CONFIG, judge_examples, tally
 
 REPO = Path(__file__).resolve().parent.parent
 RESULT_DIR = REPO / "docs" / "live-check"
@@ -101,6 +144,38 @@ class Calls:
         if self.counts[service] >= self.ceilings[service]:
             raise CeilingReached(service, self.ceilings[service])
         self.counts[service] += 1
+
+
+@dataclass(frozen=True)
+class Keys:
+    """세 서비스의 키 — 실행기 안에서만 쓰고 결과 · 화면 · 오류 어디에도 내보내지 않습니다."""
+
+    youtube: str
+    typesafe: str
+    anthropic: str
+
+
+@dataclass(frozen=True)
+class Services:
+    """실행기가 부르는 세 서비스 — 실제 실행은 connect_real 이, 테스트는 가짜가 만듭니다."""
+
+    ask: Ask
+    claude: ClaudeClient
+    youtube: YouTubeClient
+
+
+@dataclass(frozen=True)
+class RunLimits:
+    """실행 한 번의 한도 — 서비스별 호출 천장 · 목표 초안 수 · 판별 · 작성 영상 수 · 넓힌 창."""
+
+    ceilings: Mapping[str, int]
+    target_drafts: int
+    classify_max: int
+    write_max: int
+    wide_window_hours: int
+
+
+DEFAULT_LIMITS = RunLimits(CEILINGS, TARGET_DRAFTS, CLASSIFY_MAX, WRITE_MAX, WIDE_WINDOW_HOURS)
 
 
 class Redactor:
@@ -379,15 +454,785 @@ def verdict_from_file(path: Path, stdout: TextIO, stderr: TextIO) -> int:
     return 0 if line == "6B: go" else 1
 
 
+# ── 실행 부분 — 진짜 서비스(또는 테스트의 가짜)를 세어 가며 부르고 결과를 채웁니다 ──
+
+
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _error_fields(exc: BaseException) -> tuple[str, int | None]:
+    """실패한 호출의 (예외 이름, 상태 코드) — 메시지는 읽지 않습니다.
+
+    원인(__cause__)을 단 JevError 는 그 원인(SDK 오류)의 이름과 상태를 씁니다. YouTubeError 는
+    reason 의 `HTTP <세 자리>` 에서, 그 밖은 status_code 나 status 속성에서 상태를 읽고, 정수가
+    아니면 None 입니다.
+    """
+    base = exc.__cause__ if isinstance(exc, JevError) and exc.__cause__ is not None else exc
+    if isinstance(base, YouTubeError):
+        match = re.match(r"HTTP ([0-9]{3})", base.reason)
+        status: object = int(match.group(1)) if match else None
+    else:
+        status = getattr(base, "status_code", getattr(base, "status", None))
+    if isinstance(status, bool) or not isinstance(status, int):
+        status = None
+    return type(base).__name__, status
+
+
+class _Track:
+    """호출 기록 — 서비스마다 지금 단계와 지금 영상을 알고, 실패한 호출을 errors[] 에 남깁니다."""
+
+    def __init__(self, result: dict) -> None:
+        self.result = result
+        self.stage = {"jev": "accuracy", "claude": "probe", "youtube": "search"}
+        self.video: str | None = None
+        self.last: object = None
+
+    def error(self, service: str, exc: BaseException) -> None:
+        name, status = _error_fields(exc)
+        self.result["errors"].append(
+            {
+                "service": service,
+                "stage": self.stage[service],
+                "error": name,
+                "status": status,
+                "video_id": self.video,
+            }
+        )
+
+    def saw_jev(self, response: object) -> None:
+        """jev 의 답을 last 에 두고, 답이 알린 모델 이름(100자까지)을 지문에 더합니다."""
+        self.last = response
+        model = getattr(response, "model", None)
+        if isinstance(model, str):
+            fingerprint = self.result["fingerprint"]
+            fingerprint["jev_models"] = sorted({*fingerprint["jev_models"], model[:100]})
+
+
+def _guarded(service: str, calls: Calls, track: _Track, send: Callable[[], object]) -> object:
+    """천장을 먼저 세고 보냅니다. 쿼터 장부가 막은 호출은 그대로 올리고, 그 밖의 실패는 남기고 올립니다.
+
+    CeilingReached 는 BaseException 이라 여기서 잡히지 않고 실행 전체를 멈춥니다.
+    """
+    calls.take(service)
+    try:
+        return send()
+    except QuotaExhausted:
+        raise
+    except Exception as exc:
+        track.error(service, exc)
+        raise
+
+
+def _counted_ask(ask: Ask, calls: Calls, track: _Track) -> Ask:
+    """jev 의 ask 를 세는 감싸개 — 부를 때마다 last 를 비우고, 답하면 saw_jev 에 넘깁니다."""
+
+    def counted(model: str, state: str, questions: Mapping[str, Mapping[str, object]]) -> object:
+        track.last = None
+        response = _guarded("jev", calls, track, lambda: ask(model, state, questions))
+        track.saw_jev(response)
+        return response
+
+    return counted
+
+
+class _CountedClaude:
+    """Claude 클라이언트를 세는 감싸개 — `messages.create` 한 번이 실행기 호출 하나입니다."""
+
+    def __init__(self, claude: ClaudeClient, calls: Calls, track: _Track) -> None:
+        self._claude = claude
+        self._calls = calls
+        self._track = track
+
+    @property
+    def messages(self) -> _CountedClaude:
+        return self
+
+    def create(self, **kwargs: object) -> object:
+        return _guarded(
+            "claude", self._calls, self._track, lambda: self._claude.messages.create(**kwargs)
+        )
+
+
+class _CountedYouTube:
+    """YouTubeClient 를 세는 감싸개 — 같은 모양의 search · videos · top_comments, 단계도 적습니다."""
+
+    def __init__(self, youtube: YouTubeClient, calls: Calls, track: _Track) -> None:
+        self._youtube = youtube
+        self._calls = calls
+        self._track = track
+
+    def search(
+        self,
+        query: str,
+        published_after: datetime,
+        page_token: str | None,
+        now: datetime,
+        limits: LimitsConfig,
+        published_before: datetime | None = None,
+    ) -> dict[str, object]:
+        return self._send(
+            "search",
+            lambda: self._youtube.search(
+                query, published_after, page_token, now, limits, published_before=published_before
+            ),
+        )
+
+    def videos(
+        self, video_ids: Sequence[str], now: datetime, limits: LimitsConfig
+    ) -> dict[str, object]:
+        return self._send("videos", lambda: self._youtube.videos(video_ids, now, limits))
+
+    def top_comments(
+        self, video_id: str, now: datetime, limits: LimitsConfig, max_results: int
+    ) -> tuple[str, ...] | None:
+        return self._send(
+            "comments", lambda: self._youtube.top_comments(video_id, now, limits, max_results)
+        )
+
+    def _send(self, stage: str, send: Callable[[], object]) -> object:
+        self._track.stage["youtube"] = stage
+        return _guarded("youtube", self._calls, self._track, send)
+
+
+def jev_self_check(ask: Ask, model: str) -> SelfCheck:
+    """'댓글 작성' 절의 check 포트 — 질문마다 noul 하나를 한 요청으로 묻고 answers[이름].noul 을 돌려줍니다.
+
+    운영(Phase 7)이 자체 검사를 이어 붙일 때 이 모양을 옮겨 씁니다. 답의 모양이 다르면 예외가
+    그대로 올라가고, write_comment 가 jev 검사 실패로 받습니다.
+    """
+
+    def check(state: str, questions: Mapping[str, str]) -> Mapping[str, object]:
+        response = ask(
+            model,
+            state,
+            {
+                name: {
+                    "type": "noul",
+                    "instructions": text,
+                    "criteria": dict(SELF_CHECK_CRITERIA),
+                }
+                for name, text in questions.items()
+            },
+        )
+        return {name: response.answers[name].noul for name in questions}
+
+    return check
+
+
+def probe_models(claude: ClaudeClient, names: Iterable[str], into: dict) -> None:
+    """이름마다 max_tokens=1 로 한 번 부릅니다 — 답하면 accepted, 상태 404 면 rejected, 그 밖은 error."""
+    for name in names:
+        try:
+            claude.messages.create(
+                model=name,
+                max_tokens=PROBE_MAX_TOKENS,
+                messages=[{"role": "user", "content": PROBE_PROMPT}],
+            )
+        except Exception as exc:
+            error, status = _error_fields(exc)
+            into[name] = {
+                "status": "rejected" if status == 404 else "error",
+                "error": error if status is None else f"{error} {status}",
+            }
+        else:
+            into[name] = {"status": "accepted", "error": None}
+
+
+def choose_models(
+    models: Mapping[str, Mapping[str, object]], configured: str
+) -> tuple[str | None, str | None]:
+    """(작성 모델, 채점 모델) — 작성은 설정 모델이 accepted 면 그것, 아니면 처음 accepted 인 이름.
+
+    채점은 작성 모델이 아닌 처음 accepted 이름이고, 없으면 작성 모델입니다(제 글 채점 치우침을 줄임).
+    """
+    accepted = [name for name, entry in models.items() if entry["status"] == "accepted"]
+    writer = configured if configured in accepted else next(iter(accepted), None)
+    grader = next((name for name in accepted if name != writer), writer)
+    return writer, grader
+
+
+def parse_grade(raw: str) -> dict[str, bool] | None:
+    """채점 답에서 JSON 하나 — 키가 정확히 GRADE_KEYS 이고 값이 모두 참거짓일 때만, 아니면 None."""
+    start = raw.find("{")
+    end = raw.rfind("}")
+    if start < 0 or end < start:
+        return None
+    try:
+        data = json.loads(raw[start : end + 1])
+    except (ValueError, RecursionError):
+        return None
+    if not isinstance(data, dict) or set(data) != set(GRADE_KEYS):
+        return None
+    if not all(isinstance(data[key], bool) for key in GRADE_KEYS):
+        return None
+    return {key: data[key] for key in GRADE_KEYS}
+
+
+def grade_draft(
+    claude: ClaudeClient,
+    model: str,
+    record: VideoRecord,
+    top_comments: Sequence[str],
+    concern: str,
+    comment: str,
+) -> tuple[dict[str, bool] | None, str | None]:
+    """초안 하나를 채점 모델에 한 번 묻습니다 — (세 답, None) 또는 (None, 오류 이름 · "응답 모양").
+
+    재료는 작성기와 같은 태그 블록(_material)이고 고민 · 초안은 _clean 으로 감쌉니다.
+    CeilingReached 는 BaseException 이라 그대로 올라가 실행을 멈춥니다.
+    """
+    content = "\n\n".join(
+        [
+            *_material(record, "", top_comments),
+            f"<concern>\n{_clean(concern, ITEM_LIMIT)}\n</concern>",
+            f"<draft_comment>\n{_clean(comment, ITEM_LIMIT)}\n</draft_comment>",
+            GRADE_INSTRUCTION,
+        ]
+    )
+    try:
+        response = claude.messages.create(
+            model=model,
+            max_tokens=GRADE_MAX_TOKENS,
+            system=GRADE_SYSTEM,
+            messages=[{"role": "user", "content": content}],
+        )
+    except Exception as exc:
+        name, status = _error_fields(exc)
+        return None, name if status is None else f"{name} {status}"
+    try:
+        grade = parse_grade(_reply_text(response))
+    except Exception:
+        grade = None
+    return (grade, None) if grade is not None else (None, "응답 모양")
+
+
+def _answers_view(
+    judgement: Judgement, response: object, classifier: ClassifierConfig
+) -> dict[str, object]:
+    """판정 하나의 숫자 칸 — 오류 보류가 아니면 read_answers 로 읽고, 읽지 못하면 숫자는 None."""
+    view: dict[str, object] = {
+        "verdict": judgement.verdict.value,
+        "error": is_error_hold(judgement),
+        "noul": None,
+        "choice": None,
+        "probability": None,
+        "confidence": None,
+    }
+    if not view["error"]:
+        try:
+            noul, choice, probability, confidence = read_answers(response, classifier)
+        except Exception:
+            return view
+        view.update(noul=noul, choice=choice, probability=probability, confidence=confidence)
+    return view
+
+
+class _Recording:
+    """write_comment 한 번을 감쌉니다 — Claude 답과 jev 답을 남기고, 호출이 실패했는지 압니다.
+
+    영상의 끝이 API 실패인지(error)는 이 감싸개가 본 것으로만 정하고, 믿지 않는 skip_reason 글은
+    읽지 않습니다.
+    """
+
+    def __init__(self, claude: ClaudeClient, check: SelfCheck) -> None:
+        self._claude = claude
+        self._check = check
+        self.replies: list[object] = []
+        self.checks: list[object] = []
+        self.create_failed = False
+        self.check_failed = False
+
+    @property
+    def messages(self) -> _Recording:
+        return self
+
+    def create(self, **kwargs: object) -> object:
+        try:
+            response = self._claude.messages.create(**kwargs)
+        except Exception:
+            self.create_failed = True
+            raise
+        self.replies.append(response)
+        return response
+
+    def check(self, state: str, questions: Mapping[str, str]) -> Mapping[str, object]:
+        try:
+            answer = self._check(state, questions)
+        except Exception:
+            self.check_failed = True
+            raise
+        self.checks.append(answer)
+        return answer
+
+    def error_cause(self) -> str | None:
+        """claude(작성 호출 실패) · jev(검사 호출 실패) · jev_answer(0–1 밖의 답) · None."""
+        if self.create_failed:
+            return "claude"
+        if self.check_failed:
+            return "jev"
+        if any(_invalid_answer(answer) is not None for answer in self.checks):
+            return "jev_answer"
+        return None
+
+
+def new_result(config: Config, now: datetime, limits: RunLimits, calls: Calls) -> dict:
+    """빈 결과 — 실행이 칸을 채워 갑니다. calls 는 Calls.counts 그 자체라 세는 대로 바뀝니다."""
+    classifier = config.classifier
+    trigger = config.trigger
+    examples = json.dumps(
+        [[e.title, e.description, e.label.value, e.kind] for e in EXAMPLES],
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
+    return {
+        "schema_version": RESULT_SCHEMA_VERSION,
+        "notice": UNTRUSTED_NOTICE,
+        "run_at": now.isoformat(),
+        "verdict": None,
+        "stopped": None,
+        "calls": calls.counts,
+        "ceilings": dict(limits.ceilings),
+        "example_count": len(EXAMPLES),
+        "fingerprint": {
+            "classifier": {
+                "model": classifier.model,
+                "noul_yes_min": classifier.noul_yes_min,
+                "noul_no_max": classifier.noul_no_max,
+                "choice_min_confidence": classifier.choice_min_confidence,
+                "on_topic_reasons": list(classifier.on_topic_reasons),
+                "off_topic_reasons": list(classifier.off_topic_reasons),
+            },
+            "questions": {language: build_questions(config, language) for language in LANGUAGES},
+            "examples_sha256": hashlib.sha256(examples.encode("utf-8")).hexdigest(),
+            "jev_models": [],
+            "check_questions": dict(CHECK_QUESTIONS),
+            "self_check_criteria": dict(SELF_CHECK_CRITERIA),
+            "check_min_probability": config.comment.check_min_probability,
+            "trigger": {
+                "min_views": trigger.min_views,
+                "max_views": trigger.max_views,
+                "max_age_hours": trigger.max_age_hours,
+            },
+            "grade_system": GRADE_SYSTEM,
+            "margin": MARGIN,
+            "pass_correct": PASS_CORRECT,
+            "target_drafts": limits.target_drafts,
+            "wide_window_hours": limits.wide_window_hours,
+            "claude_max_retries": CLAUDE_MAX_RETRIES,
+        },
+        "models": {},
+        "writer_model": None,
+        "grader_model": None,
+        "accuracy": {language: [] for language in LANGUAGES},
+        "accuracy_tally": {},
+        "windows": {},
+        "videos": [],
+        "errors": [],
+    }
+
+
+def _preflight(
+    environ: Mapping[str, str], env_path: Path, find_spec: Callable[[str], object]
+) -> tuple[Keys | None, list[str]]:
+    """키 셋(환경 변수, 없으면 .env)과 SDK 둘을 봅니다 — 없는 것이 하나라도 있으면 키는 None."""
+    problems: list[str] = []
+    values: dict[str, str] = {}
+    for name in KEY_NAMES:
+        try:
+            values[name] = require_secret(name, env_path, environ)
+        except EnvError as exc:
+            text = str(exc)
+            problems.append(name if text.startswith(f"{name} 가 비어 있습니다") else text)
+    for module, package in SDK_MODULES.items():
+        if find_spec(module) is None:
+            problems.append(package)
+    keys = None if problems else Keys(*(values[name] for name in KEY_NAMES))
+    return keys, problems
+
+
+def connect_real(keys: Keys) -> Services:
+    """진짜 서비스 — 사람이 셸에서 돌릴 때만 불립니다. 테스트는 connect 자리에 가짜를 넘깁니다.
+
+    jev SDK 는 키를 환경 변수로 읽으므로 이 프로세스의 환경에 넣고, anthropic 은 함수 안에서
+    가져옵니다. YouTube 키 모양이 틀리면 YouTubeClient 가 ValueError 를 냅니다.
+    """
+    os.environ["TYPESAFE_API_KEY"] = keys.typesafe
+    import anthropic
+
+    return Services(
+        sdk_ask,
+        anthropic.Anthropic(
+            api_key=keys.anthropic, timeout=CLAUDE_TIMEOUT_S, max_retries=CLAUDE_MAX_RETRIES
+        ),
+        YouTubeClient(keys.youtube, QuotaLedger(QUOTA_PATH)),
+    )
+
+
+def run_live_check(services: Services, config: Config, now: datetime, limits: RunLimits) -> dict:
+    """모델 이름 확인 → 예시 정확도 → 영상 한 바퀴를 돌고 결과를 돌려줍니다.
+
+    천장 · 쿼터 · 그 밖의 예외(Ctrl-C 포함)는 그 자리에서 멈추고 stopped 에 적습니다. 결과는
+    부르는 동안 채워 가므로 멈춘 데까지가 남고, 끝에 accuracy_tally 와 판정 줄을 셉니다.
+    """
+    calls = Calls(limits.ceilings)
+    result = new_result(config, now, limits, calls)
+    track = _Track(result)
+    ask = _counted_ask(services.ask, calls, track)
+    claude = _CountedClaude(services.claude, calls, track)
+    youtube = _CountedYouTube(services.youtube, calls, track)
+    judged: dict[str, list[tuple]] = {language: [] for language in LANGUAGES}
+    try:
+        probe_models(
+            claude, dict.fromkeys((config.comment.writer_model, *MODEL_NAMES)), result["models"]
+        )
+        result["writer_model"], result["grader_model"] = choose_models(
+            result["models"], config.comment.writer_model
+        )
+        _accuracy(ask, config, now, track, result, judged)
+        _VideoRound(ask, claude, youtube, config, now, limits, track, result).run()
+    except CeilingReached as exc:
+        result["stopped"] = {"kind": "ceiling", "service": exc.service, "limit": exc.limit}
+    except QuotaExhausted as exc:
+        result["stopped"] = {
+            "kind": "quota",
+            "call": exc.call,
+            "counter": exc.counter,
+            "used": exc.used,
+            "limit": exc.limit,
+        }
+    except (Exception, KeyboardInterrupt) as exc:
+        result["stopped"] = {"kind": "aborted", "error": type(exc).__name__}
+    names = ("correct", "false_yes", "false_no", "hold", "error")
+    result["accuracy_tally"] = {
+        language: {name: getattr(counted, name) for name in names}
+        for language, counted in ((language, tally(judged[language])) for language in LANGUAGES)
+    }
+    result["verdict"] = verdict_line(result)
+    return result
+
+
+def _accuracy(
+    ask: Ask, config: Config, now: datetime, track: _Track, result: dict, judged: dict
+) -> None:
+    """예시 묶음 × LANGUAGES 를 jev_accuracy 의 judge_examples 로 판정하고 예시마다 한 줄 남깁니다."""
+    track.stage["jev"] = "accuracy"
+    for language in LANGUAGES:
+        for index, example, judgement in judge_examples(EXAMPLES, config, ask, now, language):
+            judged[language].append((index, example, judgement))
+            result["accuracy"][language].append(
+                {
+                    "index": index,
+                    "kind": example.kind,
+                    "label": example.label.value,
+                    **_answers_view(judgement, track.last, config.classifier),
+                    "untrusted": {"reason": judgement.reason},
+                }
+            )
+
+
+def _search_ids(data: Mapping[str, object]) -> list[str]:
+    """검색 한 페이지의 영상 ID — 허용 모양(VIDEO_ID_RE)만, 모양이 다른 항목은 건너뜁니다."""
+    items = data.get("items")
+    ids: list[str] = []
+    for item in items if isinstance(items, list) else []:
+        ident = item.get("id") if isinstance(item, Mapping) else None
+        raw = ident.get("videoId") if isinstance(ident, Mapping) else None
+        if isinstance(raw, str) and VIDEO_ID_RE.fullmatch(raw):
+            ids.append(raw)
+    return ids
+
+
+class _VideoRound:
+    """영상 한 바퀴 — 운영 창, 초안이 모자라면 넓힌 창.
+
+    창마다 키워드 검색 → videos.list 조회수 → 범위 안 영상만 판별 → 인기 댓글 → 댓글 작성 →
+    초안마다 채점. 초안 · 판별 · 작성 수가 한도에 닿으면 새 키워드도 새 영상도 고르지 않습니다.
+    """
+
+    def __init__(
+        self,
+        ask: Ask,
+        claude: _CountedClaude,
+        youtube: _CountedYouTube,
+        config: Config,
+        now: datetime,
+        limits: RunLimits,
+        track: _Track,
+        result: dict,
+    ) -> None:
+        self.ask = ask
+        self.claude = claude
+        self.youtube = youtube
+        self.config = config
+        self.now = now
+        self.limits = limits
+        self.track = track
+        self.result = result
+        self.seen: set[str] = set()
+        self.drafts = 0
+        self.classified = 0
+        self.written = 0
+
+    def run(self) -> None:
+        writer_model = self.result["writer_model"]
+        if writer_model is None:
+            return  # 이름 확인의 오류는 errors[] 에 있어 ① 로, 둘 다 404 면 ④ 로 셉니다
+        self.comment_config = replace(self.config.comment, writer_model=writer_model)
+        self.check = jev_self_check(self.ask, self.config.classifier.model)
+        max_age = self.config.trigger.max_age_hours
+        operation_after = self.now - timedelta(hours=max_age)
+        self._window("operation", operation_after, None)
+        wide = self.limits.wide_window_hours
+        if wide > max_age and self.drafts < self.limits.target_drafts:
+            self._window("widened", self.now - timedelta(hours=wide), operation_after)
+
+    def _done(self) -> bool:
+        limits = self.limits
+        return (
+            self.drafts >= limits.target_drafts
+            or self.classified >= limits.classify_max
+            or self.written >= limits.write_max
+        )
+
+    def _window(self, name: str, after: datetime, before: datetime | None) -> None:
+        window = {
+            "published_after": after.isoformat(),
+            "published_before": None if before is None else before.isoformat(),
+            "searches": 0,
+            "found": 0,
+            "in_range": 0,
+            "classified": 0,
+        }
+        self.result["windows"][name] = window
+        for keyword in dict.fromkeys(self.config.keywords):
+            if self._done():
+                return
+            try:
+                data = self.youtube.search(
+                    keyword, after, None, self.now, self.config.limits, published_before=before
+                )
+            except YouTubeError:
+                continue
+            window["searches"] += 1
+            ids = [i for i in dict.fromkeys(_search_ids(data)) if i not in self.seen]
+            self.seen.update(ids)
+            window["found"] += len(ids)
+            self._keyword(name, window, keyword, ids)
+
+    def _keyword(self, name: str, window: dict, keyword: str, ids: list[str]) -> None:
+        for start in range(0, len(ids), MAX_IDS_PER_CALL):
+            batch = ids[start : start + MAX_IDS_PER_CALL]
+            try:
+                items = _items_by_id(self.youtube.videos(batch, self.now, self.config.limits))
+            except YouTubeError:
+                continue
+            for video_id in batch:
+                if self._done():
+                    return
+                item = items.get(video_id)
+                if item is None:
+                    continue
+                try:
+                    record = _new_record(video_id, keyword, item, self.now)
+                except ValueError:
+                    continue
+                views = record.view_history[0].count
+                trigger = self.config.trigger
+                if trigger.min_views <= views <= trigger.max_views:
+                    window["in_range"] += 1
+                    self._video(name, window, keyword, record, views)
+
+    def _video(
+        self, name: str, window: dict, keyword: str, record: VideoRecord, views: int
+    ) -> None:
+        video = {
+            "video_id": record.video_id,
+            "window": name,
+            "keyword": keyword,
+            "published_at": record.published_at.isoformat(),
+            "age_hours": round((self.now - record.published_at).total_seconds() / 3600, 2),
+            "views": views,
+            "classification": None,
+            "material": None,
+            "top_comment_count": 0,
+            "comments_disabled": False,
+            "result": "not_written",
+            "error_cause": None,
+            "drafts": [],
+            "untrusted": {
+                "title": _clean(record.title, TITLE_LIMIT),
+                "description": _clean(record.description, DESCRIPTION_LIMIT),
+                "classification_reason": None,
+                "top_comments": [],
+                "skip_reason": None,
+            },
+        }
+        self.result["videos"].append(video)
+        self.track.video = record.video_id
+        try:
+            self._judge_and_write(video, window, record)
+        finally:
+            self.track.video = None
+
+    def _judge_and_write(self, video: dict, window: dict, record: VideoRecord) -> None:
+        track = self.track
+        track.stage["jev"] = "classify"
+        window["classified"] += 1
+        self.classified += 1
+        judgement = classify(record, self.config, self.ask, self.now)
+        video["classification"] = _answers_view(judgement, track.last, self.config.classifier)
+        video["untrusted"]["classification_reason"] = judgement.reason
+        if judgement.verdict is not Verdict.YES:
+            return
+        record.classification = judgement
+        try:
+            fetched = self.youtube.top_comments(
+                record.video_id, self.now, self.config.limits, TOP_COMMENTS_MAX
+            )
+        except YouTubeError:
+            video["result"] = "error"
+            video["error_cause"] = "comments"
+            return
+        comments = [] if fetched is None else [text for text in fetched if text.strip()]
+        video["comments_disabled"] = fetched is None
+        video["material"] = "top_comments" if comments else "title_description"
+        video["top_comment_count"] = len(comments)
+        video["untrusted"]["top_comments"] = [_clean(text, ITEM_LIMIT) for text in comments]
+        self.written += 1
+        recording = _Recording(self.claude, self.check)
+        track.stage["claude"] = "write"
+        track.stage["jev"] = "self_check"
+        with tempfile.TemporaryDirectory() as folder:
+            outcome = write_comment(
+                record,
+                config=self.comment_config,
+                claude=recording,
+                check=recording.check,
+                previous=(),
+                logbook=Logbook(Path(folder) / "live-check.log", lambda: self.now),
+                now=self.now,
+                transcript="",
+                top_comments=comments,
+            )
+        error_cause = recording.error_cause()
+        if outcome.draft is not None:
+            video["result"] = "comment"
+        else:
+            video["result"] = "error" if error_cause is not None else "skip"
+        video["error_cause"] = error_cause
+        video["untrusted"]["skip_reason"] = outcome.skip_reason
+        self._drafts(video, recording, record, comments)
+
+    def _drafts(
+        self, video: dict, recording: _Recording, record: VideoRecord, comments: list[str]
+    ) -> None:
+        """Claude 답마다 초안 한 줄 — 읽은 초안은 자체 검사 점수 · 코드 검사 · 채점 · 빈 사람 칸."""
+        self.track.stage["claude"] = "grade"
+        checks = iter(recording.checks)
+        threshold = self.comment_config.check_min_probability
+        for attempt, response in enumerate(recording.replies, 1):
+            parsed = parse_output(_reply_text(response))
+            if parsed is None:
+                video["drafts"].append({"attempt": attempt, "parsed": False})
+                continue
+            concern, text = parsed
+            answer = next(checks, None)
+            scores = (
+                None
+                if _invalid_answer(answer) is not None
+                else {name: float(answer[name]) for name in CHECK_QUESTIONS}
+            )
+            self_check_pass = (
+                None if scores is None else self_check_failure(scores, threshold) is None
+            )
+            failures = code_failures(text, [], self.comment_config)
+            grade, grade_error = grade_draft(
+                self.claude, self.result["grader_model"], record, comments, concern, text
+            )
+            if grade is None:
+                claude_grade = None
+            elif (
+                grade["scene_in_material"]
+                and not grade["reads_like_ad"]
+                and grade["follows_concern"]
+            ):
+                claude_grade = "ok"
+            else:
+                claude_grade = "bad"
+            video["drafts"].append(
+                {
+                    "attempt": attempt,
+                    "parsed": True,
+                    "scores": scores,
+                    "self_check_pass": self_check_pass,
+                    "code_pass": not failures,
+                    "passed": self_check_pass is True and not failures,
+                    "grade": grade,
+                    "claude_grade": claude_grade,
+                    "grade_error": grade_error,
+                    "human": "",
+                    "untrusted": {"concern": concern, "comment": text, "code_failures": failures},
+                }
+            )
+            self.drafts += 1
+
+
 def main(
-    argv: Sequence[str], *, stdout: TextIO | None = None, stderr: TextIO | None = None
+    argv: Sequence[str],
+    *,
+    environ: Mapping[str, str] | None = None,
+    env_path: Path = ENV_PATH,
+    config_path: Path = REPO_CONFIG,
+    out_dir: Path = RESULT_DIR,
+    connect: Callable[[Keys], Services] | None = None,
+    find_spec: Callable[[str], object] = importlib.util.find_spec,
+    clock: Callable[[], datetime] = _utc_now,
+    limits: RunLimits = DEFAULT_LIMITS,
+    stdout: TextIO | None = None,
+    stderr: TextIO | None = None,
 ) -> int:
+    """`--verdict <파일>` 은 호출 없이 다시 세기, 인자가 없으면 실행입니다.
+
+    실행의 종료 코드: 0 go · 1 stop · 2 시작 전 멈춤(인자 · 설정 · 키 · SDK · 키 모양 — 호출 0번,
+    파일 없음) · 3 결과 파일을 쓰지 못함 또는 키 조각이 보여 지움.
+    """
     stdout = sys.stdout if stdout is None else stdout
     stderr = sys.stderr if stderr is None else stderr
     if len(argv) == 2 and argv[0] == "--verdict":
         return verdict_from_file(Path(argv[1]), stdout, stderr)
-    print(USAGE, file=stderr)
-    return 2
+    if argv:
+        print(USAGE, file=stderr)
+        return 2
+    environ = os.environ if environ is None else environ
+    try:
+        config = load_config(config_path)
+    except (ConfigError, OSError) as exc:
+        print(f"실행하지 않습니다 — 설정을 읽을 수 없습니다: {exc}", file=stderr)
+        return 2
+    keys, problems = _preflight(environ, env_path, find_spec)
+    if problems:
+        print("실행하지 않습니다 — 없는 것: " + " · ".join(dict.fromkeys(problems)), file=stderr)
+        return 2
+    redactor = Redactor(dict(zip(KEY_NAMES, (keys.youtube, keys.typesafe, keys.anthropic))))
+    try:
+        services = (connect_real if connect is None else connect)(keys)
+    except ValueError as exc:
+        print(redactor(f"실행하지 않습니다 — {exc}"), file=stderr)
+        return 2
+    result = run_live_check(services, config, clock(), limits)
+    try:
+        paths = write_outputs(result, out_dir, redactor)
+    except KeyLeak as exc:
+        print(redactor(str(exc)), file=stderr)
+        return 3
+    except OSError as exc:
+        print(f"결과 파일을 쓰지 못했습니다: {type(exc).__name__}", file=stderr)
+        return 3
+    stdout.write(redactor(paths[1].read_text(encoding="utf-8")))
+    print(redactor(f"결과: {paths[0]} · {paths[1]}"), file=stdout)
+    print("키 검사: 결과 파일에 키 없음", file=stdout)
+    return 0 if result["verdict"] == "6B: go" else 1
 
 
 def cli(argv: Sequence[str], run: Callable[[Sequence[str]], int] | None = None) -> int:

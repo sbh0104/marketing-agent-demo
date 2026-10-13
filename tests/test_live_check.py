@@ -1,31 +1,42 @@
-"""실제 호출 실행기 테스트 — 판정 줄 · 요약 · 키 가림 · 결과 파일 쓰기 · --verdict · 맨 위 문(cli).
+"""실제 호출 실행기 테스트 — 판정 줄 · 요약 · 키 가림 · 결과 파일 쓰기 · --verdict · 맨 위 문(cli),
+그리고 실행 경로(미리 확인 · 모델 이름 확인 · 정확도 · 천장 · 영상 한 바퀴 · 채점 · 결과 모양).
 
 진짜 jev · Claude · YouTube 는 부르지 않습니다. 판정 줄은 가짜 결과(healthy_result 의 변형)로
-경우마다 잠그고, 같은 변형을 파일로 써 --verdict 가 같은 줄을 다시 세는지 봅니다. 키는 가짜
-문자열입니다. 계약 '실제 호출 실행기' 절.
+경우마다 잠그고, 같은 변형을 파일로 써 --verdict 가 같은 줄을 다시 세는지 봅니다. 실행 경로는
+가짜 jev(FakeJev) · 가짜 Claude(FakeClaude)와, 진짜 YouTubeClient 뒤의 가짜 전송(World)으로 돌고
+소켓 연결은 막아 둡니다. 키는 가짜 문자열입니다. 계약 '실제 호출 실행기' 절.
 """
 from __future__ import annotations
 
 import contextlib
+import copy
 import hashlib
+import importlib
 import io
 import json
 import os
+import pkgutil
+import socket
 import sys
 import tempfile
 import unittest
-from collections.abc import Callable
+import urllib.parse
+from collections.abc import Callable, Sequence
+from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from types import SimpleNamespace
 from unittest import mock
 
-from agent.classifier import LANGUAGES, build_questions
+import agent
+from agent.classifier import LANGUAGES, MATCH_ID, REASON_ID, JevError, build_questions
 from agent.config import load_config
-from agent.models import Verdict
-from agent.writer import CHECK_QUESTIONS
+from agent.models import Verdict, VideoRecord
+from agent.writer import CHECK_QUESTIONS, TOP_COMMENTS_MAX
+from agent.youtube import MAX_IDS_PER_CALL, PAGE_SIZE, QuotaLedger, YouTubeClient
 from tests import live_check
 from tests.classifier_examples import EXAMPLES
-from tests.jev_accuracy import PASS_CORRECT, REPO_CONFIG
+from tests.jev_accuracy import PASS_CORRECT, REPO_CONFIG, measure
 
 NOW = datetime(2026, 10, 14, 3, 0, tzinfo=timezone.utc)
 KEYS = {
@@ -749,9 +760,9 @@ class VerdictFlagTest(unittest.TestCase):
         self.addCleanup(self.tmp.cleanup)
         self.path = Path(self.tmp.name) / "result.json"
 
-    def recount(self, argv: list[str]) -> tuple[int, str, str]:
+    def recount(self, argv: list[str], **options: object) -> tuple[int, str, str]:
         stdout, stderr = io.StringIO(), io.StringIO()
-        code = live_check.main(argv, stdout=stdout, stderr=stderr)
+        code = live_check.main(argv, stdout=stdout, stderr=stderr, **options)
         return code, stdout.getvalue(), stderr.getvalue()
 
     def store(self, result: dict) -> None:
@@ -797,12 +808,17 @@ class VerdictFlagTest(unittest.TestCase):
                 self.assertEqual(err, f"결과 파일을 읽을 수 없습니다: {name}\n")
 
     def test_bad_arguments_exit_2(self) -> None:
+        out_dir = Path(self.tmp.name) / "out"
+        connected: list[object] = []
         for argv in (["--verdict"], ["--verdict", "a.json", "b.json"], ["--bogus"], ["a.json"]):
             with self.subTest(argv):
-                code, out, err = self.recount(argv)
+                code, out, err = self.recount(argv, connect=connected.append, out_dir=out_dir)
                 self.assertEqual(code, 2)
                 self.assertEqual(out, "")
                 self.assertEqual(err, live_check.USAGE + "\n")
+        # 잘못된 인자는 서비스에 붙지도 파일을 쓰지도 않습니다(G4)
+        self.assertEqual(connected, [])
+        self.assertFalse(out_dir.exists())
 
 
 class CliTest(unittest.TestCase):
@@ -873,6 +889,1339 @@ class CliTest(unittest.TestCase):
             ["실행기 오류 — KeyboardInterrupt (내용은 키가 섞일 수 있어 찍지 않습니다)"],
         )
         assert_no_key(self, out + err)
+
+
+# ── 실행 경로 — 가짜 jev · 가짜 Claude · 진짜 YouTubeClient 뒤의 가짜 전송 ──
+
+JEV_MODEL = "jev-1.13.0"
+NO_NETWORK = "테스트는 네트워크를 쓰지 않습니다"
+PASSING = {"mentions_scene": 0.9, "reads_like_ad": 0.1, "follows_concern": 0.9}
+FAILING = {"mentions_scene": 0.9, "reads_like_ad": 0.9, "follows_concern": 0.9}
+NO_NOUL = object()  # 자체 검사 답에 .noul 이 없는 응답 — 어댑터 모양 오류
+CONCERN = "썸 상대의 답장이 늦어 불안한 마음 고민표식"
+COMMENT = (
+    "영상에서 답장이 세 시간이나 늦었다는 장면이 너무 공감됐어요 초안표식. 저도 연애사주 봤을 때"
+    " 서로 표현 속도가 다르다는 말을 듣고 조급함을 내려놨어요."
+)
+SHORT = "짧은 초안표식"
+COMMENTS = ["영상 속 답장 기다리던 장면 공감해요 댓글표식", "저도 썸 탈 때 그랬어요 댓글표식"]
+GRADE_OK = {"scene_in_material": True, "reads_like_ad": False, "follows_concern": True}
+GRADE_BAD = {"scene_in_material": False, "reads_like_ad": False, "follows_concern": True}
+MARKERS = ("제목표식", "설명표식", "댓글표식", "고민표식", "초안표식")
+AUTHOR = "작성자표식"
+AUTHOR_CHANNEL = "UCauthor표식0000000000000"
+VIDEO_CHANNEL = "UC채널표식00000000000000"
+GRADER_NAMES = ("live_check", "grade_draft", "GRADE_SYSTEM")
+SUMMARY_PREFIXES = (
+    "- 실행: ",
+    "- 실행기 호출(SDK 안의 다시 시도 제외): ",
+    "- 멈춤: ",
+    "- 오류: ",
+    "- 모델: ",
+    "- 판별 지금 기준값 ko: ",
+    "- 판별 지금 기준값 en: ",
+    "- 판별 올리기만 범위 최다 맞음: ",
+    "- 창 operation: ",
+    "- 창 widened: ",
+    "- 초안: ",
+    "- 다음: ",
+)
+
+
+def vid(number: int) -> str:
+    return f"vid{number:08d}"
+
+
+def title(number: int, on_topic: bool = True) -> str:
+    return f"{'연애 고민' if on_topic else '게임 방송'} 제목표식 {number}"
+
+
+def title_of(state: str) -> str:
+    """판별 state(`Title: …\\n\\nDescription: …`)의 제목."""
+    return state.split("\n", 1)[0].removeprefix("Title: ")
+
+
+def writer_reply(concern: str = CONCERN, comment: str = COMMENT) -> str:
+    return json.dumps({"concern": concern, "comment": comment}, ensure_ascii=False)
+
+
+def text_response(text: str) -> SimpleNamespace:
+    """anthropic Message 모양 — 글 블록 하나."""
+    return SimpleNamespace(content=[SimpleNamespace(type="text", text=text)])
+
+
+def classify_response(noul: float, choice: str, confidence: float) -> SimpleNamespace:
+    """typesafe_sdk SystemOneResponse 모양 — 질문 id 로 찾는 답과 jev 가 알린 모델."""
+    return SimpleNamespace(
+        answers={
+            MATCH_ID: SimpleNamespace(noul=noul),
+            REASON_ID: SimpleNamespace(
+                choice=choice, probabilities={choice: 0.9}, confidence=confidence
+            ),
+        },
+        model=JEV_MODEL,
+    )
+
+
+def decided(choice: str, noul: float) -> str:
+    """_decide 가 남기는 판정 이유 — 확률 0.90 · 확신 0.90 인 가짜 답."""
+    return f"{choice} (0.90) · 일치 {noul:.2f} · 확신 0.90"
+
+
+def ok(body: dict) -> tuple[int, bytes]:
+    return 200, json.dumps(body, ensure_ascii=False).encode("utf-8")
+
+
+def google_error(reason: str, status: int = 403) -> bytes:
+    return json.dumps({"error": {"code": status, "errors": [{"reason": reason}]}}).encode()
+
+
+def thread(text: str) -> dict:
+    """commentThreads.list 항목 — 작성자 이름 · 채널 ID 까지 갖춘 실제 모양."""
+    return {
+        "kind": "youtube#commentThread",
+        "snippet": {
+            "topLevelComment": {
+                "snippet": {
+                    "textDisplay": text,
+                    "textOriginal": text,
+                    "authorDisplayName": AUTHOR,
+                    "authorChannelId": {"value": AUTHOR_CHANNEL},
+                }
+            }
+        },
+    }
+
+
+def reset(url: str) -> tuple[int, bytes]:
+    raise OSError(f"connection reset: {url}")
+
+
+class FakeSdkError(Exception):
+    """typesafe_sdk 오류 모양 — status 를 담습니다."""
+
+    def __init__(self, message: str, status: int) -> None:
+        super().__init__(message)
+        self.status = status
+
+
+class FakeApiError(Exception):
+    """anthropic 오류 모양 — status_code 를 담습니다."""
+
+    def __init__(self, message: str, status_code: int) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+
+
+def jev_error(status: int, message: str | None = None) -> JevError:
+    """sdk_ask 처럼 SDK 오류를 원인(__cause__)으로 단 JevError."""
+    error = JevError(message if message is not None else f"FakeSdkError {status}")
+    error.__cause__ = FakeSdkError(f"HTTP {status}", status)
+    return error
+
+
+class FakeJev:
+    """ask 자리의 가짜 — 판별은 state 의 제목으로, 자체 검사는 부른 차례대로 답합니다.
+
+    부른 것을 (종류, 모델, state, 질문) 으로 남깁니다. 종류는 example(예시 판별) · video(영상
+    판별) · check(자체 검사)이고, 같은 종류가 공용 log 에 ("jev", 종류) 로 쌓입니다.
+    """
+
+    def __init__(self, log: list[tuple[str, str]]) -> None:
+        self.log = log
+        self.calls: list[tuple[str, str, str, dict]] = []
+        self.examples = {example.title for example in EXAMPLES}
+        self.answers: dict[str, object] = {e.title: e.label.value for e in EXAMPLES}
+        self.checks: list[object] = []
+        self.error: BaseException | None = None
+
+    def __call__(self, model: str, state: str, questions: dict) -> object:
+        if set(questions) == set(CHECK_QUESTIONS):
+            kind = "check"
+        else:
+            kind = "example" if title_of(state) in self.examples else "video"
+        self.log.append(("jev", kind))
+        self.calls.append((kind, model, state, json.loads(json.dumps(questions))))
+        if self.error is not None:
+            raise self.error
+        if kind == "check":
+            answer = self.checks.pop(0) if self.checks else PASSING
+            if isinstance(answer, BaseException):
+                raise answer
+            if answer is NO_NOUL:
+                values = {name: SimpleNamespace(probability=0.9) for name in questions}
+            else:
+                values = {name: SimpleNamespace(noul=answer[name]) for name in questions}
+            return SimpleNamespace(answers=values, model=JEV_MODEL)
+        answer = self.answers.get(title_of(state), "yes")
+        if isinstance(answer, BaseException):
+            raise answer
+        if isinstance(answer, str):
+            answer = {"yes": (0.95, ON, 0.9), "no": (0.05, OFF, 0.9), "hold": (0.5, ON, 0.9)}[
+                answer
+            ]
+        return classify_response(*answer)
+
+
+class FakeClaude:
+    """anthropic.Anthropic 모양의 가짜 — 이름 확인(system 없음) · 채점(GRADE_SYSTEM) · 작성을 가립니다.
+
+    이름 확인은 probe_status 에 적은 이름만 그 상태로 거절하고, 작성 · 채점은 준비한 답을
+    차례로(다 쓰면 기본 답) 돌려줍니다. 답 자리에 예외를 두면 그 예외를 냅니다.
+    """
+
+    def __init__(self, log: list[tuple[str, str]]) -> None:
+        self.messages = self
+        self.log = log
+        self.calls: list[tuple[str, dict]] = []
+        self.probe_status: dict[str, int] = {}
+        self.writes: list[object] = []
+        self.grades: list[object] = []
+
+    def create(self, **kwargs: object) -> object:
+        system = kwargs.get("system")
+        if system is None:
+            kind = "probe"
+        else:
+            kind = "grade" if system == live_check.GRADE_SYSTEM else "write"
+        self.log.append(("claude", kind))
+        self.calls.append((kind, copy.deepcopy(kwargs)))
+        if kind == "probe":
+            status = self.probe_status.get(kwargs["model"])
+            if status is not None:
+                raise FakeApiError(f"model: {kwargs['model']}", status)
+            return text_response("네")
+        queue = self.writes if kind == "write" else self.grades
+        answer = queue.pop(0) if queue else (writer_reply() if kind == "write" else GRADE_OK)
+        if isinstance(answer, BaseException):
+            raise answer
+        if isinstance(answer, dict):
+            answer = json.dumps(answer)
+        return text_response(answer)
+
+
+class World:
+    """YouTube 쪽 가짜 전송 — 진짜 YouTubeClient 뒤에서 URL 을 읽고 답합니다.
+
+    검색은 (검색어, 창)으로, 영상 정보는 ID 로, 인기 댓글은 영상마다 준비한 글 목록으로 답합니다.
+    답 자리에 (상태, 본문)을 두면 그대로, URL 을 받는 함수를 두면 그 결과를 씁니다.
+    """
+
+    def __init__(self, log: list[tuple[str, str]]) -> None:
+        self.log = log
+        self.urls: list[str] = []
+        self.pages: dict[tuple[str, str], list[str]] = {}
+        self.items: dict[str, dict] = {}
+        self.comments: dict[str, object] = {}
+        self.search_answers: dict[str, object] = {}
+
+    def fetch(self, url: str, timeout: float) -> tuple[int, bytes]:
+        parts = urllib.parse.urlsplit(url)
+        query = dict(urllib.parse.parse_qsl(parts.query))
+        endpoint = parts.path.rsplit("/", 1)[-1]
+        self.log.append(("youtube", endpoint))
+        self.urls.append(url)
+        if endpoint == "search":
+            answer = self.search_answers.get(query["q"], self.search_answers.get("*"))
+            if answer is None:
+                window = "widened" if "publishedBefore" in query else "operation"
+                ids = self.pages.get((query["q"], window), [])
+                answer = ok(
+                    {"items": [{"id": {"kind": "youtube#video", "videoId": i}} for i in ids]}
+                )
+        elif endpoint == "videos":
+            wanted = query["id"].split(",")
+            answer = ok({"items": [self.items[i] for i in wanted if i in self.items]})
+        elif endpoint == "commentThreads":
+            answer = self.comments.get(query["videoId"], COMMENTS)
+            if isinstance(answer, list):
+                answer = ok({"items": [thread(text) for text in answer]})
+        else:
+            raise AssertionError(f"모르는 호출입니다: {endpoint}")
+        return answer(url) if callable(answer) else answer
+
+
+def query_of(url: str) -> dict[str, str]:
+    return dict(urllib.parse.parse_qsl(urllib.parse.urlsplit(url).query))
+
+
+def strings(node: object, *, under_untrusted: bool, inside: bool = False) -> list[str]:
+    """결과 안의 글자(키와 값)를 모읍니다 — untrusted 칸 안쪽만, 또는 바깥쪽만."""
+    found: list[str] = []
+    if isinstance(node, dict):
+        for key, value in node.items():
+            here = inside or key == "untrusted"
+            if here == under_untrusted:
+                found.append(key)
+            found += strings(value, under_untrusted=under_untrusted, inside=here)
+    elif isinstance(node, list):
+        for item in node:
+            found += strings(item, under_untrusted=under_untrusted, inside=inside)
+    elif isinstance(node, str) and inside == under_untrusted:
+        found.append(node)
+    return found
+
+
+class LiveCheckCase(unittest.TestCase):
+    """실행 경로 시험의 공통 준비 — 임시 폴더, 막아 둔 소켓, 가짜 jev · Claude · YouTube 전송.
+
+    기본 세계: 운영 창 '연애' 검색에 영상 넷(범위 안 일치 둘 · 조회수 999 하나 · 불일치 하나),
+    넓힌 창 '연애' 검색에 새 일치 영상 하나와 운영 창에서 본 영상 하나. 다른 검색어는 빈 결과.
+    """
+
+    def setUp(self) -> None:
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.tmp = Path(tmp.name)
+        for patcher in (
+            mock.patch.object(socket.socket, "connect", side_effect=AssertionError(NO_NETWORK)),
+            mock.patch.object(socket, "create_connection", side_effect=AssertionError(NO_NETWORK)),
+        ):
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        self.config = load_config(REPO_CONFIG)
+        self.builds = 0
+        self.build()
+
+    def build(self) -> None:
+        """새 가짜들과 새 쿼터 장부 · 결과 폴더 — 한 시험 안에서 실행을 여러 번 할 때 씁니다."""
+        self.builds += 1
+        self.log: list[tuple[str, str]] = []
+        self.jev = FakeJev(self.log)
+        self.claude = FakeClaude(self.log)
+        self.world = World(self.log)
+        self.connected: list[live_check.Keys] = []
+        self.quota = self.tmp / f"data-{self.builds}" / "quota.json"
+        self.out = self.tmp / f"out-{self.builds}"
+        self.add_video("연애", "operation", 1, 2500)
+        self.add_video("연애", "operation", 2, 3000)
+        self.add_video("연애", "operation", 3, 999)
+        self.add_video("연애", "operation", 4, 1500, on_topic=False)
+        self.add_video("연애", "widened", 5, 4000)
+        self.world.pages[("연애", "widened")].append(vid(1))  # 운영 창에서 본 영상 — 다시 세지 않음
+
+    def add_video(
+        self,
+        keyword: str,
+        window: str,
+        number: int,
+        views: int,
+        *,
+        on_topic: bool = True,
+        name: str | None = None,
+        description: str | None = None,
+    ) -> str:
+        video_id = vid(number)
+        name = title(number, on_topic) if name is None else name
+        hours = 5 if window == "operation" else 30
+        self.world.pages.setdefault((keyword, window), []).append(video_id)
+        self.world.items[video_id] = {
+            "id": video_id,
+            "snippet": {
+                "channelId": VIDEO_CHANNEL,
+                "title": name,
+                "description": (
+                    f"설명표식 {number} — 답장이 늦을 때 마음을 다스리는 법"
+                    if description is None
+                    else description
+                ),
+                "publishedAt": (NOW - timedelta(hours=hours)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            },
+            "statistics": {"viewCount": str(views)},
+        }
+        self.jev.answers[name] = "yes" if on_topic else "no"
+        return video_id
+
+    def connect(self, keys: live_check.Keys) -> live_check.Services:
+        """connect 자리의 가짜 — 운영과 같은 YouTubeClient 를 가짜 전송 · 임시 쿼터 장부로 만듭니다."""
+        self.connected.append(keys)
+        client = YouTubeClient(keys.youtube, QuotaLedger(self.quota), self.world.fetch)
+        return live_check.Services(self.jev, self.claude, client)
+
+    def run_main(
+        self, argv: Sequence[str] = (), **overrides: object
+    ) -> tuple[int, str, str, dict | None]:
+        """main 을 가짜와 임시 폴더로 돌려 (종료 코드, 화면, 오류 화면, 결과 또는 None) 을 돌려줍니다.
+
+        결과 파일이 있으면 판정 줄이 요약 첫 줄 · 화면 첫 줄 · result.verdict 에서 같고, 파일만으로
+        다시 세어도 같으며, 종료 코드가 판정을 따르는지 매번 봅니다(G1 실행 칸).
+        """
+        stdout, stderr = io.StringIO(), io.StringIO()
+        options: dict[str, object] = {
+            "environ": dict(KEYS),
+            "env_path": self.tmp / ".env",
+            "config_path": REPO_CONFIG,
+            "out_dir": self.out,
+            "connect": self.connect,
+            "find_spec": lambda name: object(),
+            "clock": lambda: NOW,
+            "limits": live_check.DEFAULT_LIMITS,
+            "stdout": stdout,
+            "stderr": stderr,
+        }
+        options.update(overrides)
+        code = live_check.main(list(argv), **options)
+        out, err = stdout.getvalue(), stderr.getvalue()
+        path = self.out / live_check.RESULT_NAME
+        result = json.loads(path.read_text(encoding="utf-8")) if path.exists() else None
+        if result is not None:
+            summary = (self.out / live_check.SUMMARY_NAME).read_text(encoding="utf-8")
+            self.assertEqual(summary.split("\n")[0], result["verdict"])
+            self.assertEqual(out.split("\n")[0], result["verdict"])
+            self.assertEqual(live_check.verdict_line(result), result["verdict"])
+            self.assertEqual(code, 0 if result["verdict"] == "6B: go" else 1)
+        return code, out, err, result
+
+    def calls_of(self, kind: str) -> list[dict]:
+        return [kwargs for name, kwargs in self.claude.calls if name == kind]
+
+    def claude_for(self, kind: str, number: int) -> list[dict]:
+        """그 영상의 제목이 든 Claude 작성 · 채점 호출."""
+        tag = f"<video_title>\n{title(number)}\n</video_title>"
+        return [
+            kwargs for kwargs in self.calls_of(kind) if tag in kwargs["messages"][0]["content"]
+        ]
+
+    def content(self, kind: str, number: int) -> str:
+        """그 영상의 첫 Claude 작성 · 채점 호출이 보낸 사용자 글."""
+        return self.claude_for(kind, number)[0]["messages"][0]["content"]
+
+    def jev_kinds(self, kind: str) -> list[tuple[str, str, str, dict]]:
+        return [call for call in self.jev.calls if call[0] == kind]
+
+    def searches(self) -> list[dict[str, str]]:
+        return [query_of(url) for url in self.world.urls if "/search?" in url]
+
+    def outputs(self, out: str, err: str) -> str:
+        texts = [out, err]
+        for name in (live_check.RESULT_NAME, live_check.SUMMARY_NAME):
+            path = self.out / name
+            if path.exists():
+                texts.append(path.read_text(encoding="utf-8"))
+        return "\n".join(texts)
+
+    def by_id(self, result: dict) -> dict[str, dict]:
+        return {video["video_id"]: video for video in result["videos"]}
+
+
+class PreflightTest(LiveCheckCase):
+    def assert_nothing_called(self, code: int, out: str, err: str, result: dict | None) -> None:
+        self.assertEqual(code, 2)
+        self.assertEqual(out, "")
+        self.assertEqual(len(err.splitlines()), 1, err)
+        self.assertIsNone(result)
+        self.assertFalse(self.out.exists())
+        self.assertEqual(self.log, [])
+        assert_no_key(self, err)
+
+    def test_missing_key_calls_nothing(self) -> None:
+        for name in live_check.KEY_NAMES:
+            with self.subTest(name):
+                self.build()
+                # 나머지 두 키는 .env 에서 읽습니다 — 빠진 하나만 이름이 나옵니다
+                env_path = self.tmp / f"{name}.env"
+                env_path.write_text(
+                    "".join(f"{key}={value}\n" for key, value in KEYS.items() if key != name),
+                    encoding="utf-8",
+                )
+                code, out, err, result = self.run_main(environ={}, env_path=env_path)
+                self.assert_nothing_called(code, out, err, result)
+                self.assertEqual(err, f"실행하지 않습니다 — 없는 것: {name}\n")
+                self.assertEqual(self.connected, [])
+
+    def test_missing_sdk_calls_nothing(self) -> None:
+        for module, package in live_check.SDK_MODULES.items():
+            with self.subTest(package):
+                self.build()
+                code, out, err, result = self.run_main(
+                    find_spec=lambda name, gone=module: None if name == gone else object()
+                )
+                self.assert_nothing_called(code, out, err, result)
+                self.assertEqual(err, f"실행하지 않습니다 — 없는 것: {package}\n")
+                self.assertEqual(self.connected, [])
+        with self.subTest("키와 SDK 모두"):
+            self.build()
+            environ = {key: value for key, value in KEYS.items() if key != "ANTHROPIC_API_KEY"}
+            code, out, err, result = self.run_main(environ=environ, find_spec=lambda name: None)
+            self.assert_nothing_called(code, out, err, result)
+            self.assertEqual(
+                err, "실행하지 않습니다 — 없는 것: ANTHROPIC_API_KEY · typesafe-sdk · anthropic\n"
+            )
+            self.assertEqual(self.connected, [])
+
+    def test_bad_youtube_key_shape_calls_nothing(self) -> None:
+        code, out, err, result = self.run_main(environ={**KEYS, "YOUTUBE_API_KEY": "bad key!"})
+        self.assert_nothing_called(code, out, err, result)
+        self.assertEqual(
+            err, "실행하지 않습니다 — API 키 형식이 아닙니다 — 영문자 · 숫자 · _ · - 만 씁니다\n"
+        )
+        # connect 는 불렸지만 클라이언트를 만들다 멈췄습니다 — 어느 서비스도 부르지 않았습니다
+        self.assertEqual(len(self.connected), 1)
+
+    def test_config_error_exits_2(self) -> None:
+        broken = self.tmp / "broken.yaml"
+        broken.write_text("topic: [\n", encoding="utf-8")
+        for label, path in (("문법", broken), ("없는 파일", self.tmp / "absent.yaml")):
+            with self.subTest(label):
+                self.build()
+                code, out, err, result = self.run_main(config_path=path)
+                self.assert_nothing_called(code, out, err, result)
+                self.assertTrue(err.startswith("실행하지 않습니다 — 설정을 읽을 수 없습니다: "), err)
+                self.assertEqual(self.connected, [])
+
+
+class ModelProbeTest(LiveCheckCase):
+    def test_each_model_probed_once_with_one_token(self) -> None:
+        code, out, err, result = self.run_main()
+        probe = {
+            "max_tokens": 1,
+            "messages": [{"role": "user", "content": live_check.PROBE_PROMPT}],
+        }
+        self.assertEqual(
+            self.calls_of("probe"), [{"model": SONNET, **probe}, {"model": HAIKU, **probe}]
+        )
+        accepted = {"status": "accepted", "error": None}
+        self.assertEqual(result["models"], {SONNET: accepted, HAIKU: accepted})
+        # 설정의 작성 모델이 두 이름과 다르면 세 이름을 한 번씩 확인합니다
+        text = REPO_CONFIG.read_text(encoding="utf-8")
+        self.assertEqual(text.count("writer_model: claude-sonnet-5-5"), 1)
+        other = self.tmp / "config.yaml"
+        other.write_text(
+            text.replace("writer_model: claude-sonnet-5-5", "writer_model: claude-test-writer"),
+            encoding="utf-8",
+        )
+        self.build()
+        code, out, err, result = self.run_main(config_path=other)
+        self.assertEqual(
+            [call["model"] for call in self.calls_of("probe")],
+            ["claude-test-writer", SONNET, HAIKU],
+        )
+        self.assertEqual(
+            (result["writer_model"], result["grader_model"]), ("claude-test-writer", SONNET)
+        )
+
+    def test_writer_falls_back_to_accepted_model(self) -> None:
+        self.claude.probe_status[SONNET] = 404
+        code, out, err, result = self.run_main()
+        self.assertEqual(
+            result["models"][SONNET], {"status": "rejected", "error": "FakeApiError 404"}
+        )
+        self.assertEqual(result["models"][HAIKU], {"status": "accepted", "error": None})
+        self.assertEqual((result["writer_model"], result["grader_model"]), (HAIKU, HAIKU))
+        writes = self.calls_of("write")
+        self.assertTrue(writes)
+        self.assertEqual({call["model"] for call in writes}, {HAIKU})
+        self.assertEqual(result["errors"], [error_entry("claude", "probe", "FakeApiError", 404)])
+        self.assertEqual(result["verdict"], "6B: go")
+        self.assertEqual(code, 0)
+
+    def test_grader_differs_from_writer_when_possible(self) -> None:
+        code, out, err, result = self.run_main()
+        self.assertEqual((result["writer_model"], result["grader_model"]), (SONNET, HAIKU))
+        self.assertEqual({call["model"] for call in self.calls_of("write")}, {SONNET})
+        grades = self.calls_of("grade")
+        self.assertEqual(len(grades), 3)
+        for call in grades:
+            self.assertEqual(call["model"], HAIKU)
+            self.assertEqual(call["system"], live_check.GRADE_SYSTEM)
+            self.assertEqual(call["max_tokens"], live_check.GRADE_MAX_TOKENS)
+        self.assertEqual(result["verdict"], "6B: go")
+        accepted = {"status": "accepted", "error": None}
+        rejected = {"status": "rejected", "error": "NotFoundError 404"}
+        self.assertEqual(
+            live_check.choose_models({SONNET: rejected, HAIKU: rejected}, SONNET), (None, None)
+        )
+        self.assertEqual(
+            live_check.choose_models({"other": accepted, SONNET: accepted}, SONNET),
+            (SONNET, "other"),
+        )
+
+    def test_non_404_error_is_not_rejection(self) -> None:
+        self.claude.probe_status[SONNET] = 401
+        code, out, err, result = self.run_main()
+        self.assertEqual(
+            result["models"][SONNET], {"status": "error", "error": "FakeApiError 401"}
+        )
+        self.assertEqual(result["writer_model"], HAIKU)
+        self.assertEqual(result["verdict"], "6B: stop — 재지 못함(호출 오류 1)")
+
+    def test_no_accepted_model_skips_video_round(self) -> None:
+        self.claude.probe_status.update({SONNET: 404, HAIKU: 404})
+        code, out, err, result = self.run_main()
+        self.assertEqual(self.world.urls, [])
+        self.assertEqual([kind for kind, _ in self.claude.calls], ["probe", "probe"])
+        self.assertEqual(self.jev_kinds("video") + self.jev_kinds("check"), [])
+        self.assertEqual((result["writer_model"], result["grader_model"]), (None, None))
+        self.assertEqual((result["windows"], result["videos"]), ({}, []))
+        self.assertEqual(
+            result["verdict"], "6B: stop — 모델 이름(claude-sonnet-5-5 · claude-haiku-5-5 둘 다 거절)"
+        )
+        self.assertEqual(code, 1)
+
+    def test_bad_claude_key_is_unmeasured(self) -> None:
+        self.claude.probe_status.update({SONNET: 401, HAIKU: 401})
+        code, out, err, result = self.run_main()
+        self.assertEqual(self.world.urls, [])
+        self.assertEqual(
+            result["errors"], [error_entry("claude", "probe", "FakeApiError", 401)] * 2
+        )
+        self.assertEqual(result["verdict"], "6B: stop — 재지 못함(호출 오류 2)")
+
+
+class AccuracyTest(LiveCheckCase):
+    def test_every_example_measured_in_both_languages(self) -> None:
+        code, out, err, result = self.run_main()
+        examples = self.jev_kinds("example")
+        self.assertEqual(len(examples), len(LANGUAGES) * len(EXAMPLES))
+        for number, language in enumerate(LANGUAGES):
+            chunk = examples[number * len(EXAMPLES) : (number + 1) * len(EXAMPLES)]
+            self.assertEqual(
+                [title_of(state) for _, _, state, _ in chunk], [e.title for e in EXAMPLES]
+            )
+            for _, model, _, questions in chunk:
+                self.assertEqual(model, self.config.classifier.model)
+                self.assertEqual(questions, build_questions(self.config, language))
+            rows = result["accuracy"][language]
+            for index, (row, example) in enumerate(zip(rows, EXAMPLES, strict=True), 1):
+                yes = example.label is Verdict.YES
+                choice, noul = (ON, 0.95) if yes else (OFF, 0.05)
+                self.assertEqual(
+                    row,
+                    {
+                        "index": index,
+                        "kind": example.kind,
+                        "label": example.label.value,
+                        "verdict": example.label.value,
+                        "error": False,
+                        "noul": noul,
+                        "choice": choice,
+                        "probability": 0.9,
+                        "confidence": 0.9,
+                        "untrusted": {"reason": decided(choice, noul)},
+                    },
+                )
+        perfect = {"correct": 22, "false_yes": 0, "false_no": 0, "hold": 0, "error": 0}
+        self.assertEqual(result["accuracy_tally"], {language: perfect for language in LANGUAGES})
+        self.assertEqual(result["example_count"], len(EXAMPLES))
+
+    def test_jev_error_row_is_marked_error(self) -> None:
+        self.jev.answers[EXAMPLES[0].title] = jev_error(429)
+        code, out, err, result = self.run_main()
+        for language in LANGUAGES:
+            row = result["accuracy"][language][0]
+            self.assertEqual((row["verdict"], row["error"]), ("hold", True))
+            numbers = ("noul", "choice", "probability", "confidence")
+            self.assertEqual([row[key] for key in numbers], [None] * len(numbers))
+            self.assertEqual(row["untrusted"], {"reason": "API 오류: FakeSdkError 429"})
+            self.assertEqual(result["accuracy_tally"][language]["error"], 1)
+        self.assertEqual(
+            result["errors"], [error_entry("jev", "accuracy", "FakeSdkError", 429)] * 2
+        )
+        self.assertEqual(result["verdict"], "6B: stop — 재지 못함(예시 오류 2)")
+
+    def test_fingerprint_records_models_and_retry_policy(self) -> None:
+        code, out, err, result = self.run_main()
+        fingerprint = result["fingerprint"]
+        self.assertEqual(fingerprint["jev_models"], [JEV_MODEL])
+        self.assertEqual(fingerprint["claude_max_retries"], 2)
+        # 2단계의 가짜 결과가 쓴 지문과 칸 · 값이 같습니다 — 6B 는 같은 칸을 읽습니다
+        self.assertEqual(fingerprint, healthy_result()["fingerprint"])
+
+    def test_accuracy_tally_matches_measure(self) -> None:
+        yes = [example.title for example in EXAMPLES if example.label is Verdict.YES]
+        no = [example.title for example in EXAMPLES if example.label is Verdict.NO]
+        scenarios: dict[str, tuple[dict[str, object], str]] = {
+            "보류 · 잘못된 일치 · 오류": (
+                {**dict.fromkeys(yes[:3], "hold"), no[0]: (0.9, ON, 0.9), yes[3]: jev_error(429)},
+                "6B: stop — 재지 못함(예시 오류 2); 판별 미달(ko 17/22 · en 17/22)",
+            ),
+            "여유 폭으로 막는 잘못된 일치": ({no[0]: (0.9, ON, 0.9)}, "6B: go"),
+            "1 을 넘는 하한으로만 막힘": (
+                {no[0]: (0.97, ON, 0.98)},
+                "6B: stop — 판별 미달(ko 잘못된 일치 못 막음 · en 잘못된 일치 못 막음)",
+            ),
+            "불일치 상한은 자유": (dict.fromkeys(no[:3], (0.3, OFF, 0.9)), "6B: go"),
+        }
+        names = ("correct", "false_yes", "false_no", "hold", "error")
+        for label, (answers, verdict) in scenarios.items():
+            with self.subTest(label):
+                self.build()
+                self.jev.answers.update(answers)
+                code, out, err, result = self.run_main()
+                for language in LANGUAGES:
+                    expected = measure(EXAMPLES, self.config, self.jev, NOW, language)
+                    self.assertEqual(
+                        result["accuracy_tally"][language],
+                        {name: getattr(expected, name) for name in names},
+                    )
+                self.assertEqual(result["verdict"], verdict)
+
+
+class CeilingTest(LiveCheckCase):
+    def baseline(self) -> list[tuple[str, str]]:
+        """천장 없이 돈 기본 실행의 호출 차례."""
+        self.build()
+        code, out, err, result = self.run_main()
+        self.assertEqual(result["verdict"], "6B: go")
+        return list(self.log)
+
+    def stop_at(
+        self, baseline: list[tuple[str, str]], service: str, limit: int, site: str
+    ) -> dict:
+        """service 천장을 limit 로 두면 기본 실행과 같은 차례로 가다가 site 호출 자리에서 멈춥니다."""
+        self.build()
+        ceilings = {**live_check.CEILINGS, service: limit}
+        code, out, err, result = self.run_main(
+            limits=replace(live_check.DEFAULT_LIMITS, ceilings=ceilings)
+        )
+        log = list(self.log)
+        self.assertEqual(log, baseline[: len(log)])
+        self.assertEqual(sum(1 for name, _ in log if name == service), limit)
+        # 천장에 닿은 다음 호출(이 자리)은 보내지 않았고, 그 뒤 어느 서비스도 부르지 않았습니다
+        self.assertEqual(baseline[len(log)], (service, site))
+        self.assertEqual(
+            result["stopped"], {"kind": "ceiling", "service": service, "limit": limit}
+        )
+        self.assertEqual(result["calls"][service], limit)
+        self.assertTrue(result["verdict"].startswith("6B: stop — 재지 못함("), result["verdict"])
+        self.assertIn(f"천장 {service} {limit}", result["verdict"])
+        self.assertEqual(code, 1)
+        return result
+
+    def test_jev_ceiling_stops_at_limit(self) -> None:
+        baseline = self.baseline()
+        for limit, site in ((3, "example"), (len(LANGUAGES) * len(EXAMPLES), "video")):
+            with self.subTest(site):
+                self.stop_at(baseline, "jev", limit, site)
+
+    def test_claude_ceiling_stops_at_limit(self) -> None:
+        baseline = self.baseline()
+        for limit, site in ((1, "probe"), (2, "write"), (3, "grade")):
+            with self.subTest(site):
+                self.stop_at(baseline, "claude", limit, site)
+
+    def test_youtube_ceiling_stops_at_limit(self) -> None:
+        baseline = self.baseline()
+        for limit, site in ((0, "search"), (1, "videos"), (2, "commentThreads")):
+            with self.subTest(site):
+                self.stop_at(baseline, "youtube", limit, site)
+
+    def test_ceiling_inside_write_comment_stops_run(self) -> None:
+        baseline = self.baseline()
+        limit = len(LANGUAGES) * len(EXAMPLES) + 1  # 예시 44 + 첫 영상 판별 1 — 다음은 자체 검사
+        result = self.stop_at(baseline, "jev", limit, "check")
+        self.assertEqual(result["stopped"]["service"], "jev")
+        self.assertEqual(len(self.calls_of("write")), 1)
+        self.assertEqual(self.calls_of("grade"), [])
+        self.assertEqual(len(self.jev_kinds("video")), 1)
+        # write_comment 이 끝나지 않은 영상은 쓰지 않은 채로 남습니다 — 판정은 천장(①)이 멈춥니다
+        self.assertEqual([video["result"] for video in result["videos"]], ["not_written"])
+
+    def test_quota_exhausted_stops_run(self) -> None:
+        held = {"at": (NOW - timedelta(hours=1)).isoformat(), "call": "search.list", "units": 100}
+        self.quota.parent.mkdir(parents=True)
+        self.quota.write_text(
+            json.dumps({"calls": [held] * 90, "schema_version": 1}), encoding="utf-8"
+        )
+        code, out, err, result = self.run_main()
+        self.assertEqual(
+            result["stopped"],
+            {
+                "kind": "quota",
+                "call": "search.list",
+                "counter": "searches",
+                "used": 90,
+                "limit": 90,
+            },
+        )
+        self.assertEqual(result["errors"], [])
+        self.assertEqual(self.world.urls, [])
+        self.assertEqual(self.log[-1], ("jev", "example"))
+        self.assertEqual(
+            result["verdict"], "6B: stop — 재지 못함(쿼터 search.list searches 90/90)"
+        )
+
+    def test_default_limits_fit_under_ceilings(self) -> None:
+        limits = live_check.DEFAULT_LIMITS
+        self.assertEqual(
+            limits,
+            live_check.RunLimits(
+                live_check.CEILINGS,
+                live_check.TARGET_DRAFTS,
+                live_check.CLASSIFY_MAX,
+                live_check.WRITE_MAX,
+                live_check.WIDE_WINDOW_HOURS,
+            ),
+        )
+        keywords = len(dict.fromkeys(self.config.keywords))
+        windows = 2
+        probes = 1 + len(live_check.MODEL_NAMES)  # 작성 모델이 두 이름과 다를 때
+        self.assertLessEqual(PAGE_SIZE, MAX_IDS_PER_CALL)  # 검색 한 페이지 = videos.list 한 번
+        worst = {
+            "jev": len(LANGUAGES) * len(EXAMPLES) + limits.classify_max + 2 * limits.write_max,
+            "claude": probes + 2 * limits.write_max + 2 * limits.write_max,
+            "youtube": windows * keywords + windows * keywords + limits.write_max,
+        }
+        self.assertEqual(worst, {"jev": 114, "claude": 63, "youtube": 35})
+        for service, count in worst.items():
+            self.assertLessEqual(count, limits.ceilings[service], service)
+        self.assertGreater(limits.wide_window_hours, self.config.trigger.max_age_hours)
+
+
+class VideoRoundTest(LiveCheckCase):
+    def test_out_of_range_videos_are_not_classified(self) -> None:
+        self.world.pages.clear()
+        for number, views in enumerate((999, 1000, 5000, 5001), 1):
+            self.add_video("연애", "operation", number, views)
+        code, out, err, result = self.run_main()
+        self.assertEqual(
+            [title_of(state) for _, _, state, _ in self.jev_kinds("video")], [title(2), title(3)]
+        )
+        self.assertEqual([video["views"] for video in result["videos"]], [1000, 5000])
+        operation = result["windows"]["operation"]
+        self.assertEqual(
+            (operation["found"], operation["in_range"], operation["classified"]), (4, 2, 2)
+        )
+
+    def test_operation_window_then_widened_window(self) -> None:
+        code, out, err, result = self.run_main()
+        searches = self.searches()
+        self.assertEqual([query["q"] for query in searches], list(self.config.keywords) * 2)
+        for query in searches[:5]:
+            self.assertEqual(query["publishedAfter"], "2026-10-13T15:00:00Z")
+            self.assertNotIn("publishedBefore", query)
+        for query in searches[5:]:
+            self.assertEqual(query["publishedAfter"], "2026-10-11T03:00:00Z")
+            self.assertEqual(query["publishedBefore"], "2026-10-13T15:00:00Z")
+        self.assertEqual(
+            result["windows"],
+            {
+                "operation": {
+                    "published_after": "2026-10-13T15:00:00+00:00",
+                    "published_before": None,
+                    "searches": 5,
+                    "found": 4,
+                    "in_range": 3,
+                    "classified": 3,
+                },
+                "widened": {
+                    "published_after": "2026-10-11T03:00:00+00:00",
+                    "published_before": "2026-10-13T15:00:00+00:00",
+                    "searches": 5,
+                    "found": 1,
+                    "in_range": 1,
+                    "classified": 1,
+                },
+            },
+        )
+        self.assertEqual(
+            [(video["video_id"], video["window"], video["result"]) for video in result["videos"]],
+            [
+                (vid(1), "operation", "comment"),
+                (vid(2), "operation", "comment"),
+                (vid(4), "operation", "not_written"),
+                (vid(5), "widened", "comment"),
+            ],
+        )
+        widened = result["videos"][3]
+        self.assertEqual(
+            (widened["keyword"], widened["published_at"], widened["age_hours"], widened["views"]),
+            ("연애", "2026-10-12T21:00:00+00:00", 30.0, 4000),
+        )
+        self.assertEqual(result["verdict"], "6B: go")
+
+    def test_widened_search_stays_under_ceiling(self) -> None:
+        self.world.pages.clear()
+        self.add_video("연애", "operation", 1, 999)  # 범위 밖 — 초안이 하나도 없어 넓힌 창까지
+        code, out, err, result = self.run_main()
+        self.assertEqual(len(self.searches()), 2 * len(dict.fromkeys(self.config.keywords)))
+        self.assertEqual(list(result["windows"]), ["operation", "widened"])
+        self.assertIsNone(result["stopped"])
+        self.assertLessEqual(result["calls"]["youtube"], live_check.CEILINGS["youtube"])
+        # 쓴 영상 0 · 오류 0 — 6B 가 "표본 없음" 으로 다루는 go
+        self.assertEqual(result["verdict"], "6B: go")
+
+    def test_stops_picking_when_target_reached(self) -> None:
+        for field in ("target_drafts", "write_max", "classify_max"):
+            with self.subTest(field):
+                self.build()
+                limits = replace(live_check.DEFAULT_LIMITS, **{field: 2})
+                code, out, err, result = self.run_main(limits=limits)
+                self.assertEqual(
+                    [video["video_id"] for video in result["videos"]], [vid(1), vid(2)]
+                )
+                self.assertEqual(len(self.jev_kinds("video")), 2)
+                self.assertEqual(len(self.searches()), 1)
+                self.assertEqual(result["windows"]["operation"]["in_range"], 2)
+                if field == "target_drafts":
+                    self.assertEqual(list(result["windows"]), ["operation"])
+                else:
+                    self.assertEqual(result["windows"]["widened"]["searches"], 0)
+
+    def test_top_comments_reach_the_writer(self) -> None:
+        self.world.comments[vid(1)] = [*COMMENTS, "   ", "길" * 400]
+        code, out, err, result = self.run_main()
+        urls = [url for url in self.world.urls if "/commentThreads?" in url]
+        query = query_of(urls[0])
+        self.assertEqual(
+            (query["videoId"], query["order"], query["maxResults"]),
+            (vid(1), "relevance", str(TOP_COMMENTS_MAX)),
+        )
+        kept = [*COMMENTS, "길" * 300]
+        block = "<top_comments>\n" + "\n".join(f"<comment>{text}</comment>" for text in kept)
+        self.assertIn(block + "\n</top_comments>", self.content("write", 1))
+        self.assertIn(block + "\n</top_comments>", self.content("grade", 1))
+        video = self.by_id(result)[vid(1)]
+        self.assertEqual(
+            (video["material"], video["top_comment_count"], video["comments_disabled"]),
+            ("top_comments", 3, False),
+        )
+        self.assertEqual(video["untrusted"]["top_comments"], kept)
+
+    def test_comments_disabled_continues_with_title_description(self) -> None:
+        self.world.comments[vid(1)] = (403, google_error("commentsDisabled"))
+        code, out, err, result = self.run_main()
+        video = self.by_id(result)[vid(1)]
+        self.assertEqual(
+            (video["material"], video["top_comment_count"], video["comments_disabled"]),
+            ("title_description", 0, True),
+        )
+        self.assertEqual((video["result"], video["error_cause"]), ("comment", None))
+        self.assertEqual(video["untrusted"]["top_comments"], [])
+        for kind in ("write", "grade"):
+            self.assertNotIn("<top_comments>", self.content(kind, 1))
+        self.assertEqual(result["errors"], [])
+        self.assertEqual(result["verdict"], "6B: go")
+
+    def test_comments_enabled_but_empty_is_title_description(self) -> None:
+        self.world.comments[vid(1)] = []
+        code, out, err, result = self.run_main()
+        video = self.by_id(result)[vid(1)]
+        self.assertEqual(
+            (video["material"], video["top_comment_count"], video["comments_disabled"]),
+            ("title_description", 0, False),
+        )
+        self.assertEqual(video["result"], "comment")
+
+    def test_other_comment_error_is_recorded_and_skips_writing(self) -> None:
+        cases = {
+            "403 quotaExceeded": ((403, google_error("quotaExceeded")), 403),
+            "500": ((500, google_error("backendError", 500)), 500),
+            "network": (reset, None),
+            "items 가 목록이 아님": ((200, b'{"items": {}}'), 200),
+        }
+        for label, (answer, status) in cases.items():
+            with self.subTest(label):
+                self.build()
+                self.world.comments[vid(1)] = answer
+                code, out, err, result = self.run_main()
+                videos = self.by_id(result)
+                first = videos[vid(1)]
+                self.assertEqual(
+                    (first["result"], first["error_cause"], first["material"], first["drafts"]),
+                    ("error", "comments", None, []),
+                )
+                self.assertEqual(self.claude_for("write", 1), [])
+                self.assertEqual(videos[vid(2)]["result"], "comment")  # 다음 영상은 이어 갑니다
+                self.assertEqual(
+                    result["errors"],
+                    [error_entry("youtube", "comments", "YouTubeError", status, vid(1))],
+                )
+                self.assertEqual(result["verdict"], "6B: stop — 재지 못함(호출 오류 1 · 영상 오류 1)")
+
+    def test_jev_answer_shape_error_is_unmeasured_not_blocked(self) -> None:
+        out_of_range = {**PASSING, "mentions_scene": 1.5}
+        written = (vid(1), vid(2), vid(5))
+        cases = {
+            "답에 .noul 없음": ([NO_NOUL] * 3, "jev", [], "재지 못함(영상 오류 3)"),
+            "검사 호출 오류": (
+                [jev_error(529)] * 3,
+                "jev",
+                [error_entry("jev", "self_check", "FakeSdkError", 529, v) for v in written],
+                "재지 못함(호출 오류 3 · 영상 오류 3)",
+            ),
+            "0–1 밖의 답": ([out_of_range] * 3, "jev_answer", [], "재지 못함(영상 오류 3)"),
+        }
+        for label, (checks, cause, errors, verdict) in cases.items():
+            with self.subTest(label):
+                self.build()
+                self.jev.checks = list(checks)
+                code, out, err, result = self.run_main()
+                videos = self.by_id(result)
+                for video_id in written:
+                    video = videos[video_id]
+                    self.assertEqual((video["result"], video["error_cause"]), ("error", cause))
+                    self.assertTrue(video["untrusted"]["skip_reason"].startswith("jev 검사 "))
+                    self.assertIsNone(video["drafts"][0]["scores"])
+                self.assertEqual(result["errors"], errors)
+                self.assertEqual(result["verdict"], "6B: stop — " + verdict)
+                self.assertNotIn("작성 막힘", result["verdict"])
+
+    def test_claude_write_error_is_unmeasured(self) -> None:
+        self.claude.writes = [FakeApiError("unauthorized", 401)] * 3
+        code, out, err, result = self.run_main()
+        written = (vid(1), vid(2), vid(5))
+        videos = self.by_id(result)
+        for video_id in written:
+            video = videos[video_id]
+            self.assertEqual(
+                (video["result"], video["error_cause"], video["drafts"]), ("error", "claude", [])
+            )
+        self.assertEqual(
+            result["errors"],
+            [error_entry("claude", "write", "FakeApiError", 401, video) for video in written],
+        )
+        self.assertEqual(self.calls_of("grade"), [])
+        self.assertEqual(result["verdict"], "6B: stop — 재지 못함(호출 오류 3 · 영상 오류 3)")
+
+    def test_search_errors_are_unmeasured(self) -> None:
+        self.world.search_answers["*"] = (403, google_error("forbidden"))
+        code, out, err, result = self.run_main()
+        self.assertEqual(
+            result["errors"], [error_entry("youtube", "search", "YouTubeError", 403)] * 10
+        )
+        self.assertEqual(result["videos"], [])
+        self.assertEqual(result["verdict"], "6B: stop — 재지 못함(호출 오류 10)")
+
+    def test_drafts_record_each_attempt_with_grade_and_empty_human(self) -> None:
+        self.jev.checks = [FAILING, PASSING, FAILING, FAILING, FAILING, FAILING]
+        self.claude.writes = [writer_reply(), writer_reply(), writer_reply(comment=SHORT)]
+        self.claude.grades = [GRADE_BAD, GRADE_OK]
+        code, out, err, result = self.run_main()
+        videos = self.by_id(result)
+        first = videos[vid(1)]
+        self.assertEqual((first["result"], first["error_cause"]), ("comment", None))
+        untrusted = {"concern": CONCERN, "comment": COMMENT, "code_failures": []}
+        self.assertEqual(
+            first["drafts"],
+            [
+                {
+                    "attempt": 1,
+                    "parsed": True,
+                    "scores": FAILING,
+                    "self_check_pass": False,
+                    "code_pass": True,
+                    "passed": False,
+                    "grade": GRADE_BAD,
+                    "claude_grade": "bad",
+                    "grade_error": None,
+                    "human": "",
+                    "untrusted": untrusted,
+                },
+                {
+                    "attempt": 2,
+                    "parsed": True,
+                    "scores": PASSING,
+                    "self_check_pass": True,
+                    "code_pass": True,
+                    "passed": True,
+                    "grade": GRADE_OK,
+                    "claude_grade": "ok",
+                    "grade_error": None,
+                    "human": "",
+                    "untrusted": untrusted,
+                },
+            ],
+        )
+        short = videos[vid(2)]["drafts"][0]
+        self.assertEqual((short["code_pass"], short["passed"]), (False, False))
+        self.assertEqual(short["untrusted"]["code_failures"], ["글자 수 7자 — 40–120자여야 합니다"])
+        for video_id in (vid(2), vid(5)):
+            video = videos[video_id]
+            self.assertEqual((video["result"], video["error_cause"]), ("skip", None))
+            self.assertEqual([draft["attempt"] for draft in video["drafts"]], [1, 2])
+            self.assertTrue(video["untrusted"]["skip_reason"].startswith("검사 두 번 탈락"))
+        self.assertEqual(videos[vid(5)]["window"], "widened")
+        drafts = [draft for video in result["videos"] for draft in video["drafts"]]
+        self.assertEqual(len(drafts), 6)
+        self.assertEqual({draft["human"] for draft in drafts}, {""})
+        self.assertEqual(len(self.calls_of("grade")), 6)
+        # 넓힌 창의 SKIP 도 셉니다 — 쓴 영상 3 중 SKIP 2
+        self.assertEqual(result["verdict"], "6B: stop — 작성 막힘(SKIP 2/3)")
+
+    def test_unparsable_reply_is_recorded_without_grade(self) -> None:
+        self.add_video("연애", "widened", 6, 2000)
+        self.claude.writes = ["JSON 이 아닌 답", writer_reply(), "아님", "아님", "아님", "아님"]
+        code, out, err, result = self.run_main()
+        videos = self.by_id(result)
+        first = videos[vid(1)]
+        self.assertEqual(first["result"], "comment")
+        self.assertEqual(first["drafts"][0], {"attempt": 1, "parsed": False})
+        self.assertEqual(
+            (first["drafts"][1]["attempt"], first["drafts"][1]["passed"]), (2, True)
+        )
+        unparsed = [{"attempt": 1, "parsed": False}, {"attempt": 2, "parsed": False}]
+        for video_id in (vid(2), vid(5)):
+            video = videos[video_id]
+            self.assertEqual((video["result"], video["error_cause"]), ("skip", None))
+            self.assertEqual(video["drafts"], unparsed)
+        self.assertEqual(videos[vid(6)]["result"], "comment")
+        self.assertEqual(len(self.claude_for("grade", 1)), 1)
+        self.assertEqual(self.claude_for("grade", 2) + self.claude_for("grade", 5), [])
+        # 쓴 영상 4 중 SKIP 2 — 정확히 절반은 go
+        self.assertEqual(result["verdict"], "6B: go")
+
+
+class SelfCheckAdapterTest(unittest.TestCase):
+    def test_one_request_with_noul_per_question(self) -> None:
+        jev = FakeJev([])
+        check = live_check.jev_self_check(jev, "jev-latest")
+        check("검사할 자료", CHECK_QUESTIONS)
+        criteria = {"true": "Yes, it does", "false": "No, it does not"}
+        self.assertEqual(
+            [call[1:] for call in jev.calls],
+            [
+                (
+                    "jev-latest",
+                    "검사할 자료",
+                    {
+                        name: {"type": "noul", "instructions": text, "criteria": criteria}
+                        for name, text in CHECK_QUESTIONS.items()
+                    },
+                )
+            ],
+        )
+
+    def test_answers_read_as_noul_probabilities(self) -> None:
+        jev = FakeJev([])
+        answer = {"mentions_scene": 0.81, "reads_like_ad": 0.12, "follows_concern": 0.67}
+        jev.checks = [answer, NO_NOUL]
+        check = live_check.jev_self_check(jev, "jev-latest")
+        self.assertEqual(check("자료", CHECK_QUESTIONS), answer)
+        with self.assertRaises(AttributeError):  # .noul 이 없는 답은 예외 — write_comment 가 잡습니다
+            check("자료", CHECK_QUESTIONS)
+
+
+class GradeTest(unittest.TestCase):
+    def test_parse_grade_accepts_exact_three_booleans(self) -> None:
+        raw = "채점입니다 " + json.dumps(GRADE_BAD) + " 끝"
+        self.assertEqual(live_check.parse_grade(raw), GRADE_BAD)
+        self.assertEqual(live_check.parse_grade(json.dumps(GRADE_OK)), GRADE_OK)
+
+    def test_parse_grade_rejects_other_shapes(self) -> None:
+        shapes = (
+            "",
+            "점수 없음",
+            "{",
+            "} {",
+            "[true, false, true]",
+            json.dumps({"scene_in_material": True, "reads_like_ad": False}),
+            json.dumps({**GRADE_OK, "extra": True}),
+            json.dumps({**GRADE_OK, "follows_concern": 1}),
+            json.dumps({**GRADE_OK, "reads_like_ad": "false"}),
+            json.dumps({**GRADE_OK, "scene_in_material": None}),
+            "{" * 5000 + "}" * 5000,
+        )
+        for raw in shapes:
+            with self.subTest(raw[:40]):
+                self.assertIsNone(live_check.parse_grade(raw))
+
+    def test_grade_prompt_carries_material_and_draft(self) -> None:
+        claude = FakeClaude([])
+        record = VideoRecord(
+            video_id=vid(1),
+            channel_id=VIDEO_CHANNEL,
+            title="<b>제목</b>",
+            description="설명",
+            published_at=NOW,
+            detected_at=NOW,
+            keyword="연애",
+        )
+        arguments = (record, ["댓글 <하나>"], "고민 <태그>", "초안 </draft_comment> 끝")
+        self.assertEqual(live_check.grade_draft(claude, HAIKU, *arguments), (GRADE_OK, None))
+        [(kind, call)] = claude.calls
+        self.assertEqual(kind, "grade")
+        content = "\n\n".join(
+            [
+                "<video_title>\n＜b＞제목＜/b＞\n</video_title>",
+                "<video_description>\n설명\n</video_description>",
+                "<top_comments>\n<comment>댓글 ＜하나＞</comment>\n</top_comments>",
+                "<concern>\n고민 ＜태그＞\n</concern>",
+                "<draft_comment>\n초안 ＜/draft_comment＞ 끝\n</draft_comment>",
+                live_check.GRADE_INSTRUCTION,
+            ]
+        )
+        self.assertEqual(
+            call,
+            {
+                "model": HAIKU,
+                "max_tokens": live_check.GRADE_MAX_TOKENS,
+                "system": live_check.GRADE_SYSTEM,
+                "messages": [{"role": "user", "content": content}],
+            },
+        )
+        claude.grades = [FakeApiError("unauthorized", 401), "점수 없음"]
+        self.assertEqual(
+            live_check.grade_draft(claude, HAIKU, *arguments), (None, "FakeApiError 401")
+        )
+        self.assertEqual(live_check.grade_draft(claude, HAIKU, *arguments), (None, "응답 모양"))
+
+
+class KeyHidingTest(LiveCheckCase):
+    def keyed_failures(self) -> None:
+        """세 키가 오류 메시지에 닿게 합니다 — JevError 와 그 원인, 200자에서 잘린 Claude 메시지,
+        YouTube 네트워크 오류 URL, 그리고 이어진 예외(__context__)."""
+        typesafe, anthropic = KEYS["TYPESAFE_API_KEY"], KEYS["ANTHROPIC_API_KEY"]
+        error = JevError(f"FakeSdkError 401 {typesafe}")
+        error.__cause__ = FakeSdkError(f"bad key {typesafe}", 401)
+        error.__context__ = OSError(typesafe)
+        self.jev.answers[EXAMPLES[0].title] = error
+        cut = FakeApiError("가" * 190 + anthropic + " 뒤 글", 401)
+        cut.__context__ = OSError(anthropic)
+        self.claude.writes = [cut]
+        self.world.comments[vid(2)] = reset
+        self.world.search_answers["썸"] = reset
+
+    def test_fake_keys_never_reach_output(self) -> None:
+        self.keyed_failures()
+        code, out, err, result = self.run_main()
+        self.assertIn(code, (0, 1))
+        assert_no_key(self, self.outputs(out, err))
+        saved = (self.out / live_check.RESULT_NAME).read_text(encoding="utf-8")
+        # 키가 결과까지 닿았고 가림이 바꿨습니다 — 가림 없이 지나간 것이 아닙니다
+        self.assertIn("API 오류: FakeSdkError 401 <TYPESAFE_API_KEY>", saved)
+        self.assertIn("가<ANTHROPIC_API_KEY>", saved)
+        self.assertIn(error_entry("youtube", "search", "YouTubeError", None), result["errors"])
+        self.assertIn(
+            error_entry("youtube", "comments", "YouTubeError", None, vid(2)), result["errors"]
+        )
+        with self.subTest("가림이 고장 나도 쓴 뒤 검사가 두 파일을 지웁니다"):
+            self.build()
+            self.keyed_failures()
+            with mock.patch.object(live_check.Redactor, "__call__", lambda self, text: text):
+                code, out, err, result = self.run_main()
+            self.assertEqual(code, 3)
+            self.assertEqual(out, "")
+            self.assertEqual(err, "키 조각이 결과 파일에 남아 두 파일을 지웠습니다 — 커밋하지 마세요\n")
+            self.assertIsNone(result)
+            self.assertEqual(list(self.out.iterdir()), [])
+
+    def test_abort_prints_type_only(self) -> None:
+        typesafe = KEYS["TYPESAFE_API_KEY"]
+        abort = RuntimeError(typesafe)
+        abort.__context__ = OSError(typesafe)
+        self.jev.error = abort
+        code, out, err, result = self.run_main()
+        self.assertEqual(result["stopped"], {"kind": "aborted", "error": "RuntimeError"})
+        self.assertEqual(result["errors"], [error_entry("jev", "accuracy", "RuntimeError", None)])
+        self.assertEqual(
+            result["verdict"],
+            "6B: stop — 재지 못함(중단 RuntimeError); 판별 미달(ko 0/22 · en 0/22)",
+        )
+        self.assertEqual(code, 1)
+        self.assertEqual(err, "")
+        self.assertNotIn("Traceback", out)
+        assert_no_key(self, self.outputs(out, err))
+
+
+class ResultShapeTest(LiveCheckCase):
+    def test_untrusted_text_only_under_untrusted(self) -> None:
+        self.add_video(
+            "연애",
+            "widened",
+            6,
+            2000,
+            name="연애 고민 제목표식 긴 제목 " + "가" * 400,
+            description="설명표식 긴 설명 " + "나" * 2500,
+        )
+        self.jev.checks = [PASSING, FAILING, FAILING]  # 두 번째 영상은 SKIP — 건너뛴 이유까지
+        code, out, err, result = self.run_main()
+        outside = strings(result, under_untrusted=False)
+        inside = strings(result, under_untrusted=True)
+        for marker in MARKERS:
+            self.assertEqual([text for text in outside if marker in text], [], marker)
+            self.assertTrue(any(marker in text for text in inside), marker)
+        self.assertEqual(result["notice"], live_check.UNTRUSTED_NOTICE)
+        videos = self.by_id(result)
+        self.assertEqual(videos[vid(2)]["result"], "skip")
+        self.assertTrue(videos[vid(2)]["untrusted"]["skip_reason"])
+        long = videos[vid(6)]["untrusted"]
+        self.assertEqual((len(long["title"]), len(long["description"])), (300, 2000))
+        # 결과 모양은 2단계의 가짜 결과(healthy_result)와 같은 칸입니다 — 6B 는 같은 칸을 읽습니다
+        healthy = healthy_result()
+        self.assertEqual(set(result), set(healthy))
+        self.assertEqual(set(videos[vid(1)]), set(healthy["videos"][0]))
+        self.assertEqual(set(videos[vid(1)]["untrusted"]), set(healthy["videos"][0]["untrusted"]))
+        self.assertEqual(set(videos[vid(1)]["drafts"][0]), set(healthy["videos"][0]["drafts"][0]))
+        self.assertEqual(set(result["accuracy"]["ko"][0]), set(healthy["accuracy"]["ko"][0]))
+        self.assertEqual(set(result["windows"]["widened"]), set(healthy["windows"]["operation"]))
+
+    def test_summary_has_numbers_only(self) -> None:
+        code, out, err, result = self.run_main()
+        summary = (self.out / live_check.SUMMARY_NAME).read_text(encoding="utf-8")
+        for text in (*MARKERS, AUTHOR, AUTHOR_CHANNEL, VIDEO_CHANNEL, CONCERN, COMMENT, *COMMENTS):
+            self.assertNotIn(text, summary)
+        lines = summary.split("\n")
+        self.assertEqual(lines[:2], [result["verdict"], ""])
+        self.assertEqual(lines[-1], "")
+        self.assertEqual(len(lines[2:-1]), len(SUMMARY_PREFIXES))
+        for line, prefix in zip(lines[2:-1], SUMMARY_PREFIXES):
+            self.assertTrue(line.startswith(prefix), line)
+        result_path = self.out / live_check.RESULT_NAME
+        summary_path = self.out / live_check.SUMMARY_NAME
+        self.assertEqual(
+            out, summary + f"결과: {result_path} · {summary_path}\n키 검사: 결과 파일에 키 없음\n"
+        )
+
+    def test_top_comment_authors_never_stored(self) -> None:
+        code, out, err, result = self.run_main()
+        saved = self.outputs(out, err)
+        for text in (AUTHOR, AUTHOR_CHANNEL, VIDEO_CHANNEL, "authorDisplayName", "channel"):
+            self.assertNotIn(text, saved)
+        self.assertEqual(self.by_id(result)[vid(1)]["untrusted"]["top_comments"], COMMENTS)
+
+    def test_run_verdict_matches_summary_screen_and_recount(self) -> None:
+        cases = (("go", None, "6B: go"), ("stop", "썸", "6B: stop — 재지 못함(호출 오류 2)"))
+        for label, failing, verdict in cases:
+            with self.subTest(label):
+                self.build()
+                if failing is not None:
+                    self.world.search_answers[failing] = (403, google_error("forbidden"))
+                code, out, err, result = self.run_main()
+                self.assertEqual(result["verdict"], verdict)
+                summary = (self.out / live_check.SUMMARY_NAME).read_text(encoding="utf-8")
+                self.assertEqual(out.split("\n")[0], summary.split("\n")[0])
+                self.assertEqual(out.split("\n")[-2], "키 검사: 결과 파일에 키 없음")
+                recount_out, recount_err = io.StringIO(), io.StringIO()
+                recount = live_check.main(
+                    ["--verdict", str(self.out / live_check.RESULT_NAME)],
+                    stdout=recount_out,
+                    stderr=recount_err,
+                )
+                self.assertEqual(recount_out.getvalue(), verdict + "\n")
+                self.assertEqual(recount_err.getvalue(), "")
+                self.assertEqual(recount, code)
+
+    def test_errors_carry_video_id(self) -> None:
+        self.jev.answers[EXAMPLES[0].title] = jev_error(429)
+        self.world.comments[vid(2)] = (403, google_error("quotaExceeded"))
+        code, out, err, result = self.run_main()
+        self.assertEqual(
+            result["errors"],
+            [
+                error_entry("jev", "accuracy", "FakeSdkError", 429),
+                error_entry("jev", "accuracy", "FakeSdkError", 429),
+                error_entry("youtube", "comments", "YouTubeError", 403, vid(2)),
+            ],
+        )
+
+
+class GraderBoundaryTest(unittest.TestCase):
+    def test_agent_sources_never_name_the_grader(self) -> None:
+        sources = sorted((live_check.REPO / "src" / "agent").glob("*.py"))
+        self.assertIn("writer.py", [path.name for path in sources])
+        for path in sources:
+            text = path.read_text(encoding="utf-8")
+            for name in GRADER_NAMES:
+                self.assertNotIn(name, text, f"{path.name}: {name}")
+
+    def test_agent_modules_expose_no_grader(self) -> None:
+        names = [info.name for info in pkgutil.iter_modules(agent.__path__)]
+        self.assertIn("writer", names)
+        for name in names:
+            module = importlib.import_module(f"agent.{name}")
+            for attribute in GRADER_NAMES:
+                self.assertFalse(hasattr(module, attribute), f"agent.{name}.{attribute}")
 
 
 if __name__ == "__main__":
