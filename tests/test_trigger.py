@@ -101,6 +101,12 @@ class NoTests(unittest.TestCase):
         future = video((2 * H, 900), (2 * H + 30 * M, 999), published_at=T0 + 3 * H)
         self.assertEqual(judged(future, AT), ("no", "views_below_min"))
 
+    def test_age_checked_before_decrease_and_speed(self) -> None:
+        decreased = video((19 * H + 30 * M, 1450), (20 * H, 1300))
+        self.assertEqual(judged(decreased, 20 * H), ("no", "too_old"))
+        slow = video((19 * H + 30 * M, 1200), (20 * H, 1274))
+        self.assertEqual(judged(slow, 20 * H), ("no", "too_old"))
+
     def test_age_counts_from_published_not_detected(self) -> None:
         record = video((11 * H + 30 * M, 1200), (12 * H, 1450), detected_at=T0 + 11 * H)
         self.assertEqual(judged(record, 12 * H + S), ("no", "too_old"))
