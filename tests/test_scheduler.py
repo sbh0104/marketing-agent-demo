@@ -78,7 +78,7 @@ class RunLoopTest(unittest.TestCase):
     def test_cadence_is_measured_from_cycle_start(self) -> None:
         harness = Harness(ticks=[0.0, 120.0, 1800.0])
         self.assertEqual(harness.run(max_cycles=2), 2)
-        self.assertEqual(harness.sleeps, [1680.0])
+        self.assertEqual(harness.sleeps, [7080.0])
 
     def test_reloaded_interval_changes_the_next_wait(self) -> None:
         harness = Harness(ticks=[0.0, 10.0, 1000.0, 1030.0, 2000.0], reloads=[FIVE, FIVE])
@@ -91,7 +91,7 @@ class RunLoopTest(unittest.TestCase):
         harness = Harness(ticks=[0.0, 60.0, 2000.0], reloads=[error])
         self.assertEqual(harness.run(max_cycles=2), 2)
         self.assertEqual(harness.errors, [("config", error)])
-        self.assertEqual(harness.sleeps, [1740.0])
+        self.assertEqual(harness.sleeps, [7140.0])
         self.assertEqual(harness.cycles, [BASE, BASE])
 
     def test_failing_cycle_is_reported_and_loop_continues(self) -> None:
@@ -101,10 +101,10 @@ class RunLoopTest(unittest.TestCase):
         self.assertEqual(harness.run(max_cycles=2), 2)
         self.assertEqual(harness.errors, [("cycle", failure)])
         self.assertEqual(len(harness.cycles), 2)
-        self.assertEqual(harness.sleeps, [1800.0])
+        self.assertEqual(harness.sleeps, [7200.0])
 
     def test_overrun_cycle_sleeps_zero(self) -> None:
-        harness = Harness(ticks=[0.0, 5000.0, 5000.0])
+        harness = Harness(ticks=[0.0, 8000.0, 8000.0])
         harness.run(max_cycles=2)
         self.assertEqual(harness.sleeps, [0.0])
 
@@ -176,7 +176,7 @@ class RealFileReloadTest(unittest.TestCase):
             if len(cycles) == 1:
                 write_config(directory, bad_text)
             elif len(cycles) == 2:
-                write_config(directory, variant("poll_interval_min: 30 ", "poll_interval_min: 5 "))
+                write_config(directory, variant("poll_interval_min: 120 ", "poll_interval_min: 5 "))
             use_downstream(config, directory)
 
         done = run_loop(
@@ -201,7 +201,7 @@ class RealFileReloadTest(unittest.TestCase):
                 self.assertIsInstance(errors[0][1], ConfigError)
                 self.assertEqual(cycles[:2], [initial, initial])
                 self.assertEqual(cycles[2], dataclasses.replace(initial, poll_interval_min=5))
-                self.assertEqual(sleeps, [1790.0, 270.0])
+                self.assertEqual(sleeps, [7190.0, 270.0])
 
 
 if __name__ == "__main__":
