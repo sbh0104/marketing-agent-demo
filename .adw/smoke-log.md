@@ -112,3 +112,68 @@ other line is required on every item.
 
 <!-- New items are appended below, one `### S-###` section each, newest last. The bucket
      ships empty on purpose: the short route's invariant is "empty bucket → next phase". -->
+
+### S-NEW-1 — 설정 숫자 하한 규칙(음수 대기·max_age_hours 0·음수 상한)을 테스트로 고정
+- source: cycle 20261013-062542-adw/phase-1-foundation-contracts · tracker plans/interview-marketing-agent.md#phase-1 · deferred by ship-check
+- evidence: src/agent/config.py:143, src/agent/config.py:171, src/agent/config.py:180 — 각 하한을 없애는 변이가 스위트에서 초록(.adw/ship-report.md § Test integrity)
+- direction: tests/test_config.py 의 ConfigFromMappingTest 에 channel_cooldown_hours -1·.nan, max_age_hours 0, daily_max_comments -1 이 각각 ConfigError 인지 보는 행을 더한다 — 코드 변경 없음
+- touches: tests/test_config.py
+- status: open
+- attempts: 0 · last failure: —
+- first seen: 2026-10-13 · last seen: 2026-10-13
+
+### S-NEW-2 — 로그 값 속 줄바꿈 이스케이프를 공백 없는 값으로 테스트에 고정
+- source: cycle 20261013-062542-adw/phase-1-foundation-contracts · tracker plans/interview-marketing-agent.md#phase-1 · deferred by ship-check
+- evidence: src/agent/logbook.py:51 — `[^\s"=\\]+` 를 `[^ \t"=\\]+` 로 바꾼 변이가 스위트에서 초록(.adw/ship-report.md § Test integrity)
+- direction: tests/test_logbook.py 의 test_rendering_rules 에 "x\ny"·"x\ry" 같은 공백·따옴표 없는 값을 더해 이스케이프된 따옴표 값으로 쓰이고 parse_line 으로 되돌아오는지 본다 — 코드 변경 없음
+- touches: tests/test_logbook.py
+- status: open
+- attempts: 0 · last failure: —
+- first seen: 2026-10-13 · last seen: 2026-10-13
+
+### S-NEW-3 — 가드 거부 표에 두 번째 `;` 뒤에 숨은 `v` 행을 더해 쿼리 나누기를 테스트에 고정
+- source: cycle 20261013-062542-adw/phase-1-foundation-contracts · tracker plans/interview-marketing-agent.md#phase-1 · deferred by ship-check
+- evidence: src/agent/guard.py:60 — `parts.query.replace(";", "&")` 를 `replace(";", "&", 1)`(첫 `;` 만 나눔)로 바꾼 변이가 스위트에서 초록(141개 OK). 이때 `https://youtu.be/AAAAAAAAAAA?x=1;y=2;v=BBBBBBBBBBB` 가 A 로 읽힘. tests/test_guard.py:43-46, 72 의 `;` 행은 모두 `;` 가 하나뿐(.adw/ship-report.md § Test integrity)
+- direction: tests/test_guard.py 의 REJECTED_REFS `;` 묶음에 `f"https://youtu.be/{REPRO_A}?x=1;y=2;v={REPRO_B}"` 와 `f"https://www.youtube.com/shorts/{REPRO_A}?a=1;b=2;v={REPRO_B}"` 행을 더한다 — 코드 변경 없음, 지금 코드는 둘 다 None
+- touches: tests/test_guard.py
+- base: adw/phase-1-foundation-contracts
+- phase: plans/interview-marketing-agent.md#phase-1
+- status: open
+- attempts: 0 · last failure: —
+- first seen: 2026-10-13 · last seen: 2026-10-13
+
+### S-NEW-4 — 가드 ID 표에 12자 맨 ID 와 닮은 호스트 행을 더해 11자 규칙과 호스트 목록을 테스트에 고정
+- source: cycle 20261013-062542-adw/phase-1-foundation-contracts · tracker plans/interview-marketing-agent.md#phase-1 · deferred by ship-check
+- evidence: src/agent/guard.py:49, src/agent/guard.py:19 — `VIDEO_ID_RE.fullmatch(text)` → `.match(text)` 변이와 `_YOUTUBE_HOSTS` 에 `youtube-nocookie.com` 을 더한 변이가 스위트에서 초록(141개 OK). 앞 변이에서는 `decide_post("AAAAAAAAAAA&v=BBBBBBBBBBB", ["AAAAAAAAAAA&v=BBBBBBBBBBB"], False)` 가 live=True(.adw/ship-report.md § Test integrity)
+- direction: tests/test_guard.py 의 VideoIdFromRefTest 표(158-177행)에 `"AAAAAAAAAAAB"` · `"AAAAAAAAAAA&v=BBBBBBBBBBB"` → None, test_g7 곁에 `https://youtube-nocookie.com/watch?v=AAAAAAAAAAA` → None 행을 더한다 — 코드 변경 없음, 지금 코드는 셋 다 None(ship-check 에서 확인)
+- touches: tests/test_guard.py
+- status: open
+- attempts: 0 · last failure: —
+- first seen: 2026-10-13 · last seen: 2026-10-13
+
+### S-NEW-5 — 저장소 테스트에 23.5시간 전 게시와 24시간이 아닌 채널 대기를 더해 하루 창과 대기 계산을 고정
+- source: cycle 20261013-062542-adw/phase-1-foundation-contracts · tracker plans/interview-marketing-agent.md#phase-1 · deferred by ship-check
+- evidence: src/agent/store.py:170, src/agent/store.py:174 — 하루 창 `timedelta(hours=24)` → `hours=23` 변이와 채널 대기 `hours=limits.channel_cooldown_hours` → `hours=24` 변이가 둘 다 초록(141개 OK). 저장소 테스트는 모두 `LimitsConfig(10, 24.0, 100)`(tests/test_store.py:15)을 쓰고, 하루 창은 정확히 24시간 경계 하나만 본다(tests/test_store.py:121)
+- direction: tests/test_store.py 에 ① 하루 상한 10, 다른 채널 9건을 1시간 전 · 1건을 23.5시간 전에 게시한 뒤 새 채널 → `daily_cap` ② 채널 대기 48시간, 같은 채널 30시간 전 게시 → `channel_cooldown` ③ 채널 대기 1시간, 같은 채널 2시간 전 게시 → `ok` 행을 더한다 — 코드 변경 없음
+- touches: tests/test_store.py
+- status: open
+- attempts: 0 · last failure: —
+- first seen: 2026-10-13 · last seen: 2026-10-13
+
+### S-NEW-6 — 설정 테스트에 하한 경계값 · 숫자 키의 bool · 빠진 하한 넷을 더해 계약 2절 표를 고정
+- source: cycle 20261013-062542-adw/phase-1-foundation-contracts · tracker plans/interview-marketing-agent.md#phase-1 · deferred by ship-check
+- evidence: src/agent/config.py:139-160, src/agent/config.py:179-201 — 하한 비교를 `>=`→`>` · `<`→`<=` 로 바꾼 변이, `_number` 의 bool 검사를 뺀 변이, `min_views_per_hour` · `min_views` · `daily_max_searches` · `comment.min_chars` 의 하한을 넓힌 변이 7개가 모두 초록(.adw/ship-report.md § Test integrity)
+- direction: tests/test_config.py 에 ① 하한값 그대로 읽힘: `limits.channel_cooldown_hours: 0` · `trigger.min_views_per_hour: 0` · `limits.daily_max_comments: 0` · `poll_interval_min: 1` · `trigger.max_views` = `min_views` ② 숫자 키의 bool 거부: `trigger.max_age_hours: true` · `limits.channel_cooldown_hours: false` → `숫자여야 합니다` ③ 하한 넷: `trigger.min_views_per_hour: -1` · `trigger.min_views: -1` · `limits.daily_max_searches: -1` → `0 이상이어야 합니다`, `comment.min_chars: 0` → `1 이상이어야 합니다` 행을 더한다 — 코드 변경 없음, 지금 코드는 모두 이렇게 동작(ship-check 에서 확인)
+- touches: tests/test_config.py
+- status: open
+- attempts: 0 · last failure: —
+- first seen: 2026-10-13 · last seen: 2026-10-13
+
+### S-NEW-7 — parse_line 거부 표에 따옴표 값 뒤에 붙은 글자와 끝의 빈 줄 행을 더함
+- source: cycle 20261013-062542-adw/phase-1-foundation-contracts · tracker plans/interview-marketing-agent.md#phase-1 · deferred by ship-check
+- evidence: src/agent/logbook.py:143, src/agent/logbook.py:109 — `if rest[end] != " ":` → `if False:` 변이와 줄 끝 `\n` 하나 대신 모두 떼는 변이가 초록. 앞 변이에서 `parse_line('2026-10-12T21:30:00+09:00 STOP reason="a"_extra=y')` 가 `_` 를 버리고 `{'reason': 'a', 'extra': 'y'}` 를 돌려줌(.adw/ship-report.md § Test integrity)
+- direction: tests/test_logbook.py 의 test_malformed_lines 나쁜 줄 목록(157-172행)에 `2026-10-12T21:30:00+09:00 STOP reason="a"_x=y` 와 정상 STOP 줄 + `"\n\n"` 을 더한다 — 코드 변경 없음, 지금 코드는 둘 다 ValueError(ship-check 에서 확인)
+- touches: tests/test_logbook.py
+- status: open
+- attempts: 0 · last failure: —
+- first seen: 2026-10-13 · last seen: 2026-10-13
