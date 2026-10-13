@@ -177,3 +177,30 @@ other line is required on every item.
 - status: open
 - attempts: 0 · last failure: —
 - first seen: 2026-10-13 · last seen: 2026-10-13
+
+### S-NEW-1 — 트리거 판정에서 나이 창 검사가 줄어든 조회수 · 속도 검사보다 먼저인 차례를 테스트로 고정
+- source: cycle 20261013-161358-adw/phase-4-trigger-timing · tracker plans/interview-marketing-agent.md#phase-4 · deferred by ship-check
+- evidence: src/agent/trigger.py:56-62 — `too_old` 검사를 `views_decreased` 검사 뒤로 옮긴 변이와 `too_slow` 검사 뒤로 옮긴 변이가 둘 다 스위트에서 초록(`Ran 35 tests` · `OK`). 지금 코드는 20시간 된 1450→1300 영상을 `no too_old` 로 판정하지만 앞 변이는 `hold views_decreased` 로 영원히 미룸(.adw/ship-report.md § Test integrity)
+- direction: tests/test_trigger.py 의 NoTests 에 ① `video((19*H+30*M, 1450), (20*H, 1300))` 를 `20*H` 에 → `("no", "too_old")` ② `video((19*H+30*M, 1200), (20*H, 1274))` 를 `20*H` 에 → `("no", "too_old")` 행을 더한다 — 코드 변경 없음, 지금 코드는 둘 다 too_old(ship-check 에서 확인)
+- touches: tests/test_trigger.py
+- status: open
+- attempts: 0 · last failure: —
+- first seen: 2026-10-13 · last seen: 2026-10-13
+
+### S-NEW-2 — 계약 11절이 약속하지만 테스트가 잡지 않는 네 가지(at=now · 기록 안 바꿈 · 직전 시각의 큰 조회수 · 소수 기준값)를 테스트로 고정
+- source: cycle 20261013-161358-adw/phase-4-trigger-timing · tracker plans/interview-marketing-agent.md#phase-4 · deferred by ship-check
+- evidence: src/agent/trigger.py:23-63 — 일곱 갈래의 `Judgement(..., now)` 를 `latest.at` 으로 바꾼 변이 7개, `history.sort(...)` 로 받은 목록을 제자리 정렬하는 변이, 직전 시각에서 작은 조회수를 고르는 변이, `_rate` 의 `/` → `//` 변이가 모두 스위트에서 초록. tests/test_trigger.py:229 는 최신 기록 시각에 판정해 `at=now` 와 `at=latest.at` 을 가르지 못하고, :240 은 이미 정렬된 기록을 씀(.adw/ship-report.md § Test integrity)
+- direction: tests/test_trigger.py 에 ① test_every_reason_logs_unquoted 의 여덟 장면마다 `j.at == now` 를 확인하고, 판정 시각이 최신 기록보다 늦은 장면(`video(*GOOD)` 을 `3*H` 에 → yes)을 하나 더함 ② test_record_is_not_changed 에 순서가 뒤섞인 기록을 씀 ③ `video((2*H, 1200), (2*H, 1300), (2*H+30*M, 1450))` 이 `min_views_per_hour=300.0` 에서 yes · `301.0` 에서 `too_slow` ④ `video((1*H, 1000), (11*H, 2505))` 를 `11*H` 에(시간당 150.5) `150.5` 에서 yes · `150.6` 에서 `too_slow` 행을 더한다 — 코드 변경 없음, 지금 코드는 넷 다 이렇게 동작(ship-check 에서 확인)
+- touches: tests/test_trigger.py
+- status: open
+- attempts: 0 · last failure: —
+- first seen: 2026-10-13 · last seen: 2026-10-13
+
+### S-NEW-3 — 트리거 판정이 같은 시간대 객체의 일광 절약 시각을 벽시계로 비교하는 것을 UTC 비교로 고침
+- source: cycle 20261013-161358-adw/phase-4-trigger-timing · tracker plans/interview-marketing-agent.md#phase-4 · deferred by ship-check
+- evidence: src/agent/trigger.py:23, :27, :39, :54, :56 — 파이썬은 tzinfo 가 같은 두 시각을 벽시계로 비교 · 뺄셈함. `ZoneInfo("America/New_York")` 의 2026-11-01 01:30 fold 0 · fold 1(실제 1시간 차) 두 기록이 `hold too_few_samples`, 같은 두 순간을 UTC 로 주면 `yes views_per_hour`(ship-check 에서 재현). 계약 11절 "같은 순간이면 같은 시각" · "목록 순서는 보지 않고" 와 어긋남
+- direction: `_latest_pair` · `_rate` · 미래 업로드 검사 · 나이 검사가 `.astimezone(timezone.utc)` 로 바꾼 순간끼리 비교 · 뺄셈하게 한다(`Judgement.at` 은 받은 `now` 그대로). tests/mutants.py 의 `trigger-*` 고정 문자열이 trigger.py 에 한 번씩 남는지 확인하고 바뀐 줄이면 고정 문자열도 맞춘다. 테스트는 zoneinfo 대신 손으로 쓴 일광 절약 tzinfo 로(Windows 에 tzdata 가 없어도 돌게) 가을 겹침(fold) · 봄 당김 두 행을 더한다
+- touches: src/agent/trigger.py, tests/test_trigger.py, tests/mutants.py
+- status: open
+- attempts: 0 · last failure: —
+- first seen: 2026-10-13 · last seen: 2026-10-13
