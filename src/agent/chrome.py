@@ -10,6 +10,10 @@ check_profile_dir 는 **켤 때** 하는 검사이고, `python3 -m agent.chrome`
 
 디버깅 포트가 열려 있는 동안 이 컴퓨터의 어떤 프로그램이든 로그인된 계정의 쿠키를 읽을 수
 있습니다 — 전용 유튜브(브랜드) 계정으로 로그인하고, 쓰지 않을 때는 그 크롬을 닫습니다.
+
+ChromeSession 은 이미 켜진 크롬에 connect_over_cdp 로 붙고, Playwright 는 연결할 때에만
+불러옵니다(테스트는 Playwright 없이 돕니다). 유튜브 선택자는 이 파일 위쪽의 상수들입니다 —
+화면 구성이 바뀌면 거기를 고칩니다.
 """
 from __future__ import annotations
 
@@ -24,6 +28,15 @@ from typing import TextIO
 from urllib.parse import urlsplit
 
 from agent.config import ConfigError, load_config
+from agent.poster import (
+    CHROME_UNREACHABLE,
+    COMMENT_BOX_MISSING,
+    COMMENTS_DISABLED,
+    LOGIN_REQUIRED,
+    PLAYWRIGHT_MISSING,
+    POST_BUTTON_MISSING,
+    PageError,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 PROFILE_DIR_NAME = "chrome-profile"
@@ -31,6 +44,23 @@ PORT_WARNING = (
     "주의: 이 포트가 열려 있는 동안 이 컴퓨터의 어떤 프로그램이든 로그인된 계정의 쿠키를 읽을 수 있습니다 — "
     "본 구글 계정이 아닌 전용 유튜브(브랜드) 계정으로 로그인하고, 에이전트를 쓰지 않을 때는 이 크롬을 닫으세요."
 )
+
+# 유튜브 선택자 — 화면 구성이 바뀌면 여기를 고칩니다 (R8 사람 확인이 실제 화면과 맞춰 봄)
+SIGNED_IN = "button#avatar-btn"
+COMMENTS = "ytd-comments#comments"
+COMMENTS_DISABLED_MSG = "ytd-comments#comments ytd-message-renderer"
+COMMENT_PLACEHOLDER = "#simplebox-placeholder"
+COMMENT_INPUT = "#contenteditable-root"
+SUBMIT_BUTTON = "ytd-commentbox #submit-button button"
+COMMENT_TEXTS = "ytd-comment-thread-renderer #content-text"
+
+# 기다리는 시간(밀리초)과 게시 확인 횟수
+NAV_TIMEOUT_MS = 30000
+WAIT_MS = 10000
+CLICK_TIMEOUT_MS = 3000
+CONFIRM_POLLS = 30
+CONFIRM_POLL_MS = 500
+CONFIRM_SCAN = 20
 
 
 class ChromeSetupError(ValueError):
@@ -151,6 +181,119 @@ def main(
     print(shown, file=out)
     print(PORT_WARNING, file=out)
     return 0
+
+
+def _normalize(text: str) -> str:
+    return " ".join(text.split())
+
+
+class YouTubePage:
+    """유튜브 영상 탭 하나 — agent.poster.CommentPage 를 따릅니다.
+
+    timeout_error 로 받은 시간 초과 종류만 "화면에 없음"으로 보고, 다른 예외는 그대로 올립니다.
+    """
+
+    def __init__(self, page: object, timeout_error: type[BaseException]) -> None:
+        self._page = page
+        self._timeout_error = timeout_error
+
+    @property
+    def url(self) -> str:
+        return self._page.url
+
+    def open(self, url: str) -> None:
+        self._page.goto(url, wait_until="domcontentloaded", timeout=NAV_TIMEOUT_MS)
+
+    def prepare_comment(self, text: str) -> None:
+        """로그인 · 댓글 칸 · 입력 · 버튼을 차례로 보고, 빠진 것이 있으면 그 원인으로 멈춥니다."""
+        if not self._present(SIGNED_IN, WAIT_MS):
+            raise PageError(LOGIN_REQUIRED, SIGNED_IN)
+        if not self._present(COMMENTS, WAIT_MS):
+            raise PageError(COMMENT_BOX_MISSING, COMMENTS)
+        self._page.locator(COMMENTS).first.scroll_into_view_if_needed(timeout=WAIT_MS)
+        if not self._present(COMMENT_PLACEHOLDER, WAIT_MS):
+            if self._page.locator(COMMENTS_DISABLED_MSG).count() > 0:
+                raise PageError(COMMENTS_DISABLED, COMMENTS_DISABLED_MSG)
+            raise PageError(COMMENT_BOX_MISSING, COMMENT_PLACEHOLDER)
+        self._page.locator(COMMENT_PLACEHOLDER).first.click(timeout=WAIT_MS)
+        if not self._present(COMMENT_INPUT, WAIT_MS):
+            raise PageError(COMMENT_BOX_MISSING, COMMENT_INPUT)
+        self._page.locator(COMMENT_INPUT).first.fill(text)
+        if (
+            not self._present(SUBMIT_BUTTON, WAIT_MS)
+            or not self._page.locator(SUBMIT_BUTTON).first.is_enabled()
+        ):
+            raise PageError(POST_BUTTON_MISSING, SUBMIT_BUTTON)
+
+    def submit(self) -> None:
+        """게시 버튼을 누릅니다 — 기다림도 이동도 없이. 누르는 중의 예외는 그대로 올립니다."""
+        button = self._page.locator(SUBMIT_BUTTON)
+        if button.count() == 0 or not button.first.is_enabled():
+            raise PageError(POST_BUTTON_MISSING, SUBMIT_BUTTON)
+        button.first.click(timeout=CLICK_TIMEOUT_MS)
+
+    def confirm_posted(self, text: str) -> bool:
+        """맨 위 댓글들 가운데 같은 글(공백만 다른 것 포함)이 보이면 True."""
+        for _ in range(CONFIRM_POLLS):
+            texts = self._page.locator(COMMENT_TEXTS).all_inner_texts()
+            if any(_normalize(t) == _normalize(text) for t in texts[:CONFIRM_SCAN]):
+                return True
+            self._page.wait_for_timeout(CONFIRM_POLL_MS)
+        return False
+
+    def screenshot(self, path: Path) -> None:
+        self._page.screenshot(path=str(path))
+
+    def close(self) -> None:
+        self._page.close()
+
+    def _present(self, selector: str, timeout_ms: int) -> bool:
+        try:
+            self._page.locator(selector).first.wait_for(state="attached", timeout=timeout_ms)
+        except self._timeout_error:
+            return False
+        return True
+
+
+class ChromeSession:
+    """켜져 있는 크롬에 붙는 연결 — 영상마다 새 탭을 엽니다. close() 는 연결만 끊습니다."""
+
+    def __init__(self, debug_url: str) -> None:
+        self._debug_url = debug_url
+        self._playwright = None
+        self._context = None
+        self._timeout_error = None
+
+    def new_page(self) -> YouTubePage:
+        if self._context is None:
+            self._connect()
+        return YouTubePage(self._context.new_page(), self._timeout_error)
+
+    def _connect(self) -> None:
+        try:
+            from playwright.sync_api import TimeoutError as PlaywrightTimeout, sync_playwright
+        except ImportError as exc:
+            raise PageError(PLAYWRIGHT_MISSING, "pip install -r requirements.txt") from exc
+        playwright = sync_playwright().start()
+        try:
+            browser = playwright.chromium.connect_over_cdp(self._debug_url)
+        except Exception as exc:
+            playwright.stop()
+            raise PageError(CHROME_UNREACHABLE, f"{type(exc).__name__}: {exc}"[:200]) from exc
+        if not browser.contexts:
+            playwright.stop()
+            raise PageError(CHROME_UNREACHABLE, "기본 컨텍스트가 없습니다")
+        self._playwright = playwright
+        self._context = browser.contexts[0]  # 기본 컨텍스트 — 로그인 쿠키가 여기 있습니다
+        self._timeout_error = PlaywrightTimeout
+
+    def close(self) -> None:
+        """연결만 끊습니다 — browser.close() 를 부르지 않으므로 크롬과 사용자 탭은 그대로입니다."""
+        if self._playwright is not None:
+            self._playwright.stop()
+            self._playwright = None
+            self._context = None
+            self._timeout_error = None
 
 
 if __name__ == "__main__":

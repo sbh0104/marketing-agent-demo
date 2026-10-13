@@ -542,7 +542,9 @@ class YouTubePageTest(unittest.TestCase):
 
     def test_present_lets_other_errors_propagate(self) -> None:
         page = full_page(
-            signed_in={"wait_error": RuntimeError("Target page, context or browser has been closed")}
+            signed_in={
+                "wait_error": RuntimeError("Target page, context or browser has been closed")
+            }
         )
         with self.assertRaises(RuntimeError):
             self.adapter(page).prepare_comment(TEXT)
