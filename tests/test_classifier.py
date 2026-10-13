@@ -144,7 +144,7 @@ def fake_sdk() -> types.ModuleType:
     class TypeSafeAPITimeoutError(TypeSafeAPIConnectionError):
         pass
 
-    class TypeSafeAPIResponseValidationError(TypeSafeError):
+    class TypeSafeAPIResponseValidationError(TypeSafeAPIError):
         pass
 
     class TypeSafeClient:
@@ -506,8 +506,8 @@ class SdkAskTest(unittest.TestCase):
             (sdk.TypeSafeAPIConnectionError("연결 거부"), "TypeSafeAPIConnectionError"),
             (sdk.TypeSafeAPITimeoutError("시간 초과"), "TypeSafeAPITimeoutError"),
             (
-                sdk.TypeSafeAPIResponseValidationError("모양 다름"),
-                "TypeSafeAPIResponseValidationError",
+                sdk.TypeSafeAPIResponseValidationError(200),
+                "TypeSafeAPIResponseValidationError 200",
             ),
         )
         for error, message in rows:

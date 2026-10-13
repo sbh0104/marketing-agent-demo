@@ -46,3 +46,4 @@
   - HTTP 실패는 `TypeSafeAPIError` 이고 코드는 `.status` 에 있다: 400 BadRequest · 401 Authentication · 403 PermissionDenied · 404 NotFound · 422 UnprocessableEntity · 429 RateLimit. 529 를 포함한 5xx 도 `TypeSafeAPIError` 의 하위 클래스다.
   - 연결 · 시간 초과 실패는 `TypeSafeAPIConnectionError` · `TypeSafeAPITimeoutError` 다.
   - 검증을 통과하지 못한 응답은 `TypeSafeAPIResponseValidationError` 다.
+  - 응답 검증 오류도 `TypeSafeAPIError` 의 자식이라 `.status` 를 가진다.
