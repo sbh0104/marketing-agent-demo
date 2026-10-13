@@ -49,7 +49,7 @@
 - [x] Phase 6 — ⑤ 크롬 연결 · 게시 · 확인 (plans/interview-marketing-agent.md#phase-6)
 - [~] Phase 1A — 파서 허용 쪽 규칙 (plans/interview-marketing-agent.md#phase-1a)
 - [x] Phase 1B — 계약 절 이름 규칙 (plans/interview-marketing-agent.md#phase-1b)
-- [~] Phase 6A — 진짜 호출 준비 · 사람이 돌릴 실행기 (plans/interview-marketing-agent.md#phase-6a)
+- [x] Phase 6A — 진짜 호출 준비 · 사람이 돌릴 실행기 (plans/interview-marketing-agent.md#phase-6a)
 - [ ] Phase 6B — 진짜 결과 반영 · 정확도 기록 · 기준값 조정 (plans/interview-marketing-agent.md#phase-6b)
 - [ ] Phase 7 — 파이프라인 연결 · 운영 규칙 통합 (plans/interview-marketing-agent.md#phase-7)
 - [ ] Phase 8 — 제출물 (plans/interview-marketing-agent.md#phase-8)
@@ -71,6 +71,8 @@
 - [ ] (retro 후보 · E-021) ship-check 가 받아들인 위험의 같은 코드 자리에서 새 입력을 찾아 다시 멈춤(받아들임을 입력으로 적음) — 최소 계약 고침: `.claude/skills/deep-interview/SKILL.md:98-99` Trade-offs accepted 꼴에 한 줄 — "ship-check 발견을 받아들일 때는 코드 자리(파일:함수 · 처리 줄)와 입력 부류로 적고, 재현한 입력은 경계가 아니라 예로 단다"(허브 🤖 attn-agent 의 답도 같은 꼴로). `.claude/` 는 ADWS 동기화 하네스라 고침은 상류에서(E-011 선례) (sightings: 20261013-062542-adw/phase-1-foundation-contracts (E-005) · 20261013-161159-adw/phase-2-watcher-detect)
 
 - [ ] (retro 후보 · E-022) 열거한 꼴(정규식 · 이름 목록)로 판정하는 코드에 verify-plan 이 Property-based 를 N/A 로 두고, ship-check 감사가 목록 밖 가까운 꼴을 찾아서야 빈틈이 드러남 — 최소 계약 고침: `.claude/skills/verify-plan/references/test-taxonomy.md:116-118` Property-based 행 `applies:` 에 "열거한 꼴로 판정하는 코드(정규식 · 허용/금지 목록) — N/A 대신 목록 밖 가까운 꼴 표본을 점검 줄로 두고 각 꼴을 빨강/초록으로 정한다" 한 줄 (sightings: 20261013-163932-adw/phase-6-poster-chrome(E-019, verify-plan Property-based N/A "새 파서 없음" 이 가림) · 20261014-035724-adw/phase-1b-contract-section-names(verify-plan.md:127 N/A, ship-report Risks 2); 같은 부류 E-005(Phase 1 → Phase 1A) · E-017(Phase 5))
+
+- [ ] (retro 후보 · E-009) 계약 설명 문장이 코드보다 넓게 약속한 꼴이 헌법 9조가 선 뒤에도 다시 오름 — 9조는 돌았고(약속 짝 있음 · 초록) 짝 테스트가 문장이 묶은 출처 하나(jev `model`)에 표시 글을 안 심어 못 봄(E-023) — 최소 계약 고침: `.adw/constitution.md:41-46`(9조 plan 줄)에 한 구 — "여러 출처를 묶는 약속(밖에서 온 글 · 모든 ~)은 짝 줄에 그 출처를 칸 이름으로 적고 짝 테스트가 출처마다 표시 글을 심는다; 심지 않은 출처는 `not a promise: <why>` 이거나 문장을 그만큼 줄인다" (sightings: 20261013-062542-adw/phase-1-foundation-contracts · 20261013-161358-adw/phase-4-trigger-timing · 20261014-035728-adw/phase-6a-live-check-prepare — 9조 뒤 첫 목격)
 
 ## Done
 

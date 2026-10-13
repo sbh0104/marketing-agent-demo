@@ -332,7 +332,7 @@ Open questions
 ---
 
 ## Phase 6A — 진짜 호출 준비 · 사람이 돌릴 실행기 (live check)
-- Status: Not started
+- Status: Done
 - Slug: live-check-prepare
 - After: Phase 2, Phase 3, Phase 5
 - Goal: 사람이 셸에서 한 번 돌리면 진짜 jev · Claude · YouTube를 부르고 결과를 `docs/live-check/` 아래 파일로 남기는 실행기와 실행 안내를 만든다. 이 사이클 안에서는 진짜 호출을 하지 않는다.
