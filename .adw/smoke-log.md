@@ -249,3 +249,12 @@ other line is required on every item.
 - status: open
 - attempts: 0 · last failure: —
 - first seen: 2026-10-13 · last seen: 2026-10-13
+
+### S-018 — 계약 문서 머리 문단의 `src/agent/` 모듈 목록을 실제 패키지와 맞추기
+- source: retro 20261013-161343-adw/phase-3-classifier-topic · E-013
+- evidence: docs/contracts.md:5-6 의 목록에 `trigger.py`(main, Phase 4)가 없고 이 레인이 착지하면 `classifier.py` 도 없다 — `git ls-tree --name-only main src/agent/` 와 다름. 두 페이즈 연속(20261013-161358-adw/phase-4-trigger-timing · 20261013-161343-adw/phase-3-classifier-topic)
+- direction: 머리 문단 목록을 `git ls-tree --name-only HEAD src/agent/` 의 `.py` 파일(`__init__.py` 제외)과 같게 맞춘다 — S-017 가 먼저 `classifier.py` 를 넣었으면 `trigger.py` 만 더한다. 계약 내용(키 · 판정 토큰 · 형식 · CLI 인자) 변경 없음
+- touches: docs/contracts.md
+- status: open
+- attempts: 0 · last failure: —
+- first seen: 2026-10-13 · last seen: 2026-10-13

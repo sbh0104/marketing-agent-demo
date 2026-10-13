@@ -116,7 +116,7 @@ Open questions
 ---
 
 ## Phase 3 — ② 판별 · 주제 일치 (classifier)
-- Status: Not started
+- Status: Done
 - Slug: classifier-topic
 - After: Phase 1
 - Goal: 영상의 제목 · 설명 · 자막(있을 경우)을 읽고 주제 일치 여부와 이유를 기록한다. 키워드만 겹치는 영상(예: '연애'가 들어간 게임 영상)을 걸러낸다.

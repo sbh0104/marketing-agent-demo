@@ -33,7 +33,7 @@
 - [x] [smoke] 스모크 스윕 — S-001, S-002, S-004, S-005, S-006
 - [x] Phase 1 — 뼈대와 계약 (plans/interview-marketing-agent.md#phase-1)
 - [~] Phase 2 — ① 탐지 · 조회수 추적 (plans/interview-marketing-agent.md#phase-2)
-- [~] Phase 3 — ② 판별 · 주제 일치 (plans/interview-marketing-agent.md#phase-3)
+- [x] Phase 3 — ② 판별 · 주제 일치 (plans/interview-marketing-agent.md#phase-3)
 - [x] Phase 4 — ③ 타이밍 · 뜨기 직전 판단 (plans/interview-marketing-agent.md#phase-4)
 - [~] Phase 5 — ④ 댓글 작성 · 자체 검사 (plans/interview-marketing-agent.md#phase-5)
 - [~] Phase 6 — ⑤ 크롬 연결 · 게시 · 확인 (plans/interview-marketing-agent.md#phase-6)
