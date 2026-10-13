@@ -39,7 +39,12 @@ VALID = {
         "channel_cooldown_hours": 24,
         "daily_max_searches": 100,
     },
-    "comment": {"min_chars": 40, "max_chars": 120},
+    "comment": {
+        "min_chars": 40,
+        "max_chars": 120,
+        "writer_model": "claude-sonnet-5-5",
+        "check_min_probability": 0.7,
+    },
     "chrome_debug_url": "http://localhost:9222",
     "allowed_videos": ["https://youtu.be/abcdefghijk"],
 }
@@ -188,6 +193,24 @@ OUT_OF_RANGE_VALUES: tuple[RangeValue, ...] = (
         "daily_max_comments: -1 ",
         "0 이상이어야 합니다: limits.daily_max_comments",
     ),
+    RangeValue(
+        "check_probability_above_one",
+        "check_min_probability: 0.7 ",
+        "check_min_probability: 1.5 ",
+        "1 이하여야 합니다: comment.check_min_probability",
+    ),
+    RangeValue(
+        "check_probability_negative",
+        "check_min_probability: 0.7 ",
+        "check_min_probability: -0.1 ",
+        "0 이상이어야 합니다: comment.check_min_probability",
+    ),
+    RangeValue(
+        "check_probability_nan",
+        "check_min_probability: 0.7 ",
+        "check_min_probability: .nan ",
+        "유한한 숫자여야 합니다: comment.check_min_probability",
+    ),
 )
 
 
@@ -201,7 +224,7 @@ class CommittedConfigTest(unittest.TestCase):
                 poll_interval_min=30,
                 trigger=TriggerConfig(1000, 5000, 12.0, 150.0),
                 limits=LimitsConfig(10, 24.0, 100),
-                comment=CommentConfig(40, 120),
+                comment=CommentConfig(40, 120, "claude-sonnet-5-5", 0.7),
                 chrome_debug_url="http://localhost:9222",
                 allowed_videos=("https://youtu.be/내-테스트-영상-ID",),
             ),
@@ -215,6 +238,7 @@ class CommittedConfigTest(unittest.TestCase):
         self.assertIsInstance(config.trigger.max_age_hours, float)
         self.assertIsInstance(config.trigger.min_views_per_hour, float)
         self.assertIsInstance(config.limits.channel_cooldown_hours, float)
+        self.assertIsInstance(config.comment.check_min_probability, float)
 
 
 class ParseYamlTest(unittest.TestCase):
@@ -372,6 +396,7 @@ class ConfigFromMappingTest(unittest.TestCase):
             ("limits", "channel_cooldown_hours", 0),
             ("trigger", "min_views_per_hour", 0),
             ("limits", "daily_max_comments", 0),
+            ("comment", "check_min_probability", 0),
         )
         for section, key, value in rows:
             with self.subTest(path=f"{section}.{key}", value=value):
@@ -391,11 +416,26 @@ class ConfigFromMappingTest(unittest.TestCase):
         for section, key, value in (
             ("trigger", "max_age_hours", True),
             ("limits", "channel_cooldown_hours", False),
+            ("comment", "check_min_probability", True),
         ):
             with self.subTest(path=f"{section}.{key}", value=value):
                 data = valid()
                 data[section][key] = value
                 self.assert_rejected(data, f"숫자여야 합니다: {section}.{key}")
+
+    def test_writer_model_must_be_non_empty_text(self) -> None:
+        for value in ("", 5, False):
+            with self.subTest(value=value):
+                data = valid()
+                data["comment"]["writer_model"] = value
+                self.assert_rejected(data, "비어 있지 않은 글자여야 합니다: comment.writer_model")
+
+    def test_probability_ceiling_is_accepted(self) -> None:
+        data = valid()
+        data["comment"]["check_min_probability"] = 1
+        floor = config_from_mapping(data).comment.check_min_probability
+        self.assertEqual(floor, 1.0)
+        self.assertIsInstance(floor, float)
 
     def test_missing_lower_bounds_are_rejected(self) -> None:
         rows = (
