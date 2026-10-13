@@ -48,7 +48,7 @@
 - [x] Phase 5 — ④ 댓글 작성 · 자체 검사 (plans/interview-marketing-agent.md#phase-5)
 - [x] Phase 6 — ⑤ 크롬 연결 · 게시 · 확인 (plans/interview-marketing-agent.md#phase-6)
 - [~] Phase 1A — 파서 허용 쪽 규칙 (plans/interview-marketing-agent.md#phase-1a)
-- [~] Phase 1B — 계약 절 이름 규칙 (plans/interview-marketing-agent.md#phase-1b)
+- [x] Phase 1B — 계약 절 이름 규칙 (plans/interview-marketing-agent.md#phase-1b)
 - [~] Phase 6A — 진짜 호출 준비 · 사람이 돌릴 실행기 (plans/interview-marketing-agent.md#phase-6a)
 - [ ] Phase 6B — 진짜 결과 반영 · 정확도 기록 · 기준값 조정 (plans/interview-marketing-agent.md#phase-6b)
 - [ ] Phase 7 — 파이프라인 연결 · 운영 규칙 통합 (plans/interview-marketing-agent.md#phase-7)
@@ -69,6 +69,8 @@
 - [x] ~~(retro 후보 · E-015) smoke-file 이 PASS 인 verify-report 를 본문 줄머리 `FAIL` 로 FAIL 로 읽어 ship-report 스모크 후보를 두 번 올림(홈 S-019~S-023 = S-024~S-028) — 최소 계약 고침: `.claude/skills/plan/scripts/smoke_file.py:73-76` `verdict()` 가 `section_body(text, "Verdict")` 만 보게(ship 쪽 `:75` 도 같은 꼴) (sightings: 20261013-161439-adw/phase-5-writer-comment — 한 번이지만 원장에 중복 다섯 건을 남김)~~ — ADWS 백로그로 이관 (2026-10-14 원격 인터뷰 · 슬롯 e0faf70b · Q1 A) — `~/project/ADWS/.adw/backlog.md` To do 끝의 `(retro 후보 · marketing-agent-demo E-015 이관)` 줄(한 줄 고침 · ship 쪽 `:75` · Phase 5 verify-report 를 시험 재료로). 고칠 `smoke_file.py` 는 ADWS `1a9b4236` 과 글자까지 같은 하네스라 동기화가 덮고 헌법 7조도 직접 고침을 막아, 이 저장소에는 고칠 코드가 없다. 그때까지는 검사가 초록인데 본문 줄머리가 `FAIL` 인 READY WITH RISKS 판에서 같은 고침이 통에 두 번 적힐 수 있다 — 두 번째 묶음(`filed by smoke-file (one-pass)`)은 스윕 전에 닫거나 헛 스윕(이번 8분 · 변화 0줄)을 감수. 다시 오르면 이 줄로 흡수해 닫는다
 
 - [ ] (retro 후보 · E-021) ship-check 가 받아들인 위험의 같은 코드 자리에서 새 입력을 찾아 다시 멈춤(받아들임을 입력으로 적음) — 최소 계약 고침: `.claude/skills/deep-interview/SKILL.md:98-99` Trade-offs accepted 꼴에 한 줄 — "ship-check 발견을 받아들일 때는 코드 자리(파일:함수 · 처리 줄)와 입력 부류로 적고, 재현한 입력은 경계가 아니라 예로 단다"(허브 🤖 attn-agent 의 답도 같은 꼴로). `.claude/` 는 ADWS 동기화 하네스라 고침은 상류에서(E-011 선례) (sightings: 20261013-062542-adw/phase-1-foundation-contracts (E-005) · 20261013-161159-adw/phase-2-watcher-detect)
+
+- [ ] (retro 후보 · E-022) 열거한 꼴(정규식 · 이름 목록)로 판정하는 코드에 verify-plan 이 Property-based 를 N/A 로 두고, ship-check 감사가 목록 밖 가까운 꼴을 찾아서야 빈틈이 드러남 — 최소 계약 고침: `.claude/skills/verify-plan/references/test-taxonomy.md:116-118` Property-based 행 `applies:` 에 "열거한 꼴로 판정하는 코드(정규식 · 허용/금지 목록) — N/A 대신 목록 밖 가까운 꼴 표본을 점검 줄로 두고 각 꼴을 빨강/초록으로 정한다" 한 줄 (sightings: 20261013-163932-adw/phase-6-poster-chrome(E-019, verify-plan Property-based N/A "새 파서 없음" 이 가림) · 20261014-035724-adw/phase-1b-contract-section-names(verify-plan.md:127 N/A, ship-report Risks 2); 같은 부류 E-005(Phase 1 → Phase 1A) · E-017(Phase 5))
 
 ## Done
 

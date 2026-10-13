@@ -296,7 +296,7 @@ Open questions
 ---
 
 ## Phase 1B — 계약 절 이름 규칙 (10절 뒤 절은 번호 없이 · 제목으로 가리키기)
-- Status: Not started
+- Status: Done
 - Slug: contract-section-names
 - After: Phase 2
 - Goal: 계약서(`docs/contracts.md`) 10절 뒤에 페이즈가 덧붙인 절에서 번호를 떼고, 그 절들은 제목으로만 가리키게 하며, 스위트 테스트가 이 규칙을 지킨다. 레인마다 출발 때 사본의 "마지막 번호 + 1" 로 `## 11.` 을 매겨 착지 뒤 같은 번호의 절이 둘 생기고 "계약 11절" 인용이 다른 절을 가리킨 반복(경험 장부 E-014 — Phase 3 · 5 에서 목격, Phase 2 레인이 세 번째)을 끝낸다.
