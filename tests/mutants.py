@@ -201,6 +201,66 @@ MUTANTS: dict[str, tuple[str, str, str, str]] = {
         "except JevError as exc:",
         "except Exception as exc:",
     ),
+    "trigger-negative-speed": (
+        "agent.trigger",
+        "tests.test_trigger",
+        "if gained < 0:",
+        "if False:",
+    ),
+    "trigger-flat-is-decrease": (
+        "agent.trigger",
+        "tests.test_trigger",
+        "if gained < 0:",
+        "if gained <= 0:",
+    ),
+    "trigger-list-order": (
+        "agent.trigger",
+        "tests.test_trigger",
+        "ordered = sorted(history, key=lambda sample: (_utc(sample.at), sample.count))",
+        "ordered = list(history)",
+    ),
+    "trigger-same-instant": (
+        "agent.trigger",
+        "tests.test_trigger",
+        "earlier = [sample for sample in ordered if _utc(sample.at) < _utc(latest.at)]",
+        "earlier = ordered[:-1]",
+    ),
+    "trigger-min-views-exclusive": (
+        "agent.trigger",
+        "tests.test_trigger",
+        "if latest.count < config.min_views:",
+        "if latest.count <= config.min_views:",
+    ),
+    "trigger-max-views-exclusive": (
+        "agent.trigger",
+        "tests.test_trigger",
+        "if latest.count > config.max_views:",
+        "if latest.count >= config.max_views:",
+    ),
+    "trigger-future-publish-passes": (
+        "agent.trigger",
+        "tests.test_trigger",
+        "if _utc(record.published_at) > _utc(now):",
+        "if False:",
+    ),
+    "trigger-future-publish-inclusive": (
+        "agent.trigger",
+        "tests.test_trigger",
+        "if _utc(record.published_at) > _utc(now):",
+        "if _utc(record.published_at) >= _utc(now):",
+    ),
+    "trigger-age-exclusive": (
+        "agent.trigger",
+        "tests.test_trigger",
+        "if _utc(now) - _utc(record.published_at) > timedelta(hours=config.max_age_hours):",
+        "if _utc(now) - _utc(record.published_at) >= timedelta(hours=config.max_age_hours):",
+    ),
+    "trigger-rate-exclusive": (
+        "agent.trigger",
+        "tests.test_trigger",
+        "if rate < config.min_views_per_hour:",
+        "if rate <= config.min_views_per_hour:",
+    ),
 }
 
 
