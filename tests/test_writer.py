@@ -601,6 +601,51 @@ class WriteCommentTest(unittest.TestCase):
                     ],
                 )
 
+    def test_claude_error_on_rewrite_logs_error_and_skips(self) -> None:
+        claude = FakeClaude([reply(CONCERN, GOOD), FakeApiError("overloaded")])
+        jev = FakeJev([{**PASSING, "mentions_scene": 0.25}])
+        result = self.write(claude, jev)
+        reason = "claude 호출 실패: FakeApiError 404: overloaded"
+        self.assertEqual(result, WriteResult(None, reason))
+        self.assertEqual((len(claude.calls), len(jev.calls)), (2, 1))
+        self.assertEqual(
+            self.events(),
+            [
+                (Event.ERROR, {"where": "writer.claude", "reason": reason, "video": VIDEO_ID}),
+                (Event.SKIP, {"video": VIDEO_ID, "reason": reason}),
+            ],
+        )
+
+    def test_jev_error_on_rewrite_logs_error_and_skips(self) -> None:
+        claude = FakeClaude([reply(CONCERN, GOOD), reply(CONCERN, GOOD2)])
+        jev = FakeJev([{**PASSING, "mentions_scene": 0.25}, TimeoutError("timed out")])
+        result = self.write(claude, jev)
+        reason = "jev 검사 호출 실패: TimeoutError: timed out"
+        self.assertEqual(result, WriteResult(None, reason))
+        self.assertEqual((len(claude.calls), len(jev.calls)), (2, 2))
+        self.assertEqual(
+            self.events(),
+            [
+                (Event.ERROR, {"where": "writer.jev", "reason": reason, "video": VIDEO_ID}),
+                (Event.SKIP, {"video": VIDEO_ID, "reason": reason}),
+            ],
+        )
+
+    def test_invalid_jev_answer_on_rewrite_logs_error_and_skips(self) -> None:
+        claude = FakeClaude([reply(CONCERN, GOOD), reply(CONCERN, GOOD2)])
+        jev = FakeJev([{**PASSING, "mentions_scene": 0.25}, {**PASSING, "follows_concern": 1.5}])
+        result = self.write(claude, jev)
+        reason = "jev 검사 응답 이상: follows_concern"
+        self.assertEqual(result, WriteResult(None, reason))
+        self.assertEqual((len(claude.calls), len(jev.calls)), (2, 2))
+        self.assertEqual(
+            self.events(),
+            [
+                (Event.ERROR, {"where": "writer.jev", "reason": reason, "video": VIDEO_ID}),
+                (Event.SKIP, {"video": VIDEO_ID, "reason": reason}),
+            ],
+        )
+
     def test_malformed_claude_response_is_not_hidden(self) -> None:
         claude = FakeClaude([SimpleNamespace()])
         with self.assertRaises(AttributeError):
