@@ -814,7 +814,7 @@ class ClockTest(WatcherCase):
         self.assertEqual(QuotaLedger(self.quota_path).usage(later + 24 * HOUR), Usage(0, 0))
 
     def test_naive_now_is_rejected(self) -> None:
-        with self.assertRaises(ValueError):
+        with self.assertRaisesRegex(ValueError, "now 에 시간대가 없습니다"):
             self.watcher().run(CONFIG, datetime(2026, 10, 12, 12, 0))
         self.assertEqual(self.api.calls, [])
         self.assertEqual(self.raw_lines(), [])
