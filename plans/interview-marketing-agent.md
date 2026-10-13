@@ -50,12 +50,13 @@ Decisions
 - **The plan decides** — 위 복구의 테스트 모양 · 후보: 거부해야 할 이웃 주소 표(`/../`, `%2e%2e`, `/shorts/A/../../watch?v=B`, `evil.com\@youtu.be/A`, `watch?v=A&v=B`, ID 뒤 추가 경로, `dry_run=None/0/""`)를 `tests/test_guard.py` 에 · 실제 파일을 고쳐 다시 읽는 재로딩 테스트를 `tests/test_config.py` 에 · 프로필 파일 이름 목록을 임의 폴더 아래에서 `git check-ignore` 로 확인하는 검사 · 조건: ship-report 의 재현 입력 다섯 가지와 날짜 모양 값이 모두 테스트에 실제 입력으로 들어가야 함.
 - 2026-10-13 두 번째 ship-check(`READY WITH RISKS`, 민감 확인 줄 2개로 머지 전 정지) 뒤 인터뷰 — 분류 `drift`: 형식 목록이라는 결정 자체가 한 모양을 놓쳤음. 같은 브랜치에서 아래를 고친 뒤 ship-check 를 다시 받는다 (HC1 인터뷰 질문 1–3, 모두 A):
   - 허용 목록 가드: `youtu.be` · `/shorts/` 주소의 쿼리에 `v` 키가 있으면 `invalid_video` — 쿼리를 서버처럼 한 번 푼 뒤 세므로 `%76` 도 `v` 다. `?si=` · `&t=` · `&feature=` 같은 다른 쿼리는 지금처럼 무시한다. 계약 5절 형식 목록의 "뒤에 `?si=…` 등 매개변수는 붙어도 됨"에 "단 `v` 는 안 됨"을 더한다. watch 경로는 정확히 `/watch` 이고 `/watchx` · `/watch/` 는 읽을 수 없음 — 코드는 이미 그렇고, 이번에 테스트 행으로 고정한다(ship-report R7). 근거: 유튜브는 `youtu.be/A?v=B` 를 `watch?v=B&v=A` 로, `/shorts/A?v=B` 를 `watch?v=B` 로 보내 B 를 재생하는데(실측 `303`) 가드는 A 로 읽어 `live=True` 를 줬다. 계약 6절의 두 잠금은 아직 문서뿐이라, 가드 혼자서도 막아 잠금을 세 겹으로 한다 — 되돌릴 수 없는 남의 영상 댓글을 막는 쪽을 최적화 (질문 1 A).
-  - 계약 6절 3.2 의 같은 영상 확인 조항을 확정한다: 클릭 직전 `recheck.video_id != decision.video_id` 이면 둘 다 허용 목록에 있어도 클릭하지 않고 `page_mismatch` 로 테스트 저장. `page_mismatch` 는 `decide_post` 의 이유가 아니라 게시 단계가 남기는 테스트 저장 이유다. 근거: 자동 재생이나 같은 크롬을 쓰는 사람의 조작으로 크롬이 다른 허용 영상으로 옮겨 가면, 저장소·로그는 A 에 달았다고 적고 실제 댓글은 A2 에 달린다 — 다음 주기에 A2 에 두 번째 댓글이 달려 "영상당 1개"와 기록 증명이 깨진다. 계약 문서(`docs/contracts.md:263-265, 274-280`)에 이미 이렇게 적혀 있어 Phase 1 코드 변경은 없음 (질문 2 A).
-  - 로그(`logbook.py`)는 값 안에서 `str.splitlines()` 가 줄 경계로 세는 모든 글자(`\n` `\r` `\v` `\f` `\x1c` `\x1d` `\x1e` `\x85` ` ` ` `)를 따옴표 값 안의 이스케이프로 쓴다 — 한 사건이 어떤 읽기 방식으로도 한 줄이고, `parse_line` 으로 원래 값이 되돌아온다. 근거: 영상 제목에 숨긴 `U+2028` 로 `splitlines()` 독자에게 가짜 `POST … mode=live result=posted` 줄이 읽혔다(인터뷰에서 재현, ship-report R3). 로그 형식(계약 7절)의 줄 모양은 그대로이고 이스케이프 대상만 넓어진다 (질문 3 A).
+  - 계약 6절 3.2 의 같은 영상 확인 조항을 확정한다: 클릭 직전 `recheck.video_id != decision.video_id` 이면 둘 다 허용 목록에 있어도 클릭하지 않고 `page_mismatch` 로 테스트 저장. `page_mismatch` 는 `decide_post` 의 이유가 아니라 게시 단계가 남기는 테스트 저장 이유다. 근거: 자동 재생이나 같은 크롬을 쓰는 사람의 조작으로 크롬이 다른 허용 영상으로 옮겨 가면, 저장소·로그는 A 에 달았다고 적고 실제 댓글은 A2 에 달린다 — 다음 주기에 A2 에 두 번째 댓글이 달려 "영상당 1개"와 기록 증명이 깨진다. 계약 문서(`docs/contracts.md:283-286, 295-301`)에 이미 이렇게 적혀 있어 Phase 1 코드 변경은 없음 (질문 2 A).
+  - 로그(`logbook.py`)는 값 안에서 `str.splitlines()` 가 줄 경계로 세는 모든 글자(`\n` `\r` `\v` `\f` `\x1c` `\x1d` `\x1e` `\x85` `U+2028` `U+2029`)를 따옴표 값 안의 이스케이프로 쓴다 — 한 사건이 어떤 읽기 방식으로도 한 줄이고, `parse_line` 으로 원래 값이 되돌아온다. 근거: 영상 제목에 숨긴 `U+2028` 로 `splitlines()` 독자에게 가짜 `POST … mode=live result=posted` 줄이 읽혔다(인터뷰에서 재현, ship-report R3). 로그 형식(계약 7절)의 줄 모양은 그대로이고 이스케이프 대상만 넓어진다 (질문 3 A).
   - 설정 숫자(`_number`)는 유한값만 받고(`.inf` · `-.inf` · `.nan` 은 `ConfigError`) 상한을 둔다. 근거: `channel_cooldown_hours: .inf` · `20000000` 은 읽기를 통과한 뒤 `check_post` 에서 `OverflowError` 를 내 "잘못 고친 설정은 이전 설정 유지"가 지켜지지 않았다(인터뷰에서 재현, ship-report R2). `trigger.max_age_hours` 도 같다 (질문 3 A).
   - ship-report R7 의 테스트 행을 함께 더한다 — 설정 하한 셋(`limits.channel_cooldown_hours: -1` · `.nan`, `trigger.max_age_hours: 0`, `limits.daily_max_comments: -1`), 로그 값 속 줄 바꿈(`"x\ny"` · `"x\ry"` 처럼 공백 없는 값), 가드의 `/watchx?v=A` · `/watch/?v=A`. 지금 코드는 맞지만 다음 수정이 깨도 스위트가 초록이던 약속들이다 (질문 3 A).
 - **The plan decides** — 설정 숫자 상한 값(키마다, 예: 채널 대기 시간 · `max_age_hours` · `poll_interval_min`) · 조건: 읽기를 통과한 값은 뒤 단계(`check_post` 의 `timedelta`, 주기 대기)에서 `OverflowError` 등을 내지 않아야 하고, 상한을 넘으면 `ConfigError` 라 이전 설정이 유지됨을 실제 파일 재로딩 테스트가 잠근다. 상한은 계약 2절 표에 적는다.
 - **The plan decides** — YAML 1.1 숫자 변환(`017` → 15, `1:30` → 90.0): 거부할지, 아니면 방어 범위를 실제보다 넓게 적은 문장(`config.py:3-5`, `contracts.md:52-55`)만 실제대로 고칠지 · 조건: 문서와 동작이 일치해야 하고, 고르는 쪽을 테스트 한 행이 잠근다.
+- 2026-10-13 세 번째 ship-check(`READY WITH RISKS`, 민감 확인 줄 1개로 머지 전 정지) 뒤 인터뷰 — 분류: 확인(코드와 결정은 그대로, 위험을 받아들이고 주인을 정함). 로그 값 속 제어 문자(NUL · ESC · DEL · C1 · 양방향 제어)는 Phase 1 에서 고치지 않고 출하한다 — 고침은 Phase 7 이 맡는다(아래 Phase 7 결정). 근거: 코드는 HC1 질문 3 의 규칙(줄 바꿈 글자 10개)과 계약 7절을 정확히 지키고, 계약이 증명용으로 정한 `parse_line` 은 정확하며 *파싱되는* 가짜 사건은 만들 수 없다(ship-report R1). Phase 7 은 Phase 2–6 이 모두 끝난 뒤 혼자 돌아 `logbook.py` 를 고쳐도 다른 레인과 부딪히지 않고, 평가자가 읽는 `logs/sample.log`(Phase 8)보다 앞선다. 주인 없이 받아들인 지난 로그 위험(U+2028)이 다음 ship-check 에 정지로 돌아온 선례(아래 Responsibilities 의 "(2026-10-13 HC1) 위 줄의 지난 R3…" 줄) 때문에 주인을 정해 둔다 — 출하 속도를 최적화하되 같은 정지가 되풀이되지 않게 (HC1-2 질문 1 A).
 - **The plan decides** — 이번 고침의 테스트 모양 · 조건: 이 인터뷰의 재현 입력이 모두 테스트의 실제 입력이어야 함 — `https://youtu.be/AAAAAAAAAAA?v=BBBBBBBBBBB`, `https://www.youtube.com/shorts/AAAAAAAAAAA?v=BBBBBBBBBBB`, `https://youtu.be/AAAAAAAAAAA?%76=BBBBBBBBBBB`, `https://youtu.be/AAAAAAAAAAA?si=x&v=BBBBBBBBBBB` 는 거부, `https://youtu.be/AAAAAAAAAAA?si=xYz12` 는 계속 A 로 읽힘 · 위의 줄 바꿈류 글자 각각이 든 제목을 쓴 한 사건이 `splitlines()` 로 한 줄이고 `parse_line` 으로 되돌아옴 · `channel_cooldown_hours: .inf` 와 아주 큰 수가 `ConfigError`. 각 고침을 되돌리는 변이를 `tests/mutants.py` 에 더할지는 plan 이 정한다.
 
 Trade-offs accepted
@@ -66,6 +67,7 @@ Trade-offs accepted
 - (2026-10-13 HC1) 가드가 막는 쿼리 이름은 `v` 하나뿐이다(거부 목록 방식) — 유튜브가 다른 쿼리 이름으로 재생 영상을 바꾸는 경우가 나중에 발견되면 그때 다시 막아야 한다. 쿼리를 통째로 거부하는 쪽은 공유 버튼 주소(`youtu.be/ID?si=…`)로 쓴 허용 목록 항목이 조용히 읽히지 않게 되어 택하지 않음.
 - (2026-10-13 HC1) 크롬이 다른 영상으로 옮겨 간 날은 그 게시 기회를 버리고 `page_mismatch` 로 테스트 저장된다(다음 주기에 다시 시도). 로그를 읽는 사람은 가드의 네 이유 밖의 다섯째 이유를 하나 더 알아야 한다.
 - (2026-10-13 HC1) 고침 사이클이 커진다(가드 3–4줄 + 로그 이스케이프 + 숫자 유한·상한, 테스트 행 10여 개) — 고칠 곳이 늘어 ship-check 가 새 흠을 찾아 한 번 더 멈출 가능성을 받아들임. 대신 Phase 2–6 다섯 레인이 출발하기 전에 바닥 파일(`config.py` · `logbook.py`)이 바로 서고, 뒤 페이즈가 이 파일을 고치며 다섯 레인과 부딪힐 일이 없다.
+- (2026-10-13 HC1-2) Phase 7 이 고칠 때까지 HC1 질문 3 의 "한 사건은 어떤 읽기 방식으로도 한 줄"은 "줄 바꿈 글자 10개에 한해"로 좁아진다. Phase 2–6 이 도는 동안(실제 영상 제목이 처음 로그에 들어가는 기간) 제목에 NUL 이 하나 들어오면 GNU grep 은 로그 전체를 `binary file matches` 로 가리고, ESC 는 `cat` 한 터미널에 가짜 게시 줄을 그릴 수 있다 — 이 기간에 로그를 볼 때는 `parse_line` 이나 `grep -a` 로 읽는다. 실제 유튜브 제목에 제어 문자가 오는지는 재지 못했다.
 
 Responsibilities & risks to guard against
 - 계약을 바꾸면 Phase 2–6 전부에 영향 — Phase 1의 데이터 모양은 변경하지 않는 것을 원칙으로 함.
@@ -74,6 +76,7 @@ Responsibilities & risks to guard against
 - (2026-10-13) 이름 목록은 크롬 버전이 바뀌면 뒤처진다 — 위치 규칙이 주 방어이고, Phase 8 직전 `git ls-files` 사람 확인은 그대로 남는다.
 - (2026-10-13) ship-report 의 나머지 위험(R1–R6, R9–R17)은 이번 복구 범위가 아니다 — Phase 7(R5 `on_error`, R10 단일 실행 잠금)과 Phase 6(R12 결과 모르는 게시는 `reserved` 유지)이 각자 지킨다.
 - (2026-10-13 HC1) 위 줄의 지난 R3(로그 `U+2028` 위조)과 R6(검증을 통과한 `.inf` · 큰 수)은 주인이 없어 두 번째 ship-check 에 R3 · R2 로 다시 나왔다 — 이번 고침 사이클(Phase 1)이 맡는다. 두 번째 ship-report 의 나머지: R4(가드의 유니코드 공백 자르기, 다른 영상·호스트로 가는 경우 0건)는 받아들인 위험, R5(`config.yaml` 병합 키 `<<:` 메모리 폭탄)는 설정 파일 주인만 일으킬 수 있는 자가 서비스 거부라 이번 범위 밖이며 주인 페이즈가 없다, R6(이름 목록 밖 비밀 파일)은 위 절충 그대로, R8(실제 Mac·Windows 기기, 크롬의 실제 `page.url`)은 사람 확인 · Phase 6 몫.
+- (2026-10-13 HC1-2) 세 번째 ship-report 의 R1(로그 제어 문자)은 Phase 7 이 맡는다. 나머지: R2(남은 쿼리 철자 — 진짜 영상 ID 둘로 한 번 확인)와 Windows · macOS 스위트, Phase 8 직전 `git ls-files` 는 사람 확인으로 남는다. R3(짝 없는 서로게이트 제목이 저장소 쓰기를 재시작까지 막음)은 제목을 받는 Phase 2 · 오류를 처리하는 Phase 7, R4(cp949 echo 의 이모지)는 echo 스트림을 고르는 Phase 7 몫. R5(`;` 둘 이상 테스트 행)는 `.adw/smoke-log.md` S-NEW-3, R7(정수 설정 키 상한 없음)은 계약 2절에 적힌 결정, R8(이름 목록 밖 비밀 파일)은 위 절충 그대로, R9(pip-audit 못 돌림)는 도구가 있는 기계에서 다시.
 
 Dependencies
 - Depends on: none
@@ -248,12 +251,16 @@ Open questions
 Decisions
 - 영상당 댓글 1개와 채널 대기 시간은 게시 기록 저장소(Phase 1)에서 확인한다.
 - 하루 상한(기본 10개)은 게시 성공 기록만 센다.
+- (2026-10-13, Phase 1 HC1-2 질문 1 A) 로그(`logbook.py`)는 값 속 제어 문자 — 유니코드 범주 Cc(NUL · ESC · DEL · C1 등)와 Cf(U+202E 같은 양방향 제어, U+200B 등) — 를 언제나 따옴표 값 안의 `\uXXXX` 이스케이프로 쓴다. 공백이 없어도 이런 글자가 든 값은 따옴표 없이 쓰지 않는다. 계약 7절 "값 쓰는 법" 표와 그 아래 문단을 함께 고친다(이미 있는 이름의 뜻은 그대로, 이스케이프 대상만 넓어짐 — 계약 10절). 근거: Phase 1 은 줄 바꿈 글자 10개만 이스케이프해서, 제목 속 NUL 하나로 GNU grep 이 로그 전체를 `binary file matches` 로 가리고 ESC 는 터미널에 가짜 `mode=live result=posted` 줄을 그렸다(Phase 1 세 번째 ship-report R1, 인터뷰에서 재현). 이 페이즈는 Phase 2–6 이 모두 끝난 뒤 혼자 돌아 다른 레인과 부딪히지 않고, 평가자가 읽는 `logs/sample.log`(Phase 8)보다 앞선다 — 제출 증명을 어떤 도구로 읽어도 같게 하는 쪽을 최적화.
+- **The plan decides** — 위 로그 고침의 세부 · 후보: 이스케이프 범위(Cc · Cf 전부 vs Cc 와 양방향 제어만) · `parse_line` 이 고치기 전에 쓰인 날 제어 문자 줄을 계속 읽을지 거부할지 · `tests/mutants.py` 에 이 고침을 되돌리는 변이를 더할지 · 조건: Phase 1 ship-report R1 의 재현 입력(제목 `x\x00y\x00z`, `a\x1b[2Kb`)이 테스트의 실제 입력이어야 하고, 그 제목들과 `POST … result=posted` 줄을 쓴 파일에서 GNU grep `posted` 가 게시 줄을 보여 주며(binary 판정 없음) 파일에 날 제어 문자가 0개이고 `parse_line` 이 원래 값을 되돌림을 테스트가 잠근다.
 
 Trade-offs accepted
 - 실패 후 재시도는 하지 않고 다음 영상으로 넘어간다 (과제 ⑤).
+- (2026-10-13, Phase 1 HC1-2) 로그 제어 문자 고침이 이 페이즈로 와서 일이 조금 늘어난다(코드 몇 줄 · 테스트 행 · 계약 7절 표). Phase 2–6 이 도는 동안 쓰인 `logs/agent.log` 는 이 고침 전 모양이다 — 실행 로그는 git 무시이고 실행마다 쌓이는 파일이라 제출물(`sample.log`)에는 영향이 없다.
 
 Responsibilities & risks to guard against
 - 허용 목록 밖 영상이 게시되지 않았다는 증거를 코드와 기록으로 보여줄 수 있어야 함 (과제 체크리스트).
+- (2026-10-13, Phase 1 HC1-2) 로그를 사람이 grep · 터미널로 읽어도 `parse_line` 과 같은 내용이 보여야 한다 — 이 페이즈의 리뷰에서 로그 파일에 날 제어 문자가 남지 않는지 확인.
 
 Dependencies
 - Depends on: Phase 2, Phase 3, Phase 4, Phase 5, Phase 6
@@ -312,3 +319,4 @@ Open questions
 | 2026-10-13 | 1 | 가드: `youtu.be` · `/shorts/` 쿼리에 `v` 키(한 번 푼 뒤 셈, `%76` 포함)가 있으면 `invalid_video`, 다른 쿼리는 계속 허용 · `/watchx` · `/watch/` 거부 행 고정 | 유튜브가 꼬리의 `v` 로 B 를 재생(실측 `303`)하는데 가드는 A 로 읽음 · 계약 6절 잠금은 아직 문서뿐 → 가드 혼자서도 막음. 쿼리 전부 거부는 공유 버튼 주소(`?si=`) 허용 목록 항목을 조용히 무력화해 택하지 않음 (HC1 질문 1 A) |
 | 2026-10-13 | 1, 6 | 계약 6절 3.2 같은 영상 확인 조항 확정(`recheck.video_id != decision.video_id` → 클릭 안 함, `page_mismatch` 테스트 저장) | 자동 재생 · 사람 조작으로 크롬이 다른 허용 영상으로 옮겨 가면 기록은 A, 댓글은 A2 → 영상당 1개 · 기록 증명이 깨짐. plan 이 트래커보다 넓게 적은 것을 사람이 확인 (HC1 질문 2 A) |
 | 2026-10-13 | 1 | 지난 R3(로그 줄 바꿈류 글자 위조) · R6(`.inf` · 큰 수 설정) 과 ship-report R7 테스트 행을 이번 고침 사이클에 포함 | 두 파일 모두 Phase 1 소유 · Phase 2–6 다섯 레인이 동시에 출발하기 전이 가장 쌈 · 주인 없이 두 번 다시 나옴 (HC1 질문 3 A) |
+| 2026-10-13 | 1, 7 | 세 번째 ship-check(`READY WITH RISKS`)의 민감 줄 확인: 로그 값 속 제어 문자는 Phase 1 에서 받아들이고 출하, 고침(Cc · Cf 는 언제나 따옴표 안 `\uXXXX`, 계약 7절 표 함께)은 Phase 7 이 맡음 · `human_checks.py confirm` 으로 민감 줄을 닫음 | 코드는 결정대로이고 `parse_line` 은 정확 · 고침 사이클 한 번(약 1시간 50분)과 네 번째 ship-check 를 아낌 · Phase 7 은 혼자 돌아 레인 충돌이 없고 `sample.log`(Phase 8)보다 앞섬 · 주인 없는 위험이 다시 정지로 돌아온 선례를 피함 (HC1-2 질문 1 A) |
