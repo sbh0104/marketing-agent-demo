@@ -1,12 +1,14 @@
 """설정 계약 — config.yaml 을 읽고 엄격하게 검사합니다.
 
-모든 키가 필요하고, 모르는 키는 오류이며, 타입은 정확해야 합니다. 그래서 YAML 1.1 이
-몰래 바꾸는 값(`no`/`yes` → bool, 날짜, 따옴표 없는 숫자 ID)도 조용히 지나가지 않고
-오류가 됩니다.
+모든 키가 필요하고, 모르는 키는 오류이며, 타입은 정확해야 합니다. 그래서 YAML 1.1 이 글자
+자리에 몰래 바꿔 넣는 값(`no`/`yes` → bool, 날짜, 따옴표 없는 숫자 ID)은 조용히 지나가지 않고
+오류가 됩니다. 숫자 자리의 YAML 1.1 숫자 표기(`017` → 15, `1:30` → 90)는 그대로 읽고 범위만
+검사합니다. 숫자는 유한값만 받고 키마다 상한이 있습니다 — 계약 2절.
 """
 from __future__ import annotations
 
 import collections.abc
+import math
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -109,6 +111,11 @@ _SECTION_KEYS = {
     "limits": ("daily_max_comments", "channel_cooldown_hours", "daily_max_searches"),
     "comment": ("min_chars", "max_chars"),
 }
+# 시간 키의 상한 — 100 × 365 × 24 시간(약 100년, 주기 대기의 상한과 같은 크기). 이 안의 값은
+# now − timedelta(hours=…) 가 날짜 범위를 벗어나지 않습니다(2026년 기준 약 1800만 시간부터 OverflowError).
+_MAX_HOURS = 876_000.0
+# 시간당 조회수 하한의 상한 — 실제 영상이 닿지 않는 값. 숫자 키는 모두 상한을 둡니다.
+_MAX_VIEWS_PER_HOUR = 1_000_000_000.0
 
 
 def _check_keys(data: Mapping[object, object], allowed: tuple[str, ...], prefix: str) -> None:
@@ -136,14 +143,20 @@ def _int(value: object, path: str, minimum: int) -> int:
     return value
 
 
-def _number(value: object, path: str, minimum: float, *, inclusive: bool = True) -> float:
+def _number(
+    value: object, path: str, minimum: float, maximum: float, *, inclusive: bool = True
+) -> float:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise ConfigError(f"숫자여야 합니다: {path}")
     number = float(value)
+    if not math.isfinite(number):
+        raise ConfigError(f"유한한 숫자여야 합니다: {path}")
     if inclusive and not number >= minimum:
         raise ConfigError(f"{minimum:g} 이상이어야 합니다: {path}")
     if not inclusive and not number > minimum:
         raise ConfigError(f"{minimum:g} 보다 커야 합니다: {path}")
+    if not number <= maximum:
+        raise ConfigError(f"{maximum:.0f} 이하여야 합니다: {path}")
     return number
 
 
@@ -168,10 +181,10 @@ def config_from_mapping(data: Mapping[str, object]) -> Config:
         min_views=min_views,
         max_views=_int(trigger["max_views"], "trigger.max_views", min_views),
         max_age_hours=_number(
-            trigger["max_age_hours"], "trigger.max_age_hours", 0, inclusive=False
+            trigger["max_age_hours"], "trigger.max_age_hours", 0, _MAX_HOURS, inclusive=False
         ),
         min_views_per_hour=_number(
-            trigger["min_views_per_hour"], "trigger.min_views_per_hour", 0
+            trigger["min_views_per_hour"], "trigger.min_views_per_hour", 0, _MAX_VIEWS_PER_HOUR
         ),
     )
 
@@ -179,7 +192,7 @@ def config_from_mapping(data: Mapping[str, object]) -> Config:
     limits_config = LimitsConfig(
         daily_max_comments=_int(limits["daily_max_comments"], "limits.daily_max_comments", 0),
         channel_cooldown_hours=_number(
-            limits["channel_cooldown_hours"], "limits.channel_cooldown_hours", 0
+            limits["channel_cooldown_hours"], "limits.channel_cooldown_hours", 0, _MAX_HOURS
         ),
         daily_max_searches=_int(limits["daily_max_searches"], "limits.daily_max_searches", 0),
     )

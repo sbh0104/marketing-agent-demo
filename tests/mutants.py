@@ -128,6 +128,12 @@ MUTANTS: dict[str, tuple[str, str, str, str]] = {
         "except Exception as exc:",
         "except yaml.YAMLError as exc:",
     ),
+    "config-no-ceiling": (
+        "agent.config",
+        "tests.test_config",
+        "if not number <= maximum:",
+        "if False:",
+    ),
     "scheduler-one-sleep": (
         "agent.scheduler",
         "tests.test_scheduler",

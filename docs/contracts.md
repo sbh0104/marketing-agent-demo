@@ -33,26 +33,37 @@ Phase 2–7 의 모든 단계가 기대는 계약입니다. 설정 읽기, 영�
 |---|---|---|---|
 | `topic` | 글자 | 비어 있지 않음 | `연애` |
 | `keywords` | 글자 목록 | 1개 이상, 각 항목 비어 있지 않음 | `[연애, 썸, 연애 상담, 이별, 소개팅]` |
-| `poll_interval_min` | 정수 | ≥ 1 | `30` |
+| `poll_interval_min` | 정수 | ≥ 1 (상한 없음 — 대기는 9절이 약 100년으로 묶음) | `30` |
 | `trigger.min_views` | 정수 | ≥ 0 | `1000` |
 | `trigger.max_views` | 정수 | ≥ `min_views` | `5000` |
-| `trigger.max_age_hours` | 숫자 | > 0 | `12` |
-| `trigger.min_views_per_hour` | 숫자 | ≥ 0 | `150` |
+| `trigger.max_age_hours` | 숫자 | > 0, ≤ 876000 | `12` |
+| `trigger.min_views_per_hour` | 숫자 | ≥ 0, ≤ 1000000000 | `150` |
 | `limits.daily_max_comments` | 정수 | ≥ 0 | `10` |
-| `limits.channel_cooldown_hours` | 숫자 | ≥ 0 | `24` |
+| `limits.channel_cooldown_hours` | 숫자 | ≥ 0, ≤ 876000 | `24` |
 | `limits.daily_max_searches` | 정수 | ≥ 0 | `100` (과제 밖에서 더한 키) |
 | `comment.min_chars` | 정수 | ≥ 1 | `40` |
 | `comment.max_chars` | 정수 | ≥ `min_chars` | `120` |
 | `chrome_debug_url` | 글자 | `http://` 또는 `https://` 로 시작 | `http://localhost:9222` |
 | `allowed_videos` | 글자 목록 | 비워 두면 `()`; 항목은 쓴 그대로 보관 | `- https://youtu.be/내-테스트-영상-ID` |
 
-- "정수"는 bool 을 받지 않습니다. "숫자"는 정수나 실수(bool 제외)이고 실수로 저장됩니다.
+- "정수"는 bool 을 받지 않습니다. "숫자"는 정수나 실수(bool 제외)이고 실수로 저장되며,
+  유한값만 받습니다 — `.inf` · `-.inf` · `.nan` 은 `유한한 숫자여야 합니다: <키>` 오류입니다.
+- 숫자 키의 상한은 읽기를 통과한 값이 뒤 단계에서 넘치지 않게 둡니다. 시간 키의 876000 은
+  100 × 365 × 24 시간(약 100년, 9절의 대기 상한과 같은 크기)이라 `now − timedelta(hours=…)`
+  (`check_post` 의 채널 대기, Phase 4 의 나이 창)가 날짜 범위 안에 있습니다 — 2026년 기준 약
+  1800만 시간부터 `OverflowError` 입니다. `trigger.min_views_per_hour` 의 1000000000 은 실제
+  영상이 닿지 않는 값입니다. 넘으면 `<상한> 이하여야 합니다: <키>` 오류이고, 실행 중이면 이전
+  설정을 유지합니다. 정수 키에는 상한이 없습니다 — 비교와 셈에만 쓰이고, `poll_interval_min` 의
+  대기는 9절이 묶습니다.
 - `limits.daily_max_searches` 는 과제 예시에 없는 키입니다. Phase 2 의 하루 검색 상한을
   설정 값으로 두기 위해 지금 계약에 넣었습니다(쿼터 약 100회/일). Phase 2 가 값을 조정합니다.
-- **YAML 1.1 함정은 크게 실패합니다.** 따옴표 없는 `yes`/`no`/`on`/`off` 는 bool,
-  `2026-10-12` 는 날짜, `12345678901` 은 정수로 읽히므로 글자 자리에 오면 오류입니다
+- **YAML 1.1 함정 — 글자 자리에서는 크게 실패합니다.** 따옴표 없는 `yes`/`no`/`on`/`off` 는
+  bool, `2026-10-12` 는 날짜, `12345678901` 은 정수로 읽히므로 글자 자리에 오면 오류입니다
   (예: `keywords: [연애, no]`, `topic: yes`, `allowed_videos: [12345678901]`). 이런 값은
   따옴표로 감싸세요.
+- **숫자 자리에서는 YAML 1.1 숫자 표기가 그대로 읽힙니다** — `017` 은 8진수 15, `1:30` 은
+  60진수 90, `0x1F` 는 31, `1_000` 은 1000 이 되고 위 범위 검사만 받습니다. 숫자는 앞자리 0 ·
+  `:` · `_` 없이 10진수로 쓰세요.
 - 같은 키가 두 번 나오면 두 번째 줄 번호와 함께 오류입니다. 윈도우 메모장이 붙이는 BOM 은
   떼어 내고 읽습니다. UTF-8 이 아닌 저장(메모장의 ANSI·Unicode)은 `ConfigError` 입니다.
 - 읽는 중 나는 그 밖의 모든 오류도 `ConfigError` 입니다 — 날짜 모양의 틀린 값
@@ -428,10 +439,12 @@ run_loop(cycle, reload, initial, *, on_error, sleep=time.sleep,
   python3 -m tests.mutants store-put-overwrites-attempts
   python3 -m tests.mutants store-double-reserve
   python3 -m tests.mutants config-narrow-read-errors
+  python3 -m tests.mutants config-no-ceiling
   python3 -m tests.mutants scheduler-one-sleep
   python3 -m tests.mutants scheduler-unclamped-wait
   python3 -m tests.mutants logbook-raw-line-breaks
   ```
 
   `decide_post` · `video_id_from_ref` · `put` · `reserve_live` · `check_post` · `load_config` ·
-  `run_loop` · `format_line` 의 본문을 고칠 때는 이 명령들이 계속 1 로 끝나는지 함께 확인합니다.
+  `config_from_mapping` · `run_loop` · `format_line` 의 본문을 고칠 때는 이 명령들이 계속 1 로
+  끝나는지 함께 확인합니다.
