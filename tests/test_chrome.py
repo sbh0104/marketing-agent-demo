@@ -24,6 +24,7 @@ from agent.chrome import (
     COMMENTS_DISABLED_MSG,
     CONFIRM_POLL_MS,
     CONFIRM_POLLS,
+    CONFIRM_SCAN,
     SIGNED_IN,
     SUBMIT_BUTTON,
     ChromeSession,
@@ -521,6 +522,14 @@ class YouTubePageTest(unittest.TestCase):
         self.assertEqual([c for c in page.calls if c[0] == "click"], [])
         self.assert_no_waiting(page)
 
+    def test_submit_disabled_button_raises_without_click(self) -> None:
+        page = full_page(submit={"enabled": False})
+        with self.assertRaises(PageError) as caught:
+            self.adapter(page).submit()
+        self.assertEqual(caught.exception.reason, "post_button_missing")
+        self.assertEqual([c for c in page.calls if c[0] == "click"], [])
+        self.assert_no_waiting(page)
+
     def test_submit_clicks_once_without_waiting(self) -> None:
         page = full_page()
         self.adapter(page).submit()
@@ -539,6 +548,14 @@ class YouTubePageTest(unittest.TestCase):
         self.assertFalse(self.adapter(page).confirm_posted(TEXT))
         waits = [c for c in page.calls if c[0] == "wait_for_timeout"]
         self.assertEqual(waits, [("wait_for_timeout", CONFIRM_POLL_MS)] * CONFIRM_POLLS)
+
+    def test_confirm_rejects_longer_text_containing_ours(self) -> None:
+        page = full_page(texts={"texts": (TEXT + " 그리고 덧붙인 말",)})
+        self.assertFalse(self.adapter(page).confirm_posted(TEXT))
+
+    def test_confirm_only_scans_first_confirm_scan_texts(self) -> None:
+        page = full_page(texts={"texts": ("다른 사람 댓글",) * CONFIRM_SCAN + (TEXT,)})
+        self.assertFalse(self.adapter(page).confirm_posted(TEXT))
 
     def test_present_lets_other_errors_propagate(self) -> None:
         page = full_page(
