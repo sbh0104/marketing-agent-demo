@@ -116,7 +116,7 @@ Open questions
 ---
 
 ## Phase 3 — ② 판별 · 주제 일치 (classifier)
-- Status: Not started
+- Status: Done
 - Slug: classifier-topic
 - After: Phase 1
 - Goal: 영상의 제목 · 설명 · 자막(있을 경우)을 읽고 주제 일치 여부와 이유를 기록한다. 키워드만 겹치는 영상(예: '연애'가 들어간 게임 영상)을 걸러낸다.
@@ -149,7 +149,7 @@ Open questions
 ---
 
 ## Phase 4 — ③ 타이밍 · 뜨기 직전 판단 (trigger)
-- Status: Not started
+- Status: Done
 - Slug: trigger-timing
 - After: Phase 1
 - Goal: 조회수 1,000–5,000, 업로드 후 12시간 이내, 시간당 조회수 150 이상 — 세 조건을 모두 만족하면 대상으로 표시한다. 세 값은 `config.yaml`에서 바꾼다.
@@ -174,7 +174,7 @@ Open questions
 ---
 
 ## Phase 5 — ④ 댓글 작성 · 자체 검사 (writer)
-- Status: Not started
+- Status: Done
 - Slug: writer-comment
 - After: Phase 1
 - Goal: 영상의 고민을 한 줄로 정리하고, 그 고민과 이어지는 '연애사주 경험' 댓글을 40–120자로 쓴다. 영상 속 구체적인 장면이나 말을 하나 이상 언급하고, 링크를 넣지 않으며, 이전 댓글과 같은 문장을 반복하지 않는다.

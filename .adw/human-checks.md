@@ -85,3 +85,115 @@
 - source: adw/phase-1-foundation-contracts
 - tag: plain
 - status: open
+
+### H-008 — 계약 11절의 "판정이 바뀔 수 있나" 세 문장(`docs/contracts.md:485-492`)을 어떻게 바로잡을지 정하기 — 문장만 실제대로 고칠지("나이 창이 닫힌 영상은 reason 과 상관없이 다시 `yes` 가 될 수 없음", 줄어든 조회수가 `no` 일 수 있음, 설정을 고치면 `too_old` 도 바뀜) 아니면 나이 검사를 조회수 검사 앞으로 옮길지, Phase 7 계획 전에
+- project: marketing-agent-demo
+- when: 2026-10-13 · plans/interview-marketing-agent.md#phase-4
+- from: ship-report.md § Human checks — .adw/ship-report.md § Risks
+- source: adw/phase-4-trigger-timing
+- tag: plain
+- status: open
+
+### H-009 — 트래커 Phase 2 · Phase 7 절에 이번 페이즈가 넘긴 일의 주인 적기 — 최소 기록 간격(재시작 · 시계 되감김), 한 번 튀거나 꺼진 조회수 읽기, 나이 창이 닫힌 영상의 추적 중단, `record.trigger` · `Store.put` · `TRIGGER` 연결과 새 기록마다 다시 판정, 모듈 목록 두 곳 — 지금은 `.adw/plan.md` 와 계약 11절에만 있음
+- project: marketing-agent-demo
+- when: 2026-10-13 · plans/interview-marketing-agent.md#phase-4
+- from: ship-report.md § Human checks — .adw/ship-report.md § Risks
+- source: adw/phase-4-trigger-timing
+- tag: plain
+- status: open
+
+### H-010 — 22개 예시의 일치 · 불일치 라벨을 사람이 검토하기(`tests/classifier_examples.py`) — 정확도 숫자를 믿기 전에
+- project: marketing-agent-demo
+- when: 2026-10-13 · plans/interview-marketing-agent.md#phase-3
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-3-classifier-topic
+- tag: plain
+- status: open
+
+### H-011 — `pip install -r requirements.txt` 후 `.env` 의 키를 export 하고 `python3 -m tests.jev_accuracy` 실행. exit 3 이면 키 · SDK · 연결부터 고침. 권고 줄 없이 traceback 과 exit 1 이면 설치 · 설정 문제지 모델 문제가 아님(R7). 결과 두 줄을 계약 '주제 판별' 절의 정확도 기록에 적고, 권고가 en 이면 후속 사이클, 둘 다 미달이면 인터뷰로
+- project: marketing-agent-demo
+- when: 2026-10-13 · plans/interview-marketing-agent.md#phase-3
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-3-classifier-topic
+- tag: plain
+- status: open
+
+### H-012 — 실제 `CLASSIFY` 이유를 보고 `noul_yes_min` · `noul_no_max` · `choice_min_confidence`(지금 0.8 / 0.2 / 0.5, 잰 값 아님) 조정하기
+- project: marketing-agent-demo
+- when: 2026-10-13 · plans/interview-marketing-agent.md#phase-3
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-3-classifier-topic
+- tag: plain
+- status: open
+
+### H-013 — 착지 때 lane 2 · 4 · 5 가 먼저 `## 11.` 을 붙였으면 이 절 번호를 다시 매기고, `config.py` 키 꼬리 · `config.yaml` · `VALID` · `CommittedConfigTest` · `requirements.txt` · 계약 1 · 2 · 8 · 10절의 겹친 추가분을 합치기
+- project: marketing-agent-demo
+- when: 2026-10-13 · plans/interview-marketing-agent.md#phase-3
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-3-classifier-topic
+- tag: plain
+- status: open
+
+### H-014 — topic 길이에 상한을 둘지(계약 2절), 아니면 state 몫이 2만 2천 바이트 아래면 보류할지 정하기 — 지금은 아주 긴 topic 에서 영상 글 없이 판정이 나옴(R6)
+- project: marketing-agent-demo
+- when: 2026-10-13 · plans/interview-marketing-agent.md#phase-3
+- from: ship-report.md § Human checks — .adw/ship-report.md § Risks
+- source: adw/phase-3-classifier-topic
+- tag: plain
+- status: open
+
+### H-015 — 판정에 고른 보기의 확률(`probabilities[choice]`)도 볼지 정하기 — 지금은 확률 0.01 인 보기도 confidence 만 높으면 일치(R8)
+- project: marketing-agent-demo
+- when: 2026-10-13 · plans/interview-marketing-agent.md#phase-3
+- from: ship-report.md § Human checks — .adw/ship-report.md § Risks
+- source: adw/phase-3-classifier-topic
+- tag: plain
+- status: open
+
+### H-016 — `pip-audit` 가 있는 기계에서 `pip-audit -r requirements.txt` 를 돌리고, `typesafe-sdk==0.7.4` 해시 고정으로 좁힐지 정하기(R12)
+- project: marketing-agent-demo
+- when: 2026-10-13 · plans/interview-marketing-agent.md#phase-3
+- from: ship-report.md § Human checks — .adw/ship-report.md § Risks
+- source: adw/phase-3-classifier-topic
+- tag: plain
+- status: open
+
+### H-017 — 트래커 Phase 7 절에 이번 주인 줄 옮겨 적기 — `on_error` 는 예외 이름 · 상태만 쓰고 `__cause__` · traceback 을 로그에 남기지 않음, `응답 모양 오류` 이유 길이 자르기(R11)
+- project: marketing-agent-demo
+- when: 2026-10-13 · plans/interview-marketing-agent.md#phase-3
+- from: ship-report.md § Human checks — .adw/ship-report.md § Risks
+- source: adw/phase-3-classifier-topic
+- tag: plain
+- status: open
+
+### H-018 — 실제 `ANTHROPIC_API_KEY` 와 jev 키로 영상 몇 개를 돌려, 모델 id `claude-sonnet-5-5` 가 받아들여지는지(`ERROR where=writer.claude … 404` 가 아니면 됨) 확인하고, 통과 하한 `0.7` 과 `REPEAT_MIN_CHARS` 12 를 다시 쓰기 · 건너뛰기 비율과 jev 한국어 정확도에 맞춰 조정하기(이번에 더해진 둘도 함께 봄: 규칙 5 와 '연애사주' 언급이 부딪혀 광고 질문 점수가 오르는지(R4), 자료에 넣은 전각 `＜draft_comment＞` 가짜 초안에 jev 가 흔들리는지(R3))
+- project: marketing-agent-demo
+- when: 2026-10-13 · plans/interview-marketing-agent.md#phase-5
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-5-writer-comment
+- tag: plain
+- status: open
+
+### H-019 — 착지 때 lane-merge 가 6개 파일 충돌(config.yaml · docs/contracts.md · requirements.txt · src/agent/config.py · tests/mutants.py · tests/test_config.py)을 NEEDS-HUMAN 으로 넘기면 Phase 3 · 5 의 설정 키와 `requirements.txt` 줄이 모두 살아남게 풀기
+- project: marketing-agent-demo
+- when: 2026-10-13 · plans/interview-marketing-agent.md#phase-5
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-5-writer-comment
+- tag: plain
+- status: open
+
+### H-020 — 링크 검사의 빈틈(점 닮은꼴 `‧` `•` `∙` `°` · 키릴 끝 · U+202E 뒤집기 · `saju.한국`)을 jev 광고 질문에 맡겨 받아들일지, 구분점 무리를 넓히고 양방향 제어 글자를 댓글에서 막을지 정하기(R1)
+- project: marketing-agent-demo
+- when: 2026-10-13 · plans/interview-marketing-agent.md#phase-5
+- from: ship-report.md § Human checks — .adw/ship-report.md § Risks
+- source: adw/phase-5-writer-comment
+- tag: plain
+- status: open
+
+### H-021 — Phase 7 이 계획을 세우기 전에, 트래커 Phase 7 절에 "`write_comment` 가 던진 예외는 그 영상 하나의 오류로 받아 `ERROR` 로 남기고 다음 영상으로 · jev 포트 어댑터는 상태 코드를 `status_code` 나 메시지로 싣는다"를 더할지 정하기(R2 · R5)
+- project: marketing-agent-demo
+- when: 2026-10-13 · plans/interview-marketing-agent.md#phase-5
+- from: ship-report.md § Human checks — .adw/ship-report.md § Risks
+- source: adw/phase-5-writer-comment
+- tag: plain
+- status: open

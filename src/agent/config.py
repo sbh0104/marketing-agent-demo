@@ -44,6 +44,18 @@ class LimitsConfig:
 class CommentConfig:
     min_chars: int
     max_chars: int
+    writer_model: str
+    check_min_probability: float
+
+
+@dataclass(frozen=True)
+class ClassifierConfig:
+    model: str
+    noul_yes_min: float
+    noul_no_max: float
+    choice_min_confidence: float
+    on_topic_reasons: tuple[str, ...]
+    off_topic_reasons: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -54,6 +66,7 @@ class Config:
     trigger: TriggerConfig
     limits: LimitsConfig
     comment: CommentConfig
+    classifier: ClassifierConfig
     chrome_debug_url: str
     allowed_videos: tuple[str, ...]
 
@@ -103,19 +116,31 @@ _TOP_KEYS = (
     "trigger",
     "limits",
     "comment",
+    "classifier",
     "chrome_debug_url",
     "allowed_videos",
 )
 _SECTION_KEYS = {
     "trigger": ("min_views", "max_views", "max_age_hours", "min_views_per_hour"),
     "limits": ("daily_max_comments", "channel_cooldown_hours", "daily_max_searches"),
-    "comment": ("min_chars", "max_chars"),
+    "comment": ("min_chars", "max_chars", "writer_model", "check_min_probability"),
+    "classifier": (
+        "model",
+        "noul_yes_min",
+        "noul_no_max",
+        "choice_min_confidence",
+        "on_topic_reasons",
+        "off_topic_reasons",
+    ),
 }
 # 시간 키의 상한 — 100 × 365 × 24 시간(약 100년, 주기 대기의 상한과 같은 크기). 이 안의 값은
 # now − timedelta(hours=…) 가 날짜 범위를 벗어나지 않습니다(2026년 기준 약 1800만 시간부터 OverflowError).
 _MAX_HOURS = 876_000.0
 # 시간당 조회수 하한의 상한 — 실제 영상이 닿지 않는 값. 숫자 키는 모두 상한을 둡니다.
 _MAX_VIEWS_PER_HOUR = 1_000_000_000.0
+# 이유 보기 수 · 이름 길이 상한 — 50개 × 40자면 가장 긴 질문이 1만 바이트를 넘지 않아 state 에 2만 2천 바이트 이상이 남습니다(계약 '주제 판별' 절).
+_MAX_REASONS = 50
+_MAX_REASON_CHARS = 40
 
 
 def _check_keys(data: Mapping[object, object], allowed: tuple[str, ...], prefix: str) -> None:
@@ -166,6 +191,52 @@ def _text(value: object, path: str) -> str:
     return value
 
 
+def _reasons(value: object, path: str, seen: set[str]) -> tuple[str, ...]:
+    if not isinstance(value, list) or not value:
+        raise ConfigError(f"보기가 하나 이상 필요합니다: {path}")
+    names: list[str] = []
+    for i, item in enumerate(value):
+        name = _text(item, f"{path}[{i}]")
+        if len(name) > _MAX_REASON_CHARS:
+            raise ConfigError(f"{_MAX_REASON_CHARS}자 이하여야 합니다: {path}[{i}]")
+        if name in seen:
+            raise ConfigError(f"보기 이름이 겹칩니다: {path}[{i}]")
+        seen.add(name)
+        names.append(name)
+    return tuple(names)
+
+
+def _classifier(data: Mapping[str, object]) -> ClassifierConfig:
+    section = _section(data, "classifier")
+    model = _text(section["model"], "classifier.model")
+    noul_yes_min = _number(
+        section["noul_yes_min"], "classifier.noul_yes_min", 0.5, 1.0, inclusive=False
+    )
+    noul_no_max = _number(section["noul_no_max"], "classifier.noul_no_max", 0, 1.0)
+    if not noul_no_max < noul_yes_min:
+        raise ConfigError("noul_yes_min 보다 작아야 합니다: classifier.noul_no_max")
+    choice_min_confidence = _number(
+        section["choice_min_confidence"], "classifier.choice_min_confidence", 0, 1.0
+    )
+    seen: set[str] = set()
+    on_topic_reasons = _reasons(
+        section["on_topic_reasons"], "classifier.on_topic_reasons", seen
+    )
+    off_topic_reasons = _reasons(
+        section["off_topic_reasons"], "classifier.off_topic_reasons", seen
+    )
+    if len(on_topic_reasons) + len(off_topic_reasons) > _MAX_REASONS:
+        raise ConfigError(f"보기는 모두 {_MAX_REASONS}개 이하여야 합니다: classifier")
+    return ClassifierConfig(
+        model=model,
+        noul_yes_min=noul_yes_min,
+        noul_no_max=noul_no_max,
+        choice_min_confidence=choice_min_confidence,
+        on_topic_reasons=on_topic_reasons,
+        off_topic_reasons=off_topic_reasons,
+    )
+
+
 def config_from_mapping(data: Mapping[str, object]) -> Config:
     """읽은 묶음을 검사해 Config 로 바꿉니다. 메시지는 점으로 이은 키 경로를 말합니다."""
     _check_keys(data, _TOP_KEYS, "")
@@ -199,10 +270,16 @@ def config_from_mapping(data: Mapping[str, object]) -> Config:
 
     comment = _section(data, "comment")
     min_chars = _int(comment["min_chars"], "comment.min_chars", 1)
+    # check_min_probability 의 상한 1 은 확률의 끝입니다 — 숫자 키는 모두 상한을 둡니다.
     comment_config = CommentConfig(
         min_chars=min_chars,
         max_chars=_int(comment["max_chars"], "comment.max_chars", min_chars),
+        writer_model=_text(comment["writer_model"], "comment.writer_model"),
+        check_min_probability=_number(
+            comment["check_min_probability"], "comment.check_min_probability", 0, 1
+        ),
     )
+    classifier_config = _classifier(data)
 
     url = data["chrome_debug_url"]
     if not isinstance(url, str) or not url.startswith(("http://", "https://")):
@@ -226,6 +303,7 @@ def config_from_mapping(data: Mapping[str, object]) -> Config:
         trigger=trigger_config,
         limits=limits_config,
         comment=comment_config,
+        classifier=classifier_config,
         chrome_debug_url=url,
         allowed_videos=allowed_items,
     )

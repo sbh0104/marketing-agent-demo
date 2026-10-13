@@ -3,7 +3,7 @@
     python3 -m tests.mutants <이름>
 
 agent.guard / agent.store / agent.config / agent.scheduler / agent.logbook / agent.poster /
-agent.chrome 의 소스에서 정확한 글자 하나를 바꿔 메모리에서만 모듈을 다시
+agent.chrome / agent.classifier / agent.writer 의 소스에서 정확한 글자 하나를 바꿔 메모리에서만 모듈을 다시
 만들고(파일은 건드리지 않음), 해당 테스트 모듈을 돌립니다. 종료 코드 1 은 테스트가
 망가짐을 잡았다는 뜻, 2 는 이름을 모르거나 바꿀 글자가 정확히 한 번 나오지 않았다는
 뜻입니다. 이 파일은 test*.py 가 아니라서 discover 가 줍지 않습니다.
@@ -218,6 +218,240 @@ MUTANTS: dict[str, tuple[str, str, str, str]] = {
         "tests.test_logbook",
         "json.dumps(value, ensure_ascii=False).translate(_LINE_BREAK_ESCAPES)",
         "json.dumps(value, ensure_ascii=False)",
+    ),
+    "writer-hardcoded-model": (
+        "agent.writer",
+        "tests.test_writer",
+        'model=config.writer_model,',
+        'model="claude-sonnet-5-5",',
+    ),
+    "writer-no-rewrite": (
+        "agent.writer",
+        "tests.test_writer",
+        "for attempt in (1, 2):",
+        "for attempt in (1,):",
+    ),
+    "writer-third-try": (
+        "agent.writer",
+        "tests.test_writer",
+        "for attempt in (1, 2):",
+        "for attempt in (1, 2, 3):",
+    ),
+    "writer-ignore-self-check": (
+        "agent.writer",
+        "tests.test_writer",
+        "if score + _TOLERANCE < threshold:",
+        "if False:",
+    ),
+    "writer-threshold-strict": (
+        "agent.writer",
+        "tests.test_writer",
+        "if score + _TOLERANCE < threshold:",
+        "if score <= threshold:",
+    ),
+    "writer-no-float-tolerance": (
+        "agent.writer",
+        "tests.test_writer",
+        "if score + _TOLERANCE < threshold:",
+        "if score < threshold:",
+    ),
+    "writer-ad-not-inverted": (
+        "agent.writer",
+        "tests.test_writer",
+        "score = 1.0 - probability if name in INVERTED_QUESTIONS else probability",
+        "score = probability",
+    ),
+    "writer-trusts-jev-answer": (
+        "agent.writer",
+        "tests.test_writer",
+        "if isinstance(value, bool) or not isinstance(value, (int, float)) or not 0.0 <= value <= 1.0:",
+        "if False:",
+    ),
+    "writer-no-length": (
+        "agent.writer",
+        "tests.test_writer",
+        "if not config.min_chars <= length <= config.max_chars:",
+        "if False:",
+    ),
+    "writer-length-in-bytes": (
+        "agent.writer",
+        "tests.test_writer",
+        "length = len(text)",
+        'length = len(text.encode("utf-8"))',
+    ),
+    "writer-no-link": (
+        "agent.writer",
+        "tests.test_writer",
+        "if link is not None:",
+        "if False:",
+    ),
+    "writer-link-no-nfkc": (
+        "agent.writer",
+        "tests.test_writer",
+        'folded = unicodedata.normalize("NFKC", text).casefold()',
+        "folded = text.casefold()",
+    ),
+    "writer-link-view-keeps-all": (
+        "agent.writer",
+        "tests.test_writer",
+        'if ch.isalnum() or ch == "@":',
+        "if True:",
+    ),
+    "writer-link-ascii-separators-only": (
+        "agent.writer",
+        "tests.test_writer",
+        "if any(part in name for part in _SEPARATOR_NAMES):",
+        'if ch in ".:/":',
+    ),
+    "writer-link-latin-left-only": (
+        "agent.writer",
+        "tests.test_writer",
+        r"[^\W_]\.+[a-z]{2,}",
+        r"[a-z0-9]\.+[a-z]{2,}",
+    ),
+    "writer-link-no-handle": (
+        "agent.writer",
+        "tests.test_writer",
+        r"|@[^\W_]",
+        "",
+    ),
+    "writer-no-repeat": (
+        "agent.writer",
+        "tests.test_writer",
+        "if match.size >= min_run:",
+        "if False:",
+    ),
+    "writer-repeat-keeps-punctuation": (
+        "agent.writer",
+        "tests.test_writer",
+        ".casefold() if ch.isalnum())",
+        ".casefold())",
+    ),
+    "writer-repeat-all-history": (
+        "agent.writer",
+        "tests.test_writer",
+        "recent = list(previous)[-RECENT_WINDOW:]",
+        "recent = list(previous)",
+    ),
+    "writer-unescaped-material": (
+        "agent.writer",
+        "tests.test_writer",
+        'text.replace("<", "＜").replace(">", "＞")',
+        "text",
+    ),
+    "writer-api-error-unlogged": (
+        "agent.writer",
+        "tests.test_writer",
+        "logbook.write(Event.ERROR, where=where, reason=reason, video=record.video_id)",
+        "None",
+    ),
+    "classifier-error-yes": (
+        "agent.classifier",
+        "tests.test_classifier",
+        'return Judgement(Verdict.HOLD, f"API 오류: {exc}", now)',
+        'return Judgement(Verdict.YES, f"API 오류: {exc}", now)',
+    ),
+    "classifier-malformed-yes": (
+        "agent.classifier",
+        "tests.test_classifier",
+        'return Judgement(Verdict.HOLD, f"응답 모양 오류: {type(exc).__name__}: {exc}", now)',
+        'return Judgement(Verdict.YES, f"응답 모양 오류: {type(exc).__name__}: {exc}", now)',
+    ),
+    "classifier-unchecked-probability": (
+        "agent.classifier",
+        "tests.test_classifier",
+        "if not 0.0 <= number <= 1.0:",
+        "if False:",
+    ),
+    "classifier-no-confidence-floor": (
+        "agent.classifier",
+        "tests.test_classifier",
+        "if confidence < config.choice_min_confidence:",
+        "if False:",
+    ),
+    "classifier-keyword-only-passes": (
+        "agent.classifier",
+        "tests.test_classifier",
+        "if noul >= config.noul_yes_min and on_topic:",
+        "if noul >= config.noul_yes_min:",
+    ),
+    "classifier-no-truncation": (
+        "agent.classifier",
+        "tests.test_classifier",
+        "_MAX_INPUT_BYTES = 32_000",
+        "_MAX_INPUT_BYTES = 10**9",
+    ),
+    "classifier-error-hold-unmarked": (
+        "agent.classifier",
+        "tests.test_classifier",
+        "return judgement.verdict is Verdict.HOLD and judgement.reason.startswith(ERROR_PREFIXES)",
+        "return False",
+    ),
+    "classifier-swallows-faults": (
+        "agent.classifier",
+        "tests.test_classifier",
+        "except JevError as exc:",
+        "except Exception as exc:",
+    ),
+    "trigger-negative-speed": (
+        "agent.trigger",
+        "tests.test_trigger",
+        "if gained < 0:",
+        "if False:",
+    ),
+    "trigger-flat-is-decrease": (
+        "agent.trigger",
+        "tests.test_trigger",
+        "if gained < 0:",
+        "if gained <= 0:",
+    ),
+    "trigger-list-order": (
+        "agent.trigger",
+        "tests.test_trigger",
+        "ordered = sorted(history, key=lambda sample: (_utc(sample.at), sample.count))",
+        "ordered = list(history)",
+    ),
+    "trigger-same-instant": (
+        "agent.trigger",
+        "tests.test_trigger",
+        "earlier = [sample for sample in ordered if _utc(sample.at) < _utc(latest.at)]",
+        "earlier = ordered[:-1]",
+    ),
+    "trigger-min-views-exclusive": (
+        "agent.trigger",
+        "tests.test_trigger",
+        "if latest.count < config.min_views:",
+        "if latest.count <= config.min_views:",
+    ),
+    "trigger-max-views-exclusive": (
+        "agent.trigger",
+        "tests.test_trigger",
+        "if latest.count > config.max_views:",
+        "if latest.count >= config.max_views:",
+    ),
+    "trigger-future-publish-passes": (
+        "agent.trigger",
+        "tests.test_trigger",
+        "if _utc(record.published_at) > _utc(now):",
+        "if False:",
+    ),
+    "trigger-future-publish-inclusive": (
+        "agent.trigger",
+        "tests.test_trigger",
+        "if _utc(record.published_at) > _utc(now):",
+        "if _utc(record.published_at) >= _utc(now):",
+    ),
+    "trigger-age-exclusive": (
+        "agent.trigger",
+        "tests.test_trigger",
+        "if _utc(now) - _utc(record.published_at) > timedelta(hours=config.max_age_hours):",
+        "if _utc(now) - _utc(record.published_at) >= timedelta(hours=config.max_age_hours):",
+    ),
+    "trigger-rate-exclusive": (
+        "agent.trigger",
+        "tests.test_trigger",
+        "if rate < config.min_views_per_hour:",
+        "if rate <= config.min_views_per_hour:",
     ),
 }
 
