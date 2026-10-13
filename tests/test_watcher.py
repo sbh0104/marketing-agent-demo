@@ -327,6 +327,24 @@ class DetectTest(WatcherCase):
         self.assertEqual(self.counts(batches[1][0]), [1000, 2000])
         self.assertEqual(report, CycleReport(1, (), 51, 0, False, False))
 
+    def test_prev_is_the_latest_of_two_samples_s040(self) -> None:
+        # 표본 둘 [1000, 1300] — prev 는 바로 앞 표본 1300 이고 첫 표본 1000 이 아닙니다
+        self.seed(K, views=1000)
+        record = self.store.get(K)
+        assert record is not None
+        record.view_history.append(ViewSample(NOW - HOUR / 2, 1300))
+        self.store.put(record)
+        self.api.videos[K] = video_item(K, 1450)
+        report = self.run_cycle()
+        self.assertEqual(self.api.video_batches(), [[K]])
+        self.assertEqual(self.counts(K), [1000, 1300, 1450])
+        self.assertEqual(self.events(), [views(K, 1450, prev=1300)])
+        self.assertEqual(
+            self.raw_lines()[0].split(" ", 1)[1],
+            f"VIEWS video={K} views=1450 prev=1300 delta=150",
+        )
+        self.assertEqual(report, CycleReport(1, (), 1, 0, False, False))
+
 
 class PaginationTest(WatcherCase):
     def test_next_page_follows_an_all_new_page_with_a_token(self) -> None:
@@ -453,6 +471,24 @@ class QuotaTest(WatcherCase):
         self.assertEqual(self.events(), [quota(10000, 10000, "videos.list", "units")])
         self.assertEqual([self.counts(video_id) for video_id in tracked], [[1000]] * 51)
         self.assertEqual(report, CycleReport(2, (), 0, 0, True, False))
+
+    def test_videos_only_hold_sets_held_s040(self) -> None:
+        # 검색 99회(9,900 단위) + 이번 검색 1회 = 10,000 — 검색 상한 200 이라 검색은 지나가고
+        # videos.list(1단위)만 단위 상한에 막힙니다
+        self.seed(K)
+        self.api.videos[K] = video_item(K, 1100)
+        self.seed_quota(99, NOW - HOUR)
+        report = self.run_cycle(with_cap(200))
+        self.assertEqual(self.api.searches(), [("연애", None)])
+        self.assertEqual(self.api.video_batches(), [])
+        self.assertEqual(self.events(), [quota(10000, 10000, "videos.list", "units")])
+        self.assertEqual(
+            self.raw_lines()[0].split(" ", 1)[1],
+            "QUOTA used=10000 limit=10000 call=videos.list counter=units",
+        )
+        self.assertEqual(self.counts(K), [1000])
+        self.assertIs(report.held, True)
+        self.assertEqual(report, CycleReport(1, (), 0, 0, True, False))
 
 
 class ApiErrorTest(WatcherCase):
