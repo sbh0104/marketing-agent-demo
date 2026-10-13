@@ -2,7 +2,8 @@
 
     python3 -m tests.mutants <이름>
 
-agent.guard / agent.store / agent.config / agent.scheduler / agent.logbook 의 소스에서 정확한 글자 하나를 바꿔 메모리에서만 모듈을 다시
+agent.guard / agent.store / agent.config / agent.scheduler / agent.logbook / agent.classifier 의
+소스에서 정확한 글자 하나를 바꿔 메모리에서만 모듈을 다시
 만들고(파일은 건드리지 않음), 해당 테스트 모듈을 돌립니다. 종료 코드 1 은 테스트가
 망가짐을 잡았다는 뜻, 2 는 이름을 모르거나 바꿀 글자가 정확히 한 번 나오지 않았다는
 뜻입니다. 이 파일은 test*.py 가 아니라서 discover 가 줍지 않습니다.
@@ -151,6 +152,54 @@ MUTANTS: dict[str, tuple[str, str, str, str]] = {
         "tests.test_logbook",
         "json.dumps(value, ensure_ascii=False).translate(_LINE_BREAK_ESCAPES)",
         "json.dumps(value, ensure_ascii=False)",
+    ),
+    "classifier-error-yes": (
+        "agent.classifier",
+        "tests.test_classifier",
+        'return Judgement(Verdict.HOLD, f"API 오류: {exc}", now)',
+        'return Judgement(Verdict.YES, f"API 오류: {exc}", now)',
+    ),
+    "classifier-malformed-yes": (
+        "agent.classifier",
+        "tests.test_classifier",
+        'return Judgement(Verdict.HOLD, f"응답 모양 오류: {type(exc).__name__}: {exc}", now)',
+        'return Judgement(Verdict.YES, f"응답 모양 오류: {type(exc).__name__}: {exc}", now)',
+    ),
+    "classifier-unchecked-probability": (
+        "agent.classifier",
+        "tests.test_classifier",
+        "if not 0.0 <= number <= 1.0:",
+        "if False:",
+    ),
+    "classifier-no-confidence-floor": (
+        "agent.classifier",
+        "tests.test_classifier",
+        "if confidence < config.choice_min_confidence:",
+        "if False:",
+    ),
+    "classifier-keyword-only-passes": (
+        "agent.classifier",
+        "tests.test_classifier",
+        "if noul >= config.noul_yes_min and on_topic:",
+        "if noul >= config.noul_yes_min:",
+    ),
+    "classifier-no-truncation": (
+        "agent.classifier",
+        "tests.test_classifier",
+        "_MAX_INPUT_BYTES = 32_000",
+        "_MAX_INPUT_BYTES = 10**9",
+    ),
+    "classifier-error-hold-unmarked": (
+        "agent.classifier",
+        "tests.test_classifier",
+        "return judgement.verdict is Verdict.HOLD and judgement.reason.startswith(ERROR_PREFIXES)",
+        "return False",
+    ),
+    "classifier-swallows-faults": (
+        "agent.classifier",
+        "tests.test_classifier",
+        "except JevError as exc:",
+        "except Exception as exc:",
     ),
 }
 
