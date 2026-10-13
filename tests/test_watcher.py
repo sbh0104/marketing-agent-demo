@@ -681,6 +681,31 @@ INVALID_ITEMS: tuple[tuple[str, dict[str, object]], ...] = (
     ("no statistics", bad_item(statistics="")),
 )
 
+# INVALID_ITEMS 행마다 SKIP 줄 detail 의 앞부분 — 지금 코드가 내는 글 그대로 (S-047).
+# month 13 은 _PUBLISHED_RE 모양에는 맞아 strptime 에서 떨어지므로 strptime 의 글로 시작합니다.
+INVALID_DETAIL_PREFIX: dict[str, str] = {
+    "viewCount -5": "statistics.viewCount:",
+    "viewCount 1_000": "statistics.viewCount:",
+    "viewCount ' 12'": "statistics.viewCount:",
+    "viewCount arabic-indic": "statistics.viewCount:",
+    "viewCount 20 digits": "statistics.viewCount:",
+    "viewCount int": "statistics.viewCount:",
+    "viewCount missing": "statistics.viewCount:",
+    "publishedAt 어제": "snippet.publishedAt:",
+    "publishedAt None": "snippet.publishedAt:",
+    "publishedAt +09:00": "snippet.publishedAt:",
+    "publishedAt year 1 +14:00": "snippet.publishedAt:",
+    "publishedAt 9999 -01:00": "snippet.publishedAt:",
+    "publishedAt basic": "snippet.publishedAt:",
+    "publishedAt week date": "snippet.publishedAt:",
+    "publishedAt no zone": "snippet.publishedAt:",
+    "publishedAt month 13": "time data '2026-13-01T00:00:00'",
+    "publishedAt Z junk": "snippet.publishedAt:",
+    "channelId empty": "VideoRecord.channel_id:",
+    "no snippet": "snippet:",
+    "no statistics": "statistics:",
+}
+
 
 class IntakeTest(WatcherCase):
     def test_unavailable_video_is_skipped(self) -> None:
@@ -705,7 +730,8 @@ class IntakeTest(WatcherCase):
                 report = self.run_cycle()
                 [(event, fields)] = self.events()
                 self.assertEqual(event, Event.SKIP)
-                self.assertTrue(fields.pop("detail"))
+                detail = fields.pop("detail")
+                self.assertTrue(detail.startswith(INVALID_DETAIL_PREFIX[label]), detail)
                 self.assertEqual(
                     fields, {"video": A, "reason": "invalid_item", "call": "videos.list"}
                 )

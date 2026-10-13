@@ -554,6 +554,14 @@ class HttpGetTest(unittest.TestCase):
         self.assertEqual(result, (200, body))
         self.assert_request(urlopen, 12.5)
 
+    def test_no_content_response_keeps_its_status_s047(self) -> None:
+        # 200 이 아닌 2xx — 상태를 200 으로 바꾸지 않고 응답의 것 그대로 돌려줍니다
+        response = FakeResponse(204, b"")
+        with mock.patch("urllib.request.urlopen", return_value=response) as urlopen:
+            result = http_get(GET_URL, 12.5)
+        self.assertEqual(result, (204, b""))
+        self.assert_request(urlopen, 12.5)
+
 
 if __name__ == "__main__":
     unittest.main()
