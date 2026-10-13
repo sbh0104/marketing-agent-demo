@@ -34,6 +34,28 @@
    resolves that name only inside its own directory
    (`.claude/skills/plan/scripts/`) and refuses to start the cycle (`EXIT_CONFIG`)
    when the name carries a path separator, `..`, or names an interpreter.
+9. **A contract promise is measured where it is written; a wrong one is narrowed,
+   not escalated.** A line a phase adds to or changes in `docs/contracts.md` that
+   contains 뿐 · 않 · 될 수 있 · 에만 is a promise unless the phase says why not.
+   Lines no phase edits are out of scope until one does.
+   - **plan** — every such line `.adw/plan.md` writes is paired in `## Test plan`:
+     `Promise: "<first words>" → tests/<file>::<test>` or
+     `Promise: "<first words>" → not a promise: <why>`. The test lives in the
+     suite, never only in `.adw/verify.sh`. The step that writes the line says:
+     "paired test red while the code matches this plan → plan-miss: narrow the
+     sentence to what the code does".
+   - **implement** — such a red is a `plan-miss`: narrow the sentence through
+     `.adw/plan-repairs.md`. Never change code to make a sentence true.
+   - **verify-plan** — sweep the diff's added or changed contract lines for the
+     four words; each caught line gets one `## Checks` line:
+     `Promise: L<n> — test <name>` · `Promise: L<n> — V<m>` ·
+     `Promise: L<n> — not a promise: <why>`. A `V<m>` row ends
+     `— red: narrow the sentence to the measured behavior (constitution 9), not
+     drift`, so verify-run, which does not read this file, takes it as a bounded fix.
+   - **ship-check** — each narrowed sentence (a plan-repairs entry or a verify-run
+     fix) goes under `## Risks` with its original wording, not `## Human checks`.
+     Widening a promise — changing code so a broader sentence holds — is a
+     decision and stays with a person.
 
 ## Never
 
