@@ -67,5 +67,17 @@
 - evidence: ship-report R1 — `bit‧ly/3xYzAb` 가 `bitly/3xyzab` 로 읽혀 통과(감사 재현); `## Human checks` 3번째 줄 — 어디까지 막을지는 사람 결정(보이지 않는 글자를 다 막으면 U+200D 이모지 잇기도 막힘). 실제 게시는 허용 목록뿐(`src/agent/guard.py:94`) (cycle 20261013-161439-adw/phase-5-writer-comment)
 - first confirmed: 2026-10-13 · last confirmed: 2026-10-13
 
+### E-018 · tooling — 이 기계에는 `playwright` 도 `pip-audit` 도 설치돼 있지 않다 — 브라우저 층 시험은 가짜 객체로만 돌고, `requirements.txt` 를 바꾼 사이클의 의존성 감사는 미측정이라 ship 판정이 ⚠️ READY WITH RISKS 위로 올라가지 못한다
+- evidence: ship-report.md:142 `python3 -c "import playwright"` → rc 1 `ModuleNotFoundError: No module named 'playwright'`; ship-report.md:172,229 `command -v pip-audit` → exit 1, `import pip_audit` → `ModuleNotFoundError` — "이 미측정 하나만으로도 판정은 ⚠️ 위로 올라갈 수 없습니다" (cycle 20261013-163932-adw/phase-6-poster-chrome)
+- first confirmed: 2026-10-13 · last confirmed: 2026-10-13
+
+### E-019 · hazard — Phase 6 의 크롬 프로필 점검(`src/agent/chrome.py:70-85` 기본 폴더 목록 + `_same_or_inside`)도 E-005 처럼 열거한 꼴로 막는다 — `posixpath.normcase` 는 대소문자를 접지 않아 대소문자 무구분 파일 시스템(macOS APFS · WSL `/mnt/c`)의 다른 철자가 통과하고, 목록에 없는 Chrome Beta · Dev · Canary · Edge 기본 폴더도 통과한다
+- evidence: ship-report.md:326-332 (R5, WSL 실측) — `/mnt/c/Windows/System32` → 거절, `/mnt/c/WINDOWS/System32` · `/mnt/c/windows/fonts` · `…/.config/google-chrome-beta` → ACCEPT; verify-plan 의 Property-based N/A "새 파서 없음(E-005)" 이 이 빈틈을 가렸다(ship-report.md:277) (cycle 20261013-163932-adw/phase-6-poster-chrome)
+- first confirmed: 2026-10-13 · last confirmed: 2026-10-13
+
+### E-020 · codebase — `tests/test_chrome.py` · `tests/test_poster.py` 의 가짜 Playwright 객체는 기다리지도 시간 초과를 내지도 않고 CDP 연결 끊김을 흉내 내지 못한다 — 실제 `is_enabled()`(기본 30초) · `click(timeout=3000)` 의 자동 대기와 크롬 재시작 뒤 낡은 연결(`TargetClosedError`)은 스위트가 재지 못한다
+- evidence: ship-report.md:258-261 (Test integrity — 가짜 객체가 실제 API 와 맞는지), :194 (노트 1), :311-319 (R3 감사 데모 `attempt 0..2: raw Closed: Target page, context or browser has been closed (connects so far=1)`) (cycle 20261013-163932-adw/phase-6-poster-chrome)
+- first confirmed: 2026-10-13 · last confirmed: 2026-10-13
+
 ## Retired (history — one line each, never deleted)
 - E-001 · gotcha — [stop:red-unbucketable · 1] ship-check BLOCKED 이고 통이 그 고침을 못 받는다 — 이 페이즈는 제 브랜치에서 아래 Blockers 를 범위로 다시 돈다 — retired 2026-10-13 (shipped (Phase 1 ship 게이트 승인 2026-10-13; `youtu.be/A/../B` 꼴은 `5352cf8` 로 막힘 — notes.md Expertise check))

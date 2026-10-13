@@ -210,7 +210,7 @@ Open questions
 ---
 
 ## Phase 6 — ⑤ 크롬 연결 · 게시 · 확인 (poster)
-- Status: Not started
+- Status: Done
 - Slug: poster-chrome
 - After: Phase 1
 - Goal: 로그인된 크롬에 연결해 영상을 열고, 댓글 창까지 이동해 입력하고, 게시하고, 내 댓글이 실제로 보이는지 확인한다. 실패하면 원인과 화면 캡처를 기록하고 다음 영상으로 넘어간다.
