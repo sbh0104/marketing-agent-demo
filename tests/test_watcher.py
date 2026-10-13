@@ -298,6 +298,21 @@ class DetectTest(WatcherCase):
         self.run_cycle(with_keywords("연애", "썸", "연애"))
         self.assertEqual(self.api.searches(), [("연애", None), ("썸", None)])
 
+    def test_second_videos_batch_is_sampled_s033(self) -> None:
+        # 추적 51개 → videos.list 두 번(50 · 1), 두 묶음 모두 200
+        tracked = [f"t{n:010d}" for n in range(51)]
+        for video_id in tracked:
+            self.seed(video_id)
+            self.api.videos[video_id] = video_item(video_id, 2000)
+        report = self.run_cycle()
+        batches = self.api.video_batches()
+        self.assertEqual([len(batch) for batch in batches], [50, 1])
+        sent = [video_id for batch in batches for video_id in batch]
+        self.assertEqual(sorted(sent), tracked)
+        self.assertEqual(self.events(), [views(video_id, 2000, prev=1000) for video_id in sent])
+        self.assertEqual(self.counts(batches[1][0]), [1000, 2000])
+        self.assertEqual(report, CycleReport(1, (), 51, 0, False, False))
+
 
 class PaginationTest(WatcherCase):
     def test_next_page_follows_an_all_new_page_with_a_token(self) -> None:
