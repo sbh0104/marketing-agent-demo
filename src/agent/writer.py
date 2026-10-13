@@ -191,6 +191,7 @@ def parse_output(raw: str) -> tuple[str, str] | None:
     """Claude 의 답에서 JSON `{"concern", "comment"}` 을 읽습니다. 읽을 수 없으면 None.
 
     고민은 한 줄로 모으고, 댓글은 NFC 로 맞춘 뒤 앞뒤 공백을 뗍니다.
+    서로게이트가 든 답도 읽을 수 없는 답입니다.
     """
     start = raw.find("{")
     end = raw.rfind("}")
@@ -205,6 +206,8 @@ def parse_output(raw: str) -> tuple[str, str] | None:
     concern = data.get("concern")
     comment = data.get("comment")
     if not isinstance(concern, str) or not isinstance(comment, str):
+        return None
+    if any("\ud800" <= ch <= "\udfff" for ch in concern + comment):
         return None
     concern = " ".join(unicodedata.normalize("NFC", concern).split())
     comment = unicodedata.normalize("NFC", comment).strip()
@@ -367,7 +370,7 @@ def write_comment(
         failures.append(failure)
         messages = [
             *messages,
-            {"role": "assistant", "content": raw or "(빈 응답)"},
+            {"role": "assistant", "content": raw if raw.strip() else "(빈 응답)"},
             {"role": "user", "content": REWRITE_PROMPT.format(reason=failure)},
         ]
     return _skip(
