@@ -450,11 +450,33 @@ run_loop(cycle, reload, initial, *, on_error, sleep=time.sleep,
   python3 -m tests.mutants scheduler-one-sleep
   python3 -m tests.mutants scheduler-unclamped-wait
   python3 -m tests.mutants logbook-raw-line-breaks
+  python3 -m tests.mutants writer-hardcoded-model
+  python3 -m tests.mutants writer-no-rewrite
+  python3 -m tests.mutants writer-third-try
+  python3 -m tests.mutants writer-ignore-self-check
+  python3 -m tests.mutants writer-threshold-strict
+  python3 -m tests.mutants writer-no-float-tolerance
+  python3 -m tests.mutants writer-ad-not-inverted
+  python3 -m tests.mutants writer-trusts-jev-answer
+  python3 -m tests.mutants writer-no-length
+  python3 -m tests.mutants writer-length-in-bytes
+  python3 -m tests.mutants writer-no-link
+  python3 -m tests.mutants writer-link-no-nfkc
+  python3 -m tests.mutants writer-link-view-keeps-all
+  python3 -m tests.mutants writer-link-ascii-separators-only
+  python3 -m tests.mutants writer-link-latin-left-only
+  python3 -m tests.mutants writer-link-no-handle
+  python3 -m tests.mutants writer-no-repeat
+  python3 -m tests.mutants writer-repeat-keeps-punctuation
+  python3 -m tests.mutants writer-repeat-all-history
+  python3 -m tests.mutants writer-unescaped-material
+  python3 -m tests.mutants writer-api-error-unlogged
   ```
 
   `decide_post` · `video_id_from_ref` · `put` · `reserve_live` · `check_post` · `load_config` ·
-  `config_from_mapping` · `run_loop` · `format_line` 의 본문을 고칠 때는 이 명령들이 계속 1 로
-  끝나는지 함께 확인합니다.
+  `config_from_mapping` · `run_loop` · `format_line` · `write_comment` · `code_failures` ·
+  `self_check_failure` · `link_fragment` · `repeated_run` 의 본문을 고칠 때는 이 명령들이 계속
+  1 로 끝나는지 함께 확인합니다.
 
 ## 11. 댓글 작성 — `writer.py` (Phase 5)
 
