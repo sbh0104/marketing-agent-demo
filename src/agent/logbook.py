@@ -1,14 +1,16 @@
 """로그 형식 — 사건 하나에 한 줄: `<KST ISO-8601 초> <EVENT> key=value …`.
 
-공백 · `"` · `=` · `\\` 가 없는 값은 그대로, 나머지는 JSON 따옴표로 씁니다. 따옴표 안에서는
-str.splitlines() 가 줄 경계로 세는 글자(U+0085 · U+2028 · U+2029 포함)를 모두 이스케이프하므로,
-여러 줄짜리 댓글도 줄 경계를 숨긴 영상 제목도 한 줄에 남고, parse_line 으로 정확히 되읽을 수
-있습니다.
+값 안에 날 글자로 남는 것은 유니코드 범주 L · M · N · P · S 와 U+0020 뿐입니다. 그런 글자로만 되어
+있고 공백 · `"` · `=` · `\\` 가 없는 값은 그대로, 나머지는 JSON 따옴표로 쓰며, 따옴표 안에서 그 밖의
+글자(제어 · 서식 · 다른 공백 · 줄 경계 · 서로게이트 …)는 모두 \\uXXXX 로 씁니다. 그래서 로그 파일에는
+날 제어 문자도 서로게이트도 없습니다. 로그를 읽는 단 하나의 방법은 read_log 입니다 — UTF-8 로 풀고
+`\\n` 에서만 나눠 줄마다 parse_line 으로 정확히 되읽습니다.
 """
 from __future__ import annotations
 
 import json
 import re
+import unicodedata
 from collections.abc import Callable, Mapping
 from datetime import datetime, timedelta, timezone
 from enum import Enum
@@ -51,10 +53,10 @@ REQUIRED_FIELDS: dict[Event, tuple[str, ...]] = {
 _KEY_RE = re.compile(r"[a-z][a-z0-9_]*")
 _BARE_RE = re.compile(r'[^\s"=\\]+')
 _DECODER = json.JSONDecoder()
-# str.splitlines() 가 줄 경계로 세는 글자 — 따옴표 값 안에서 모두 \uXXXX 로 씁니다. 0x20 미만은
-# json.dumps 가 이미 바꾸므로 실제로 바뀌는 것은 U+0085 · U+2028 · U+2029 입니다.
-_LINE_BREAKS = "\n\v\f\r\x1c\x1d\x1e\x85\u2028\u2029"
-_LINE_BREAK_ESCAPES = {ord(char): f"\\u{ord(char):04x}" for char in _LINE_BREAKS}
+# 값 안에 날 글자로 남기는 유니코드 범주(첫 글자) — 글자 · 결합 표시 · 숫자 · 문장부호 · 기호. 이것과 U+0020
+# 밖의 글자(제어 · 서식 · 다른 공백 · 줄 경계 · 사용자 정의 · 미할당 · 서로게이트)는 언제나 따옴표 안의
+# \uXXXX 입니다. 막을 글자 대신 남길 글자를 적어, 아직 아무도 찾지 않은 글자도 바꿔 쓰는 쪽에 떨어집니다.
+_RAW_CATEGORIES = frozenset("LMNPS")
 
 
 def _stamp(at: datetime) -> str:
@@ -63,10 +65,16 @@ def _stamp(at: datetime) -> str:
     return at.astimezone(KST).isoformat(timespec="seconds")
 
 
+def _is_raw(char: str) -> bool:
+    """값 안에 날 글자로 남겨도 되는 글자 — 범주 L · M · N · P · S 와 U+0020 (계약 7절)."""
+    return char == " " or unicodedata.category(char)[0] in _RAW_CATEGORIES
+
+
 def _render_str(value: str) -> str:
-    if value != "-" and _BARE_RE.fullmatch(value):
+    if value != "-" and _BARE_RE.fullmatch(value) and all(map(_is_raw, value)):
         return value
-    return json.dumps(value, ensure_ascii=False).translate(_LINE_BREAK_ESCAPES)
+    quoted = json.dumps(value, ensure_ascii=False)
+    return "".join(char if _is_raw(char) else json.dumps(char)[1:-1] for char in quoted)
 
 
 def _render(value: object) -> str:
@@ -105,7 +113,8 @@ def format_line(at: datetime, event: Event, fields: Mapping[str, object]) -> str
 
 
 def parse_line(line: str) -> tuple[datetime, Event, dict[str, str]]:
-    """format_line 의 정확한 역. 값은 글자로 돌려줍니다. 형식이 틀리면 ValueError."""
+    """format_line 의 정확한 역. 값은 글자로 돌려줍니다. 형식이 틀리면 ValueError.
+    이 규칙 전에 쓰인 줄(맨 값 속 날 제어 문자 등)도 읽습니다."""
     if line.endswith("\n"):
         line = line[:-1]
     stamp, sep, rest = line.partition(" ")
@@ -147,6 +156,34 @@ def parse_line(line: str) -> tuple[datetime, Event, dict[str, str]]:
         if key not in fields:
             raise ValueError(f"{event.value} 에 필요한 필드가 없습니다: {key}")
     return at, event, fields
+
+
+def read_log(path: Path | str) -> list[tuple[datetime, Event, dict[str, str]]]:
+    """로그 파일을 읽는 단 하나의 방법 — 로그 증명(Phase 7 · 8)은 이것으로 읽습니다.
+
+    바이트를 UTF-8 로 엄격히 풀고 `\\n` 에서만 줄을 나눠, 빈 줄을 뺀 모든 줄을 parse_line 으로
+    읽어 파일 순서대로 돌려줍니다. 잘못된 UTF-8 바이트 · 해석할 수 없는 줄 · 끝 `\\n` 이 없는
+    마지막 줄(쓰기 중 끊긴 줄)은 건너뛰지 않고 `<n>번째 줄: …` ValueError 입니다. 파일을 열 수
+    없으면 OSError 그대로입니다. 계약 7절.
+    """
+    data = Path(path).read_bytes()
+    try:
+        text = data.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        number = data.count(b"\n", 0, exc.start) + 1
+        raise ValueError(f"{number}번째 줄: UTF-8 이 아닌 바이트가 있습니다") from exc
+    *lines, tail = text.split("\n")
+    if tail:
+        raise ValueError(f"{len(lines) + 1}번째 줄: 끝에 줄바꿈이 없습니다 (쓰기 중 끊긴 줄)")
+    events: list[tuple[datetime, Event, dict[str, str]]] = []
+    for number, line in enumerate(lines, start=1):
+        if not line:
+            continue
+        try:
+            events.append(parse_line(line))
+        except ValueError as exc:
+            raise ValueError(f"{number}번째 줄: {exc}") from exc
+    return events
 
 
 class Logbook:

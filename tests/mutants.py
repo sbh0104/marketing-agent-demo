@@ -235,8 +235,38 @@ MUTANTS: dict[str, tuple[str, str, str, str]] = {
     "logbook-raw-line-breaks": (
         "agent.logbook",
         "tests.test_logbook",
-        "json.dumps(value, ensure_ascii=False).translate(_LINE_BREAK_ESCAPES)",
-        "json.dumps(value, ensure_ascii=False)",
+        'return "".join(char if _is_raw(char) else json.dumps(char)[1:-1] for char in quoted)',
+        "return quoted",
+    ),
+    "logbook-bare-control-chars": (
+        "agent.logbook",
+        "tests.test_logbook",
+        "_BARE_RE.fullmatch(value) and all(map(_is_raw, value))",
+        "_BARE_RE.fullmatch(value)",
+    ),
+    "logbook-read-latin1": (
+        "agent.logbook",
+        "tests.test_logbook",
+        'text = data.decode("utf-8")',
+        'text = data.decode("latin-1")',
+    ),
+    "logbook-read-splitlines": (
+        "agent.logbook",
+        "tests.test_logbook",
+        r'*lines, tail = text.split("\n")',
+        r'*lines, tail = [*text.splitlines(), ""]',
+    ),
+    "logbook-read-skips-bad-lines": (
+        "agent.logbook",
+        "tests.test_logbook",
+        'raise ValueError(f"{number}번째 줄: {exc}") from exc',
+        "continue",
+    ),
+    "logbook-read-keeps-cut-line": (
+        "agent.logbook",
+        "tests.test_logbook",
+        "if tail:",
+        "if False:",
     ),
     "youtube-no-search-cap": (
         "agent.youtube",

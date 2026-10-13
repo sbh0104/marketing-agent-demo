@@ -431,17 +431,31 @@ post_video(record, *, config, dry_run, store, logbook, open_page, clock,
   | 정수 | 그대로 |
   | 실수 | 소수 둘째 자리 (`181.25`) |
   | 시각 | KST ISO 8601 초 |
-  | 글자 | 공백 · `"` · `=` · `\` 가 없고 `-` 가 아니면 그대로, 아니면 JSON 따옴표(한글 그대로) |
+  | 글자 | 아래 날 글자로만 되어 있고 공백 · `"` · `=` · `\` 가 없으며 `-` 가 아니면 그대로, 아니면 JSON 따옴표(한글 그대로) |
   | 그 밖 | `TypeError` |
 
-  따옴표 값 안에서는 `str.splitlines()` 가 줄 경계로 세는 글자 — `\n` `\r` `\v` `\f` `\x1c`
-  `\x1d` `\x1e` `\x85` `U+2028` `U+2029` — 를 모두 이스케이프로 씁니다(`\n` · `\r` · `\f` 는
-  JSON 그대로, 나머지는 `\u000b` · `\u001c` · `\u0085` · `\u2028` 처럼 `\uXXXX`). 그래서 여러
-  줄짜리 댓글도, 영상 제목에 숨긴 `U+2028` 도 한 사건을 어떤 읽기 방식으로든 한 줄로 남기고,
-  `parse_line` 이 원래 값을 되돌립니다. 줄 모양은 그대로입니다. 글자 `-` 는 `"-"` 로 써서
-  `None` 과 구분됩니다.
+  값 안에 날 글자로 남는 것은 유니코드 범주 L(글자) · M(결합 표시) · N(숫자) · P(문장부호) ·
+  S(기호)와 보통 공백 U+0020 뿐입니다. 그 밖의 모든 글자 — Cc(NUL · ESC · DEL · C1, `\n` 같은
+  줄 경계 포함) · Cf(U+202E 같은 양방향 제어 · U+200B · U+200D) · 다른 공백 Zs(U+00A0 · U+3000) ·
+  Zl · Zp · Co · Cn · Cs(짝 없는 서로게이트) — 는 언제나 따옴표 값 안의 이스케이프로 씁니다
+  (`\n` · `\r` · `\t` · `\f` · `\b` 는 JSON 그대로, 나머지는 `\u0000` · `\u001b` · `\u0085` ·
+  `\u2028` · `\u3000` · `\ud800` 처럼 `\uXXXX`, U+FFFF 위의 글자는 서로게이트 두 개). 그런 글자가
+  든 값은 공백이 없어도 따옴표로 씁니다. 범주는 실행 중인 파이썬의 `unicodedata` 판정을 따르고,
+  그 판이 모르는 글자(Cn)는 이스케이프 쪽입니다. 그래서 로그 파일에는 날 제어 문자도 서로게이트도
+  없어, UTF-8 로캘의 GNU grep(`/usr/bin/grep`)이 파일을 바이너리로 보지 않고 터미널에 가짜 줄이
+  그려지지 않습니다. 여러 줄짜리 댓글도, 영상 제목에 숨긴 `U+2028` 도 `read_log` 의 읽기(UTF-8 ·
+  `\n`)로 한 사건 한 줄이고, `parse_line` 이 원래 값을 되돌립니다(따로 들어온 서로게이트 두 개가
+  짝을 이루면 한 글자로 읽힘). 줄 모양은 그대로입니다. 글자 `-` 는 `"-"` 로 써서 `None` 과
+  구분됩니다.
 - `parse_line(line)` 은 `format_line` 의 정확한 역으로 `(시각, Event, {키: 글자})` 를 돌려줍니다.
-  Phase 7/8 은 이것으로 로그만 보고 허용 목록 밖 영상이 게시되지 않았음을 확인할 수 있습니다.
+  이 규칙 전에 쓰인 줄(맨 값 속 날 제어 문자 등)도 그대로 읽습니다.
+- `read_log(path)` 는 로그 파일을 읽는 단 하나의 방법입니다. 바이트를 UTF-8 로 엄격히 풀고
+  `\n` 에서만 줄을 나눠, 빈 줄을 뺀 모든 줄을 `parse_line` 으로 읽은 `(시각, Event, {키: 글자})`
+  목록을 파일 순서대로 돌려줍니다. 잘못된 UTF-8 바이트, 해석할 수 없는 줄, 끝 `\n` 이 없는
+  마지막 줄(쓰기 중 끊긴 줄)은 건너뛰지 않고 `<n>번째 줄: …` `ValueError` 입니다. 파일을 열 수
+  없으면 `OSError` 그대로입니다. Phase 7 · Phase 8 의 로그 증명(허용 목록 밖 영상의 게시 0건)은
+  `read_log` 로 읽습니다 — latin-1 처럼 다른 글자 코드로 풀거나 `str.splitlines()` 로 나누면
+  `갅`(`ea b0 85`) 같은 한글 속 `0x85` 가 줄 경계가 되어 제목 속 글이 가짜 줄로 읽힙니다.
 - `Logbook(path, clock, echo)` 의 `write(event, **fields)` 는 줄을 만들어 파일에 UTF-8 로
   덧붙이고 같은 줄을 `echo` 로 냅니다. 실행 로그는 `logs/agent.log`(git 무시), 제출용 예시는
   `logs/sample.log`(커밋 가능)입니다.
@@ -590,6 +604,11 @@ run_loop(cycle, reload, initial, *, on_error, sleep=time.sleep,
   python3 -m tests.mutants scheduler-one-sleep
   python3 -m tests.mutants scheduler-unclamped-wait
   python3 -m tests.mutants logbook-raw-line-breaks
+  python3 -m tests.mutants logbook-bare-control-chars
+  python3 -m tests.mutants logbook-read-latin1
+  python3 -m tests.mutants logbook-read-splitlines
+  python3 -m tests.mutants logbook-read-skips-bad-lines
+  python3 -m tests.mutants logbook-read-keeps-cut-line
   python3 -m tests.mutants youtube-no-search-cap
   python3 -m tests.mutants youtube-no-unit-cap
   python3 -m tests.mutants youtube-unguarded-call
