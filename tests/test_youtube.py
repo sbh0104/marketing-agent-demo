@@ -4,6 +4,7 @@ from __future__ import annotations
 import http.client
 import io
 import json
+import os
 import tempfile
 import unittest
 import urllib.error
@@ -347,6 +348,18 @@ class LedgerTest(YouTubeCase):
         self.assertEqual(str(caught.exception), "모르는 호출입니다: 'comments.list'")
         self.assertFalse(self.path.exists())
 
+    def test_ledger_is_written_through_a_tmp_file_s045(self) -> None:
+        ledger = QuotaLedger(self.path)
+        with mock.patch("os.replace", wraps=os.replace) as replace:
+            ledger.reserve("search.list", NOW, limits(90))
+        replace.assert_called_once()
+        source, target = replace.call_args.args
+        self.assertTrue(str(source).endswith("quota.json.tmp"), source)
+        self.assertEqual(Path(source), self.path.with_name("quota.json.tmp"))
+        self.assertEqual(Path(target), self.path)
+        self.assertFalse(Path(source).exists())
+        self.assertEqual(len(self.stored()), 1)
+
 
 class ClientTest(YouTubeCase):
     def test_search_url_carries_region_language_window_and_order(self) -> None:
@@ -459,6 +472,15 @@ class ClientTest(YouTubeCase):
             client.search("연애", WINDOW_START, None, NOW, limits(90))
         exc = caught.exception
         self.assertEqual((exc.call, exc.reason), ("search.list", "HTTP 302"))
+
+    def test_non_string_google_reason_is_left_out_s045(self) -> None:
+        for reason in (5, None):
+            with self.subTest(reason=reason):
+                body = json.dumps({"error": {"errors": [{"reason": reason}]}}).encode("utf-8")
+                client = self.client(FakeFetch((404, body)), name=f"reason-{reason}")
+                with self.assertRaises(YouTubeError) as caught:
+                    client.search("연애", WINDOW_START, None, NOW, limits(90))
+                self.assertEqual(caught.exception.reason, "HTTP 404")
 
     def test_invalid_json_is_an_error(self) -> None:
         for body in (b"not json", b"[1, 2]", b'"text"', b"[" * 100_000, b"\xff\xfe"):
