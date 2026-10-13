@@ -353,3 +353,12 @@ other line is required on every item.
 - phase: plans/interview-marketing-agent.md#phase-5
 - status: open
 - attempts: 0 · last failure: —
+
+### S-029 — 계약 머리 문단의 `src/agent/` 모듈 나열을 없애 페이즈마다 생기는 빠짐을 끊기
+- source: retro 20261013-161439-adw/phase-5-writer-comment · E-013
+- evidence: docs/contracts.md:5-6 의 나열에 `writer.py` 가 없음(ship-report R9). S-018 은 나열을 한 번 맞췄지만(resolved) 다음 페이즈를 막지 못해 세 페이즈 연속 빠짐 — Phase 4 `trigger.py` · Phase 3 `classifier.py` · Phase 5 `writer.py`. 각 절 제목이 이미 제 모듈을 적는다(`## 3. 영상 기록 — \`models.py\`` … `## 11. 댓글 작성 — \`writer.py\``)
+- direction: 머리 문단의 모듈 나열을 "`src/agent/` 패키지에 있고, 각 절 제목이 그 절의 모듈을 적습니다" 한 문장으로 바꾼다 — 계약 내용(키 · 판정 토큰 · 형식 · CLI 인자) 변경 없음
+- touches: docs/contracts.md
+- status: open
+- attempts: 0 · last failure: —
+- first seen: 2026-10-13 · last seen: 2026-10-13

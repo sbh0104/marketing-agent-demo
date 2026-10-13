@@ -174,7 +174,7 @@ Open questions
 ---
 
 ## Phase 5 — ④ 댓글 작성 · 자체 검사 (writer)
-- Status: Not started
+- Status: Done
 - Slug: writer-comment
 - After: Phase 1
 - Goal: 영상의 고민을 한 줄로 정리하고, 그 고민과 이어지는 '연애사주 경험' 댓글을 40–120자로 쓴다. 영상 속 구체적인 장면이나 말을 하나 이상 언급하고, 링크를 넣지 않으며, 이전 댓글과 같은 문장을 반복하지 않는다.
