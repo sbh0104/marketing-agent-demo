@@ -2,13 +2,17 @@
 from __future__ import annotations
 
 import http.client
+import io
 import json
 import tempfile
 import unittest
+import urllib.error
 import urllib.parse
+import urllib.request
 from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from unittest import mock
 
 from agent.config import LimitsConfig
 from agent.youtube import (
@@ -19,6 +23,7 @@ from agent.youtube import (
     Usage,
     YouTubeClient,
     YouTubeError,
+    http_get,
 )
 
 NOW = datetime(2026, 10, 12, 12, 0, tzinfo=timezone.utc)
@@ -418,6 +423,59 @@ class ClientTest(YouTubeCase):
                 self.assertEqual(
                     str(caught.exception), "API 키 형식이 아닙니다 — 영문자 · 숫자 · _ · - 만 씁니다"
                 )
+
+
+GET_URL = "https://www.googleapis.com/youtube/v3/videos?id=abcdefghijk&key=test-key"
+
+
+class FakeResponse:
+    """urlopen 이 돌려주는 응답 자리 — with 문 · status · read 만."""
+
+    def __init__(self, status: int, body: bytes) -> None:
+        self.status = status
+        self._body = body
+
+    def __enter__(self) -> FakeResponse:
+        return self
+
+    def __exit__(self, *exc: object) -> None:
+        return None
+
+    def read(self) -> bytes:
+        return self._body
+
+
+class HttpGetTest(unittest.TestCase):
+    """http_get — urllib.request.urlopen 을 patch 해 네트워크 없이."""
+
+    def assert_request(self, urlopen: mock.MagicMock, timeout: float) -> None:
+        urlopen.assert_called_once()
+        args, kwargs = urlopen.call_args
+        [request] = args
+        self.assertIsInstance(request, urllib.request.Request)
+        self.assertEqual(request.full_url, GET_URL)
+        self.assertEqual(request.get_method(), "GET")
+        self.assertEqual(request.get_header("Accept"), "application/json")
+        self.assertEqual(kwargs, {"timeout": timeout})
+
+    def test_http_error_becomes_its_code_and_body_s037(self) -> None:
+        body = b'{"error": {"code": 403, "errors": [{"reason": "quotaExceeded"}]}}'
+        error = urllib.error.HTTPError(
+            GET_URL, 403, "Forbidden", http.client.HTTPMessage(), io.BytesIO(body)
+        )
+        self.addCleanup(error.close)
+        with mock.patch("urllib.request.urlopen", side_effect=error) as urlopen:
+            result = http_get(GET_URL, 12.5)
+        self.assertEqual(result, (403, body))
+        self.assert_request(urlopen, 12.5)
+
+    def test_ok_response_becomes_its_status_and_body_s037(self) -> None:
+        body = b'{"items": []}'
+        response = FakeResponse(200, body)
+        with mock.patch("urllib.request.urlopen", return_value=response) as urlopen:
+            result = http_get(GET_URL, 12.5)
+        self.assertEqual(result, (200, body))
+        self.assert_request(urlopen, 12.5)
 
 
 if __name__ == "__main__":
