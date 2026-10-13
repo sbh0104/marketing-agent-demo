@@ -6,7 +6,7 @@
 대화에서 한 번 다시 쓰고, 두 번째도 떨어지면 그 영상을 건너뛰고 이유를 `SKIP` 으로 남깁니다.
 Claude · jev 호출 오류는 다시 써도 고쳐지지 않으므로 다시 쓰지 않고 `ERROR` 와 `SKIP` 을 남깁니다.
 
-프롬프트 원문은 이 모듈 맨 위에만 둡니다 — Phase 8 PROCESS.md 가 옮겨 적습니다. 계약 11절.
+프롬프트 원문은 이 모듈 맨 위에만 둡니다 — Phase 8 PROCESS.md 가 옮겨 적습니다. 계약 '댓글 작성' 절.
 """
 from __future__ import annotations
 
@@ -191,6 +191,7 @@ def parse_output(raw: str) -> tuple[str, str] | None:
     """Claude 의 답에서 JSON `{"concern", "comment"}` 을 읽습니다. 읽을 수 없으면 None.
 
     고민은 한 줄로 모으고, 댓글은 NFC 로 맞춘 뒤 앞뒤 공백을 뗍니다.
+    서로게이트가 든 답도 읽을 수 없는 답입니다.
     """
     start = raw.find("{")
     end = raw.rfind("}")
@@ -205,6 +206,8 @@ def parse_output(raw: str) -> tuple[str, str] | None:
     concern = data.get("concern")
     comment = data.get("comment")
     if not isinstance(concern, str) or not isinstance(comment, str):
+        return None
+    if any("\ud800" <= ch <= "\udfff" for ch in concern + comment):
         return None
     concern = " ".join(unicodedata.normalize("NFC", concern).split())
     comment = unicodedata.normalize("NFC", comment).strip()
@@ -299,7 +302,7 @@ def write_comment(
     """영상 하나에 댓글을 씁니다 — 쓰기 → jev 자체 검사 → 코드 검사, 떨어지면 한 번 다시 씁니다.
 
     결과에 맞춰 `COMMENT` · `SKIP` · `ERROR` 를 직접 남기고, 저장소는 건드리지 않습니다.
-    주제 판별이 yes 가 아닌 영상은 `ValueError` 입니다. 계약 11절.
+    주제 판별이 yes 가 아닌 영상은 `ValueError` 입니다. 계약 '댓글 작성' 절.
     """
     if record.classification is None or record.classification.verdict is not Verdict.YES:
         raise ValueError(f"주제 판별이 yes 인 영상에만 댓글을 씁니다: {record.video_id}")
@@ -367,7 +370,7 @@ def write_comment(
         failures.append(failure)
         messages = [
             *messages,
-            {"role": "assistant", "content": raw or "(빈 응답)"},
+            {"role": "assistant", "content": raw if raw.strip() else "(빈 응답)"},
             {"role": "user", "content": REWRITE_PROMPT.format(reason=failure)},
         ]
     return _skip(

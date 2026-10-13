@@ -10,8 +10,8 @@ Phase 2–7 의 모든 단계가 기대는 계약입니다. 설정 읽기, 영�
 - Python 3.10 이상. 3.11 이후에만 있는 기능(`datetime.UTC`, `enum.StrEnum`, `tomllib`,
   `typing.Self`, `except*`)은 쓰지 않습니다.
 - 의존성 설치: `pip install -r requirements.txt` — `PyYAML>=6.0`(설정 읽기), jev 판별(Phase 3)의
-  `typesafe-sdk>=0.7.4,<0.8`, 댓글 작성기(Phase 5, 11절)의 Claude SDK `anthropic>=0.40`, 게시 단계(Phase 6)의
-  `playwright>=1.40` 네 줄입니다. 게시 단계는 이미 설치된 크롬에 `connect_over_cdp` 로 붙으므로
+  `typesafe-sdk>=0.7.4,<0.8`, 댓글 작성기(Phase 5, '댓글 작성' 절)의 Claude SDK `anthropic>=0.40`,
+  게시 단계(Phase 6)의 `playwright>=1.40` 네 줄입니다. 게시 단계는 이미 설치된 크롬에 `connect_over_cdp` 로 붙으므로
   `playwright install`(브라우저 내려받기)은 필요 없습니다. 테스트는 SDK 와 Playwright 없이 돕니다 —
   판별 테스트는 가짜 jev 를, 작성기 테스트는 가짜 클라이언트를 씁니다. `agent.chrome` 이 크롬에
   연결할 때에만 Playwright 를 불러옵니다.
@@ -47,8 +47,8 @@ Phase 2–7 의 모든 단계가 기대는 계약입니다. 설정 읽기, 영�
 | `limits.daily_max_searches` | 정수 | ≥ 0 | `100` (과제 밖에서 더한 키) |
 | `comment.min_chars` | 정수 | ≥ 1 | `40` |
 | `comment.max_chars` | 정수 | ≥ `min_chars` | `120` |
-| `comment.writer_model` | 글자 | 비어 있지 않음 — 댓글을 쓰는 Claude 모델 이름 (11절) | `claude-sonnet-5-5` |
-| `comment.check_min_probability` | 숫자 | ≥ 0, ≤ 1 — jev 자체 검사 통과 하한 (11절) | `0.7` |
+| `comment.writer_model` | 글자 | 비어 있지 않음 — 댓글을 쓰는 Claude 모델 이름 ('댓글 작성' 절) | `claude-sonnet-5-5` |
+| `comment.check_min_probability` | 숫자 | ≥ 0, ≤ 1 — jev 자체 검사 통과 하한 ('댓글 작성' 절) | `0.7` |
 | `classifier.model` | 글자 | 비어 있지 않음 — jev 모델 이름 | `jev-latest` |
 | `classifier.noul_yes_min` | 숫자 | > 0.5, ≤ 1 — 주제 일치 확률이 이 값 이상이어야 일치 | `0.8` |
 | `classifier.noul_no_max` | 숫자 | ≥ 0, < `noul_yes_min` — 이 값 이하여야 불일치, 사이는 보류 | `0.2` |
@@ -70,7 +70,7 @@ Phase 2–7 의 모든 단계가 기대는 계약입니다. 설정 읽기, 영�
 - `limits.daily_max_searches` 는 과제 예시에 없는 키입니다. Phase 2 의 하루 검색 상한을
   설정 값으로 두기 위해 지금 계약에 넣었습니다(쿼터 약 100회/일). Phase 2 가 값을 조정합니다.
 - `comment.writer_model` · `comment.check_min_probability` 는 과제 예시에 없는 키로, Phase 5 가
-  댓글 작성 · 자체 검사를 위해 더했습니다(11절). `check_min_probability` 의 상한 1 은 확률의
+  댓글 작성 · 자체 검사를 위해 더했습니다('댓글 작성' 절). `check_min_probability` 의 상한 1 은 확률의
   끝입니다.
 - **YAML 1.1 함정 — 글자 자리에서는 크게 실패합니다.** 따옴표 없는 `yes`/`no`/`on`/`off` 는
   bool, `2026-10-12` 는 날짜, `12345678901` 은 정수로 읽히므로 글자 자리에 오면 오류입니다
@@ -482,7 +482,7 @@ post_video(record, *, config, dry_run, store, logbook, open_page, clock,
 - `data/` 와 `logs/` 는 폴더만(`.gitkeep`) 커밋합니다. `logs/sample.log` 는 제출물이라 커밋할
   수 있습니다.
 - `.env.example` 에는 댓글 작성 Claude 키 `ANTHROPIC_API_KEY=` 도 있습니다(Phase 5).
-  `anthropic_client()` 에 키를 넘기지 않으면 `anthropic` 패키지가 이 환경 변수를 읽습니다(11절).
+  `anthropic_client()` 에 키를 넘기지 않으면 `anthropic` 패키지가 이 환경 변수를 읽습니다('댓글 작성' 절).
 
 ## 9. 주기 실행 — `scheduler.py`
 
@@ -652,6 +652,7 @@ if result.draft is not None:
   "하한과 같으면 통과" 가 깨집니다.
 - **글자 수** — NFC 로 맞춘 댓글의 `len()`, 곧 코드 포인트 수이지 바이트가 아닙니다.
   `parse_output` 이 댓글을 NFC 로 맞추고 앞뒤 공백을 떼며, 고민은 한 줄로 모읍니다.
+  서로게이트(U+D800–U+DFFF)가 든 고민 · 댓글은 읽을 수 없는 답으로 보아 다시 씁니다.
 - **링크** — 링크 보기는 NFKC + casefold 한 글에서 글자 · 숫자(`isalnum`, 한글 포함)와 `@` 는
   그대로, 유니코드 이름에 `FULL STOP`/`DOT` 이 든 글자는 `.`, `SOLIDUS`/`SLASH` 는 `/`,
   `COLON` 은 `:` 로 남기고, 나머지(공백 · 괄호 · 보이지 않는 글자 · 다른 문장부호)는 모두
@@ -659,9 +660,9 @@ if result.draft is not None:
   곧 글자 뒤 점 뒤 영문(호스트와 끝) · `@이름` · 스킴 · IPv4 입니다. 그래서 `연애사주.com` ·
   `naver . me` · `ｎａｖｅｒ．ｍｅ` · `naver[.]com` · `youtu·be` · 보이지 않는 글자로 가른 주소도
   걸리고, `1.5배` · `10:30` · `P.S. 저도` · `A/S` · `장면·말` · `봤는데, MBTI랑` 은 지나갑니다.
-  - 받아들인 오탐: `좋았어요. MBTI도` 는 `어요.mbti` 로 걸려 다시 쓰기 하나를 치릅니다(막는 쪽).
-  - 남은 틈: 한글 호스트에 한글 끝(`연애사주.한국`)은 문장 끊김과 구분할 수 없어 코드 검사에서
-    빠지고, 광고 질문에 맡깁니다.
+  - 받아들인 오탐: `좋았어요. MBTI도` 는 `요.mbti` 로 걸려 다시 쓰기 하나를 치릅니다(막는 쪽).
+  - 남은 틈: 한글 끝(`연애사주.한국` · `saju.한국` 등)은 호스트 글자와 상관없이 문장 끊김과
+    구분할 수 없어 코드 검사에서 빠지고, 광고 질문에 맡깁니다.
 - **반복** — 두 글을 NFKC + casefold 한 뒤 `isalnum` 글자만 남겨 비교합니다. 최근 댓글과
   같거나, `difflib.SequenceMatcher(autojunk=False)` 로 찾은 가장 긴 연속 공통 글자가
   `REPEAT_MIN_CHARS`(12, 코드 상수) 이상이면 반복입니다. 비교 대상은 `previous` 의 마지막
@@ -677,7 +678,8 @@ if result.draft is not None:
   써도 고쳐지지 않음) `ERROR where=writer.claude` 또는 `where=writer.jev` 와, 같은 이유의
   `SKIP` 을 남깁니다:
   - `claude 호출 실패: <오류 종류> <상태 코드>: <메시지 200자까지>` (상태 코드는 있을 때만)
-  - `jev 검사 호출 실패: <오류 종류>: <메시지 200자까지>`
+  - `jev 검사 호출 실패: <오류 종류>[ <상태 코드>][: <메시지 200자까지>]` (상태 코드는 있을 때만,
+    메시지가 비면 `: …` 도 뺍니다; Claude 틀과 같음)
   - `jev 검사 응답 이상: <질문 이름>` — 묶음이 아니거나, 질문이 빠졌거나, 값이 bool · 숫자
     아님 · 0–1 밖(NaN 포함)
 

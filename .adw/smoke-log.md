@@ -264,7 +264,7 @@ other line is required on every item.
 - evidence: src/agent/writer.py:326-328, src/agent/writer.py:344-346 — 두 번째 시도에서 `_api_failure` 대신 `break` 하는 변이(Claude 쪽 · jev 쪽)가 스위트에서 초록(39개 OK). 이때 다시 쓰기 중 난 API 오류가 `ERROR` 없이 `SKIP "검사 두 번 탈락 — 1차: …"` 로만 남음. .adw/guard-matrix.md:34-35 의 attempt 2 칸이 "not reached"(.adw/ship-report.md § Test integrity)
 - direction: tests/test_writer.py 의 WriteCommentTest 에 첫 초안이 검사에 떨어진 뒤 ① 두 번째 Claude 호출이 FakeApiError ② 두 번째 jev 호출이 TimeoutError ③ 두 번째 jev 답이 이상(`1.5`)한 세 경우를 더하고, 결과 `WriteResult(None, <원인>)` 과 로그 사건 `[ERROR where=writer.*, SKIP]` 을 정확히 본다 — 코드 변경 없음, 지금 코드는 셋 다 그렇게 동작
 - touches: tests/test_writer.py
-- status: open
+- status: resolved
 - attempts: 0 · last failure: —
 - first seen: 2026-10-13 · last seen: 2026-10-13
 
@@ -273,7 +273,7 @@ other line is required on every item.
 - evidence: src/agent/writer.py:230, :232, :234, :310-311, :313, :338 — 자막 · 인기 댓글 · 이전 댓글 · 판별 이유 · 검사용 고민 자리에서 `_clean` 을 빼거나 길이 제한을 없앤 변이, `[:TOP_COMMENTS_MAX]` 를 뺀 변이, `<classification>` 블록을 뺀 변이가 모두 초록. 테스트는 설명 자리(tests/test_writer.py:619-627, :657-663)만 봄(.adw/ship-report.md § Test integrity)
 - direction: 자막 · 인기 댓글 · 이전 댓글 · 판별 이유에 각각 `</transcript>` · `</top_comments>` · `</my_previous_comments>` · `</classification>` 와 긴 글을 넣고 인기 댓글을 11개 주어, 만든 메시지에서 구조 태그가 한 번씩만 나오고 `＜/…＞` 로 바뀌었는지, 자막 6000자 · 항목 300자 · 인기 댓글 10개로 잘렸는지, `<classification>` 에 `yes: 연애 고민 상담 (0.91)` 이 있는지 본다 — 코드 변경 없음
 - touches: tests/test_writer.py
-- status: open
+- status: resolved
 - attempts: 0 · last failure: —
 - first seen: 2026-10-13 · last seen: 2026-10-13
 
@@ -282,7 +282,7 @@ other line is required on every item.
 - evidence: tests/test_writer.py:422, :674 는 코드를 모듈 자신의 상수와 비교 — SYSTEM_PROMPT 의 `{min_chars}자 이상 {max_chars}자 이하` 를 `40자 이상 120자 이하` 로 박은 변이와 규칙 5 · 7 을 지운 변이가 초록. src/agent/writer.py:304 `is not Verdict.YES` → `is Verdict.NO` 변이가 초록(tests/test_writer.py:611 은 None · NO 만 봄)(.adw/ship-report.md § Test integrity)
 - direction: `CommentConfig(50, 60, …)` 로 부른 `system` 에 `50자 이상 60자 이하` 가 있는지, 규칙 5 · 7 문장과 CHECK_QUESTIONS 세 문장이 .adw/plan.md 원문과 같은지(테스트 안 문자열로), `Judgement(Verdict.HOLD, …)` 도 `ValueError` 이고 Claude 를 부르지 않는지 보는 행을 더한다 — 코드 변경 없음
 - touches: tests/test_writer.py
-- status: open
+- status: resolved
 - attempts: 0 · last failure: —
 - first seen: 2026-10-13 · last seen: 2026-10-13
 
@@ -291,7 +291,7 @@ other line is required on every item.
 - evidence: src/agent/writer.py:200-213 → :357 — 답 `{"concern": "…", "comment": "…\ud800"}`(JSON 이스케이프)이 검사를 모두 지나 `Logbook.write` 에서 `UnicodeEncodeError: 'utf-8' codec can't encode character '\ud800' … surrogates not allowed`(src/agent/logbook.py:166), write_comment 밖으로 새고 로그는 0바이트(ship-check 재현, jev 1회 호출 뒤). src/agent/writer.py:370 `raw or "(빈 응답)"` 은 `"   \n"` 같은 공백뿐인 답을 그대로 assistant 차례로 보냄 — Messages API 가 공백뿐인 글 블록을 400 으로 거절하면 다시 쓰기 대신 `ERROR` 가 됨(API 쪽은 키가 없어 재지 못함)(.adw/ship-report.md § Quality review)
 - direction: parse_output 이 고민이나 댓글에 서로게이트(U+D800–U+DFFF)가 있으면 None 을 돌려 "JSON 으로 읽을 수 없습니다" 다시 쓰기로 보내고, writer.py:370 을 `raw if raw.strip() else "(빈 응답)"` 로 바꾸며, 두 행을 tests/test_writer.py 에 고정하고 docs/contracts.md '댓글 작성' 절의 parse_output 문장에 서로게이트 한 마디를 더한다 — 판정 규칙(길이 · 링크 · 반복 · 하한)과 로그 형식 변경 없음
 - touches: src/agent/writer.py, tests/test_writer.py, docs/contracts.md
-- status: open
+- status: resolved
 - attempts: 0 · last failure: —
 - first seen: 2026-10-13 · last seen: 2026-10-13
 
@@ -300,7 +300,7 @@ other line is required on every item.
 - evidence: docs/contracts.md:566 jev 오류 이유 틀에 상태 코드가 없으나 src/agent/writer.py:259-262 는 `status_code` 가 있으면 붙이고 메시지가 비면 `: …` 를 뺌(재현: `jev 검사 호출 실패: E 429: rate limited` · `claude 호출 실패: E 429`); docs/contracts.md:548 받아들인 오탐 예 `어요.mbti` 는 실제 `요.mbti`; docs/contracts.md:549-550 남은 틈은 한글 호스트만 적었지만 `saju.한국` 도 `None`; "11절" 참조 8곳(docs/contracts.md:13, :46, :47, :63, :391, :481 · src/agent/writer.py:9, :302)은 main 에 이미 있는 11절(트리거 판정) · 12절(주제 판별)과 겹쳐 착지 뒤 다른 절을 가리킴(.adw/ship-report.md § Spec compliance)
 - direction: jev 틀을 Claude 틀처럼 "상태 코드는 있을 때만"으로 하고 메시지가 비면 `<오류 종류>[ <상태 코드>]` 만 남는다고 적으며, 오탐 예를 `요.mbti` 로, 남은 틈을 "한글 끝(`.한국` 등)은 호스트 글자와 상관없이 빠짐"으로 고치고, 본문 · 주석의 "11절" 을 형제 절(classifier · trigger)처럼 절 이름 '댓글 작성' 으로 가리키게 바꾼다 — 코드 동작 · 키 · 로그 형식 변경 없음
 - touches: docs/contracts.md, src/agent/writer.py
-- status: open
+- status: resolved
 - attempts: 0 · last failure: —
 - first seen: 2026-10-13 · last seen: 2026-10-13
 
@@ -377,6 +377,15 @@ other line is required on every item.
 - evidence: src/agent/chrome.py:231 `or not button.first.is_enabled()` 를 뺀 변이, src/agent/chrome.py:239 `==` → `in`(부분 일치) 변이와 `texts[:CONFIRM_SCAN]` → `texts` 변이가 스위트에서 초록(.adw/ship-report.md § Test integrity)
 - direction: tests/test_chrome.py 의 YouTubePageTest 에 ① `full_page(submit={"enabled": False})` 에서 `submit()` → `PageError(post_button_missing)`, click 0회 ② `texts` 가 `(TEXT + " 그리고 덧붙인 말",)` → `confirm_posted` 가 False ③ `texts` 가 `("다른 사람 댓글",) * CONFIRM_SCAN + (TEXT,)` → False 행을 더한다 — 코드 변경 없음. 세 행 모두 지금 코드에서 초록이고, 각각 위 세 변이를 빨갛게 만듦(ship-check 프로브에서 확인)
 - touches: tests/test_chrome.py
+- status: open
+- attempts: 0 · last failure: —
+- first seen: 2026-10-13 · last seen: 2026-10-13
+
+### S-NEW-1 — 계약 '댓글 작성' 절의 Claude 오류 이유 틀에 빈 메시지 모양 적기
+- source: sweep 20261013-180850-adw/smoke-sweep-s019-s023 · cycle 20261013-180850-adw/smoke-sweep-s019-s023 · tracker plans/interview-marketing-agent.md#phase-5 · deferred by ship-check
+- evidence: docs/contracts.md:680 `claude 호출 실패: <오류 종류> <상태 코드>: <메시지 200자까지>` 는 콜론이 늘 붙는 것처럼 적었지만 src/agent/writer.py:260-265 `_error_detail` 은 메시지가 비면 `: …` 를 뺌(재현: `claude 호출 실패: E 429`). 바로 아래 :681-682 jev 틀은 `[ <상태 코드>][: …]` 로 적고 "Claude 틀과 같음"이라 해 두 줄이 서로 다르게 읽힘(.adw/ship-report.md § Risks R2)
+- direction: docs/contracts.md:680 의 Claude 틀을 jev 틀과 같은 `claude 호출 실패: <오류 종류>[ <상태 코드>][: <메시지 200자까지>]` 표기로 바꾸고 괄호 설명에 "메시지가 비면 `: …` 도 뺍니다"를 더한다 — 코드 동작 · 로그 형식 변경 없음
+- touches: docs/contracts.md
 - status: open
 - attempts: 0 · last failure: —
 - first seen: 2026-10-13 · last seen: 2026-10-13
