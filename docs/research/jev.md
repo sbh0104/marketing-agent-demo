@@ -36,3 +36,13 @@
 - Recommendation: Claude가 쓰고 jev가 판단·검사 (because jev는 글을 생성하지 않고, 문서가 판단은 jev · 글은 LLM 짝짓기를 권장 — intent-routing 패턴)
 - 결정: 사용자가 A 선택 (2026-10-12)
 - Red flags: 한국어 정확도 미검증 · 얼리 액세스 키가 없으면 mock으로만 검증 가능 · 이유(reason)를 문장으로 받을 수 없음 → 보기 이름 + 확률로 기록
+
+## SDK 확인 — typesafe-sdk 0.7.4 (2026-10-13)
+- **출처.** PyPI 의 wheel 소스를 설치하지 않고 읽었다. Python ≥3.10 이 필요하고, 의존성은 httpx2 · pydantic · tenacity 이며 다시 시도는 tenacity 가 한다.
+- **클라이언트.** `TypeSafeClient(api_key=None → 환경 변수 TYPESAFE_API_KEY)` 는 `with` 블록으로 쓴다. `system_one(state, questions, *, model=…)` 이 `SystemOneResponse` 를 돌려준다.
+- **응답.** `answers: dict[질문 id, 답]`. `nouls` · `choices` · `scores` 는 같은 answers 를 거른 보기다. `NoulAnswer.noul: float` 에는 confidence 가 없다. `ChoiceAnswer` 에는 `choice: str` · `probabilities: dict[str, float]` · `confidence: float` 가 있다.
+- **질문.** `Noul(instructions=…, criteria=NoulCriteria(true=…, false=…))` — `NoulCriteria` 는 TypedDict 다. `Choice(instructions=…, criteria={보기: 설명 또는 None})`.
+- **오류.** 모든 오류는 `TypeSafeError` 아래에 있다.
+  - HTTP 실패는 `TypeSafeAPIError` 이고 코드는 `.status` 에 있다: 400 BadRequest · 401 Authentication · 403 PermissionDenied · 404 NotFound · 422 UnprocessableEntity · 429 RateLimit. 529 를 포함한 5xx 도 `TypeSafeAPIError` 의 하위 클래스다.
+  - 연결 · 시간 초과 실패는 `TypeSafeAPIConnectionError` · `TypeSafeAPITimeoutError` 다.
+  - 검증을 통과하지 못한 응답은 `TypeSafeAPIResponseValidationError` 다.
