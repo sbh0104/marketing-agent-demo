@@ -5,7 +5,7 @@ import copy
 import dataclasses
 import itertools
 import unittest
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, tzinfo
 from pathlib import Path
 
 from agent.config import TriggerConfig, load_config
@@ -303,6 +303,88 @@ class ContractTests(unittest.TestCase):
                 line = format_line(now, Event.TRIGGER, fields)
                 self.assertTrue(line.endswith(f"verdict={verdict} reason={reason}"), line)
         self.assertEqual(seen, REASONS)
+
+
+class _NewYork(tzinfo):
+    """2026년 뉴욕 — 3월 8일 02시에 한 시간을 건너뛰고, 11월 1일 01시대를 두 번 지납니다.
+
+    tzdata 없이도(Windows) 돌도록 손으로 적었습니다. fold=1 은 두 번째 01시대입니다.
+    """
+
+    def utcoffset(self, dt: datetime) -> timedelta:
+        wall = dt.replace(tzinfo=None)
+        if datetime(2026, 3, 8, 2) <= wall < datetime(2026, 11, 1, 2):
+            if dt.fold == 1 and wall >= datetime(2026, 11, 1, 1):
+                return -5 * H
+            return -4 * H
+        return -5 * H
+
+    def dst(self, dt: datetime) -> None:
+        return None
+
+    def tzname(self, dt: datetime) -> None:
+        return None
+
+
+NY = _NewYork()  # 모든 시각이 같은 시간대 객체를 씁니다 — 그래야 벽시계 비교가 드러납니다
+
+
+def ny_video(published_at, *samples) -> VideoRecord:
+    """뉴욕 시각 (시각, 조회수) 기록들로 영상 기록을 만듭니다."""
+    return VideoRecord(
+        video_id="abcdefghijk", channel_id="UC123", title="제목", description="",
+        published_at=published_at, detected_at=published_at, keyword="썸",
+        view_history=[ViewSample(at, count) for at, count in samples],
+    )
+
+
+class InstantTests(unittest.TestCase):
+    """같은 시간대 객체끼리도 벽시계가 아니라 순간으로 비교합니다."""
+
+    def judged_at(self, record, now, config=DEFAULTS) -> tuple[str, str]:
+        judgement = judge_trigger(record, config, now)
+        self.assertIs(judgement.at, now)
+        return judgement.verdict.value, judgement.reason
+
+    def test_fall_overlap_samples_are_an_hour_apart(self) -> None:
+        samples = (
+            (datetime(2026, 11, 1, 1, 30, tzinfo=NY), 1200),  # 05:30Z
+            (datetime(2026, 11, 1, 1, 30, fold=1, tzinfo=NY), 1650),  # 06:30Z, 시간당 450회
+        )
+        published = datetime(2026, 11, 1, 0, 0, tzinfo=NY)
+        now = datetime(2026, 11, 1, 1, 45, fold=1, tzinfo=NY)
+        for order in (samples, samples[::-1]):
+            with self.subTest(order=order):
+                record = ny_video(published, *order)
+                self.assertEqual(self.judged_at(record, now), ("yes", "views_per_hour"))
+
+    def test_spring_skip_rate_is_over_the_real_hour(self) -> None:
+        record = ny_video(
+            datetime(2026, 3, 8, 0, 0, tzinfo=NY),
+            (datetime(2026, 3, 8, 1, 30, tzinfo=NY), 1200),  # 06:30Z
+            (datetime(2026, 3, 8, 3, 30, tzinfo=NY), 1400),  # 07:30Z, 시간당 200회
+        )
+        now = datetime(2026, 3, 8, 3, 30, tzinfo=NY)
+        self.assertEqual(self.judged_at(record, now), ("yes", "views_per_hour"))
+
+    def test_spring_skip_age_is_the_real_age(self) -> None:
+        record = ny_video(
+            datetime(2026, 3, 8, 0, 0, tzinfo=NY),  # 05:00Z, 실제 나이 2시간 30분
+            (datetime(2026, 3, 8, 1, 30, tzinfo=NY), 1200),
+            (datetime(2026, 3, 8, 3, 30, tzinfo=NY), 1400),
+        )
+        now = datetime(2026, 3, 8, 3, 30, tzinfo=NY)
+        config = dataclasses.replace(DEFAULTS, max_age_hours=3.0)
+        self.assertEqual(self.judged_at(record, now, config), ("yes", "views_per_hour"))
+
+    def test_fall_publish_before_now_is_not_future(self) -> None:
+        record = ny_video(
+            datetime(2026, 11, 1, 1, 50, tzinfo=NY),  # 05:50Z, 지금보다 50분 전
+            (datetime(2026, 11, 1, 1, 20, tzinfo=NY), 1200),  # 05:20Z
+            (datetime(2026, 11, 1, 1, 40, fold=1, tzinfo=NY), 1700),  # 06:40Z
+        )
+        now = datetime(2026, 11, 1, 1, 40, fold=1, tzinfo=NY)
+        self.assertEqual(self.judged_at(record, now), ("yes", "views_per_hour"))
 
 
 if __name__ == "__main__":

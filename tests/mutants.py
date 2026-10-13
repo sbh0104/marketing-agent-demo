@@ -167,13 +167,13 @@ MUTANTS: dict[str, tuple[str, str, str, str]] = {
     "trigger-list-order": (
         "agent.trigger",
         "tests.test_trigger",
-        "ordered = sorted(history, key=lambda sample: (sample.at, sample.count))",
+        "ordered = sorted(history, key=lambda sample: (_utc(sample.at), sample.count))",
         "ordered = list(history)",
     ),
     "trigger-same-instant": (
         "agent.trigger",
         "tests.test_trigger",
-        "earlier = [sample for sample in ordered if sample.at < latest.at]",
+        "earlier = [sample for sample in ordered if _utc(sample.at) < _utc(latest.at)]",
         "earlier = ordered[:-1]",
     ),
     "trigger-min-views-exclusive": (
@@ -191,20 +191,20 @@ MUTANTS: dict[str, tuple[str, str, str, str]] = {
     "trigger-future-publish-passes": (
         "agent.trigger",
         "tests.test_trigger",
-        "if record.published_at > now:",
+        "if _utc(record.published_at) > _utc(now):",
         "if False:",
     ),
     "trigger-future-publish-inclusive": (
         "agent.trigger",
         "tests.test_trigger",
-        "if record.published_at > now:",
-        "if record.published_at >= now:",
+        "if _utc(record.published_at) > _utc(now):",
+        "if _utc(record.published_at) >= _utc(now):",
     ),
     "trigger-age-exclusive": (
         "agent.trigger",
         "tests.test_trigger",
-        "if now - record.published_at > timedelta(hours=config.max_age_hours):",
-        "if now - record.published_at >= timedelta(hours=config.max_age_hours):",
+        "if _utc(now) - _utc(record.published_at) > timedelta(hours=config.max_age_hours):",
+        "if _utc(now) - _utc(record.published_at) >= timedelta(hours=config.max_age_hours):",
     ),
     "trigger-rate-exclusive": (
         "agent.trigger",
