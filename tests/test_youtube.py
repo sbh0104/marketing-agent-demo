@@ -307,6 +307,46 @@ class LedgerTest(YouTubeCase):
         self.assertEqual(fetch.urls, [])
         self.assertFalse(self.path.exists())
 
+    def test_bom_prefixed_ledger_is_read_s043(self) -> None:
+        # 윈도우 메모장이 붙이는 BOM 이 앞에 있어도 유효한 기록으로 읽습니다
+        seed(self.path, searches(1, NOW - SECOND))
+        self.path.write_bytes(b"\xef\xbb\xbf" + self.path.read_bytes())
+        self.assertEqual(QuotaLedger(self.path).usage(NOW), Usage(1, 100))
+
+    def test_saved_ledger_is_sorted_indented_and_utc_s043(self) -> None:
+        # KST now 로 적어도 at 은 +00:00 — 키 정렬 · 2칸 들여쓰기 · 끝 줄바꿈 한 번
+        QuotaLedger(self.path).reserve("search.list", NOW.astimezone(KST), limits(90))
+        self.assertEqual(
+            self.path.read_bytes().decode("utf-8"),
+            "{\n"
+            '  "calls": [\n'
+            "    {\n"
+            '      "at": "2026-10-12T12:00:00+00:00",\n'
+            '      "call": "search.list",\n'
+            '      "units": 100\n'
+            "    }\n"
+            "  ],\n"
+            '  "schema_version": 1\n'
+            "}\n",
+        )
+
+    def test_unbuildable_url_is_neither_reserved_nor_fetched_s043(self) -> None:
+        # URL 을 만들 수 없는 호출(외톨이 서로게이트 pageToken)은 장부에 적기 전에 멈춥니다
+        fetch = FakeFetch()
+        client = self.client(fetch)
+        with self.assertRaises(UnicodeEncodeError):
+            client.search("연애", WINDOW_START, "\ud800", NOW, limits(90))
+        self.assertEqual(fetch.urls, [])
+        self.assertFalse(self.path.exists())
+        self.assertEqual(self.ledger.usage(NOW), Usage(0, 0))
+
+    def test_unknown_call_is_refused_s043(self) -> None:
+        ledger = QuotaLedger(self.path)
+        with self.assertRaises(ValueError) as caught:
+            ledger.reserve("comments.list", NOW, limits(90))
+        self.assertEqual(str(caught.exception), "모르는 호출입니다: 'comments.list'")
+        self.assertFalse(self.path.exists())
+
 
 class ClientTest(YouTubeCase):
     def test_search_url_carries_region_language_window_and_order(self) -> None:
@@ -402,6 +442,23 @@ class ClientTest(YouTubeCase):
                 # 원래 예외(키가 든 URL)는 traceback 에도 붙지 않습니다
                 self.assertIsNone(exc.__cause__)
                 self.assertTrue(exc.__suppress_context__)
+
+    def test_url_echoed_twice_is_masked_twice_s043(self) -> None:
+        client = self.client(FakeFetch(lambda url: OSError(f"{url} 다시 {url}")))
+        with self.assertRaises(YouTubeError) as caught:
+            client.videos(["abcdefghijk"], NOW, limits(90))
+        reason = caught.exception.reason
+        self.assertEqual(reason.count("key=<YOUTUBE_API_KEY>"), 2, reason)
+        self.assertNotIn(KEY, reason)
+        self.assertNotIn(KEY, str(caught.exception))
+
+    def test_non_200_status_is_an_error_s043(self) -> None:
+        # 2xx · 3xx 라도 200 이 아니면 오류 — Google reason 이 없으면 "HTTP 302" 만 남습니다
+        client = self.client(FakeFetch((302, b'{"items": []}')))
+        with self.assertRaises(YouTubeError) as caught:
+            client.search("연애", WINDOW_START, None, NOW, limits(90))
+        exc = caught.exception
+        self.assertEqual((exc.call, exc.reason), ("search.list", "HTTP 302"))
 
     def test_invalid_json_is_an_error(self) -> None:
         for body in (b"not json", b"[1, 2]", b'"text"', b"[" * 100_000, b"\xff\xfe"):
