@@ -177,3 +177,21 @@ other line is required on every item.
 - status: resolved
 - attempts: 0 · last failure: —
 - first seen: 2026-10-13 · last seen: 2026-10-13
+
+### S-NEW-1 — 게시 단계 테스트에 채널 대기 · 하루 상한 · live 인자 · 클릭 중 Ctrl-C 행을 더해 check_post 연결을 고정
+- source: cycle 20261013-163932-adw/phase-6-poster-chrome · tracker plans/interview-marketing-agent.md#phase-6 · deferred by ship-check
+- evidence: src/agent/poster.py:139 — `record.channel_id` → `""` 변이가 스위트에서 초록(218개 OK, ship-check 가 따로 다시 잼). 이 변이에서 같은 채널의 허용 영상 둘이 5분 간격으로 둘 다 `live/posted`. `live=decision.live` → `True` · `False` 변이와 src/agent/poster.py:214 `except Exception` → `except BaseException` 변이도 초록(.adw/ship-report.md § Test integrity)
+- direction: tests/test_poster.py 에 ① 같은 채널 다른 허용 영상이 5분 전 `live/posted` → `SKIP reason=channel_cooldown`, open_page 0회 ② `LimitsConfig(1, 24.0, 100)` 에 다른 채널 1건 게시 → `SKIP reason=daily_cap` ③ 허용 목록 밖 영상을 두 번 → 두 번째는 `test/skipped/duplicate_video`, 시도 1건 ④ 허용 영상에 앞선 `test/saved`(page_mismatch) 1건 → live 게시가 `posted` ⑤ `submit` 이 `KeyboardInterrupt` → 그대로 올라가고 시도는 `reserved`, 탭 닫힘 행을 더한다 — 코드 변경 없음. 다섯 행 모두 지금 코드에서 초록이고, ①③④⑤ 가 각각 위 변이 j · k1 · k2 · q2 를 빨갛게 만듦(ship-check 프로브에서 확인)
+- touches: tests/test_poster.py
+- status: open
+- attempts: 0 · last failure: —
+- first seen: 2026-10-13 · last seen: 2026-10-13
+
+### S-NEW-2 — 유튜브 화면 어댑터 테스트에 클릭 순간 꺼진 버튼 · 댓글 확인의 비슷한 글 · 훑는 범위 행을 더함
+- source: cycle 20261013-163932-adw/phase-6-poster-chrome · tracker plans/interview-marketing-agent.md#phase-6 · deferred by ship-check
+- evidence: src/agent/chrome.py:231 `or not button.first.is_enabled()` 를 뺀 변이, src/agent/chrome.py:239 `==` → `in`(부분 일치) 변이와 `texts[:CONFIRM_SCAN]` → `texts` 변이가 스위트에서 초록(.adw/ship-report.md § Test integrity)
+- direction: tests/test_chrome.py 의 YouTubePageTest 에 ① `full_page(submit={"enabled": False})` 에서 `submit()` → `PageError(post_button_missing)`, click 0회 ② `texts` 가 `(TEXT + " 그리고 덧붙인 말",)` → `confirm_posted` 가 False ③ `texts` 가 `("다른 사람 댓글",) * CONFIRM_SCAN + (TEXT,)` → False 행을 더한다 — 코드 변경 없음. 세 행 모두 지금 코드에서 초록이고, 각각 위 세 변이를 빨갛게 만듦(ship-check 프로브에서 확인)
+- touches: tests/test_chrome.py
+- status: open
+- attempts: 0 · last failure: —
+- first seen: 2026-10-13 · last seen: 2026-10-13
