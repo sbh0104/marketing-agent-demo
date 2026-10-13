@@ -2,7 +2,7 @@
 
     python3 -m tests.mutants <이름>
 
-agent.guard / agent.store / agent.config / agent.scheduler 의 소스에서 정확한 글자 하나를 바꿔 메모리에서만 모듈을 다시
+agent.guard / agent.store / agent.config / agent.scheduler / agent.logbook 의 소스에서 정확한 글자 하나를 바꿔 메모리에서만 모듈을 다시
 만들고(파일은 건드리지 않음), 해당 테스트 모듈을 돌립니다. 종료 코드 1 은 테스트가
 망가짐을 잡았다는 뜻, 2 는 이름을 모르거나 바꿀 글자가 정확히 한 번 나오지 않았다는
 뜻입니다. 이 파일은 test*.py 가 아니라서 discover 가 줍지 않습니다.
@@ -139,6 +139,12 @@ MUTANTS: dict[str, tuple[str, str, str, str]] = {
         "tests.test_scheduler",
         "min(config.poll_interval_min * 60, _LONGEST_WAIT_S)",
         "config.poll_interval_min * 60",
+    ),
+    "logbook-raw-line-breaks": (
+        "agent.logbook",
+        "tests.test_logbook",
+        "json.dumps(value, ensure_ascii=False).translate(_LINE_BREAK_ESCAPES)",
+        "json.dumps(value, ensure_ascii=False)",
     ),
 }
 

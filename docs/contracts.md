@@ -314,8 +314,12 @@ Phase 3–5 가 정합니다.)
   | 글자 | 공백 · `"` · `=` · `\` 가 없고 `-` 가 아니면 그대로, 아니면 JSON 따옴표(한글 그대로) |
   | 그 밖 | `TypeError` |
 
-  그래서 여러 줄짜리 댓글도 `\n` 으로 한 줄에 남고, 글자 `-` 는 `"-"` 로 써서 `None` 과
-  구분됩니다.
+  따옴표 값 안에서는 `str.splitlines()` 가 줄 경계로 세는 글자 — `\n` `\r` `\v` `\f` `\x1c`
+  `\x1d` `\x1e` `\x85` `U+2028` `U+2029` — 를 모두 이스케이프로 씁니다(`\n` · `\r` · `\f` 는
+  JSON 그대로, 나머지는 `\u000b` · `\u001c` · `\u0085` · `\u2028` 처럼 `\uXXXX`). 그래서 여러
+  줄짜리 댓글도, 영상 제목에 숨긴 `U+2028` 도 한 사건을 어떤 읽기 방식으로든 한 줄로 남기고,
+  `parse_line` 이 원래 값을 되돌립니다. 줄 모양은 그대로입니다. 글자 `-` 는 `"-"` 로 써서
+  `None` 과 구분됩니다.
 - `parse_line(line)` 은 `format_line` 의 정확한 역으로 `(시각, Event, {키: 글자})` 를 돌려줍니다.
   Phase 7/8 은 이것으로 로그만 보고 허용 목록 밖 영상이 게시되지 않았음을 확인할 수 있습니다.
 - `Logbook(path, clock, echo)` 의 `write(event, **fields)` 는 줄을 만들어 파일에 UTF-8 로
@@ -401,7 +405,7 @@ run_loop(cycle, reload, initial, *, on_error, sleep=time.sleep,
   인자와 이유, 로그 사건과 필수 필드)은 고정입니다.
 - 더하는 것은 그 필드를 쓰는 단계(Phase)가 `models.py` · `config.py` 에서, 테스트와 함께, 이
   문서도 함께 고칩니다. 이미 있는 이름의 뜻을 바꾸거나 지우지 않습니다.
-- 가드 · 저장소 · 설정 읽기 규칙이 테스트로 지켜지는지는 음성 대조로 확인합니다. 각 명령은 가드 한 줄을
+- 가드 · 저장소 · 설정 읽기 · 로그 한 줄 규칙이 테스트로 지켜지는지는 음성 대조로 확인합니다. 각 명령은 가드 한 줄을
   메모리에서만 망가뜨리고 테스트를 돌리며, **종료 코드 1(테스트가 잡음)** 이어야 합니다. 2 는
   바꿀 글자를 찾지 못했다는 뜻이라 실패입니다:
 
@@ -426,7 +430,8 @@ run_loop(cycle, reload, initial, *, on_error, sleep=time.sleep,
   python3 -m tests.mutants config-narrow-read-errors
   python3 -m tests.mutants scheduler-one-sleep
   python3 -m tests.mutants scheduler-unclamped-wait
+  python3 -m tests.mutants logbook-raw-line-breaks
   ```
 
   `decide_post` · `video_id_from_ref` · `put` · `reserve_live` · `check_post` · `load_config` ·
-  `run_loop` 의 본문을 고칠 때는 이 명령들이 계속 1 로 끝나는지 함께 확인합니다.
+  `run_loop` · `format_line` 의 본문을 고칠 때는 이 명령들이 계속 1 로 끝나는지 함께 확인합니다.

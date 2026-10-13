@@ -1,8 +1,9 @@
 """로그 형식 — 사건 하나에 한 줄: `<KST ISO-8601 초> <EVENT> key=value …`.
 
-사건 종류는 닫힌 Event 목록이고, 사건마다 필요한 필드를 쓸 때 검사합니다.
-공백 · `"` · `=` · `\\` 가 없는 값은 그대로, 나머지는 JSON 따옴표로 씁니다. 그래서
-여러 줄짜리 댓글도 한 줄에 남고, parse_line 으로 정확히 되읽을 수 있습니다.
+공백 · `"` · `=` · `\\` 가 없는 값은 그대로, 나머지는 JSON 따옴표로 씁니다. 따옴표 안에서는
+str.splitlines() 가 줄 경계로 세는 글자(U+0085 · U+2028 · U+2029 포함)를 모두 이스케이프하므로,
+여러 줄짜리 댓글도 줄 경계를 숨긴 영상 제목도 한 줄에 남고, parse_line 으로 정확히 되읽을 수
+있습니다.
 """
 from __future__ import annotations
 
@@ -50,6 +51,10 @@ REQUIRED_FIELDS: dict[Event, tuple[str, ...]] = {
 _KEY_RE = re.compile(r"[a-z][a-z0-9_]*")
 _BARE_RE = re.compile(r'[^\s"=\\]+')
 _DECODER = json.JSONDecoder()
+# str.splitlines() 가 줄 경계로 세는 글자 — 따옴표 값 안에서 모두 \uXXXX 로 씁니다. 0x20 미만은
+# json.dumps 가 이미 바꾸므로 실제로 바뀌는 것은 U+0085 · U+2028 · U+2029 입니다.
+_LINE_BREAKS = "\n\v\f\r\x1c\x1d\x1e\x85\u2028\u2029"
+_LINE_BREAK_ESCAPES = {ord(char): f"\\u{ord(char):04x}" for char in _LINE_BREAKS}
 
 
 def _stamp(at: datetime) -> str:
@@ -61,7 +66,7 @@ def _stamp(at: datetime) -> str:
 def _render_str(value: str) -> str:
     if value != "-" and _BARE_RE.fullmatch(value):
         return value
-    return json.dumps(value, ensure_ascii=False)
+    return json.dumps(value, ensure_ascii=False).translate(_LINE_BREAK_ESCAPES)
 
 
 def _render(value: object) -> str:
