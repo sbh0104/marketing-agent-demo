@@ -9,8 +9,9 @@ Phase 2–7 의 모든 단계가 기대는 계약입니다. 설정 읽기, 영�
 
 - Python 3.10 이상. 3.11 이후에만 있는 기능(`datetime.UTC`, `enum.StrEnum`, `tomllib`,
   `typing.Self`, `except*`)은 쓰지 않습니다.
-- 의존성 설치: `pip install -r requirements.txt` — 지금은 `PyYAML>=6.0` 한 줄입니다.
-  Phase 6 이 Playwright 를 더합니다.
+- 의존성 설치: `pip install -r requirements.txt` — `PyYAML>=6.0` 과 jev 판별(Phase 3)의
+  `typesafe-sdk>=0.7.4,<0.8` 이 들어 있습니다. 테스트는 SDK 없이 돕니다 — 판별 테스트는 가짜
+  jev 를 씁니다. Phase 6 이 Playwright 를 더합니다.
 - 테스트(저장소 뿌리에서, 설치 없이):
 
   ```
@@ -43,6 +44,12 @@ Phase 2–7 의 모든 단계가 기대는 계약입니다. 설정 읽기, 영�
 | `limits.daily_max_searches` | 정수 | ≥ 0 | `100` (과제 밖에서 더한 키) |
 | `comment.min_chars` | 정수 | ≥ 1 | `40` |
 | `comment.max_chars` | 정수 | ≥ `min_chars` | `120` |
+| `classifier.model` | 글자 | 비어 있지 않음 — jev 모델 이름 | `jev-latest` |
+| `classifier.noul_yes_min` | 숫자 | > 0.5, ≤ 1 — 주제 일치 확률이 이 값 이상이어야 일치 | `0.8` |
+| `classifier.noul_no_max` | 숫자 | ≥ 0, < `noul_yes_min` — 이 값 이하여야 불일치, 사이는 보류 | `0.2` |
+| `classifier.choice_min_confidence` | 숫자 | ≥ 0, ≤ 1 — 이유 보기 확신이 이보다 낮으면 보류 | `0.5` |
+| `classifier.on_topic_reasons` | 글자 목록 | 1개 이상, 각 1–40자, 두 목록 합쳐 50개 이하, 이름 겹침 금지 | 4개 (config.yaml) |
+| `classifier.off_topic_reasons` | 글자 목록 | 같은 규칙 — jev 에 먼저 보임 | 4개 (config.yaml) |
 | `chrome_debug_url` | 글자 | `http://` 또는 `https://` 로 시작 | `http://localhost:9222` |
 | `allowed_videos` | 글자 목록 | 비워 두면 `()`; 항목은 쓴 그대로 보관 | `- https://youtu.be/내-테스트-영상-ID` |
 
@@ -64,6 +71,9 @@ Phase 2–7 의 모든 단계가 기대는 계약입니다. 설정 읽기, 영�
 - **숫자 자리에서는 YAML 1.1 숫자 표기가 그대로 읽힙니다** — `017` 은 8진수 15, `1:30` 은
   60진수 90, `0x1F` 는 31, `1_000` 은 1000 이 되고 위 범위 검사만 받습니다. 숫자는 앞자리 0 ·
   `:` · `_` 없이 10진수로 쓰세요.
+- 보기 이름에 `: ` 가 들어가면 따옴표로 감싸세요 — 따옴표 없는 `- 키워드만 겹침: 게임` 은
+  YAML 이 '키: 값' 묶음으로 읽어
+  `비어 있지 않은 글자여야 합니다: classifier.off_topic_reasons[0]` 오류입니다.
 - 같은 키가 두 번 나오면 두 번째 줄 번호와 함께 오류입니다. 윈도우 메모장이 붙이는 BOM 은
   떼어 내고 읽습니다. UTF-8 이 아닌 저장(메모장의 ANSI·Unicode)은 `ConfigError` 입니다.
 - 읽는 중 나는 그 밖의 모든 오류도 `ConfigError` 입니다 — 날짜 모양의 틀린 값
@@ -365,8 +375,9 @@ Phase 3–5 가 정합니다.)
 ## 8. 비밀 값
 
 - API 키는 `.env` 에만 둡니다. `.gitignore` 가 `.env`, `.env.*` 를 막고 `.env.example` 만
-  커밋합니다. `.env.example` 에는 `YOUTUBE_API_KEY=` 가 있고, AI 접속 키 이름은 Phase 3 이
-  더합니다. `.env` 를 읽는 코드는 비밀 값을 처음 읽는 Phase 2 가 더합니다.
+  커밋합니다. `.env.example` 에는 `YOUTUBE_API_KEY=` 와 `TYPESAFE_API_KEY=`(jev 판별 —
+  `typesafe-sdk` 가 환경 변수에서 읽음)가 있고 값은 비워 둡니다. 댓글 작성 AI 의 키는 그것을
+  쓰는 단계가 더합니다. `.env` 를 읽는 코드는 비밀 값을 처음 읽는 Phase 2 가 더합니다.
 - 크롬 전용 프로필은 `chrome-profile/`(통째로 무시됩니다) 또는 저장소 밖에만 둡니다 — 저장소
   안의 다른 폴더는 금지입니다. Phase 6 · 8 의 실행 안내는 이 두 위치만 예시로 보입니다. 이 위치
   규칙이 첫 방어입니다.
@@ -443,8 +454,70 @@ run_loop(cycle, reload, initial, *, on_error, sleep=time.sleep,
   python3 -m tests.mutants scheduler-one-sleep
   python3 -m tests.mutants scheduler-unclamped-wait
   python3 -m tests.mutants logbook-raw-line-breaks
+  python3 -m tests.mutants classifier-error-yes
+  python3 -m tests.mutants classifier-malformed-yes
+  python3 -m tests.mutants classifier-unchecked-probability
+  python3 -m tests.mutants classifier-no-confidence-floor
+  python3 -m tests.mutants classifier-keyword-only-passes
+  python3 -m tests.mutants classifier-no-truncation
+  python3 -m tests.mutants classifier-error-hold-unmarked
+  python3 -m tests.mutants classifier-swallows-faults
   ```
 
+  `classify` · `read_answers` · `build_state` · `is_error_hold` · `sdk_ask` ·
   `decide_post` · `video_id_from_ref` · `put` · `reserve_live` · `check_post` · `load_config` ·
   `config_from_mapping` · `run_loop` · `format_line` 의 본문을 고칠 때는 이 명령들이 계속 1 로
   끝나는지 함께 확인합니다.
+
+## 11. 주제 판별 — `classifier.py` (Phase 3)
+
+- **절 번호.** 다른 갈래가 자기 11절을 먼저 들였으면 이 제목의 번호는 들일 때 고칩니다. 코드와
+  다른 글은 이 절을 번호가 아니라 제목('주제 판별')으로만 가리킵니다.
+- **부르기.**
+
+  ```python
+  classify(record, config, ask, now, *, transcript=None, language=QUESTION_LANGUAGE) -> Judgement
+  ```
+
+  자막은 `transcript` 인자로만 받습니다.
+- **부르는 쪽의 할 일.** 판정마다 `CLASSIFY video=… verdict=… reason=…` 를 씁니다. 오류
+  보류(`is_error_hold(j)` 가 참)이면 `ERROR where=classify reason=<j.reason>` 도 함께 씁니다.
+  오류 보류를 `record.classification` 에 저장할지, 나중에 다시 판정할지는 Phase 7 이 정합니다
+  (트래커 Phase 7: 실패 후 재시도 없이 다음 영상).
+- **보류가 되는 실패.** SDK 가 알린 실패만 보류입니다 — 모든 `TypeSafeError`, 곧 401 · 422 ·
+  429 · 529 · 연결 · 응답 검증. 429/529 의 다시 시도는 SDK 기본 정책을 따릅니다. SDK 가 없거나
+  우리 코드가 잘못된 경우는 예외가 그대로 올라갑니다(9절의 `on_error("cycle")`).
+- **한 요청, 두 질문.** `matches_topic`(noul)과 `reason`(choice). choice 가 첫 보기 쪽으로
+  기우는 경향 때문에 보기는 `off_topic_reasons` 를 먼저, 그다음 `on_topic_reasons` 를 보입니다.
+- **믿지 않는 입력.** 영상 글은 `state` 에만 들어가고 질문에는 들어가지 않습니다. 두 답이 같은
+  state 를 읽으므로 주입은 두 답을 함께 움직일 수 있습니다. 판별만으로는 아무것도 게시하지
+  않으며, Phase 4 · 5 · 7 의 조건이 그대로 적용됩니다.
+- **판정표.** `noul` 은 주제 일치 확률, `confidence` 는 이유 보기(choice) 답의 확신입니다.
+
+  | 판정 | 조건 |
+  |---|---|
+  | `yes` | `confidence ≥ choice_min_confidence` ∧ `noul ≥ noul_yes_min` ∧ 보기 ∈ `on_topic_reasons` |
+  | `no` | `confidence ≥ choice_min_confidence` ∧ `noul ≤ noul_no_max` ∧ 보기 ∈ `off_topic_reasons` |
+  | `hold` | 그 밖의 모든 경우 — SDK 오류 · 응답 모양 오류 · 낮은 확신 · `noul` 이 두 기준값 사이 · 두 답이 엇갈림 |
+
+- **이유 모양.**
+  - 판정: `<보기> (<그 보기 확률>) · 일치 <noul> · 확신 <confidence>`, 숫자는 소수 둘째 자리까지.
+  - 판단 보류: 위 모양 앞에 `확신 낮음: ` 또는 `판단 엇갈림: ` 이 붙습니다.
+  - 오류 보류: `API 오류: <SDK 예외 이름> [<상태 코드>]` 또는
+    `응답 모양 오류: <예외 이름>: <내용>`.
+  - 3절과 7절의 `연애 고민 상담` 은 이 모양의 앞부분입니다.
+- **자르기.** `state` 와 가장 긴 질문(JSON 을 UTF-8 바이트로 잰 것)의 합은 32000 바이트
+  이하입니다 — 토큰 수는 UTF-8 바이트 수를 넘지 않습니다. 자막부터, 그다음 설명, 그다음 제목
+  순으로 끝에서 잘라 내며 글자를 쪼개지 않습니다.
+- 세기와 날짜 비교는 jev 에 묻지 않습니다.
+- **질문 언어.** `QUESTION_LANGUAGE` 상수이고 기본값은 `ko` 입니다.
+- **한국어 정확도.** 예시 묶음은 22개(일치 10 · 불일치 12, 그중 주입 2)입니다.
+  `python3 -m tests.jev_accuracy` 를 돌리면 언어마다 맞음 · 잘못된 일치 · 잘못된 불일치 ·
+  보류 · 오류 수를 찍습니다.
+  - 통과는 잘못된 일치가 없고 22개 중 20개 이상 맞는 것입니다.
+  - 종료 코드: 0 ko 통과 · 1 ko 미달 · 2 재지 않음 · 3 측정 실패(오류가 있음 — 모델 문제가
+    아님).
+  - 기록: 아직 재지 않음 — 2026-10-13 키 없음.
+  - ko 가 미달이고 en 이 통과하면 `QUESTION_LANGUAGE` 를 `"en"` 으로 바꿉니다. 둘 다 미달이면
+    사람이 정합니다(트래커 cross-cutting).
+- **음성 대조.** 음성 대조는 10절 목록.
