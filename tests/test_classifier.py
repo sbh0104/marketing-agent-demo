@@ -697,9 +697,33 @@ class ExamplesTest(unittest.TestCase):
         self.assertIn("측정 실패", out)
         self.assertIn("ko: 맞음 0/22 · 잘못된 일치 0 · 잘못된 불일치 0 · 보류 0 · 오류 22", out)
 
+    def test_runner_error_in_en_only_exits_3(self) -> None:
+        labels = LabelJev(languages=("en",))
+
+        def en_fails(
+            model: str, state: str, questions: Mapping[str, Mapping[str, object]]
+        ) -> object:
+            if questions[MATCH_ID]["instructions"] in labels.wording.values():
+                raise JevError("TypeSafeRateLimitError 429")
+            return labels(model, state, questions)
+
+        code, out, _ = run_main([], KEY, en_fails)
+        self.assertIn("ko: 맞음 22/22 · 잘못된 일치 0 · 잘못된 불일치 0 · 보류 0 · 오류 0", out)
+        self.assertIn("en: 맞음 0/22 · 잘못된 일치 0 · 잘못된 불일치 0 · 보류 0 · 오류 22", out)
+        self.assertIn("측정 실패", out)
+        self.assertEqual(code, 3)
+
     def test_runner_perfect_labels_exit_0(self) -> None:
         code, out, _ = run_main([], KEY, LabelJev())
         self.assertIn("ko: 맞음 22/22 · 잘못된 일치 0 · 잘못된 불일치 0 · 보류 0 · 오류 0", out)
+        self.assertIn("권고: ko 그대로", out)
+        self.assertEqual(code, 0)
+
+    def test_runner_exactly_20_correct_without_false_yes_passes(self) -> None:
+        yes = [n for n, example in enumerate(EXAMPLES, 1) if example.label is Verdict.YES][:2]
+        self.assertEqual(len(yes), 2)
+        code, out, _ = run_main([], KEY, LabelJev({n: Verdict.NO for n in yes}))
+        self.assertIn("ko: 맞음 20/22 · 잘못된 일치 0 · 잘못된 불일치 2 · 보류 0 · 오류 0", out)
         self.assertIn("권고: ko 그대로", out)
         self.assertEqual(code, 0)
 
