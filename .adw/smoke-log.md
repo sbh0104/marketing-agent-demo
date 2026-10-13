@@ -138,7 +138,7 @@ other line is required on every item.
 - touches: tests/test_guard.py
 - base: adw/phase-1-foundation-contracts
 - phase: plans/interview-marketing-agent.md#phase-1
-- status: open
+- status: resolved
 - attempts: 0 · last failure: —
 - first seen: 2026-10-13 · last seen: 2026-10-13
 
