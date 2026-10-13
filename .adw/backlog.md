@@ -27,7 +27,7 @@
 
 ## To do
 
-- [~] [smoke] 스모크 스윕 — S-001, S-002, S-004, S-005, S-006
+- [x] [smoke] 스모크 스윕 — S-001, S-002, S-004, S-005, S-006
 - [x] Phase 1 — 뼈대와 계약 (plans/interview-marketing-agent.md#phase-1)
 - [ ] Phase 2 — ① 탐지 · 조회수 추적 (plans/interview-marketing-agent.md#phase-2)
 - [ ] Phase 3 — ② 판별 · 주제 일치 (plans/interview-marketing-agent.md#phase-3)
