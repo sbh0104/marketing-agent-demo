@@ -36,16 +36,16 @@ Phase 2–7 의 모든 단계가 기대는 계약입니다. 설정 읽기, 영�
 |---|---|---|---|
 | `topic` | 글자 | 비어 있지 않음 | `연애` |
 | `keywords` | 글자 목록 | 1개 이상, 각 항목 비어 있지 않음 | `[연애, 썸, 연애 상담, 이별, 소개팅]` |
-| `poll_interval_min` | 정수 | ≥ 1 (상한 없음 — 대기는 9절이 약 100년으로 묶음) | `120` (과제 예시 `30` — 아래) |
-| `trigger.min_views` | 정수 | ≥ 0 | `1000` |
-| `trigger.max_views` | 정수 | ≥ `min_views` | `5000` |
+| `poll_interval_min` | 정수 | ≥ 1, ≤ 52560000 | `120` (과제 예시 `30` — 아래) |
+| `trigger.min_views` | 정수 | ≥ 0, ≤ 1000000000000 | `1000` |
+| `trigger.max_views` | 정수 | ≥ `min_views`, ≤ 1000000000000 | `5000` |
 | `trigger.max_age_hours` | 숫자 | > 0, ≤ 876000 | `12` |
 | `trigger.min_views_per_hour` | 숫자 | ≥ 0, ≤ 1000000000 | `150` |
-| `limits.daily_max_comments` | 정수 | ≥ 0 | `10` |
+| `limits.daily_max_comments` | 정수 | ≥ 0, ≤ 86400 | `10` |
 | `limits.channel_cooldown_hours` | 숫자 | ≥ 0, ≤ 876000 | `24` |
-| `limits.daily_max_searches` | 정수 | ≥ 0 | `90` (과제 밖에서 더한 키) |
-| `comment.min_chars` | 정수 | ≥ 1 | `40` |
-| `comment.max_chars` | 정수 | ≥ `min_chars` | `120` |
+| `limits.daily_max_searches` | 정수 | ≥ 0, ≤ 86400 | `90` (과제 밖에서 더한 키) |
+| `comment.min_chars` | 정수 | ≥ 1, ≤ 10000 | `40` |
+| `comment.max_chars` | 정수 | ≥ `min_chars`, ≤ 10000 | `120` |
 | `comment.writer_model` | 글자 | 비어 있지 않음 — 댓글을 쓰는 Claude 모델 이름 ('댓글 작성' 절) | `claude-sonnet-5-5` |
 | `comment.check_min_probability` | 숫자 | ≥ 0, ≤ 1 — jev 자체 검사 통과 하한 ('댓글 작성' 절) | `0.7` |
 | `classifier.model` | 글자 | 비어 있지 않음 — jev 모델 이름 | `jev-latest` |
@@ -64,8 +64,20 @@ Phase 2–7 의 모든 단계가 기대는 계약입니다. 설정 읽기, 영�
   (`check_post` 의 채널 대기, Phase 4 의 나이 창)가 날짜 범위 안에 있습니다 — 2026년 기준 약
   1800만 시간부터 `OverflowError` 입니다. `trigger.min_views_per_hour` 의 1000000000 은 실제
   영상이 닿지 않는 값입니다. 넘으면 `<상한> 이하여야 합니다: <키>` 오류이고, 실행 중이면 이전
-  설정을 유지합니다. 정수 키에는 상한이 없습니다 — 비교와 셈에만 쓰이고, `poll_interval_min` 의
-  대기는 9절이 묶습니다.
+  설정을 유지합니다.
+- 정수 키도 모두 상한이 있습니다 — 정수는 비교와 셈 말고도 글자로 쓰입니다: `START interval_min=` ·
+  `QUOTA limit=` 로그 줄(7절), 댓글 작성 지시문과 코드 검사의 글자 수 문구('댓글 작성' 절). YAML 의
+  16진수 · 60진수 표기(`0x…`, `1:30`)는 파이썬의 4,300자리 한도와 상관없이 정수로 읽혀서, 상한이
+  없으면 `0x` 뒤에 `F` 3,700개를 쓴 값이 읽기를 통과한 뒤 글자로 바꾸는 자리에서 `ValueError` 를
+  냅니다. 상한은 `_int` 의 필수 인자라 정수 키를 더하는 단계가 빠뜨릴 수 없습니다. 넘으면
+  `<상한> 이하여야 합니다: <키>` 오류(값은 메시지에 쓰지 않음)이고, 실행 중이면 이전 설정을
+  유지합니다. 키마다 근거:
+  - `poll_interval_min` 52560000 — 100 × 365 × 24 × 60 분(약 100년), 9절의 대기 상한과 같은 크기.
+  - `trigger.min_views` · `trigger.max_views` 1000000000000 — 지구 인구의 100배가 넘는 값, 어떤
+    영상의 조회수보다도 큼.
+  - `limits.daily_max_comments` · `limits.daily_max_searches` 86400 — 하루의 초 수. 게시는 한 번이
+    1초보다 오래 걸려 이 수에 닿을 수 없고, 검색은 그보다 훨씬 앞서 쿼터 장부가 막습니다(아래).
+  - `comment.min_chars` · `comment.max_chars` 10000 — 유튜브 댓글 한 개의 최대 길이.
 - `limits.daily_max_searches` 는 과제 예시에 없는 키로, 최근 24시간(굴러가는 창) 안의
   `search.list` 호출 수 — 페이지 넘김 한 번도 한 번 — 의 상한입니다. 닿으면 호출하지 않고
   `QUOTA` 를 남깁니다('탐지 · 조회수 추적' 절). Google 은 2026-10-08 부터 `search.list` 를
@@ -526,8 +538,8 @@ run_loop(cycle, reload, initial, *, on_error, sleep=time.sleep,
   돕니다.
 - 아주 큰 `poll_interval_min` 도 루프를 죽이지 않습니다 — sleep 한 번은 하루까지(운영체제마다
   다른 sleep 한도에 닿지 않게), 대기 전체는 약 100년까지(아주 큰 정수를 실수로 바꾸다 나는
-  OverflowError 방지). 하루 이하 주기는 지금처럼 sleep 한 번이고, 설정 규칙
-  (`poll_interval_min ≥ 1`)은 그대로입니다.
+  OverflowError 방지). 하루 이하 주기는 지금처럼 sleep 한 번입니다. 설정에서 읽은 주기는 2절의
+  상한(52560000분)이 이미 이 크기로 묶고, 이 묶음은 코드로 만든 설정에도 남습니다.
 - `poll_interval_min` 만 고치면 재시작이나 OS 설정 없이 다음 대기부터 주기가 바뀝니다.
 - 신호 처리나 fork 는 쓰지 않습니다. Phase 7 의 진입점이 `run_loop` 를 부릅니다.
 
@@ -574,6 +586,7 @@ run_loop(cycle, reload, initial, *, on_error, sleep=time.sleep,
   python3 -m tests.mutants store-double-reserve
   python3 -m tests.mutants config-narrow-read-errors
   python3 -m tests.mutants config-no-ceiling
+  python3 -m tests.mutants config-no-int-ceiling
   python3 -m tests.mutants scheduler-one-sleep
   python3 -m tests.mutants scheduler-unclamped-wait
   python3 -m tests.mutants logbook-raw-line-breaks

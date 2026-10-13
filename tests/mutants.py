@@ -214,6 +214,12 @@ MUTANTS: dict[str, tuple[str, str, str, str]] = {
         "if not number <= maximum:",
         "if False:",
     ),
+    "config-no-int-ceiling": (
+        "agent.config",
+        "tests.test_config",
+        "if value > maximum:",
+        "if False:",
+    ),
     "scheduler-one-sleep": (
         "agent.scheduler",
         "tests.test_scheduler",
