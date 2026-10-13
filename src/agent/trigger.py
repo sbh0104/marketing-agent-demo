@@ -3,13 +3,14 @@
 조회수(min_views ~ max_views), 업로드 뒤 나이(max_age_hours 이내), 시간당 조회수
 (min_views_per_hour 이상)를 모두 만족하면 대상(yes)입니다. 기준은 부를 때마다 받은
 TriggerConfig 에서 읽고, 지금 시각도 인자로 받아 같은 입력이면 언제나 같은 판정입니다.
+시각은 벽시계가 아니라 순간으로 비교합니다.
 시간당 조회수는 시각이 다른 가장 늦은 두 기록으로 재며, 조회수가 줄었으면 재지 않습니다 —
 음수 속도는 없습니다. 판정만 돌려주고 저장 · 로그는 부르는 쪽이 합니다.
 """
 from __future__ import annotations
 
 from collections.abc import Sequence
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from agent.config import TriggerConfig
 from agent.models import Judgement, Verdict, VideoRecord, ViewSample
@@ -18,13 +19,18 @@ _MICROSECOND = timedelta(microseconds=1)
 _US_PER_HOUR = 3_600_000_000
 
 
+def _utc(moment: datetime) -> datetime:
+    """같은 시간대 객체끼리도 벽시계가 아니라 순간으로 비교하도록 UTC 로 옮깁니다."""
+    return moment.astimezone(timezone.utc)
+
+
 def _latest_pair(history: Sequence[ViewSample]) -> tuple[ViewSample, ViewSample] | None:
     """(직전, 최신) — 시각이 다른 가장 늦은 두 기록. 목록 순서는 보지 않습니다."""
-    ordered = sorted(history, key=lambda sample: (sample.at, sample.count))
+    ordered = sorted(history, key=lambda sample: (_utc(sample.at), sample.count))
     if not ordered:
         return None
     latest = ordered[-1]
-    earlier = [sample for sample in ordered if sample.at < latest.at]
+    earlier = [sample for sample in ordered if _utc(sample.at) < _utc(latest.at)]
     if not earlier:
         return None
     return earlier[-1], latest
@@ -36,7 +42,7 @@ def _rate(previous: ViewSample, latest: ViewSample) -> float | None:
     if gained < 0:
         return None
     # 정수끼리 한 번만 나눠, 정확히 기준값인 속도가 반올림으로 흔들리지 않게 합니다.
-    return gained * _US_PER_HOUR / ((latest.at - previous.at) // _MICROSECOND)
+    return gained * _US_PER_HOUR / ((_utc(latest.at) - _utc(previous.at)) // _MICROSECOND)
 
 
 def judge_trigger(record: VideoRecord, config: TriggerConfig, now: datetime) -> Judgement:
@@ -51,9 +57,9 @@ def judge_trigger(record: VideoRecord, config: TriggerConfig, now: datetime) -> 
         return Judgement(Verdict.NO, "views_below_min", now)
     if latest.count > config.max_views:
         return Judgement(Verdict.NO, "views_above_max", now)
-    if record.published_at > now:
+    if _utc(record.published_at) > _utc(now):
         return Judgement(Verdict.HOLD, "published_in_future", now)
-    if now - record.published_at > timedelta(hours=config.max_age_hours):
+    if _utc(now) - _utc(record.published_at) > timedelta(hours=config.max_age_hours):
         return Judgement(Verdict.NO, "too_old", now)
     rate = _rate(previous, latest)
     if rate is None:
