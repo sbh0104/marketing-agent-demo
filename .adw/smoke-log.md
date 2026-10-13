@@ -205,7 +205,7 @@ other line is required on every item.
 - attempts: 0 · last failure: —
 - first seen: 2026-10-13 · last seen: 2026-10-13
 
-### S-NEW-1 — sdk_ask 의 좁은 catch 를 테스트로 고정 — try 안에서 난 TypeError 가 그대로 올라가는지
+### S-011 — sdk_ask 의 좁은 catch 를 테스트로 고정 — try 안에서 난 TypeError 가 그대로 올라가는지
 - source: cycle 20261013-161343-adw/phase-3-classifier-topic · tracker plans/interview-marketing-agent.md#phase-3 · deferred by ship-check
 - evidence: src/agent/classifier.py:198 — `except typesafe_sdk.TypeSafeError as exc:` → `except Exception as exc:` 변이가 tests.test_classifier 39개 모두 초록. test_non_sdk_error_inside_sdk_ask_propagates(tests/test_classifier.py:524)는 try 바깥의 `Noul(...)`(classifier.py:184)에서 오류를 내 이 자리에 닿지 않음(.adw/ship-report.md § Test integrity, R1)
 - direction: tests/test_classifier.py SdkAskTest 에 가짜 TypeSafeClient.system_one 이 TypeError 를 내면 classify(…, sdk_ask, …) 가 같은 TypeError 를 올리는지(보류가 아님) 보는 테스트를 더한다 — 코드 변경 없음, 지금 코드는 이렇게 동작
@@ -214,7 +214,7 @@ other line is required on every item.
 - attempts: 0 · last failure: —
 - first seen: 2026-10-13 · last seen: 2026-10-13
 
-### S-NEW-2 — 설정의 classifier.model 이 ask · system_one 까지 가는지 테스트로 고정
+### S-012 — 설정의 classifier.model 이 ask · system_one 까지 가는지 테스트로 고정
 - source: cycle 20261013-161343-adw/phase-3-classifier-topic · tracker plans/interview-marketing-agent.md#phase-3 · deferred by ship-check
 - evidence: src/agent/classifier.py:160, src/agent/classifier.py:197 — `ask(config.classifier.model, …)` → `ask("jev-latest", …)` 와 `system_one(model=model, …)` → `system_one(model="jev-latest", …)` 변이가 초록. tests/test_classifier.py:199, :493 이 고정 설정의 유일한 값 `"jev-latest"` 만 확인(.adw/ship-report.md § Test integrity, R2)
 - direction: tests/test_classifier.py 에 classifier.model 을 `jev-test-x` 로 바꾼 설정으로 classify 를 불러 FakeJev 의 model 인자와 가짜 system_one 의 `model=` 이 `jev-test-x` 인지 보는 테스트를 더한다 — 코드 변경 없음
@@ -223,7 +223,7 @@ other line is required on every item.
 - attempts: 0 · last failure: —
 - first seen: 2026-10-13 · last seen: 2026-10-13
 
-### S-NEW-3 — 정확도 러너의 경계(오류가 일부만 · 정확히 20/22)를 테스트로 고정
+### S-013 — 정확도 러너의 경계(오류가 일부만 · 정확히 20/22)를 테스트로 고정
 - source: cycle 20261013-161343-adw/phase-3-classifier-topic · tracker plans/interview-marketing-agent.md#phase-3 · deferred by ship-check
 - evidence: tests/jev_accuracy.py:28, tests/jev_accuracy.py:81-82, tests/jev_accuracy.py:108 — `any(t.error > 0 …)` → `all(…)` · ko 만 보기, `t.correct >= PASS_CORRECT` → `>`, `PASS_CORRECT = 21` 변이가 모두 초록. test_runner_error_holds_exit_3(tests/test_classifier.py:672)는 22개 × 두 언어 모두 오류인 경우만 돌림(.adw/ship-report.md § Test integrity, R3)
 - direction: tests/test_classifier.py ExamplesTest 에 ① en 의 예시 하나만 JevError 를 내는 가짜로 main 이 3 과 `측정 실패` 줄을 내는지 ② 잘못된 일치 0 · 정확히 20/22(YES 라벨 둘을 NO 로 답하는 가짜)로 main 이 0 과 `권고: ko 그대로` 를 내는지 보는 테스트를 더한다 — 코드 변경 없음
@@ -232,7 +232,7 @@ other line is required on every item.
 - attempts: 0 · last failure: —
 - first seen: 2026-10-13 · last seen: 2026-10-13
 
-### S-NEW-4 — 가짜 SDK 의 응답 검증 오류를 진짜 typesafe-sdk 0.7.4 계보로 맞추기
+### S-014 — 가짜 SDK 의 응답 검증 오류를 진짜 typesafe-sdk 0.7.4 계보로 맞추기
 - source: cycle 20261013-161343-adw/phase-3-classifier-topic · tracker plans/interview-marketing-agent.md#phase-3 · deferred by ship-check
 - evidence: tests/test_classifier.py:147 `class TypeSafeAPIResponseValidationError(TypeSafeError)` — 진짜 0.7.4 휠 `_core/errors.py:176` 은 `class TypeSafeAPIResponseValidationError(TypeSafeAPIError)` 라 `.status` 가 있어 실제 이유는 `API 오류: TypeSafeAPIResponseValidationError 200` 꼴. docs/research/jev.md 오류 항목에 이 계보가 없음(.adw/ship-report.md § Risks R4)
 - direction: 가짜 TypeSafeAPIResponseValidationError 를 TypeSafeAPIError 의 자식(.status 있음)으로 바꾸고 그 행의 기대 이유에 상태 코드를 넣으며, docs/research/jev.md 'SDK 확인' 절 오류 항목에 "응답 검증 오류도 TypeSafeAPIError 의 자식이라 .status 를 가진다" 한 줄을 더한다 — 코드 변경 없음, 계약의 `[<상태 코드>]` 모양 안
@@ -241,7 +241,7 @@ other line is required on every item.
 - attempts: 0 · last failure: —
 - first seen: 2026-10-13 · last seen: 2026-10-13
 
-### S-NEW-5 — 계약 문서 머리 문단 · 10절 머리 문장에 판별 모듈 반영
+### S-015 — 계약 문서 머리 문단 · 10절 머리 문장에 판별 모듈 반영
 - source: cycle 20261013-161343-adw/phase-3-classifier-topic · tracker plans/interview-marketing-agent.md#phase-3 · deferred by ship-check
 - evidence: docs/contracts.md:5-6 — `src/agent/` 목록에 `classifier.py` 없음; docs/contracts.md:430 — 음성 대조 대상 "가드 · 저장소 · 설정 읽기 · 로그 한 줄 규칙"에 판별 없음(verify-plan § Out of scope 의 RISK 메모, .adw/ship-report.md § Risks R5)
 - direction: 머리 문단 `src/agent/` 목록에 `classifier.py` 를, 10절 머리 문장 대상 목록에 `판별` 을 더한다 — 계약 내용(키 · 판정 토큰 · 형식 · CLI 인자) 변경 없음

@@ -101,3 +101,67 @@
 - source: adw/phase-4-trigger-timing
 - tag: plain
 - status: open
+
+### H-010 — 22개 예시의 일치 · 불일치 라벨을 사람이 검토하기(`tests/classifier_examples.py`) — 정확도 숫자를 믿기 전에
+- project: marketing-agent-demo
+- when: 2026-10-13 · plans/interview-marketing-agent.md#phase-3
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-3-classifier-topic
+- tag: plain
+- status: open
+
+### H-011 — `pip install -r requirements.txt` 후 `.env` 의 키를 export 하고 `python3 -m tests.jev_accuracy` 실행. exit 3 이면 키 · SDK · 연결부터 고침. 권고 줄 없이 traceback 과 exit 1 이면 설치 · 설정 문제지 모델 문제가 아님(R7). 결과 두 줄을 계약 '주제 판별' 절의 정확도 기록에 적고, 권고가 en 이면 후속 사이클, 둘 다 미달이면 인터뷰로
+- project: marketing-agent-demo
+- when: 2026-10-13 · plans/interview-marketing-agent.md#phase-3
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-3-classifier-topic
+- tag: plain
+- status: open
+
+### H-012 — 실제 `CLASSIFY` 이유를 보고 `noul_yes_min` · `noul_no_max` · `choice_min_confidence`(지금 0.8 / 0.2 / 0.5, 잰 값 아님) 조정하기
+- project: marketing-agent-demo
+- when: 2026-10-13 · plans/interview-marketing-agent.md#phase-3
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-3-classifier-topic
+- tag: plain
+- status: open
+
+### H-013 — 착지 때 lane 2 · 4 · 5 가 먼저 `## 11.` 을 붙였으면 이 절 번호를 다시 매기고, `config.py` 키 꼬리 · `config.yaml` · `VALID` · `CommittedConfigTest` · `requirements.txt` · 계약 1 · 2 · 8 · 10절의 겹친 추가분을 합치기
+- project: marketing-agent-demo
+- when: 2026-10-13 · plans/interview-marketing-agent.md#phase-3
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-3-classifier-topic
+- tag: plain
+- status: open
+
+### H-014 — topic 길이에 상한을 둘지(계약 2절), 아니면 state 몫이 2만 2천 바이트 아래면 보류할지 정하기 — 지금은 아주 긴 topic 에서 영상 글 없이 판정이 나옴(R6)
+- project: marketing-agent-demo
+- when: 2026-10-13 · plans/interview-marketing-agent.md#phase-3
+- from: ship-report.md § Human checks — .adw/ship-report.md § Risks
+- source: adw/phase-3-classifier-topic
+- tag: plain
+- status: open
+
+### H-015 — 판정에 고른 보기의 확률(`probabilities[choice]`)도 볼지 정하기 — 지금은 확률 0.01 인 보기도 confidence 만 높으면 일치(R8)
+- project: marketing-agent-demo
+- when: 2026-10-13 · plans/interview-marketing-agent.md#phase-3
+- from: ship-report.md § Human checks — .adw/ship-report.md § Risks
+- source: adw/phase-3-classifier-topic
+- tag: plain
+- status: open
+
+### H-016 — `pip-audit` 가 있는 기계에서 `pip-audit -r requirements.txt` 를 돌리고, `typesafe-sdk==0.7.4` 해시 고정으로 좁힐지 정하기(R12)
+- project: marketing-agent-demo
+- when: 2026-10-13 · plans/interview-marketing-agent.md#phase-3
+- from: ship-report.md § Human checks — .adw/ship-report.md § Risks
+- source: adw/phase-3-classifier-topic
+- tag: plain
+- status: open
+
+### H-017 — 트래커 Phase 7 절에 이번 주인 줄 옮겨 적기 — `on_error` 는 예외 이름 · 상태만 쓰고 `__cause__` · traceback 을 로그에 남기지 않음, `응답 모양 오류` 이유 길이 자르기(R11)
+- project: marketing-agent-demo
+- when: 2026-10-13 · plans/interview-marketing-agent.md#phase-3
+- from: ship-report.md § Human checks — .adw/ship-report.md § Risks
+- source: adw/phase-3-classifier-topic
+- tag: plain
+- status: open
