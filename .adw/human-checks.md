@@ -165,3 +165,35 @@
 - source: adw/phase-3-classifier-topic
 - tag: plain
 - status: open
+
+### H-018 — 실제 `ANTHROPIC_API_KEY` 와 jev 키로 영상 몇 개를 돌려, 모델 id `claude-sonnet-5-5` 가 받아들여지는지(`ERROR where=writer.claude … 404` 가 아니면 됨) 확인하고, 통과 하한 `0.7` 과 `REPEAT_MIN_CHARS` 12 를 다시 쓰기 · 건너뛰기 비율과 jev 한국어 정확도에 맞춰 조정하기(이번에 더해진 둘도 함께 봄: 규칙 5 와 '연애사주' 언급이 부딪혀 광고 질문 점수가 오르는지(R4), 자료에 넣은 전각 `＜draft_comment＞` 가짜 초안에 jev 가 흔들리는지(R3))
+- project: marketing-agent-demo
+- when: 2026-10-13 · plans/interview-marketing-agent.md#phase-5
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-5-writer-comment
+- tag: plain
+- status: open
+
+### H-019 — 착지 때 lane-merge 가 6개 파일 충돌(config.yaml · docs/contracts.md · requirements.txt · src/agent/config.py · tests/mutants.py · tests/test_config.py)을 NEEDS-HUMAN 으로 넘기면 Phase 3 · 5 의 설정 키와 `requirements.txt` 줄이 모두 살아남게 풀기
+- project: marketing-agent-demo
+- when: 2026-10-13 · plans/interview-marketing-agent.md#phase-5
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-5-writer-comment
+- tag: plain
+- status: open
+
+### H-020 — 링크 검사의 빈틈(점 닮은꼴 `‧` `•` `∙` `°` · 키릴 끝 · U+202E 뒤집기 · `saju.한국`)을 jev 광고 질문에 맡겨 받아들일지, 구분점 무리를 넓히고 양방향 제어 글자를 댓글에서 막을지 정하기(R1)
+- project: marketing-agent-demo
+- when: 2026-10-13 · plans/interview-marketing-agent.md#phase-5
+- from: ship-report.md § Human checks — .adw/ship-report.md § Risks
+- source: adw/phase-5-writer-comment
+- tag: plain
+- status: open
+
+### H-021 — Phase 7 이 계획을 세우기 전에, 트래커 Phase 7 절에 "`write_comment` 가 던진 예외는 그 영상 하나의 오류로 받아 `ERROR` 로 남기고 다음 영상으로 · jev 포트 어댑터는 상태 코드를 `status_code` 나 메시지로 싣는다"를 더할지 정하기(R2 · R5)
+- project: marketing-agent-demo
+- when: 2026-10-13 · plans/interview-marketing-agent.md#phase-5
+- from: ship-report.md § Human checks — .adw/ship-report.md § Risks
+- source: adw/phase-5-writer-comment
+- tag: plain
+- status: open
