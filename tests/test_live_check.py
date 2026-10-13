@@ -340,6 +340,15 @@ def floor_above_one() -> dict:
     return result
 
 
+def confidence_floor_only() -> dict:
+    result = healthy_result()
+    for language in LANGUAGES:
+        no_rows(result["accuracy"][language])[0].update(
+            noul=0.97, choice=ON, confidence=0.6, verdict="yes"
+        )
+    return result
+
+
 def no_max_moved() -> dict:
     result = healthy_result()
     for language in LANGUAGES:
@@ -459,6 +468,7 @@ G1_CASES: tuple[Callable[[], dict], ...] = (
     both_models_rejected,
     human_filled,
     all_cases,
+    confidence_floor_only,
 )
 
 
@@ -553,6 +563,13 @@ class VerdictTest(unittest.TestCase):
         self.assertEqual(
             line, "6B: stop — 판별 미달(ko 잘못된 일치 못 막음 · en 잘못된 일치 못 막음)"
         )
+
+    def test_confidence_floor_alone_blocks_false_yes(self) -> None:
+        result = confidence_floor_only()
+        base = live_check.classifier_config(result["fingerprint"]["classifier"])
+        for language in LANGUAGES:
+            self.assertEqual(live_check.best_correct(result["accuracy"][language], base), 21)
+        self.assertEqual(self.line(result), "6B: go")
 
     def test_noul_no_max_moves_freely(self) -> None:
         result = no_max_moved()
@@ -779,6 +796,12 @@ class VerdictFlagTest(unittest.TestCase):
                 self.assertEqual(err, "")
                 self.assertEqual(code, 0 if result["verdict"] == "6B: go" else 1)
 
+    def test_confidence_floor_sample_recounts_go(self) -> None:
+        result = confidence_floor_only()
+        result["verdict"] = live_check.verdict_line(result)
+        self.store(result)
+        self.assertEqual(self.recount(["--verdict", str(self.path)]), (0, "6B: go\n", ""))
+
     def test_mismatched_stored_verdict_adds_a_line(self) -> None:
         result = ceiling_stop()
         self.store(result)  # 저장된 판정은 healthy_result 의 "6B: go" 그대로
@@ -907,6 +930,8 @@ SHORT = "짧은 초안표식"
 COMMENTS = ["영상 속 답장 기다리던 장면 공감해요 댓글표식", "저도 썸 탈 때 그랬어요 댓글표식"]
 GRADE_OK = {"scene_in_material": True, "reads_like_ad": False, "follows_concern": True}
 GRADE_BAD = {"scene_in_material": False, "reads_like_ad": False, "follows_concern": True}
+GRADE_AD = {"scene_in_material": True, "reads_like_ad": True, "follows_concern": True}
+GRADE_OFF_CONCERN = {"scene_in_material": True, "reads_like_ad": False, "follows_concern": False}
 MARKERS = ("제목표식", "설명표식", "댓글표식", "고민표식", "초안표식")
 AUTHOR = "작성자표식"
 AUTHOR_CHANNEL = "UCauthor표식0000000000000"
@@ -1938,6 +1963,17 @@ class VideoRoundTest(LiveCheckCase):
         self.assertEqual(len(self.calls_of("grade")), 6)
         # 넓힌 창의 SKIP 도 셉니다 — 쓴 영상 3 중 SKIP 2
         self.assertEqual(result["verdict"], "6B: stop — 작성 막힘(SKIP 2/3)")
+
+    def test_ad_or_off_concern_grade_is_bad(self) -> None:
+        self.jev.checks = [FAILING, PASSING, FAILING, FAILING, FAILING, FAILING]
+        self.claude.writes = [writer_reply(), writer_reply()]
+        self.claude.grades = [GRADE_AD, GRADE_OFF_CONCERN]
+        code, out, err, result = self.run_main()
+        drafts = self.by_id(result)[vid(1)]["drafts"]
+        self.assertEqual(
+            [(draft["grade"], draft["claude_grade"]) for draft in drafts],
+            [(GRADE_AD, "bad"), (GRADE_OFF_CONCERN, "bad")],
+        )
 
     def test_unparsable_reply_is_recorded_without_grade(self) -> None:
         self.add_video("연애", "widened", 6, 2000)
