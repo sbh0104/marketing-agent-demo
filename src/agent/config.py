@@ -44,6 +44,8 @@ class LimitsConfig:
 class CommentConfig:
     min_chars: int
     max_chars: int
+    writer_model: str
+    check_min_probability: float
 
 
 @dataclass(frozen=True)
@@ -121,7 +123,7 @@ _TOP_KEYS = (
 _SECTION_KEYS = {
     "trigger": ("min_views", "max_views", "max_age_hours", "min_views_per_hour"),
     "limits": ("daily_max_comments", "channel_cooldown_hours", "daily_max_searches"),
-    "comment": ("min_chars", "max_chars"),
+    "comment": ("min_chars", "max_chars", "writer_model", "check_min_probability"),
     "classifier": (
         "model",
         "noul_yes_min",
@@ -268,9 +270,14 @@ def config_from_mapping(data: Mapping[str, object]) -> Config:
 
     comment = _section(data, "comment")
     min_chars = _int(comment["min_chars"], "comment.min_chars", 1)
+    # check_min_probability 의 상한 1 은 확률의 끝입니다 — 숫자 키는 모두 상한을 둡니다.
     comment_config = CommentConfig(
         min_chars=min_chars,
         max_chars=_int(comment["max_chars"], "comment.max_chars", min_chars),
+        writer_model=_text(comment["writer_model"], "comment.writer_model"),
+        check_min_probability=_number(
+            comment["check_min_probability"], "comment.check_min_probability", 0, 1
+        ),
     )
     classifier_config = _classifier(data)
 

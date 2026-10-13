@@ -9,9 +9,10 @@ Phase 2–7 의 모든 단계가 기대는 계약입니다. 설정 읽기, 영�
 
 - Python 3.10 이상. 3.11 이후에만 있는 기능(`datetime.UTC`, `enum.StrEnum`, `tomllib`,
   `typing.Self`, `except*`)은 쓰지 않습니다.
-- 의존성 설치: `pip install -r requirements.txt` — `PyYAML>=6.0` 과 jev 판별(Phase 3)의
-  `typesafe-sdk>=0.7.4,<0.8` 이 들어 있습니다. 테스트는 SDK 없이 돕니다 — 판별 테스트는 가짜
-  jev 를 씁니다. Phase 6 이 Playwright 를 더합니다.
+- 의존성 설치: `pip install -r requirements.txt` — `PyYAML>=6.0`(설정 읽기), jev 판별(Phase 3)의
+  `typesafe-sdk>=0.7.4,<0.8`, 댓글 작성기(Phase 5, 11절)의 Claude SDK `anthropic>=0.40` 세 줄입니다.
+  테스트는 SDK 없이 돕니다 — 판별 테스트는 가짜 jev 를, 작성기 테스트는 가짜 클라이언트를 씁니다.
+  Phase 6 이 Playwright 를 더합니다.
 - 테스트(저장소 뿌리에서, 설치 없이):
 
   ```
@@ -44,6 +45,8 @@ Phase 2–7 의 모든 단계가 기대는 계약입니다. 설정 읽기, 영�
 | `limits.daily_max_searches` | 정수 | ≥ 0 | `100` (과제 밖에서 더한 키) |
 | `comment.min_chars` | 정수 | ≥ 1 | `40` |
 | `comment.max_chars` | 정수 | ≥ `min_chars` | `120` |
+| `comment.writer_model` | 글자 | 비어 있지 않음 — 댓글을 쓰는 Claude 모델 이름 (11절) | `claude-sonnet-5-5` |
+| `comment.check_min_probability` | 숫자 | ≥ 0, ≤ 1 — jev 자체 검사 통과 하한 (11절) | `0.7` |
 | `classifier.model` | 글자 | 비어 있지 않음 — jev 모델 이름 | `jev-latest` |
 | `classifier.noul_yes_min` | 숫자 | > 0.5, ≤ 1 — 주제 일치 확률이 이 값 이상이어야 일치 | `0.8` |
 | `classifier.noul_no_max` | 숫자 | ≥ 0, < `noul_yes_min` — 이 값 이하여야 불일치, 사이는 보류 | `0.2` |
@@ -64,6 +67,9 @@ Phase 2–7 의 모든 단계가 기대는 계약입니다. 설정 읽기, 영�
   대기는 9절이 묶습니다.
 - `limits.daily_max_searches` 는 과제 예시에 없는 키입니다. Phase 2 의 하루 검색 상한을
   설정 값으로 두기 위해 지금 계약에 넣었습니다(쿼터 약 100회/일). Phase 2 가 값을 조정합니다.
+- `comment.writer_model` · `comment.check_min_probability` 는 과제 예시에 없는 키로, Phase 5 가
+  댓글 작성 · 자체 검사를 위해 더했습니다(11절). `check_min_probability` 의 상한 1 은 확률의
+  끝입니다.
 - **YAML 1.1 함정 — 글자 자리에서는 크게 실패합니다.** 따옴표 없는 `yes`/`no`/`on`/`off` 는
   bool, `2026-10-12` 는 날짜, `12345678901` 은 정수로 읽히므로 글자 자리에 오면 오류입니다
   (예: `keywords: [연애, no]`, `topic: yes`, `allowed_videos: [12345678901]`). 이런 값은
@@ -393,6 +399,8 @@ Phase 3–5 가 정합니다.)
   목록을 임의 폴더 아래에서 `git check-ignore` 로 확인합니다.
 - `data/` 와 `logs/` 는 폴더만(`.gitkeep`) 커밋합니다. `logs/sample.log` 는 제출물이라 커밋할
   수 있습니다.
+- `.env.example` 에는 댓글 작성 Claude 키 `ANTHROPIC_API_KEY=` 도 있습니다(Phase 5).
+  `anthropic_client()` 에 키를 넘기지 않으면 `anthropic` 패키지가 이 환경 변수를 읽습니다(11절).
 
 ## 9. 주기 실행 — `scheduler.py`
 
@@ -454,6 +462,27 @@ run_loop(cycle, reload, initial, *, on_error, sleep=time.sleep,
   python3 -m tests.mutants scheduler-one-sleep
   python3 -m tests.mutants scheduler-unclamped-wait
   python3 -m tests.mutants logbook-raw-line-breaks
+  python3 -m tests.mutants writer-hardcoded-model
+  python3 -m tests.mutants writer-no-rewrite
+  python3 -m tests.mutants writer-third-try
+  python3 -m tests.mutants writer-ignore-self-check
+  python3 -m tests.mutants writer-threshold-strict
+  python3 -m tests.mutants writer-no-float-tolerance
+  python3 -m tests.mutants writer-ad-not-inverted
+  python3 -m tests.mutants writer-trusts-jev-answer
+  python3 -m tests.mutants writer-no-length
+  python3 -m tests.mutants writer-length-in-bytes
+  python3 -m tests.mutants writer-no-link
+  python3 -m tests.mutants writer-link-no-nfkc
+  python3 -m tests.mutants writer-link-view-keeps-all
+  python3 -m tests.mutants writer-link-ascii-separators-only
+  python3 -m tests.mutants writer-link-latin-left-only
+  python3 -m tests.mutants writer-link-no-handle
+  python3 -m tests.mutants writer-no-repeat
+  python3 -m tests.mutants writer-repeat-keeps-punctuation
+  python3 -m tests.mutants writer-repeat-all-history
+  python3 -m tests.mutants writer-unescaped-material
+  python3 -m tests.mutants writer-api-error-unlogged
   python3 -m tests.mutants classifier-error-yes
   python3 -m tests.mutants classifier-malformed-yes
   python3 -m tests.mutants classifier-unchecked-probability
@@ -466,8 +495,110 @@ run_loop(cycle, reload, initial, *, on_error, sleep=time.sleep,
 
   `classify` · `read_answers` · `build_state` · `is_error_hold` · `sdk_ask` ·
   `decide_post` · `video_id_from_ref` · `put` · `reserve_live` · `check_post` · `load_config` ·
-  `config_from_mapping` · `run_loop` · `format_line` 의 본문을 고칠 때는 이 명령들이 계속 1 로
-  끝나는지 함께 확인합니다.
+  `config_from_mapping` · `run_loop` · `format_line` · `write_comment` · `code_failures` ·
+  `self_check_failure` · `link_fragment` · `repeated_run` 의 본문을 고칠 때는 이 명령들이 계속
+  1 로 끝나는지 함께 확인합니다.
+
+## 11. 댓글 작성 — `writer.py` (Phase 5)
+
+Phase 7 이 영상마다 부르는 모양:
+
+```python
+result = write_comment(record, config=config.comment, claude=anthropic_client(),
+                       check=<Phase 3 의 jev 검사>, previous=store.comments(),
+                       logbook=logbook, now=now, transcript=…, top_comments=…)
+if result.draft is not None:
+    record.comment = result.draft
+    store.put(record)
+```
+
+- `WriteResult(draft, skip_reason)` 는 둘 중 정확히 하나를 담습니다(둘 다 있거나 둘 다 없으면
+  `ValueError`). `write_comment` 는 `COMMENT` · `SKIP` · `ERROR` 줄을 직접 남기고 저장소는
+  건드리지 않습니다 — 초안을 `record.comment` 에 넣고 `store.put` 하는 것은 Phase 7 의
+  몫입니다.
+- **주제 판별 문** — `record.classification` 이 없거나 `verdict` 가 `yes` 가 아니면
+  `ValueError("주제 판별이 yes 인 영상에만 댓글을 씁니다: <영상 ID>")` 이고 Claude 를 부르지
+  않습니다.
+- **`claude` 포트** — `anthropic.Anthropic` 과 같은 모양
+  (`messages.create(model=, max_tokens=, system=, messages=)`). `anthropic_client(api_key=None)`
+  가 실제 클라이언트를 만듭니다. `anthropic` 패키지는 이 함수 안에서만 가져오므로 테스트는 설치
+  없이 돕니다. 제한 시간은 60초(`CLAUDE_TIMEOUT_S` — SDK 기본값 10분이면 한 줄로 도는 루프가
+  멈춥니다)이고, 429/529 재시도는 SDK 기본값 그대로입니다. 모델 이름은 `comment.writer_model`
+  (2절)에서 읽습니다.
+- **`check` 포트** — `check(state, questions) -> {질문 이름: P(예)}`. 초안 한 개에 `noul` 질문
+  세 개(`CHECK_QUESTIONS`: `mentions_scene` · `reads_like_ad` · `follows_concern`)를 **한
+  요청**으로 묻습니다. 접속(키 `TYPESAFE_API_KEY` · jev 모델 · `typesafe-sdk`)은 Phase 3 의
+  것이고, Phase 7 이 Phase 3 의 클라이언트를 이 자리에 이어 붙입니다.
+
+**흐름** — 시도마다(최대 두 번):
+
+1. Claude 가 JSON `{"concern": "고민 한 줄", "comment": "댓글"}` 으로 답합니다. 읽을 수 없으면
+   jev 를 부르지 않고 그 시도는 `JSON 으로 읽을 수 없습니다` 로 떨어집니다.
+2. jev 자체 검사.
+3. 코드 검사 — 글자 수 · 링크 · 반복을 **모두** 돌립니다(코드가 마지막).
+
+떨어진 이유(jev 이유가 먼저, 코드 이유는 위 순서)를 모두 `; ` 로 이어 다시 쓰기 이유 하나로
+만들고, 같은 대화에 Claude 의 원래 답(assistant)과 `REWRITE_PROMPT`(user)를 붙여 한 번 다시
+씁니다. 두 번째도 떨어지면 `SKIP reason="검사 두 번 탈락 — 1차: … / 2차: …"` 입니다. 통과하면
+`COMMENT` 를 남기고 초안을 돌려줍니다.
+
+| 검사 | 통과 규칙 | 떨어질 때 이유 |
+|---|---|---|
+| 답 읽기 | JSON 객체, `concern` · `comment` 가 비어 있지 않은 글자 | `JSON 으로 읽을 수 없습니다` |
+| jev 자체 검사 | 질문마다 점수 + `_TOLERANCE` ≥ `check_min_probability` | `자체 검사 미달 — <이름표> <P(예)>, …` |
+| 글자 수 | `min_chars` ≤ 글자 수 ≤ `max_chars` | `글자 수 <n>자 — <min>–<max>자여야 합니다` |
+| 링크 | 링크 보기에 `_LINK_RE` 조각이 없음 | `링크·주소 모양이 들어 있습니다: <조각>` |
+| 반복 | 최근 댓글과 같지 않고, 겹친 연속 글자 < 12 | `이전 댓글과 겹칩니다: <겹친 글자>` |
+
+- 이름표(`CHECK_LABELS`)는 `영상 속 장면·말 언급` · `광고처럼 읽힘` · `영상 고민과 이어짐`
+  이고, 확률은 소수 둘째 자리입니다(`자체 검사 미달 — 영상 속 장면·말 언급 0.25`).
+- **하한 비교** — 점수는 `mentions_scene` · `follows_concern` 이 P(예), `reads_like_ad` 는
+  1 − P(예)입니다. jev 는 부정을 글자 그대로 읽으므로 광고 질문은 긍정으로 묻고 뒤집습니다.
+  `score + _TOLERANCE < check_min_probability` 이면 떨어집니다(`_TOLERANCE = 1e-9`). 그냥 `<`
+  로 비교하면 1 − P 의 부동소수 오차(`1 - 0.9 = 0.0999…98`) 때문에 두 자리 하한 99개 중 20개에서
+  "하한과 같으면 통과" 가 깨집니다.
+- **글자 수** — NFC 로 맞춘 댓글의 `len()`, 곧 코드 포인트 수이지 바이트가 아닙니다.
+  `parse_output` 이 댓글을 NFC 로 맞추고 앞뒤 공백을 떼며, 고민은 한 줄로 모읍니다.
+- **링크** — 링크 보기는 NFKC + casefold 한 글에서 글자 · 숫자(`isalnum`, 한글 포함)와 `@` 는
+  그대로, 유니코드 이름에 `FULL STOP`/`DOT` 이 든 글자는 `.`, `SOLIDUS`/`SLASH` 는 `/`,
+  `COLON` 은 `:` 로 남기고, 나머지(공백 · 괄호 · 보이지 않는 글자 · 다른 문장부호)는 모두
+  버립니다. 링크는 `_LINK_RE` — `[^\W_]\.+[a-z]{2,}|@[^\W_]|:/|[0-9]{1,3}(?:\.[0-9]{1,3}){3}`,
+  곧 글자 뒤 점 뒤 영문(호스트와 끝) · `@이름` · 스킴 · IPv4 입니다. 그래서 `연애사주.com` ·
+  `naver . me` · `ｎａｖｅｒ．ｍｅ` · `naver[.]com` · `youtu·be` · 보이지 않는 글자로 가른 주소도
+  걸리고, `1.5배` · `10:30` · `P.S. 저도` · `A/S` · `장면·말` · `봤는데, MBTI랑` 은 지나갑니다.
+  - 받아들인 오탐: `좋았어요. MBTI도` 는 `어요.mbti` 로 걸려 다시 쓰기 하나를 치릅니다(막는 쪽).
+  - 남은 틈: 한글 호스트에 한글 끝(`연애사주.한국`)은 문장 끊김과 구분할 수 없어 코드 검사에서
+    빠지고, 광고 질문에 맡깁니다.
+- **반복** — 두 글을 NFKC + casefold 한 뒤 `isalnum` 글자만 남겨 비교합니다. 최근 댓글과
+  같거나, `difflib.SequenceMatcher(autojunk=False)` 로 찾은 가장 긴 연속 공통 글자가
+  `REPEAT_MIN_CHARS`(12, 코드 상수) 이상이면 반복입니다. 비교 대상은 `previous` 의 마지막
+  `RECENT_WINDOW`(20)개 — Claude 가 `<my_previous_comments>` 에서 보는 바로 그 댓글들입니다.
+- **자료** — 태그 블록 `<video_title>` · `<video_description>` · `<transcript>`(자막이 비었으면
+  대신 `<top_comments>` — 비어 있지 않은 인기 댓글 앞 10개) · `<classification>` ·
+  `<my_previous_comments>`(최근 댓글이 있을 때만). 시스템 프롬프트가 태그 안의 글을 지시가 아닌
+  자료로 선언하고, 자료의 `<` `>` 는 `＜` `＞` 로 바꿔 태그를 닫지 못하게 합니다. 자르는 길이는
+  제목 300 · 설명 2000 · 자막 6000자, 인기 댓글 · 판별 이유 · 이전 댓글 · 검사용 고민과 초안
+  각 300자입니다. jev 상태는 같은 자료 블록에 `<video_concern>` · `<draft_comment>` 를 더한
+  것입니다.
+- **API 오류** — Claude 호출이나 jev 호출이 오류를 내거나 jev 답이 이상하면 다시 쓰지 않고(다시
+  써도 고쳐지지 않음) `ERROR where=writer.claude` 또는 `where=writer.jev` 와, 같은 이유의
+  `SKIP` 을 남깁니다:
+  - `claude 호출 실패: <오류 종류> <상태 코드>: <메시지 200자까지>` (상태 코드는 있을 때만)
+  - `jev 검사 호출 실패: <오류 종류>: <메시지 200자까지>`
+  - `jev 검사 응답 이상: <질문 이름>` — 묶음이 아니거나, 질문이 빠졌거나, 값이 bool · 숫자
+    아님 · 0–1 밖(NaN 포함)
+
+  잘못된 모델 이름 · 취소된 키 · 크레딧 없음 · jev 포트 모양 불일치 같은 영구 오류도 이렇게
+  원인과 함께 `ERROR` 로 보입니다. 그 `ERROR` 위에 멈춤 정책을 세우는 것은 Phase 7 의
+  몫입니다. `try` 안에는 `messages.create` 와 `check` 호출만 있으므로, 모양이 틀린 Claude
+  응답(작성기 버그)은 건너뛰기로 숨지 않고 그대로 오류가 됩니다.
+- **로그** — `COMMENT` 는 필수 필드 뒤에 `attempt`(1 또는 2)와
+  `check`(`mentions_scene=0.90 reads_like_ad=0.10 follows_concern=0.80`)를 더합니다(7절의
+  "나머지 필드").
+- **`self_check`** — 초안의 `self_check` 는 `Judgement(yes, "<질문>=<P(예)> …", now)` 입니다.
+  `CommentDraft.at` 도 넘겨받은 `now` 이고, 숨은 시계는 없습니다.
+- 프롬프트 원문(`SYSTEM_PROMPT` · `USER_INSTRUCTION` · `REWRITE_PROMPT` · `CHECK_QUESTIONS` ·
+  `CHECK_LABELS`)은 `writer.py` 맨 위에만 있고, Phase 8 의 PROCESS.md 가 옮겨 적습니다.
 
 ## 11. 트리거 판정 — `trigger.py`
 
