@@ -282,6 +282,20 @@ class DetectTest(WatcherCase):
         query = self.api.calls[0][1]
         self.assertEqual(query["publishedAfter"], "2026-10-12T00:00:00Z")
 
+    def test_age_window_edge_comes_from_the_config_s036(self) -> None:
+        # max_age_hours 6 — 정확히 NOW−6h 는 창 밖(경계는 `>`), NOW−5h 는 창 안
+        edge, inside = "eeeeeeeeeee", "iiiiiiiiiii"
+        self.seed(edge, published=NOW - 6 * HOUR)
+        self.seed(inside, published=NOW - 5 * HOUR)
+        self.api.videos[edge] = video_item(edge, 2000)
+        self.api.videos[inside] = video_item(inside, 2000)
+        config = dataclasses.replace(CONFIG, trigger=TriggerConfig(1000, 5000, 6.0, 150.0))
+        self.run_cycle(config)
+        self.assertEqual(self.api.video_batches(), [[inside]])
+        self.assertEqual(self.counts(edge), [1000])
+        self.assertEqual(self.counts(inside), [1000, 2000])
+        self.assertEqual(self.api.calls[0][1]["publishedAfter"], "2026-10-12T06:00:00Z")
+
     def test_video_found_by_two_keywords_keeps_the_first_keyword(self) -> None:
         self.api.pages[("연애", None)] = search_page([A])
         self.api.pages[("썸", None)] = search_page([A])
@@ -343,6 +357,14 @@ class PaginationTest(WatcherCase):
         report = self.run_cycle()
         self.assertEqual(self.api.searches(), [("연애", None)])
         self.assertEqual(self.event_names(), [Event.DETECT, Event.VIEWS])
+        self.assertEqual(report, CycleReport(1, (A,), 1, 0, False, False))
+
+    def test_empty_next_page_token_ends_the_keyword_s036(self) -> None:
+        self.api.pages[("연애", None)] = search_page([A], "")
+        self.api.videos[A] = video_item(A, 1200)
+        report = self.run_cycle()
+        self.assertEqual(self.api.searches(), [("연애", None)])
+        self.assertEqual(self.events(), [detect(A), views(A, 1200)])
         self.assertEqual(report, CycleReport(1, (A,), 1, 0, False, False))
 
     def test_pages_stop_at_the_page_cap(self) -> None:
@@ -645,6 +667,17 @@ class IntakeTest(WatcherCase):
             self.assertEqual(record.published_at, PUBLISHED)
             self.assertEqual(record.published_at.utcoffset(), timedelta(0))
         self.assertEqual(report.detected, (A, B))
+
+    def test_published_at_keeps_its_seconds_s036(self) -> None:
+        self.api.pages[("연애", None)] = search_page([A])
+        self.api.videos[A] = video_item(A, 1200, published="2026-10-12T10:00:37Z")
+        report = self.run_cycle()
+        record = Store(self.store_path).get(A)
+        assert record is not None
+        self.assertEqual(
+            record.published_at, datetime(2026, 10, 12, 10, 0, 37, tzinfo=timezone.utc)
+        )
+        self.assertEqual(report.detected, (A,))
 
     def test_offset_at_the_date_limit_does_not_poison_the_store(self) -> None:
         self.api.pages[("연애", None)] = search_page([B, C])

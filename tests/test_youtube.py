@@ -168,6 +168,19 @@ class LedgerTest(YouTubeCase):
         self.assertEqual(fetch.urls, [])
         self.assertEqual(len(self.stored()), 199)
 
+    def test_last_unit_under_the_ceiling_is_allowed_s036(self) -> None:
+        # 9,999 단위 — videos.list(1단위) 하나는 10,000 에 딱 닿아 지나가고, 다음 것은 막힙니다
+        fetch = FakeFetch()
+        client = self.client(fetch, searches(99, NOW - SECOND) + videos(99, NOW - SECOND))
+        self.assertEqual(self.ledger.usage(NOW), Usage(99, 9999))
+        client.videos(["abcdefghijk"], NOW, limits(90))
+        self.assertEqual(len(fetch.urls), 1)
+        self.assertEqual(self.ledger.usage(NOW), Usage(99, 10000))
+        with self.assertRaises(QuotaExhausted) as caught:
+            client.videos(["abcdefghijk"], NOW, limits(90))
+        self.assert_held(caught.exception, "videos.list", "units", 10000, DAILY_QUOTA_UNITS)
+        self.assertEqual(len(fetch.urls), 1)
+
     def test_unit_ceiling_holds_search_under_a_raised_search_cap(self) -> None:
         for site in ("first page", "next page"):
             with self.subTest(site):
