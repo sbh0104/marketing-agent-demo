@@ -325,3 +325,11 @@
 - source: adw/smoke-sweep-s038-s042
 - tag: plain
 - status: open
+
+### H-038 — H-037에 답하기: 이번 스윕은 계약 머리 문단 부분을 빼고 `config.yaml` 1행 주석만 고쳤습니다. 이 선택이 맞는지 확인하고, 맞으면 H-037을 닫습니다
+- project: marketing-agent-demo
+- when: 2026-10-14 · adw/smoke-sweep-s038
+- from: ship-report.md § Human checks — .adw/smoke-batch.md § S-038
+- source: adw/smoke-sweep-s038
+- tag: plain
+- status: open
