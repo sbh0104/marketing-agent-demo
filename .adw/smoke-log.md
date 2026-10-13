@@ -118,7 +118,7 @@ other line is required on every item.
 - evidence: src/agent/config.py:143, src/agent/config.py:171, src/agent/config.py:180 — 각 하한을 없애는 변이가 스위트에서 초록(.adw/ship-report.md § Test integrity)
 - direction: tests/test_config.py 의 ConfigFromMappingTest 에 channel_cooldown_hours -1·.nan, max_age_hours 0, daily_max_comments -1 이 각각 ConfigError 인지 보는 행을 더한다 — 코드 변경 없음
 - touches: tests/test_config.py
-- status: open
+- status: resolved
 - attempts: 0 · last failure: —
 - first seen: 2026-10-13 · last seen: 2026-10-13
 
@@ -127,7 +127,7 @@ other line is required on every item.
 - evidence: src/agent/logbook.py:51 — `[^\s"=\\]+` 를 `[^ \t"=\\]+` 로 바꾼 변이가 스위트에서 초록(.adw/ship-report.md § Test integrity)
 - direction: tests/test_logbook.py 의 test_rendering_rules 에 "x\ny"·"x\ry" 같은 공백·따옴표 없는 값을 더해 이스케이프된 따옴표 값으로 쓰이고 parse_line 으로 되돌아오는지 본다 — 코드 변경 없음
 - touches: tests/test_logbook.py
-- status: open
+- status: resolved
 - attempts: 0 · last failure: —
 - first seen: 2026-10-13 · last seen: 2026-10-13
 
@@ -147,7 +147,7 @@ other line is required on every item.
 - evidence: src/agent/guard.py:49, src/agent/guard.py:19 — `VIDEO_ID_RE.fullmatch(text)` → `.match(text)` 변이와 `_YOUTUBE_HOSTS` 에 `youtube-nocookie.com` 을 더한 변이가 스위트에서 초록(141개 OK). 앞 변이에서는 `decide_post("AAAAAAAAAAA&v=BBBBBBBBBBB", ["AAAAAAAAAAA&v=BBBBBBBBBBB"], False)` 가 live=True(.adw/ship-report.md § Test integrity)
 - direction: tests/test_guard.py 의 VideoIdFromRefTest 표(158-177행)에 `"AAAAAAAAAAAB"` · `"AAAAAAAAAAA&v=BBBBBBBBBBB"` → None, test_g7 곁에 `https://youtube-nocookie.com/watch?v=AAAAAAAAAAA` → None 행을 더한다 — 코드 변경 없음, 지금 코드는 셋 다 None(ship-check 에서 확인)
 - touches: tests/test_guard.py
-- status: open
+- status: resolved
 - attempts: 0 · last failure: —
 - first seen: 2026-10-13 · last seen: 2026-10-13
 
@@ -156,7 +156,7 @@ other line is required on every item.
 - evidence: src/agent/store.py:170, src/agent/store.py:174 — 하루 창 `timedelta(hours=24)` → `hours=23` 변이와 채널 대기 `hours=limits.channel_cooldown_hours` → `hours=24` 변이가 둘 다 초록(141개 OK). 저장소 테스트는 모두 `LimitsConfig(10, 24.0, 100)`(tests/test_store.py:15)을 쓰고, 하루 창은 정확히 24시간 경계 하나만 본다(tests/test_store.py:121)
 - direction: tests/test_store.py 에 ① 하루 상한 10, 다른 채널 9건을 1시간 전 · 1건을 23.5시간 전에 게시한 뒤 새 채널 → `daily_cap` ② 채널 대기 48시간, 같은 채널 30시간 전 게시 → `channel_cooldown` ③ 채널 대기 1시간, 같은 채널 2시간 전 게시 → `ok` 행을 더한다 — 코드 변경 없음
 - touches: tests/test_store.py
-- status: open
+- status: resolved
 - attempts: 0 · last failure: —
 - first seen: 2026-10-13 · last seen: 2026-10-13
 
@@ -165,7 +165,7 @@ other line is required on every item.
 - evidence: src/agent/config.py:139-160, src/agent/config.py:179-201 — 하한 비교를 `>=`→`>` · `<`→`<=` 로 바꾼 변이, `_number` 의 bool 검사를 뺀 변이, `min_views_per_hour` · `min_views` · `daily_max_searches` · `comment.min_chars` 의 하한을 넓힌 변이 7개가 모두 초록(.adw/ship-report.md § Test integrity)
 - direction: tests/test_config.py 에 ① 하한값 그대로 읽힘: `limits.channel_cooldown_hours: 0` · `trigger.min_views_per_hour: 0` · `limits.daily_max_comments: 0` · `poll_interval_min: 1` · `trigger.max_views` = `min_views` ② 숫자 키의 bool 거부: `trigger.max_age_hours: true` · `limits.channel_cooldown_hours: false` → `숫자여야 합니다` ③ 하한 넷: `trigger.min_views_per_hour: -1` · `trigger.min_views: -1` · `limits.daily_max_searches: -1` → `0 이상이어야 합니다`, `comment.min_chars: 0` → `1 이상이어야 합니다` 행을 더한다 — 코드 변경 없음, 지금 코드는 모두 이렇게 동작(ship-check 에서 확인)
 - touches: tests/test_config.py
-- status: open
+- status: resolved
 - attempts: 0 · last failure: —
 - first seen: 2026-10-13 · last seen: 2026-10-13
 

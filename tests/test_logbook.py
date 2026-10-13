@@ -77,6 +77,15 @@ class FormatLineTest(unittest.TestCase):
         self.assertEqual(event, Event.COMMENT)
         self.assertEqual(parsed, fields)
 
+    def test_bare_looking_line_breaks_round_trip(self) -> None:
+        for value, token in (("x\ny", 'reason="x\\ny"'), ("x\ry", 'reason="x\\ry"')):
+            with self.subTest(value=value):
+                line = format_line(AT, Event.STOP, {"reason": value})
+                self.assertNotIn("\n", line)
+                self.assertNotIn("\r", line)
+                self.assertEqual(line.split(" ", 2)[2], token)
+                self.assertEqual(parse_line(line)[2], {"reason": value})
+
     def test_extras_sort_after_required(self) -> None:
         line = format_line(AT, Event.SKIP, {"zeta": 1, "reason": "dup", "alpha": 2, "video": "v"})
         self.assertEqual(line.split(" ", 2)[2], "video=v reason=dup alpha=2 zeta=1")

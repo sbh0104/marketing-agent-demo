@@ -124,6 +124,13 @@ class CheckPostRowsTest(StoreCase):
         self.posted(10, "UC10", NOW - 24 * HOUR)
         self.assertEqual(self.check(vid(50), "UCnew", live=True), OK)
 
+    def test_s7b_post_23h30_ago_still_counts_toward_cap(self) -> None:
+        limits = LimitsConfig(10, 24.0, 100)
+        for n in range(1, 10):
+            self.posted(n, f"UC{n}", NOW - HOUR)
+        self.posted(10, "UC10", NOW - timedelta(hours=23.5))
+        self.assertEqual(self.store.check_post(vid(50), "UCnew", NOW, limits, True), CAP)
+
     def test_s8_failed_attempts_do_not_count_toward_cap(self) -> None:
         for n in range(1, 11):
             self.failed(n, f"UC{n}", NOW - HOUR)
@@ -137,6 +144,16 @@ class CheckPostRowsTest(StoreCase):
     def test_s10_same_channel_exactly_cooldown_hours_ago_is_ok(self) -> None:
         self.posted(1, "UCsame", NOW - 24 * HOUR)
         self.assertEqual(self.check(vid(50), "UCsame", live=True), OK)
+
+    def test_s9b_cooldown_follows_configured_hours(self) -> None:
+        limits = LimitsConfig(10, 48.0, 100)
+        self.posted(1, "UCsame", NOW - 30 * HOUR)
+        self.assertEqual(self.store.check_post(vid(50), "UCsame", NOW, limits, True), COOLDOWN)
+
+    def test_s10b_short_cooldown_has_passed(self) -> None:
+        limits = LimitsConfig(10, 1.0, 100)
+        self.posted(1, "UCsame", NOW - 2 * HOUR)
+        self.assertEqual(self.store.check_post(vid(50), "UCsame", NOW, limits, True), OK)
 
     def test_s11_different_channel_within_cooldown_is_ok(self) -> None:
         self.posted(1, "UCother", NOW - HOUR)

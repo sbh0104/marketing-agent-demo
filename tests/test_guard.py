@@ -136,6 +136,9 @@ class GuardRowsTest(unittest.TestCase):
             f"https://youtube.com@evil.example/watch?v={VID}",
             f"ftp://youtube.com/watch?v={VID}",
             f"https://www.youtube.com/embed/{VID}",
+            "AAAAAAAAAAAB",
+            "AAAAAAAAAAA&v=BBBBBBBBBBB",
+            "https://youtube-nocookie.com/watch?v=AAAAAAAAAAA",
         )
         for ref in refs:
             for dry_run in (False, True):
@@ -174,6 +177,9 @@ class VideoIdFromRefTest(unittest.TestCase):
             ("https://youtu.be/", None),
             (PLACEHOLDER, None),
             ("http://[::1", None),
+            ("AAAAAAAAAAAB", None),
+            ("AAAAAAAAAAA&v=BBBBBBBBBBB", None),
+            ("https://youtube-nocookie.com/watch?v=AAAAAAAAAAA", None),
         )
         for ref, expected in table:
             with self.subTest(ref=ref):

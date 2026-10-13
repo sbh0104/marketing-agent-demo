@@ -354,6 +354,62 @@ class ConfigFromMappingTest(unittest.TestCase):
         data.update(parse_yaml("allowed_videos:\n"))
         self.assertEqual(config_from_mapping(data).allowed_videos, ())
 
+    def test_lower_bounds_reject_negative_and_zero_values(self) -> None:
+        rows = (
+            ("limits", "channel_cooldown_hours", -1, "0 이상이어야 합니다"),
+            ("limits", "channel_cooldown_hours", float("nan"), "유한한 숫자여야 합니다"),
+            ("trigger", "max_age_hours", 0, "0 보다 커야 합니다"),
+            ("limits", "daily_max_comments", -1, "0 이상이어야 합니다"),
+        )
+        for section, key, value, message in rows:
+            with self.subTest(path=f"{section}.{key}", value=value):
+                data = valid()
+                data[section][key] = value
+                self.assert_rejected(data, f"{message}: {section}.{key}")
+
+    def test_lower_bound_values_are_accepted(self) -> None:
+        rows = (
+            ("limits", "channel_cooldown_hours", 0),
+            ("trigger", "min_views_per_hour", 0),
+            ("limits", "daily_max_comments", 0),
+        )
+        for section, key, value in rows:
+            with self.subTest(path=f"{section}.{key}", value=value):
+                data = valid()
+                data[section][key] = value
+                config_from_mapping(data)
+        with self.subTest(path="poll_interval_min", value=1):
+            data = valid()
+            data["poll_interval_min"] = 1
+            config_from_mapping(data)
+        with self.subTest(path="trigger.max_views", value="trigger.min_views"):
+            data = valid()
+            data["trigger"]["max_views"] = data["trigger"]["min_views"]
+            config_from_mapping(data)
+
+    def test_bool_in_number_keys_is_rejected(self) -> None:
+        for section, key, value in (
+            ("trigger", "max_age_hours", True),
+            ("limits", "channel_cooldown_hours", False),
+        ):
+            with self.subTest(path=f"{section}.{key}", value=value):
+                data = valid()
+                data[section][key] = value
+                self.assert_rejected(data, f"숫자여야 합니다: {section}.{key}")
+
+    def test_missing_lower_bounds_are_rejected(self) -> None:
+        rows = (
+            ("trigger", "min_views_per_hour", -1, "0 이상이어야 합니다"),
+            ("trigger", "min_views", -1, "0 이상이어야 합니다"),
+            ("limits", "daily_max_searches", -1, "0 이상이어야 합니다"),
+            ("comment", "min_chars", 0, "1 이상이어야 합니다"),
+        )
+        for section, key, value, message in rows:
+            with self.subTest(path=f"{section}.{key}", value=value):
+                data = valid()
+                data[section][key] = value
+                self.assert_rejected(data, f"{message}: {section}.{key}")
+
 
 class LoadConfigTest(unittest.TestCase):
     def setUp(self) -> None:
