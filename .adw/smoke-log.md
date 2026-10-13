@@ -440,7 +440,7 @@ other line is required on every item.
 - evidence: docs/contracts.md:3-6 — 코드 위치로 Phase 1 파일 6개만 나열하고 11절의 env.py · youtube.py · watcher.py 를 빠뜨림. config.yaml:1 — "과제 안내의 예시 값입니다" 인데 poll_interval_min · daily_max_searches 는 과제와 다름(.adw/verify-plan.md § Out of scope (b), .adw/ship-report.md § Smoke candidates)
 - direction: docs/contracts.md:3-6 의 모듈 목록에 `env.py` · `youtube.py` · `watcher.py`(11절)를 더하고, config.yaml:1 주석을 "과제 예시 값이 기본이고, 주기와 검색 상한은 계약 2절대로 바꿈" 으로 고친다 — 값과 계약 조항은 그대로
 - touches: docs/contracts.md, config.yaml
-- status: reverted
+- status: resolved
 - attempts: 1 · last failure: reverted d7ca76f — own check red (스윕 20261014-031024-adw/smoke-sweep-s038-s042)
 - first seen: 2026-10-13 · last seen: 2026-10-13
 
