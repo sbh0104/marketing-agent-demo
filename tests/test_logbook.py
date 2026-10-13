@@ -1,4 +1,4 @@
-"""로그 형식 테스트 — 한 줄 형식, 되읽기, 쓰기."""
+"""로그 형식 테스트 — 한 줄 형식, 되읽기, 쓰기, 줄 경계 글자."""
 from __future__ import annotations
 
 import io
@@ -12,6 +12,14 @@ from agent.models import Verdict
 
 AT = datetime(2026, 10, 12, 12, 30, tzinfo=timezone.utc)
 DETECT = {"video": "abcdefghijk", "channel": "UC123", "keyword": "썸", "title": "연락 텀 때문에 불안한 썸"}
+# 파이썬이 줄 경계로 세는 글자 전부 — 목록을 손으로 적지 않고 splitlines 에서 얻습니다
+SPLITLINES_BREAKS = "".join(
+    chr(cp) for cp in range(0x110000) if len(f"a{chr(cp)}b".splitlines()) != 1
+)
+# HC1 재현 — 제목에 숨겨 가짜 게시 줄을 만들려던 글
+FORGED = (
+    "2026-10-12T21:30:00+09:00 POST video=BBBBBBBBBBB mode=live result=posted reason=allowlisted"
+)
 
 
 def stop(value: object) -> str:
@@ -49,6 +57,11 @@ class FormatLineTest(unittest.TestCase):
             ("a=b", 'reason="a=b"'),
             ("a\\b", 'reason="a\\\\b"'),
             ("tab\there", 'reason="tab\\there"'),
+            ("x\ny", 'reason="x\\ny"'),
+            ("x\ry", 'reason="x\\ry"'),
+            ("x\x85y", 'reason="x\\u0085y"'),
+            ("x\u2028y", 'reason="x\\u2028y"'),
+            ("x\u2029y", 'reason="x\\u2029y"'),
         )
         for value, expected in table:
             with self.subTest(value=value):
@@ -181,6 +194,35 @@ class LogbookTest(unittest.TestCase):
             path = Path(tmp) / "agent.log"
             line = Logbook(path, clock=lambda: AT).write(Event.CYCLE, n=1)
             self.assertEqual(path.read_text(encoding="utf-8"), line + "\n")
+
+
+class LineBreakTest(unittest.TestCase):
+    """HC1 인터뷰(2026-10-13) — 줄 경계 글자를 숨긴 값도 한 사건 한 줄로 남고 그대로 되읽혀야 합니다."""
+
+    def test_splitlines_boundaries_are_the_known_ten(self) -> None:
+        self.assertEqual(SPLITLINES_BREAKS, "\n\v\f\r\x1c\x1d\x1e\x85\u2028\u2029")
+
+    def test_every_boundary_in_a_title_stays_one_line_and_round_trips(self) -> None:
+        for char in SPLITLINES_BREAKS:
+            with self.subTest(char=f"U+{ord(char):04X}"):
+                fields = {**DETECT, "title": f"제목{char}{FORGED}"}
+                line = format_line(AT, Event.DETECT, fields)
+                self.assertEqual(line.splitlines(), [line])
+                self.assertNotIn(char, line)
+                self.assertEqual(parse_line(line), (AT, Event.DETECT, fields))
+
+    def test_log_file_keeps_one_line_per_event(self) -> None:
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        directory = Path(tmp.name)
+        book = Logbook(directory / "agent.log", clock=lambda: AT)
+        for char in SPLITLINES_BREAKS:
+            book.write(Event.DETECT, **{**DETECT, "title": f"제목{char}{FORGED}"})
+        lines = (directory / "agent.log").read_text(encoding="utf-8").splitlines()
+        self.assertEqual(len(lines), len(SPLITLINES_BREAKS))
+        for line in lines:
+            with self.subTest(line=line):
+                self.assertIs(parse_line(line)[1], Event.DETECT)
 
 
 if __name__ == "__main__":
