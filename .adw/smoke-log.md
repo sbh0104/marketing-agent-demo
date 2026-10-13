@@ -311,7 +311,7 @@ other line is required on every item.
 - touches: tests/test_writer.py
 - base: adw/phase-5-writer-comment
 - phase: plans/interview-marketing-agent.md#phase-5
-- status: open
+- status: resolved
 - attempts: 0 · last failure: —
 
 ### S-025 — 자료 자리마다 `<`/`>` 바꿈 · 자르기 길이 · `<classification>` 블록을 테스트로 고정
@@ -321,7 +321,7 @@ other line is required on every item.
 - touches: tests/test_writer.py
 - base: adw/phase-5-writer-comment
 - phase: plans/interview-marketing-agent.md#phase-5
-- status: open
+- status: resolved
 - attempts: 0 · last failure: —
 
 ### S-026 — 프롬프트 문구 · jev 질문 원문 · `hold` 관문을 테스트로 고정
@@ -331,7 +331,7 @@ other line is required on every item.
 - touches: tests/test_writer.py
 - base: adw/phase-5-writer-comment
 - phase: plans/interview-marketing-agent.md#phase-5
-- status: open
+- status: resolved
 - attempts: 0 · last failure: —
 
 ### S-027 — Claude 답의 서로게이트 · 공백뿐인 답 처리
@@ -341,7 +341,7 @@ other line is required on every item.
 - touches: src/agent/writer.py, tests/test_writer.py, docs/contracts.md
 - base: adw/phase-5-writer-comment
 - phase: plans/interview-marketing-agent.md#phase-5
-- status: open
+- status: resolved
 - attempts: 0 · last failure: —
 
 ### S-028 — 계약 '댓글 작성' 절 · writer 주석의 어긋남 바로잡기
@@ -351,7 +351,7 @@ other line is required on every item.
 - touches: docs/contracts.md, src/agent/writer.py
 - base: adw/phase-5-writer-comment
 - phase: plans/interview-marketing-agent.md#phase-5
-- status: open
+- status: resolved
 - attempts: 0 · last failure: —
 
 ### S-029 — 계약 머리 문단의 `src/agent/` 모듈 나열을 없애 페이즈마다 생기는 빠짐을 끊기
