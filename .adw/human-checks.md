@@ -30,3 +30,58 @@
 
 ## Entries
 
+### H-001 — `v` 거부 목록을 매개변수 이름 허용 목록(`si` · `t` · `feature` · `pp` …)으로 바꿀지 정하기 — 이번에 주소 끝 제어 문자(`youtu.be/A?v\x01`)가 거부 목록을 비켜 간다는 근거가 더해짐(R2, 다른 영상 0)
+- project: marketing-agent-demo
+- when: 2026-10-13 · plans/interview-marketing-agent.md#phase-1
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-1-foundation-contracts
+- tag: plain
+- status: open
+
+### H-002 — 진짜 영상 ID 둘로 `youtu.be/<내 ID>?V=<다른 ID>`, `?%56=`, `?+v=`, 전각 `v` 가 실제 YouTube 에서 다른 영상을 트는지 한 번 확인하기
+- project: marketing-agent-demo
+- when: 2026-10-13 · plans/interview-marketing-agent.md#phase-1
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-1-foundation-contracts
+- tag: plain
+- status: open
+
+### H-003 — Windows 와 macOS 에서 스위트를 한 번씩 돌리기(Windows 는 출력이 cp949 일 때 이모지 제목의 echo 도 봄)
+- project: marketing-agent-demo
+- when: 2026-10-13 · plans/interview-marketing-agent.md#phase-1
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-1-foundation-contracts
+- tag: plain
+- status: open
+
+### H-004 — Phase 8 직전 `git ls-files` 로 크롬 프로필 · 쿠키 · `.env` · `credentials.json` 류가 커밋되지 않았는지 확인하기
+- project: marketing-agent-demo
+- when: 2026-10-13 · plans/interview-marketing-agent.md#phase-1
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-1-foundation-contracts
+- tag: plain
+- status: open
+
+### H-005 — Phase 7 이 시작하기 전에 트래커 Phase 7 절의 로그 결정에 "로그 증명은 UTF-8 로만 읽고 `\n` 으로만 나눈다"를 더할지 정하기(R1 latin-1 가짜 POST · R5 계약 7절 문단과 함께)
+- project: marketing-agent-demo
+- when: 2026-10-13 · plans/interview-marketing-agent.md#phase-1
+- from: ship-report.md § Human checks — .adw/ship-report.md § Risks
+- source: adw/phase-1-foundation-contracts
+- tag: plain
+- status: open
+
+### H-006 — 정수 설정 키에 자릿수 상한을 둘지, 계약 2절의 "비교와 셈에만 쓰인다" 문장만 고칠지 정하기(R4)
+- project: marketing-agent-demo
+- when: 2026-10-13 · plans/interview-marketing-agent.md#phase-1
+- from: ship-report.md § Human checks — .adw/ship-report.md § Risks
+- source: adw/phase-1-foundation-contracts
+- tag: plain
+- status: open
+
+### H-007 — 트래커 Phase 2 · Phase 7 절에 Phase 1 이 넘긴 주인 줄(짝 없는 서로게이트 제목 → Phase 2 · 7, cp949 echo 이모지 → Phase 7)을 옮겨 적기 — 지금은 Phase 1 절 79행에만 있음
+- project: marketing-agent-demo
+- when: 2026-10-13 · plans/interview-marketing-agent.md#phase-1
+- from: ship-report.md § Human checks — .adw/ship-report.md § Risks
+- source: adw/phase-1-foundation-contracts
+- tag: plain
+- status: open
