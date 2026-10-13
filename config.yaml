@@ -11,7 +11,7 @@ trigger:
 limits:
   daily_max_comments: 10       # 최근 24시간 게시 수 상한 (성공 + 결과 모르는 예약)
   channel_cooldown_hours: 24   # 같은 채널 재댓글 대기 시간
-  daily_max_searches: 90       # 최근 24시간 search.list 호출 상한(페이지 넘김 포함). 90 × 100 = 9,000 단위, 남는 1,000 단위는 조회수 호출 몫
+  daily_max_searches: 90       # 검색 상한. 장부가 일부러 1회 100단위로 셈(구글은 2026-10-08부터 별도 통) — 조회수 몫 1,000단위
 comment:
   min_chars: 40
   max_chars: 120
