@@ -3,12 +3,15 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import os
 import tempfile
+import time
 import unittest
 import urllib.parse
 from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from unittest import mock
 
 from agent.config import ClassifierConfig, CommentConfig, Config, LimitsConfig, TriggerConfig
 from agent.logbook import Event, Logbook, parse_line
@@ -385,6 +388,18 @@ class PaginationTest(WatcherCase):
         self.assertEqual(self.events(), [detect(A), views(A, 1200)])
         self.assertEqual(report, CycleReport(1, (A,), 1, 0, False, False))
 
+    def test_non_string_next_page_token_ends_the_keyword_s042(self) -> None:
+        page = search_page([A])
+        page["nextPageToken"] = 5
+        self.api.pages[("연애", None)] = page
+        self.api.pages[("연애", "5")] = search_page([B])
+        self.api.videos[A] = video_item(A, 1200)
+        self.api.videos[B] = video_item(B, 1300)
+        report = self.run_cycle()
+        self.assertEqual(self.api.searches(), [("연애", None)])
+        self.assertEqual(self.events(), [detect(A), views(A, 1200)])
+        self.assertEqual(report, CycleReport(1, (A,), 1, 0, False, False))
+
     def test_pages_stop_at_the_page_cap(self) -> None:
         self.reset("endless", endless=True)
         report = self.run_cycle(with_cap(10))
@@ -622,6 +637,7 @@ INVALID_ITEMS: tuple[tuple[str, dict[str, object]], ...] = (
     ("publishedAt week date", bad_item(snippet__publishedAt="2026-W41-1T10:00:00+00:00")),
     ("publishedAt no zone", bad_item(snippet__publishedAt="2026-10-12T10:00:00")),
     ("publishedAt month 13", bad_item(snippet__publishedAt="2026-13-01T00:00:00Z")),
+    ("publishedAt Z junk", bad_item(snippet__publishedAt="2026-10-12T10:00:00Zjunk")),
     ("channelId empty", bad_item(snippet__channelId="")),
     ("no snippet", bad_item(snippet="")),
     ("no statistics", bad_item(statistics="")),
@@ -692,6 +708,43 @@ class IntakeTest(WatcherCase):
         self.assertEqual(self.api.video_batches(), [[B]])
         self.assertEqual(report.detected, (B,))
 
+    def test_long_invalid_search_id_is_cut_to_40_chars_s042(self) -> None:
+        raw = "abcdefghij" * 5  # 50자 — VIDEO_ID_RE 에 맞지 않음
+        self.api.pages[("연애", None)] = search_page([raw])
+        report = self.run_cycle()
+        self.assertEqual(
+            self.events(), [skip("abcdefghij" * 4, "invalid_item", "search.list", keyword="연애")]
+        )
+        self.assertEqual(len(self.events()[0][1]["video"]), 40)
+        self.assertEqual(report, CycleReport(1, (), 0, 0, False, False))
+
+    def test_twelve_char_search_id_never_reaches_videos_s042(self) -> None:
+        # 앞 11자는 VIDEO_ID_RE 에 맞지만 12자 전체는 맞지 않음 — search.list 단계에서 SKIP
+        long_id = A + "a"
+        self.api.pages[("연애", None)] = search_page([long_id, B])
+        self.api.videos[B] = video_item(B, 1200)
+        report = self.run_cycle()
+        self.assertEqual(
+            self.events(),
+            [
+                skip(long_id, "invalid_item", "search.list", keyword="연애"),
+                detect(B),
+                views(B, 1200),
+            ],
+        )
+        self.assertEqual(self.api.video_batches(), [[B]])
+        self.assertEqual(report, CycleReport(1, (B,), 1, 0, False, False))
+
+    def test_missing_description_is_stored_empty_s042(self) -> None:
+        self.api.pages[("연애", None)] = search_page([A])
+        self.api.videos[A] = bad_item(snippet__description=...)
+        report = self.run_cycle()
+        record = Store(self.store_path).get(A)
+        assert record is not None
+        self.assertEqual(record.description, "")
+        self.assertEqual(self.events(), [detect(A), views(A, 1200)])
+        self.assertEqual(report, CycleReport(1, (A,), 1, 0, False, False))
+
     def test_published_at_accepts_only_the_utc_z_form(self) -> None:
         self.api.pages[("연애", None)] = search_page([A, B])
         self.api.videos[A] = video_item(A, 1200, published="2026-10-12T10:00:00Z")
@@ -703,6 +756,23 @@ class IntakeTest(WatcherCase):
             self.assertEqual(record.published_at, PUBLISHED)
             self.assertEqual(record.published_at.utcoffset(), timedelta(0))
         self.assertEqual(report.detected, (A, B))
+
+    def test_published_at_is_pinned_under_a_non_utc_local_zone_s042(self) -> None:
+        # .replace(tzinfo=utc) 와 .astimezone(utc) 는 로컬 시간대가 UTC 인 호스트에서만 같습니다
+        if not hasattr(time, "tzset"):
+            self.skipTest("time.tzset 이 없습니다")
+        self.addCleanup(time.tzset)  # 정리는 거꾸로 돕니다 — TZ 를 되돌린 뒤 다시 읽습니다
+        patcher = mock.patch.dict(os.environ, {"TZ": "Asia/Seoul"})
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        time.tzset()
+        self.assertEqual(
+            datetime(2026, 10, 12, 10, 0).astimezone(timezone.utc),
+            datetime(2026, 10, 12, 1, 0, tzinfo=timezone.utc),
+            "TZ=Asia/Seoul 이 먹지 않았습니다 — 시간대 자료가 없으면"
+            " 이 테스트는 아무것도 보지 못합니다",
+        )
+        self.test_published_at_accepts_only_the_utc_z_form()
 
     def test_published_at_keeps_its_seconds_s036(self) -> None:
         self.api.pages[("연애", None)] = search_page([A])
