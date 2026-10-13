@@ -9,8 +9,10 @@ Phase 2–7 의 모든 단계가 기대는 계약입니다. 설정 읽기, 영�
 
 - Python 3.10 이상. 3.11 이후에만 있는 기능(`datetime.UTC`, `enum.StrEnum`, `tomllib`,
   `typing.Self`, `except*`)은 쓰지 않습니다.
-- 의존성 설치: `pip install -r requirements.txt` — 지금은 `PyYAML>=6.0` 한 줄입니다.
-  Phase 6 이 Playwright 를 더합니다.
+- 의존성 설치: `pip install -r requirements.txt` — `PyYAML>=6.0` 과 `playwright>=1.40` 이
+  들어 있습니다. 게시 단계는 이미 설치된 크롬에 `connect_over_cdp` 로 붙으므로
+  `playwright install`(브라우저 내려받기)은 필요 없습니다. 테스트는 Playwright 없이 돕니다 —
+  `agent.chrome` 이 크롬에 연결할 때에만 불러옵니다.
 - 테스트(저장소 뿌리에서, 설치 없이):
 
   ```
@@ -300,6 +302,65 @@ Phase 3–5 가 정합니다.)
   테스트 저장 이유입니다. 유튜브가 중간 화면(로그인 · 동의)을 띄우면 정상 게시도 테스트 모드로
   빠질 수 있습니다 — 안전한 쪽 실패로 받아들입니다. Phase 6 이 지킵니다.
 
+### 게시 단계 구현 — poster.py · chrome.py (Phase 6)
+
+```python
+post_video(record, *, config, dry_run, store, logbook, open_page, clock,
+           repo_root) -> PostOutcome
+```
+
+위 순서를 그대로 따릅니다. `video_ref` 는 `record.video_id` 입니다. `PostOutcome.result` 는
+`skipped` · `saved` · `stopped` · `reserved` · `posted` · `failed` 중 하나입니다.
+
+- **댓글 없음.** 댓글이 없는 기록은 `SKIP reason=no_comment` 입니다.
+- **테스트 모드는 크롬을 열지 않습니다.** `--dry-run` 의 "게시 직전까지"는 탐지 · 분류 ·
+  트리거 · 댓글 작성까지라는 뜻입니다.
+- **3.2 앞에서 멈춤** (크롬 연결, 영상 열기, 댓글 칸 준비, 입력, 버튼 확인) — 아무것도 누르지
+  않았으므로 저장소는 그대로이고 결과는 `stopped` 입니다. 남는 기록은
+  `ERROR where=poster reason=<원인> detail=… screenshot=… stage=before_click video=<ID>` 한
+  줄뿐이고, 다음 사이클이 다시 시도합니다.
+- **3.2 의 되돌림**은 전처럼 4(테스트 모드)로 갑니다. 이때 `POST … mode=test result=saved` 줄에
+  `screenshot=` 과 `page_url=` 이 붙습니다(저장소 기록에는 캡처 칸이 없습니다).
+- **예약 뒤:**
+  - 클릭 전에 게시 버튼이 없음 → `resolve_live(…, "failed", reason, screenshot)` 과
+    `POST … result=failed`.
+  - 클릭 중 예외, 확인 중 예외, "댓글이 보이지 않음" → 결과를 모르므로 `reserved` 를 그대로 두고
+    `ERROR where=poster reason=<이유> detail=… screenshot=… stage=after_click video=<ID>` 를
+    남깁니다(`detail=` 은 예외일 때만). 확정되지 않은 예약은 게시로 칩니다(4절).
+  - 댓글이 보임 → `resolve_live(…, "posted", reason="allowlisted")`.
+  - 예약 뒤의 Ctrl-C 도 `reserved` 로 남깁니다.
+- **시계 읽기.** 실패 갈래마다 시계를 한 번 읽습니다. 저장된 시도의 `at` 과 그 캡처 파일 이름은
+  같은 시각입니다.
+- **원인 표.** 로그와 결과의 `reason` 에 남는 원인 이름입니다.
+
+  | 이유 | 자리 | 뜻 |
+  |---|---|---|
+  | `no_comment` | 시작 | 기록에 댓글이 없음 — `SKIP` |
+  | `playwright_missing` | 연결 | Playwright 가 설치되어 있지 않음 (`pip install -r requirements.txt`) |
+  | `chrome_unreachable` | 연결 | `chrome_debug_url` 의 크롬에 붙지 못했거나, 붙은 크롬에 기본 컨텍스트가 없음 |
+  | `login_required` | 준비 | 유튜브에 로그인되어 있지 않음 |
+  | `comments_disabled` | 준비 | 이 영상은 댓글을 막아 둠 |
+  | `comment_box_missing` | 준비 | 댓글 영역이나 입력 칸을 찾지 못함 |
+  | `post_button_missing` | 준비 · 클릭 | 게시 버튼이 없거나 눌리지 않음 — 준비에서는 `stopped`, 클릭 직전이면 `failed` |
+  | `page_error` | 연결 · 준비 | 그 밖의 예외 (탭 열기 · 영상 열기 시간 초과 등) |
+  | `page_mismatch` | 다시 확인 | 크롬이 다른 영상에 있음 — 테스트 저장 |
+  | `click_unknown` | 클릭 | 누르는 중 예외 — 결과를 모름, `reserved` |
+  | `confirm_error` | 확인 | 게시 확인 중 예외 — 결과를 모름, `reserved` |
+  | `not_confirmed` | 확인 | 기다리는 동안 댓글이 보이지 않음 — 결과를 모름, `reserved` |
+
+- **캡처.**
+  - 경로는 `logs/screenshots/<영상 ID>-<UTC YYYYMMDDTHHMMSSZ>.png` 입니다. 저장소 뿌리 기준
+    상대 경로이고 `logs/*` 로 git 이 무시합니다.
+  - 캡처가 실패하면 로그 줄에서 `screenshot=` 을 빼고 기록에는 `null` 을 저장하며, 나머지는
+    모두 그대로 씁니다.
+- **크롬 세션.** `ChromeSession(config.chrome_debug_url)` 은 `connect_over_cdp` 로
+  `browser.contexts[0]`(로그인 쿠키가 있는 기본 컨텍스트)에 붙고, 영상마다 새 탭을 엽니다.
+  `close()` 는 연결만 끊습니다.
+- **선택자.** 유튜브 선택자는 `chrome.py` 맨 위의 상수입니다. 화면 구성이 바뀌면 여기를
+  고칩니다(트래커 Trade-off).
+- `post_video` · `check_profile_dir` 본문을 고칠 때도 10절의 음성 대조가 계속 1 로 끝나는지 함께
+  확인합니다.
+
 ## 7. 로그 형식 — `logbook.py`
 
 사건 하나에 한 줄입니다:
@@ -370,6 +431,27 @@ Phase 3–5 가 정합니다.)
 - 크롬 전용 프로필은 `chrome-profile/`(통째로 무시됩니다) 또는 저장소 밖에만 둡니다 — 저장소
   안의 다른 폴더는 금지입니다. Phase 6 · 8 의 실행 안내는 이 두 위치만 예시로 보입니다. 이 위치
   규칙이 첫 방어입니다.
+- 크롬은 전용 프로필로 켭니다(`--user-data-dir` 를 기본 데이터 폴더가 아닌 곳으로) — Chrome
+  136+ 는 기본 데이터 폴더에서 `--remote-debugging-port` 를 무시합니다.
+  `python3 -m agent.chrome --profile <폴더>`(저장소 뿌리에서 `PYTHONPATH=src`, 윈도우
+  PowerShell 은 먼저 `$env:PYTHONPATH = "src"`)가 켜기 전에 위치를 검사(`check_profile_dir`)하고
+  켤 명령을 보여 줍니다 — 크롬을 직접 켜지는 않습니다. 기본 데이터 폴더(그 안 포함)와, 저장소
+  안이면서 `chrome-profile/` 밖인 곳은 거부합니다(종료 코드 2). 상대 경로는 저장소 뿌리
+  기준이고, 심볼릭 링크는 따라간 실제 위치로 봅니다. **이 검사는 켤 때의 안내입니다** — 에이전트는
+  붙은 크롬의 프로필 위치를 실행 중에 확인하지 않습니다. 실행 중 방어는 둘입니다: 기본 데이터
+  폴더로 켠 크롬은 포트가 열리지 않아 게시가 `chrome_unreachable` 로 멈추고, 저장소 안 다른
+  폴더의 비밀 파일은 아래 둘째 방어(이름 목록)가 막습니다.
+
+  ```
+  PYTHONPATH=src python3 -m agent.chrome --profile chrome-profile
+  PYTHONPATH=src python3 -m agent.chrome --profile ~/marketing-agent-chrome
+  ```
+
+  보여 준 명령으로 크롬을 켠 뒤 그 창에서 유튜브에 한 번 로그인합니다. **디버깅 포트의 위험:**
+  포트가 열려 있는 동안 이 컴퓨터의 어떤 프로그램이든 인증 없이 그 크롬에 붙어 로그인된 계정의
+  쿠키(HttpOnly 포함)를 읽을 수 있습니다 — Chrome 136 이 기본 프로필에서 포트를 막은 까닭이
+  이것입니다. 그래서 이 프로필에는 본 구글 계정이 아닌 전용 유튜브(브랜드) 계정으로만 로그인하고,
+  에이전트를 쓰지 않을 때는 그 크롬을 닫습니다.
 - 둘째 방어 — 사람이 위치 규칙을 어겨도, 프로필 안의 비밀 파일은 폴더 이름과 상관없이 어느
   깊이에서든 이름으로 막습니다: `Cookies`, `Cookies-journal`, `Login Data*`, `Web Data*`,
   `Local State`, `Local Storage/`, `Session Storage/`, `Preferences`, `Secure Preferences`,
@@ -421,6 +503,17 @@ run_loop(cycle, reload, initial, *, on_error, sleep=time.sleep,
   바꿀 글자를 찾지 못했다는 뜻이라 실패입니다:
 
   ```
+  python3 -m tests.mutants poster-open-received-ref
+  python3 -m tests.mutants poster-recheck-before-prepare
+  python3 -m tests.mutants poster-no-recheck
+  python3 -m tests.mutants poster-no-page-mismatch
+  python3 -m tests.mutants poster-skip-reserve
+  python3 -m tests.mutants poster-click-error-as-failed
+  python3 -m tests.mutants poster-unconfirmed-as-posted
+  python3 -m tests.mutants poster-ignore-check
+  python3 -m tests.mutants poster-test-mode-opens-chrome
+  python3 -m tests.mutants chrome-allow-default-profile
+  python3 -m tests.mutants chrome-allow-repo-folder
   python3 -m tests.mutants guard-allow-all
   python3 -m tests.mutants guard-ignore-dry-run
   python3 -m tests.mutants guard-dry-run-truthy
