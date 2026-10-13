@@ -539,6 +539,17 @@ class SdkAskTest(unittest.TestCase):
         (client,) = self.sdk.clients
         self.assertEqual(len(client.calls), 1)
 
+    def test_configured_model_reaches_ask_and_system_one(self) -> None:
+        data = valid()
+        data["classifier"]["model"] = "jev-test-x"
+        cfg = config_from_mapping(data)
+        fake = FakeJev()
+        classify(record(), cfg, fake, T0)
+        self.assertEqual(fake.calls[0][0], "jev-test-x")
+        classify(record(), cfg, sdk_ask, T0)
+        (client,) = self.sdk.clients
+        self.assertEqual(client.calls[0]["model"], "jev-test-x")
+
     def test_missing_sdk_raises(self) -> None:
         sys.modules["typesafe_sdk"] = None
         with self.assertRaises(ModuleNotFoundError):
