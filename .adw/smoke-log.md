@@ -395,7 +395,7 @@ other line is required on every item.
 - evidence: src/agent/watcher.py:222 — `range(0, len(queue), MAX_IDS_PER_CALL)` → `range(0, min(len(queue), MAX_IDS_PER_CALL), MAX_IDS_PER_CALL)`(처음 50개만 추적) 변이가 스위트에서 초록(201개 OK). 50개 넘는 테스트는 tests/test_watcher.py:421-433 하나뿐이고 첫 묶음이 500(.adw/ship-report.md § Test integrity). 지금 코드는 맞음 — 새 영상 120개 → `['videos:50', 'videos:50', 'videos:20']`, sampled 120(ship-check 에서 확인)
 - direction: tests/test_watcher.py 에 창 안 영상 51개(새 ID 51개 또는 저장 영상 51개)와 두 묶음 모두 200 인 행을 더해 videos 호출 2번(50 · 1), `sampled == 51`, VIEWS 51줄을 단언한다 — 코드 변경 없음
 - touches: tests/test_watcher.py
-- status: open
+- status: resolved
 - attempts: 0 · last failure: —
 - first seen: 2026-10-13 · last seen: 2026-10-13
 
@@ -404,7 +404,7 @@ other line is required on every item.
 - evidence: src/agent/watcher.py:181, src/agent/watcher.py:177, src/agent/watcher.py:230 — 검색 오류 뒤 `return`→`break`, 검색 보류 뒤 `return`→`break`, videos 보류 뒤 `return`→`continue` 변이가 모두 초록. ApiErrorTest · QuotaTest 는 키워드 하나(tests/test_watcher.py:30 CONFIG)라 "남은 검색을 그만둠"(계약 11절)이 안 걸림(.adw/ship-report.md § Test integrity)
 - direction: tests/test_watcher.py 에 키워드 2개 Config 로 (a) 첫 검색 403 → search 호출 1번 · ERROR 1줄, (b) daily_max_searches 1 + 첫 키워드가 다음 페이지 토큰 → search 1번 · QUOTA 1줄, (c) 추적 51개 + 단위 한도로 첫 videos 묶음 보류 → QUOTA 1줄 · videos 호출 0번 을 단언한다 — 코드 변경 없음
 - touches: tests/test_watcher.py
-- status: open
+- status: resolved
 - attempts: 0 · last failure: —
 - first seen: 2026-10-13 · last seen: 2026-10-13
 
@@ -413,7 +413,7 @@ other line is required on every item.
 - evidence: src/agent/watcher.py:72, src/agent/watcher.py:167, src/agent/watcher.py:207, src/agent/watcher.py:268, src/agent/watcher.py:296 — 각 자리의 `_clean` 을 뺀 변이가 tests.test_watcher 에서 초록. `Logbook.write(Event.ERROR, reason="HTTP 400 \ud800bad")` 는 UnicodeEncodeError 를 내므로 :296 이 깨지면 주기가 ERROR 줄 없이 끝남(.adw/ship-report.md § Test integrity)
 - direction: tests/test_watcher.py IntakeTest/ApiErrorTest 에 channelId `"UC\ud800"`, 키워드 `"연애\ud800"`, search videoId `"x\ud800"`, 잘못된 viewCount 의 detail, 403 본문 reason `"bad\ud800"` 행을 더해 run 이 CycleReport 를 돌려주고 로그 값이 U+FFFD 로 parse_line 되는지 단언한다 — 코드 변경 없음
 - touches: tests/test_watcher.py
-- status: open
+- status: resolved
 - attempts: 0 · last failure: —
 - first seen: 2026-10-13 · last seen: 2026-10-13
 
@@ -422,7 +422,7 @@ other line is required on every item.
 - evidence: src/agent/watcher.py:55 (`value[:16]` 변이 초록), src/agent/watcher.py:220 (`>`→`>=` 초록), src/agent/watcher.py:152 (`timedelta(hours=12)` 로 박은 변이 초록), src/agent/youtube.py:110 (`>`→`>=` 초록), src/agent/watcher.py:213 (빈 토큰을 따라가는 변이 초록)(.adw/ship-report.md § Test integrity)
 - direction: tests/test_watcher.py 에 `publishedAt "2026-10-12T10:00:37Z"` → `published_at` 초 37, `max_age_hours 6` 에서 정확히 NOW−6h 영상은 비추적 · NOW−5h 는 추적, `nextPageToken: ""` 이면 다음 페이지를 부르지 않음 을, tests/test_youtube.py 에 9,999 단위에서 videos.list 1회 허용 뒤 다음 호출 보류(units 10000/10000) 를 더한다 — 코드 변경 없음
 - touches: tests/test_watcher.py, tests/test_youtube.py
-- status: open
+- status: resolved
 - attempts: 0 · last failure: —
 - first seen: 2026-10-13 · last seen: 2026-10-13
 
@@ -431,7 +431,7 @@ other line is required on every item.
 - evidence: src/agent/youtube.py:181-188 — `grep -n -e http_get -e HTTPError -e urlopen tests/*.py` 결과 없음. 지금 증명은 verify 러너 V9(실제 루프백 403)뿐이라 스위트 밖(.adw/ship-report.md § Spec compliance)
 - direction: tests/test_youtube.py 에 `urllib.request.urlopen` 을 patch 한 테스트를 더해 HTTPError(403, 본문) → `(403, 본문)`, 200 응답 → `(200, 본문)`, 요청의 `Accept: application/json` 헤더와 timeout 전달을 단언한다 — 코드 변경 없음
 - touches: tests/test_youtube.py
-- status: open
+- status: resolved
 - attempts: 0 · last failure: —
 - first seen: 2026-10-13 · last seen: 2026-10-13
 

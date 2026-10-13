@@ -282,6 +282,20 @@ class DetectTest(WatcherCase):
         query = self.api.calls[0][1]
         self.assertEqual(query["publishedAfter"], "2026-10-12T00:00:00Z")
 
+    def test_age_window_edge_comes_from_the_config_s036(self) -> None:
+        # max_age_hours 6 — 정확히 NOW−6h 는 창 밖(경계는 `>`), NOW−5h 는 창 안
+        edge, inside = "eeeeeeeeeee", "iiiiiiiiiii"
+        self.seed(edge, published=NOW - 6 * HOUR)
+        self.seed(inside, published=NOW - 5 * HOUR)
+        self.api.videos[edge] = video_item(edge, 2000)
+        self.api.videos[inside] = video_item(inside, 2000)
+        config = dataclasses.replace(CONFIG, trigger=TriggerConfig(1000, 5000, 6.0, 150.0))
+        self.run_cycle(config)
+        self.assertEqual(self.api.video_batches(), [[inside]])
+        self.assertEqual(self.counts(edge), [1000])
+        self.assertEqual(self.counts(inside), [1000, 2000])
+        self.assertEqual(self.api.calls[0][1]["publishedAfter"], "2026-10-12T06:00:00Z")
+
     def test_video_found_by_two_keywords_keeps_the_first_keyword(self) -> None:
         self.api.pages[("연애", None)] = search_page([A])
         self.api.pages[("썸", None)] = search_page([A])
@@ -297,6 +311,21 @@ class DetectTest(WatcherCase):
     def test_duplicate_keywords_are_searched_once(self) -> None:
         self.run_cycle(with_keywords("연애", "썸", "연애"))
         self.assertEqual(self.api.searches(), [("연애", None), ("썸", None)])
+
+    def test_second_videos_batch_is_sampled_s033(self) -> None:
+        # 추적 51개 → videos.list 두 번(50 · 1), 두 묶음 모두 200
+        tracked = [f"t{n:010d}" for n in range(51)]
+        for video_id in tracked:
+            self.seed(video_id)
+            self.api.videos[video_id] = video_item(video_id, 2000)
+        report = self.run_cycle()
+        batches = self.api.video_batches()
+        self.assertEqual([len(batch) for batch in batches], [50, 1])
+        sent = [video_id for batch in batches for video_id in batch]
+        self.assertEqual(sorted(sent), tracked)
+        self.assertEqual(self.events(), [views(video_id, 2000, prev=1000) for video_id in sent])
+        self.assertEqual(self.counts(batches[1][0]), [1000, 2000])
+        self.assertEqual(report, CycleReport(1, (), 51, 0, False, False))
 
 
 class PaginationTest(WatcherCase):
@@ -328,6 +357,14 @@ class PaginationTest(WatcherCase):
         report = self.run_cycle()
         self.assertEqual(self.api.searches(), [("연애", None)])
         self.assertEqual(self.event_names(), [Event.DETECT, Event.VIEWS])
+        self.assertEqual(report, CycleReport(1, (A,), 1, 0, False, False))
+
+    def test_empty_next_page_token_ends_the_keyword_s036(self) -> None:
+        self.api.pages[("연애", None)] = search_page([A], "")
+        self.api.videos[A] = video_item(A, 1200)
+        report = self.run_cycle()
+        self.assertEqual(self.api.searches(), [("연애", None)])
+        self.assertEqual(self.events(), [detect(A), views(A, 1200)])
         self.assertEqual(report, CycleReport(1, (A,), 1, 0, False, False))
 
     def test_pages_stop_at_the_page_cap(self) -> None:
@@ -389,6 +426,34 @@ class QuotaTest(WatcherCase):
         self.assertEqual(self.counts(K), [1000])
         self.assertEqual(report, CycleReport(0, (), 0, 0, True, False))
 
+    def test_search_hold_stops_the_remaining_keywords_s034(self) -> None:
+        # 검색 상한 1 — 첫 키워드의 다음 페이지에서 막히면 둘째 키워드는 묻지도 않습니다
+        config = dataclasses.replace(with_cap(1), keywords=("연애", "썸"))
+        self.api.pages[("연애", None)] = search_page([A], "P1")
+        self.api.videos[A] = video_item(A, 1200)
+        report = self.run_cycle(config)
+        self.assertEqual(self.api.searches(), [("연애", None)])
+        self.assertEqual(
+            self.events(),
+            [quota(1, 1, "search.list", "searches", keyword="연애"), detect(A), views(A, 1200)],
+        )
+        self.assertEqual(report, CycleReport(1, (A,), 1, 0, True, False))
+
+    def test_videos_hold_stops_the_remaining_batches_s034(self) -> None:
+        # 9,800 단위 + 검색 둘(200) = 10,000 — 첫 videos 묶음부터 막히고 둘째 묶음은 묻지 않습니다
+        config = dataclasses.replace(with_cap(100), keywords=("연애", "썸"))
+        tracked = [f"t{n:010d}" for n in range(51)]
+        for video_id in tracked:
+            self.seed(video_id)
+            self.api.videos[video_id] = video_item(video_id, 2000)
+        self.seed_quota(98, NOW - HOUR)
+        report = self.run_cycle(config)
+        self.assertEqual(self.api.searches(), [("연애", None), ("썸", None)])
+        self.assertEqual(self.api.video_batches(), [])
+        self.assertEqual(self.events(), [quota(10000, 10000, "videos.list", "units")])
+        self.assertEqual([self.counts(video_id) for video_id in tracked], [[1000]] * 51)
+        self.assertEqual(report, CycleReport(2, (), 0, 0, True, False))
+
 
 class ApiErrorTest(WatcherCase):
     def test_search_error_is_logged_and_views_are_still_tracked(self) -> None:
@@ -418,6 +483,40 @@ class ApiErrorTest(WatcherCase):
             self.assertEqual(self.api.searches(), [("연애", None), ("연애", "P1")])
             self.assertEqual(self.events(), [error, detect(A), views(A, 1200)])
             self.assertEqual(report, CycleReport(1, (A,), 1, 0, False, True))
+
+    def test_search_error_stops_the_remaining_keywords_s034(self) -> None:
+        self.api.status["search"] = 403
+        report = self.run_cycle(with_keywords("연애", "썸"))
+        self.assertEqual(self.api.searches(), [("연애", None)])
+        self.assertEqual(
+            self.events(),
+            [
+                (
+                    Event.ERROR,
+                    {"where": "search.list", "reason": "HTTP 403 quotaExceeded", "keyword": "연애"},
+                )
+            ],
+        )
+        self.assertEqual(report, CycleReport(0, (), 0, 0, False, True))
+
+    def test_lone_surrogate_in_the_error_reason_is_replaced_s035(self) -> None:
+        body = {"error": {"code": 403, "errors": [{"reason": "bad\ud800"}]}}
+        self.api.pages[("연애", None)] = (403, body)
+        report = self.run_cycle()
+        self.assertEqual(
+            self.events(),
+            [
+                (
+                    Event.ERROR,
+                    {
+                        "where": "search.list",
+                        "reason": "HTTP 403 bad\N{REPLACEMENT CHARACTER}",
+                        "keyword": "연애",
+                    },
+                )
+            ],
+        )
+        self.assertEqual(report, CycleReport(0, (), 0, 0, False, True))
 
     def test_videos_error_stops_tracking(self) -> None:
         tracked = [f"t{n:010d}" for n in range(51)]
@@ -569,6 +668,17 @@ class IntakeTest(WatcherCase):
             self.assertEqual(record.published_at.utcoffset(), timedelta(0))
         self.assertEqual(report.detected, (A, B))
 
+    def test_published_at_keeps_its_seconds_s036(self) -> None:
+        self.api.pages[("연애", None)] = search_page([A])
+        self.api.videos[A] = video_item(A, 1200, published="2026-10-12T10:00:37Z")
+        report = self.run_cycle()
+        record = Store(self.store_path).get(A)
+        assert record is not None
+        self.assertEqual(
+            record.published_at, datetime(2026, 10, 12, 10, 0, 37, tzinfo=timezone.utc)
+        )
+        self.assertEqual(report.detected, (A,))
+
     def test_offset_at_the_date_limit_does_not_poison_the_store(self) -> None:
         self.api.pages[("연애", None)] = search_page([B, C])
         self.api.videos[B] = video_item(B, 1200, published="0001-01-01T00:00:00+14:00")
@@ -596,6 +706,62 @@ class IntakeTest(WatcherCase):
         self.assertEqual(record.title, "\N{REPLACEMENT CHARACTER}연애")
         self.assertEqual(record.description, "\N{REPLACEMENT CHARACTER}")
         self.assertEqual(self.events()[0], detect(A, title="\N{REPLACEMENT CHARACTER}연애"))
+
+    def test_lone_surrogates_outside_title_are_replaced_s035(self) -> None:
+        bad, fixed = "\ud800", "\N{REPLACEMENT CHARACTER}"
+        with self.subTest("channelId"):
+            self.reset("channel")
+            self.api.pages[("연애", None)] = search_page([A])
+            self.api.videos[A] = video_item(A, 1200, channel="UC" + bad)
+            report = self.run_cycle()
+            self.assertEqual(
+                self.events(),
+                [(Event.DETECT, {**detect(A)[1], "channel": "UC" + fixed}), views(A, 1200)],
+            )
+            record = Store(self.store_path).get(A)
+            assert record is not None
+            self.assertEqual(record.channel_id, "UC" + fixed)
+            self.assertEqual(report, CycleReport(1, (A,), 1, 0, False, False))
+        with self.subTest("keyword"):
+            self.reset("keyword")
+            self.api.pages[("연애" + fixed, None)] = search_page([A])
+            self.api.videos[A] = video_item(A, 1200)
+            report = self.run_cycle(with_keywords("연애" + bad))
+            self.assertEqual(self.api.searches(), [("연애" + fixed, None)])
+            self.assertEqual(
+                self.events(),
+                [(Event.DETECT, {**detect(A)[1], "keyword": "연애" + fixed}), views(A, 1200)],
+            )
+            record = Store(self.store_path).get(A)
+            assert record is not None
+            self.assertEqual(record.keyword, "연애" + fixed)
+            self.assertEqual(report, CycleReport(1, (A,), 1, 0, False, False))
+        with self.subTest("search videoId"):
+            self.reset("search id")
+            self.api.pages[("연애", None)] = search_page(["x" + bad])
+            report = self.run_cycle()
+            self.assertEqual(
+                self.events(), [skip("x" + fixed, "invalid_item", "search.list", keyword="연애")]
+            )
+            self.assertEqual(report, CycleReport(1, (), 0, 0, False, False))
+        with self.subTest("viewCount detail"):
+            # detail 은 값을 repr(!r)로 적어 서로게이트가 이미 `\ud800` 여섯 글자로 바뀌어 옵니다
+            self.reset("detail")
+            self.api.pages[("연애", None)] = search_page([A])
+            self.api.videos[A] = bad_item(statistics__viewCount="1" + bad)
+            report = self.run_cycle()
+            self.assertEqual(
+                self.events(),
+                [
+                    skip(
+                        A,
+                        "invalid_item",
+                        "videos.list",
+                        detail="statistics.viewCount: 0 이상의 10진수 글자가 아닙니다: '1\\ud800'",
+                    )
+                ],
+            )
+            self.assertEqual(report, CycleReport(1, (), 0, 0, False, False))
 
 
 class ClockTest(WatcherCase):
