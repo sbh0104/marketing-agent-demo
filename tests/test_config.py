@@ -288,7 +288,7 @@ OUT_OF_RANGE_VALUES: tuple[RangeValue, ...] = (
 
 TEXT_CHARS = (
     "글자 · 숫자 · 문장부호 · 기호와 보통 스페이스만 쓸 수 있습니다 "
-    "(줄바꿈 · 탭 · 전각 공백 · 폭 없는 공백 등은 안 됩니다)"
+    "(줄바꿈 · 탭 · 전각 공백 · 폭 없는 공백, 이 파이썬이 모르는 새 글자(최근 이모지 등) 등은 안 됩니다)"
 )
 EDGE_SPACE = "스페이스로 시작하거나 끝나면 안 됩니다"
 
@@ -863,6 +863,14 @@ class TextKeyTest(unittest.TestCase):
         data = valid()
         data["allowed_videos"] = items
         self.assertEqual(config_from_mapping(data).allowed_videos, tuple(items))
+
+    def test_chrome_debug_url_error_precedes_topic_error(self) -> None:
+        data = valid()
+        data["topic"] = "연애\t"
+        data["chrome_debug_url"] = "http://localhost:9222 "
+        with self.assertRaises(ConfigError) as caught:
+            config_from_mapping(data)
+        self.assertEqual(str(caught.exception), f"{EDGE_SPACE}: chrome_debug_url")
 
 
 class LoadConfigTest(unittest.TestCase):

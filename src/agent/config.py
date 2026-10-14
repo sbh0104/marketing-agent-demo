@@ -214,7 +214,7 @@ def _text(value: object, path: str) -> str:
     if not all(map(_is_raw, value)):
         raise ConfigError(
             "글자 · 숫자 · 문장부호 · 기호와 보통 스페이스만 쓸 수 있습니다 "
-            f"(줄바꿈 · 탭 · 전각 공백 · 폭 없는 공백 등은 안 됩니다): {path}"
+            f"(줄바꿈 · 탭 · 전각 공백 · 폭 없는 공백, 이 파이썬이 모르는 새 글자(최근 이모지 등) 등은 안 됩니다): {path}"
         )
     if value[0] == " " or value[-1] == " ":  # 잘라 쓰지 않습니다 — 조용히 지나가지 않고 오류
         raise ConfigError(f"스페이스로 시작하거나 끝나면 안 됩니다: {path}")
