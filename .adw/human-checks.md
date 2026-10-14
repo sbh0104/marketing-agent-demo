@@ -621,3 +621,11 @@
 - source: adw/phase-6c-live-check-grader-fix
 - tag: plain
 - status: open
+
+### H-075 — S-079–S-082 를 `.adw/smoke-log.md` 에서 S-075–S-078 의 중복(이미 고침: `56bdfd8` · `41de530` · `184bb74` · `7776b1d`)으로 닫기 — `smoke-close` 가 `escalated` 로 둔 뒤, `smoke-triage` 로 단계를 만들지 말 것
+- project: marketing-agent-demo
+- when: 2026-10-14 · adw/smoke-sweep-s079-s082
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/smoke-sweep-s079-s082
+- tag: plain
+- status: open
