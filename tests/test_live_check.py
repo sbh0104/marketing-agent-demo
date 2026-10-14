@@ -62,6 +62,11 @@ CLASSIFIER = {
     ],
 }
 UNMEASURED_HINT = " — 재지 못함은 위 오류 줄(서비스 · 단계 · 상태: 키 · 크레딧 · API 설정)을 먼저 봅니다"
+GRADE_BLOCK_HINT = " — 채점 막힘은 위 채점 답 모양 줄과 result.json 초안의 grade_shape 칸을 먼저 봅니다"
+NEXT_GO = "- 다음: 결과 두 파일을 다시 반영 페이즈의 레인 브랜치에 커밋하고 그 페이즈를 시작합니다"
+NEXT_STOP = (
+    "- 다음: 결과 두 파일을 다시 반영 페이즈의 레인 브랜치에 커밋하고 그 페이즈 대신 인터뷰로 옵니다"
+)
 # 채점 답의 다섯 이름 — 앞 셋이 grade, 뒤 둘이 과제 품질(task_quality) 몫입니다
 ANSWER_NAMES = [
     "scene_in_material",
@@ -456,6 +461,39 @@ def human_filled() -> dict:
     return result
 
 
+def grade_error_draft(entry: dict, shape: dict = SHAPE_TRUNCATED) -> dict:
+    """초안 하나를 채점 응답 모양 오류로 바꿉니다 — 실행기가 남기는 모양 칸까지."""
+    entry.update(grade=None, claude_grade=None, grade_error="응답 모양", grade_shape=dict(shape))
+    return entry
+
+
+def ten_drafts(errors: int, schema: int = live_check.RESULT_SCHEMA_VERSION) -> dict:
+    """쓴 영상 10개에 초안 10개 — 앞 errors 개가 채점 오류인 결과(판 schema)."""
+    result = healthy_result()
+    result["schema_version"] = schema
+    result["videos"] = [video(number, "comment") for number in range(1, 11)]
+    for item in result["videos"][:errors]:
+        grade_error_draft(item["drafts"][0])
+    return result
+
+
+def grade_errors_under_half() -> dict:
+    return ten_drafts(4)
+
+
+def grade_errors_half() -> dict:
+    return ten_drafts(5)
+
+
+def grade_errors_over_half() -> dict:
+    return ten_drafts(6)
+
+
+def grade_errors_schema_one() -> dict:
+    # 판 1 결과는 옛 채점기로 잰 숫자라 채점 막힘을 세지 않습니다(트래커 Phase 6C 질문 5 A)
+    return ten_drafts(10, schema=1)
+
+
 def all_cases() -> dict:
     result = healthy_result()
     ko, en = result["accuracy"]["ko"], result["accuracy"]["en"]
@@ -474,6 +512,9 @@ def all_cases() -> dict:
         video(5, "skip"),
         video(6, "error", error_cause="jev"),
     ]
+    drafts = [entry for item in result["videos"] for entry in item["drafts"]]
+    for entry in drafts[:5]:  # 초안 8 중 채점 오류 5
+        grade_error_draft(entry)
     result["stopped"] = {"kind": "ceiling", "service": "claude", "limit": 70}
     return result
 
@@ -501,6 +542,10 @@ G1_CASES: tuple[Callable[[], dict], ...] = (
     human_filled,
     all_cases,
     confidence_floor_only,
+    grade_errors_under_half,
+    grade_errors_half,
+    grade_errors_over_half,
+    grade_errors_schema_one,
 )
 
 
@@ -646,8 +691,36 @@ class VerdictTest(unittest.TestCase):
             self.line(all_cases()),
             "6B: stop — 재지 못함(예시 오류 1 · 호출 오류 1 · 영상 오류 1 · 천장 claude 70); "
             "판별 미달(ko 16/22 · en 18/22); 작성 막힘(SKIP 3/5); "
-            "모델 이름(claude-sonnet-5-5 · claude-haiku-5-5 둘 다 거절)",
+            "모델 이름(claude-sonnet-5-5 · claude-haiku-5-5 둘 다 거절); 채점 막힘(오류 5/8)",
         )
+
+    def test_grade_errors_under_half_is_go(self) -> None:
+        self.assertEqual(self.line(grade_errors_under_half()), "6B: go")
+
+    def test_grade_errors_exactly_half_is_go(self) -> None:
+        self.assertEqual(self.line(grade_errors_half()), "6B: go")
+
+    def test_grade_errors_over_half_stops(self) -> None:
+        self.assertEqual(self.line(grade_errors_over_half()), "6B: stop — 채점 막힘(오류 6/10)")
+
+    def test_schema_one_result_keeps_old_rule(self) -> None:
+        result = grade_errors_schema_one()
+        self.assertEqual(result["schema_version"], 1)
+        self.assertEqual(self.line(result), "6B: go")
+        result["schema_version"] = 2
+        self.assertEqual(self.line(result), "6B: stop — 채점 막힘(오류 10/10)")
+
+    def test_no_draft_is_not_grade_blocked(self) -> None:
+        result = nothing_written()
+        self.assertEqual(result["schema_version"], 2)
+        self.assertEqual(self.line(result), "6B: go")
+
+    def test_task_errors_do_not_block(self) -> None:
+        result = healthy_result()
+        for item in result["videos"]:
+            for entry in item["drafts"]:
+                entry.update(task_quality=None, task_error="응답 모양", grade_shape=SHAPE_EXTRA_KEY)
+        self.assertEqual(self.line(result), "6B: go")
 
 
 class SummaryTest(unittest.TestCase):
@@ -658,7 +731,14 @@ class SummaryTest(unittest.TestCase):
         return text.split("\n")[:-1]
 
     def test_first_line_is_verdict(self) -> None:
-        for build in (healthy_result, all_cases, skip_over_half):
+        builds = (
+            healthy_result,
+            all_cases,
+            skip_over_half,
+            grade_errors_over_half,
+            grade_errors_schema_one,
+        )
+        for build in builds:
             with self.subTest(build.__name__):
                 result = build()
                 lines = self.summary(result)
@@ -690,7 +770,7 @@ class SummaryTest(unittest.TestCase):
         self.assertEqual(
             lines[2:],
             [
-                "- 실행: 2026-10-14T03:00:00+00:00 · 스키마 1",
+                "- 실행: 2026-10-14T03:00:00+00:00 · 스키마 2",
                 "- 실행기 호출(SDK 안의 다시 시도 제외): jev 55/120 · claude 12/70 · youtube 14/50",
                 "- 멈춤: 없음",
                 "- 오류: 영상 오류 1",
@@ -706,7 +786,7 @@ class SummaryTest(unittest.TestCase):
                 "- 초안: 7 · 채점 ok 2 · bad 4 · 채점 오류 1 · 사람 칸 1/7",
                 "- 채점 답 모양: 모양 칸 1/7 · 도구 블록 없음 1 · JSON 못 읽음 1 · 키 다름 0"
                 " · 참거짓 아님 0 · stop_reason max_tokens 1",
-                "- 다음: 결과 두 파일을 커밋하고 Phase 6B 대신 인터뷰로 옵니다" + UNMEASURED_HINT,
+                NEXT_STOP + UNMEASURED_HINT,
             ],
         )
         del result["accuracy_tally"]["en"]
@@ -747,19 +827,28 @@ class SummaryTest(unittest.TestCase):
             lines,
         )
         self.assertTrue(lines[0].startswith("6B: stop — 재지 못함("))
-        self.assertEqual(
-            lines[-1],
-            "- 다음: 결과 두 파일을 커밋하고 Phase 6B 대신 인터뷰로 옵니다" + UNMEASURED_HINT,
-        )
+        self.assertEqual(lines[-1], NEXT_STOP + UNMEASURED_HINT)
 
         blocked = self.summary(skip_over_half())
         self.assertEqual(blocked[0], "6B: stop — 작성 막힘(SKIP 3/5)")
         self.assertIn("- 오류: 없음", blocked)
-        self.assertEqual(blocked[-1], "- 다음: 결과 두 파일을 커밋하고 Phase 6B 대신 인터뷰로 옵니다")
+        self.assertEqual(blocked[-1], NEXT_STOP)
         self.assertNotIn("오류 줄", blocked[-1])
 
+        graded = self.summary(grade_errors_over_half())
+        self.assertEqual(graded[0], "6B: stop — 채점 막힘(오류 6/10)")
+        self.assertEqual(graded[-1], NEXT_STOP + GRADE_BLOCK_HINT)
+
+        both = grade_errors_over_half()
+        both["errors"].append(error_entry("claude", "grade", "FakeApiError", 529, vid(1)))
+        both_lines = self.summary(both)
+        self.assertEqual(
+            both_lines[0], "6B: stop — 재지 못함(호출 오류 1); 채점 막힘(오류 6/10)"
+        )
+        self.assertEqual(both_lines[-1], NEXT_STOP + UNMEASURED_HINT + GRADE_BLOCK_HINT)
+
         go = self.summary(healthy_result())
-        self.assertEqual(go[-1], "- 다음: 결과 두 파일을 커밋하고 Phase 6B 를 시작합니다")
+        self.assertEqual(go[-1], NEXT_GO)
 
 
 class WriteOutputsTest(unittest.TestCase):
@@ -843,6 +932,19 @@ class VerdictFlagTest(unittest.TestCase):
                 self.assertEqual(out, result["verdict"] + "\n")
                 self.assertEqual(err, "")
                 self.assertEqual(code, 0 if result["verdict"] == "6B: go" else 1)
+
+    def test_grade_block_recount_exit_codes(self) -> None:
+        cases = (
+            (grade_errors_over_half, (1, "6B: stop — 채점 막힘(오류 6/10)\n", "")),
+            (grade_errors_half, (0, "6B: go\n", "")),
+            (grade_errors_schema_one, (0, "6B: go\n", "")),
+        )
+        for build, expected in cases:
+            with self.subTest(build.__name__):
+                result = build()
+                result["verdict"] = live_check.verdict_line(result)
+                self.store(result)
+                self.assertEqual(self.recount(["--verdict", str(self.path)]), expected)
 
     def test_confidence_floor_sample_recounts_go(self) -> None:
         result = confidence_floor_only()
@@ -2052,6 +2154,34 @@ class VideoRoundTest(LiveCheckCase):
             [(draft["grade"], draft["claude_grade"]) for draft in drafts],
             [(GRADE_AD, "bad"), (GRADE_OFF_CONCERN, "bad")],
         )
+
+    def test_grade_shape_errors_block_the_run(self) -> None:
+        self.claude.grades = ["점수 없음"] * 3
+        code, out, err, result = self.run_main()
+        self.assertEqual(result["schema_version"], 2)
+        self.assertEqual(result["errors"], [])
+        drafts = [draft for video in result["videos"] for draft in video["drafts"]]
+        self.assertEqual([draft["grade_error"] for draft in drafts], ["응답 모양"] * 3)
+        self.assertEqual(result["verdict"], "6B: stop — 채점 막힘(오류 3/3)")
+        self.assertEqual(code, 1)
+
+    def test_grader_outage_reads_unmeasured_then_blocked(self) -> None:
+        self.claude.grades = [FakeApiError("overloaded", 529)] * 3
+        code, out, err, result = self.run_main()
+        written = (vid(1), vid(2), vid(5))
+        self.assertEqual(
+            result["errors"],
+            [error_entry("claude", "grade", "FakeApiError", 529, video) for video in written],
+        )
+        drafts = [draft for video in result["videos"] for draft in video["drafts"]]
+        self.assertEqual(
+            [(draft["grade_error"], draft["grade_shape"]) for draft in drafts],
+            [("FakeApiError 529", None)] * 3,
+        )
+        self.assertEqual(
+            result["verdict"], "6B: stop — 재지 못함(호출 오류 3); 채점 막힘(오류 3/3)"
+        )
+        self.assertEqual(code, 1)
 
     def test_task_quality_does_not_move_claude_grade(self) -> None:
         self.claude.grades = [answer5(GRADE_OK, TASK_NO), answer5(GRADE_BAD, TASK_OK)]

@@ -698,6 +698,18 @@ MUTANTS: dict[str, tuple[str, str, str, str]] = {
         "raise SystemExit(cli(sys.argv[1:]))",
         "raise SystemExit(main(sys.argv[1:]))",
     ),
+    "live-check-grade-block-half-stops": (
+        "tests.live_check",
+        "tests.test_live_check",
+        "if 2 * grade_errors > graded:",
+        "if 2 * grade_errors >= graded:",
+    ),
+    "live-check-grade-block-schema-ignored": (
+        "tests.live_check",
+        "tests.test_live_check",
+        'if result["schema_version"] >= GRADE_BLOCK_SCHEMA:',
+        "if True:",
+    ),
     "live-check-applied-yes-floor-lowered": (
         "agent.config",
         "tests.test_live_check_applied",

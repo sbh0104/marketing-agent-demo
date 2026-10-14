@@ -78,7 +78,9 @@ SUMMARY_NAME = "summary.md"
 QUOTA_PATH = REPO / "data" / "quota.json"
 ENV_PATH = REPO / ".env"
 
-RESULT_SCHEMA_VERSION = 1
+RESULT_SCHEMA_VERSION = 2
+# 채점 막힘을 세는 첫 결과 판 — 판 1 은 옛 채점기로 잰 숫자입니다(트래커 Phase 6C 질문 5 A)
+GRADE_BLOCK_SCHEMA = 2
 KEY_NAMES = ("YOUTUBE_API_KEY", "TYPESAFE_API_KEY", "ANTHROPIC_API_KEY")
 SDK_MODULES = {"typesafe_sdk": "typesafe-sdk", "anthropic": "anthropic"}
 MODEL_NAMES = ("claude-sonnet-5-5", "claude-haiku-5-5")
@@ -294,7 +296,11 @@ def _stopped_text(stopped: Mapping[str, object]) -> str:
 
 
 def verdict_line(result: dict) -> str:
-    """결과 하나로 6B 판정 줄을 셉니다 — 사람 칸 · untrusted · 채점은 읽지 않습니다."""
+    """결과 하나로 6B 판정 줄을 셉니다.
+
+    사람 칸 · untrusted · 영상 판별 칸 · 과제 칸은 읽지 않고, 초안 채점은 판 2 이상 결과에서
+    `grade_error` 수만 셉니다.
+    """
     cases: list[str] = []
     parts: list[str] = []
     example_errors = sum(
@@ -336,6 +342,14 @@ def verdict_line(result: dict) -> str:
         cases.append(f"작성 막힘(SKIP {skipped}/{written})")
     if all(_model_status(result, name) == "rejected" for name in MODEL_NAMES):
         cases.append(f"모델 이름({' · '.join(MODEL_NAMES)} 둘 다 거절)")
+    if result["schema_version"] >= GRADE_BLOCK_SCHEMA:
+        graded_drafts = [
+            draft for video in result["videos"] for draft in video["drafts"] if draft["parsed"]
+        ]
+        grade_errors = sum(1 for draft in graded_drafts if draft["grade_error"] is not None)
+        graded = len(graded_drafts)
+        if 2 * grade_errors > graded:
+            cases.append(f"채점 막힘(오류 {grade_errors}/{graded})")
     return "6B: go" if not cases else "6B: stop — " + "; ".join(cases)
 
 
@@ -442,12 +456,15 @@ def render_summary(result: dict) -> str:
         f" · 채점 오류 {grade_errors} · 사람 칸 {humans}/{len(drafts)}"
     )
     lines.append(_shape_line(drafts))
+    commit = "결과 두 파일을 다시 반영 페이즈의 레인 브랜치에 커밋하고"
     if verdict == "6B: go":
-        step = "결과 두 파일을 커밋하고 Phase 6B 를 시작합니다"
+        step = f"{commit} 그 페이즈를 시작합니다"
     else:
-        step = "결과 두 파일을 커밋하고 Phase 6B 대신 인터뷰로 옵니다"
+        step = f"{commit} 그 페이즈 대신 인터뷰로 옵니다"
         if "재지 못함(" in verdict:
             step += " — 재지 못함은 위 오류 줄(서비스 · 단계 · 상태: 키 · 크레딧 · API 설정)을 먼저 봅니다"
+        if "채점 막힘(" in verdict:
+            step += " — 채점 막힘은 위 채점 답 모양 줄과 result.json 초안의 grade_shape 칸을 먼저 봅니다"
     lines.append(f"- 다음: {step}")
     return "\n".join(lines) + "\n"
 
