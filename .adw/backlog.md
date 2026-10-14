@@ -48,7 +48,7 @@
 - [x] Phase 4 — ③ 타이밍 · 뜨기 직전 판단 (plans/interview-marketing-agent.md#phase-4)
 - [x] Phase 5 — ④ 댓글 작성 · 자체 검사 (plans/interview-marketing-agent.md#phase-5)
 - [x] Phase 6 — ⑤ 크롬 연결 · 게시 · 확인 (plans/interview-marketing-agent.md#phase-6)
-- [~] Phase 1A — 파서 허용 쪽 규칙 (plans/interview-marketing-agent.md#phase-1a)
+- [x] Phase 1A — 파서 허용 쪽 규칙 (plans/interview-marketing-agent.md#phase-1a)
 - [x] Phase 1B — 계약 절 이름 규칙 (plans/interview-marketing-agent.md#phase-1b)
 - [x] Phase 6A — 진짜 호출 준비 · 사람이 돌릴 실행기 (plans/interview-marketing-agent.md#phase-6a)
 - [ ] Phase 1C — 글자 설정값 허용 규칙 (plans/interview-marketing-agent.md#phase-1c)

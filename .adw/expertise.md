@@ -14,11 +14,6 @@
 - evidence: ship-report.md:320 (R5); `type grep` → "grep is a function", `/usr/bin/grep` 따로 있음 (cycle 20261013-062542-adw/phase-1-foundation-contracts)
 - first confirmed: 2026-10-13 · last confirmed: 2026-10-14
 
-### E-005 · hazard — Phase 1 의 세 파서(가드 주소 읽기 · 로그 줄 이스케이프 · 설정 숫자 읽기)는 열거한 꼴 목록으로 막는다 — ship-check 네 번이 매번 목록 밖 꼴을 하나 이상 더 찾았다
-- evidence: 트래커 Phase 1 결정 기록 — `youtu.be/A/../B`(첫 BLOCKED) → `?v=B` · `U+2028` · `.inf`·큰 수(HC1) → 로그 NUL·ESC(HC1-2) → 이번 ship-report R1 · R2 · R4
-- 남은 꼴(최종 트리 `a35981b`, 실측): `youtu.be/A?v\x01` · `shorts/A?v\x00` → A 로 live(다른 영상 · 호스트 0, ship-report.md:283-297) · 로그를 latin-1 로 읽고 `splitlines()` 하면 UTF-8 에 `0x85` 가 든 한글(11,172자 중 364자, 예 `갅` = `ea b0 85`)이 NEL 이 되어 가짜 `POST … mode=live result=posted` 조각이 `parse_line` 을 통과(ship-report.md:261-281) · `0x`+F 3,700개 같은 정수 설정이 4,456자리 int 로 `load_config` 를 통과한 뒤 `START interval_min=` 쓰기에서 파이썬 4300자리 한도 `ValueError`(ship-report.md:307-315)
-- first confirmed: 2026-10-13 · last confirmed: 2026-10-14
-
 ### E-006 · tooling — [stop:unknown · 1] 정지 부류 표에 "ship-check sensitive human checks — confirm in the interview before merge" 행이 없다 — 민감 확인 줄로 머지 전에 멈춘 ship-check 는 부류 `unknown` 으로 남는다
 - evidence: `.adw/journal/20261013-122544-stop-1/stop.md:1,5-6`(홈 트리) — "stop: ship-check · unknown · 1 · seen 2", "lesson: 표에 없는 정지 — 사유를 읽고 부류를 정한다"; 같은 꼴 첫 목격 20261013-075734-stop-1. 같은 stop.md 에 `stale harness: yes` — 현 하네스 표에 행이 이미 생겼는지는 이 retro 가 확인하지 못함
 - first confirmed: 2026-10-13 · last confirmed: 2026-10-14
@@ -95,6 +90,23 @@
 - evidence: `src/agent/youtube.py:69-75`(`__init__(self, call, reason)`) · `:41` `COMMENTS_DISABLED = "HTTP 403 commentsDisabled"` · `:277` `if exc.reason == COMMENTS_DISABLED:`; 모양 오류가 `except YouTubeError: continue` 로 삼켜지는 자리는 ship-report R1(`tests/live_check.py:1026-1029`) (cycle 20261014-035728-adw/phase-6a-live-check-prepare · understand 후보 2)
 - first confirmed: 2026-10-14 · last confirmed: 2026-10-14
 
+### E-026 · reviewer — 헌법 9조 짝 테스트가 초록이어도 약속 문장은 그 테스트가 재는 것보다 넓을 수 있다 — 9조 첫 사례(Phase 1A)에서 빠진 짝은 0 이었지만 PARTIAL 이 7개였고, 짝이 초록인 계약 7절 "터미널에 가짜 줄이 그려지지 않습니다" 는 화면 폭 접힘까지 약속해 ship-check 가 사이클 안 줄이기가 아니라 사람 확인(R4)으로 올렸다
+- evidence: `.adw/ship-report.md:350-362` (Promise 정산 — MISSING 0 · PROVES L68 · L301 · L445 · PARTIAL 7, L445-446 짝은 입력 넷뿐이라 변이 l14 가 짝을 통과) · `:442-450` (R4) · `:477` (민감 확인 줄, confirmed 2026-10-14); 인터뷰가 `3a4a6e7` 로 문장을 짝이 재는 만큼으로 좁힘. E-009 부류의 9조 뒤 첫 목격 (cycle 20261014-035715-adw/phase-1a-parser-allow-rules)
+- first confirmed: 2026-10-14 · last confirmed: 2026-10-14
+
+### E-027 · gotcha — 가드의 youtu.be · shorts 거절 행이 한 검사(`;` 나누기 등)를 재려면 쿼리의 다른 이름이 모두 받는 이름(`si` · `t` · `feature`)이어야 한다 — 셋 밖 이름은 먼저 막혀 행이 다른 이유로 초록이 된다. Phase 1 의 S-003 잠금 행 `?x=1;y=2;v=B` 가 1A 뒤 그렇게 풀려, `guard.py:65` 의 `replace(";", "&")` 를 첫 구분자만 바꾸게 한 변이 g1 이 스위트 461개 초록으로 산다
+- evidence: `tests/test_guard.py:47` (S-003 행) · `src/agent/guard.py:23,65`; `.adw/ship-report.md:405` (가드 표 G1 의 `;` 행은 하나짜리 꼴만) · `:418-421` (R1) → S-056 이 받는 이름만 든 행으로 다시 잠금 (cycle 20261014-035715-adw/phase-1a-parser-allow-rules)
+- first confirmed: 2026-10-14 · last confirmed: 2026-10-14
+
+### E-028 · tooling — `tests/mutants.py` 의 변이는 소스에서 바꿀 글자가 **정확히 한 번** 나와야 돈다(아니면 종료 코드 2) — 가드 · 로그 · 설정의 한 줄을 고치는 페이즈는 그 줄을 겨눈 변이 문자열도 함께 고쳐야 하고, 같은 글자를 한 번 더 쓰는 줄을 더하기만 해도 기존 변이가 깨진다
+- evidence: `tests/mutants.py:9-10` 머리말("2 는 이름을 모르거나 바꿀 글자가 정확히 한 번 나오지 않았다는 뜻"); 1A 가 고친 가드 줄을 겨눈 `guard-youtu-be-ignores-query-v` · `guard-shorts-ignores-query-v` · `guard-query-ampersand-only`(`tests/mutants.py:139,145,151`); 등록부 82 → 90 (cycle 20261014-035715-adw/phase-1a-parser-allow-rules)
+- first confirmed: 2026-10-14 · last confirmed: 2026-10-14
+
+### E-029 · tooling — PyYAML 이 읽은 16진수(`0x…`) 정수는 파이썬의 4,300자리 문자열 변환 한도를 읽기에서 거치지 않는다(2의 거듭제곱 진법은 한도 밖) — 십진 `str()` · `format` 에 닿아서야 `ValueError` 가 나므로, 십진수 행만 있는 시험은 이 꼴을 재지 않는다. 정수 키는 1A 의 필수 상한(`src/agent/config.py:174`)이 막지만, 새 숫자 읽기는 같은 꼴을 다시 만날 수 있다
+- evidence: `python3 -I -c "import yaml; n=yaml.safe_load('k: 0x'+'F'*3700)['k']; str(n)"` → 14,800비트 int 로 읽힌 뒤 `ValueError: Exceeds the limit (4300 digits) for integer string conversion` (이 retro 실측); Phase 1 ship-report R4 · 트래커 Phase 1A 결정 2 (cycle 20261014-035715-adw/phase-1a-parser-allow-rules)
+- first confirmed: 2026-10-14 · last confirmed: 2026-10-14
+
 ## Retired (history — one line each, never deleted)
+- E-005 · hazard — Phase 1 의 세 파서(가드 주소 읽기 · 로그 줄 이스케이프 · 설정 숫자 읽기)는 열거한 꼴 목록으로 막는다 — ship-check 네 번이 매번 목록 밖 꼴을 하나 이상 더 찾았다 — retired 2026-10-14 (contradicted by `src/agent/guard.py:23` `_SHARE_QUERY_NAMES = frozenset({"si", "t", "feature"})` · `src/agent/config.py:174` `_int(value, path, minimum, maximum)` 상한 필수 · `src/agent/logbook.py:59,70` 날 글자 범주 허용 목록(L·M·N·P·S + U+0020) — Phase 1A 가 세 파서를 받는 쪽 목록으로 바꿈 (cycle 20261014-035715-adw/phase-1a-parser-allow-rules))
 - E-014 · hazard — 계약의 새 절 번호는 레인마다 자기 base 에서 매긴다 — main 의 `## 11. 트리거 판정 — trigger.py` 와 이 브랜치의 `## 11. 주제 판별 — classifier.py (Phase 3)` 가 같은 번호라, 착지 때 절 번호와 `config.py` 키 꼬리 · `config.yaml` · `VALID` · `CommittedConfigTest` · `requirements.txt` 의 겹친 추가분을 합쳐야 한다 — retired 2026-10-14 (shipped Phase 1B (cycle 20261014-035724-adw/phase-1b-contract-section-names): 계약 10절 규칙 줄로 10절 뒤 절은 번호 없이 제목만 달고, `tests/test_contract_sections.py` 가 `## <숫자>.` 제목과 10 넘는 절 인용을 착지 전에 빨강으로 막는다 — 남은 틈은 E-022)
 - E-001 · gotcha — [stop:red-unbucketable · 1] ship-check BLOCKED 이고 통이 그 고침을 못 받는다 — 이 페이즈는 제 브랜치에서 아래 Blockers 를 범위로 다시 돈다 — retired 2026-10-13 (shipped (Phase 1 ship 게이트 승인 2026-10-13; `youtu.be/A/../B` 꼴은 `5352cf8` 로 막힘 — notes.md Expertise check))

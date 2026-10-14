@@ -260,7 +260,7 @@ Open questions
 ---
 
 ## Phase 1A — 파서 허용 쪽 규칙 (가드 주소 꼬리 · 설정 정수 상한 · 로그 글자 · 로그 읽기)
-- Status: Not started
+- Status: Done
 - Slug: parser-allow-rules
 - After: Phase 2
 - Goal: Phase 1 의 세 파서가 막을 꼴을 적어 두는 방식(거부 목록) 대신 받을 꼴만 적는 방식(허용 목록)으로 판단하게 바꾼다 — 가드의 youtu.be · shorts 쿼리 이름, 설정 정수의 범위, 로그 값에 날 글자로 남는 글자. 그리고 로그를 읽는 단 하나의 방법 `read_log` 를 둔다. Phase 1 출하 점검이 네 번 연속 목록 밖 꼴을 찾은 반복(경험 장부 E-005)을 끝내는 것이 목적이다.
