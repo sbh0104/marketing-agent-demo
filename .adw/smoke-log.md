@@ -596,3 +596,21 @@ other line is required on every item.
 - status: resolved
 - attempts: 0 · last failure: —
 - first seen: 2026-10-14 · last seen: 2026-10-14
+
+### S-NEW-1 — 설정 글자 규칙 오류 메시지 괄호에 "이 파이썬이 모르는 새 글자(최근 이모지 등)" 를 더하기
+- source: cycle 20261014-112313-adw/phase-1c-text-config-allow · tracker plans/interview-marketing-agent.md#phase-1c · deferred by deep-interview (HC1 질문 1 B, 슬롯 1c)
+- evidence: src/agent/config.py:216-217 — 괄호가 "줄바꿈 · 탭 · 전각 공백 · 폭 없는 공백" 만 예로 듦; tests/test_config.py:289-292 (TEXT_CHARS) 가 정확한 문구를 고정; `topic: "연애 고민 🫩"` 이 파이썬 3.14.4 에서 `load OK`, 3.12.13 에서 이 메시지(인터뷰가 같은 파일로 잼) — 판정이 실행 중인 파이썬의 unicodedata 를 따르므로 낡은 판은 새 이모지를 Cn 으로 거절
+- direction: `_text` 의 글자 규칙 ConfigError 괄호를 "(줄바꿈 · 탭 · 전각 공백 · 폭 없는 공백, 이 파이썬이 모르는 새 글자(최근 이모지 등) 등은 안 됩니다)" 꼴로 넓히고 TEXT_CHARS 를 같은 문구로 맞춘다 — 규칙 · 거절 범위 · 키 이름 꼬리 `: <키>` 는 그대로, 값은 여전히 메시지에 쓰지 않음; 계약 2절은 괄호를 `(…)` 로 비워 두어(docs/contracts.md:116) 고치지 않는다
+- touches: src/agent/config.py, tests/test_config.py
+- status: open
+- attempts: 0 · last failure: —
+- first seen: 2026-10-14 · last seen: 2026-10-14
+
+### S-NEW-2 — 두 키가 함께 틀린 설정에서 chrome_debug_url 오류가 topic 오류보다 먼저 나는 순서를 스위트로 고정
+- source: cycle 20261014-112313-adw/phase-1c-text-config-allow · tracker plans/interview-marketing-agent.md#phase-1c · deferred by ship-check
+- evidence: src/agent/config.py:319 (`chrome_debug_url` 읽기)가 :334 (`topic` 읽기)보다 앞 — topic 읽기를 크롬 주소 읽기 앞으로 옮긴 변이가 전체 스위트에서 `OK (skipped=3)`(.adw/ship-report.md § Test integrity, 시드 S15); 이 순서는 계획의 "error precedence is unchanged" 이고 지금은 일회성 점검 .adw/verify.sh V2 의 `order_url_before_topic` 행만 잼
+- direction: tests/test_config.py 의 TextKeyTest 에 `config_from_mapping(valid())` 로 topic 을 `"연애\t"`, chrome_debug_url 을 `"http://localhost:9222 "` 로 함께 바꾼 행 하나를 더해 `str(exc) == f"{EDGE_SPACE}: chrome_debug_url"` 를 단언한다 — 코드 · 계약 변경 없음, 같은 행이 base 4ef1455 의 순서(주소 먼저)와도 같음
+- touches: tests/test_config.py
+- status: open
+- attempts: 0 · last failure: —
+- first seen: 2026-10-14 · last seen: 2026-10-14
