@@ -27,7 +27,7 @@
 
 ## To do
 
-- [~] [smoke] 스모크 스윕 — S-073, S-074
+- [x] [smoke] 스모크 스윕 — S-073, S-074
 - [x] [smoke] 스모크 스윕 — S-068, S-069, S-070, S-071, S-072
 - [x] [smoke] 스모크 스윕 — S-064, S-065, S-066, S-067
 - [x] [smoke] 스모크 스윕 — S-059, S-060, S-061, S-062, S-063
@@ -62,6 +62,8 @@
 - [x] Phase 6B — 진짜 결과 반영 · 정확도 기록 · 기준값 조정 (plans/interview-marketing-agent.md#phase-6b)
 - [ ] Phase 6C — 채점 고치기 · 다시 잴 준비 (plans/interview-marketing-agent.md#phase-6c)
 - [ ] Phase 6D — 다시 잰 결과 반영 (plans/interview-marketing-agent.md#phase-6d)
+- [ ] Phase 6E — 댓글 품질 고치기 (작성 프롬프트 · 6D 숫자가 나쁠 때만) (plans/interview-marketing-agent.md#phase-6e)
+- [ ] Phase 6F — 고친 뒤 다시 반영 (전후 숫자) (plans/interview-marketing-agent.md#phase-6f)
 - [ ] Phase 7 — 파이프라인 연결 · 운영 규칙 통합 (plans/interview-marketing-agent.md#phase-7)
 - [ ] Phase 8 — 제출물 (plans/interview-marketing-agent.md#phase-8)
 - [ ] (example) Add social login buttons to the login screen
@@ -87,7 +89,7 @@
 
 - [x] ~~(retro 후보 · E-030) 인터뷰가 민감 확인 줄을 트래커만 고쳐 확정해도(코드 그대로) 사이클이 verify-run 부터 다시 돌아 같은 트리에서 verify-run · ship-check 전체를 한 번 더 함 — 최소 계약 고침: 허브의 확인 인터뷰 뒤 재개 자리(`hub:move` → `step: verify-run`)를, 판정한 트리와 HEAD 사이 `plans/` 밖 diff 가 비었을 때 ship-check 로 두고 ship-check 는 앞 보고서를 옮겨 새 트래커 결정 줄만 다시 추적 — 허브 · `.claude/skills/ship-check/SKILL.md` 는 ADWS 동기화 하네스라 고침은 상류에서(E-011 선례) (sightings: 20261014-035715-adw/phase-1a-parser-allow-rules · 20261014-112313-adw/phase-1c-text-config-allow)~~ — ADWS 백로그로 이관 (2026-10-14 원격 인터뷰 · 슬롯 40effaa6 · Q1 A · Q2 A) — `~/project/ADWS/.adw/backlog.md` To do 끝의 `(retro 후보 · marketing-agent-demo E-030 이관)` 줄. 원인은 확인 도장 `human_checks.py confirm` 이 ship-report 만 다시 쓰는 것이었다: 인터뷰의 트래커 커밋 뒤 verify-report 가 "마지막 커밋보다 낡음"이 되어 허브 ↪ Move 의 R2″(`scripts/hub/lanemove.py:500-503`)가 ship-explain 을 막는다(커밋 없이 도장만 찍은 1B 는 다시 돌지 않음). 고침은 원안(재개 자리를 ship-check 로 · ship-check 옮겨 쓰기 모드, 세 곳)보다 작게 넘김: `confirm` 이, 판정 뒤 바뀐 경로가 모두 `plans/` 이고 PASS 일 때만 verify-report 도 이어받아 ↪ Move → ship-explain 이 열리게 하고, 허브 · 드라이버의 낡음 규칙은 그대로 둔다. 받아들인 값: 새 트래커 줄은 기계가 다시 대조하지 않고, 1C 에서 R7 · R8 을 건진 우연한 두 번째 감사도 사라짐. 1A 처럼 계약 문서도 고친 확인은 고침 뒤에도 전부 다시 돎(맞는 동작). 그 사이 헌법 임시 조항은 두지 않음 — 인터뷰가 verify-report 를 손으로 이어받으면 경로를 잘못 읽은 날 autonomy full 게이트가 검사 안 된 변경을 병합하므로. 고침이 올 때까지 인터뷰가 레인에 커밋한 민감 확인 정지마다 verify-run · ship-check 재실행(18–30분 · $9–15)을 감수한다. 다시 오르면 이 줄로 흡수해 닫는다
 
-- [ ] (retro 후보 · E-034) 트래커만 고친 확인 인터뷰 뒤 두 번째 ship-check 가 같은 코드 트리에서 새 결함을 찾음(1C R7 · R8, 6B R12 · S-075) — E-030 상류 고침이 받아들인 "새 트래커 줄은 기계가 다시 대조하지 않음"을 다시 볼지 — 최소 계약 고침: ADWS 백로그 `(retro 후보 · marketing-agent-demo E-030 이관)` 줄의 받아들인 값 — `human_checks.py confirm` 이 verify-report 를 이어받을 때 인터뷰가 더한 트래커 줄만 Spec compliance 로 다시 추적하는 좁은 ship-check 하나를 남김 (sightings: 20261014-112313-adw/phase-1c-text-config-allow · 20261014-112322-adw/phase-6b-live-check-apply)
+- [x] ~~(retro 후보 · E-034) 트래커만 고친 확인 인터뷰 뒤 두 번째 ship-check 가 같은 코드 트리에서 새 결함을 찾음(1C R7 · R8, 6B R12 · S-075) — E-030 상류 고침이 받아들인 "새 트래커 줄은 기계가 다시 대조하지 않음"을 다시 볼지 — 최소 계약 고침: ADWS 백로그 `(retro 후보 · marketing-agent-demo E-030 이관)` 줄의 받아들인 값 — `human_checks.py confirm` 이 verify-report 를 이어받을 때 인터뷰가 더한 트래커 줄만 Spec compliance 로 다시 추적하는 좁은 ship-check 하나를 남김 (sightings: 20261014-112313-adw/phase-1c-text-config-allow · 20261014-112322-adw/phase-6b-live-check-apply)~~ — ADWS 백로그 E-030 이관 줄에 보탬으로 흡수 (2026-10-14 원격 인터뷰 · 슬롯 738761dc · Q1 A · Q2 A · Q3 A) — `~/project/ADWS/.adw/backlog.md` 의 `(retro 후보 · marketing-agent-demo E-030 이관)` 줄 안 "E-034 보탬" 과 고친 받아들인 값. 두 번째 검사가 찾은 것은 두 종류였다: 인터뷰가 쓴 새 줄 자체의 거짓(6B R12, `plans/interview-marketing-agent.md:487` — 지금 H-064 로 6C 를 기다림)과, 인터뷰와 상관없이 두 번째 눈이 본 코드 결함(1C R7 · R8 · 6B S-066 — 이 줄의 'S-075' 는 S-066(다시 접수된 S-073)을 잘못 적은 번호). 고침은 앞 종류만 겨냥한다: 확인 인터뷰가 도장 전에 판정 뒤 `plans/` 의 바뀐 줄 전체를 읽기 전용 `adw-auditor` 에게 넘겨 사실 주장을 사본에서 시험하고, 거짓이면 글만 좁히는 고침은 인터뷰가 · 결정이 바뀌는 고침은 같은 인터뷰에서 사람에게 묻고, 커밋 꼬리말 `Claims-checked: N found · 0 false` 가 없거나 거짓이 남으면 `confirm` 이 verify-report 를 이어받지 않아 지금처럼 전부 다시 돈다. 원안의 "도장 뒤 좁은 ship-check" 는 버림 — 세 곳 고침이 되살아나고, R12 는 Spec compliance 가 아니라 품질 감사가 바꿈을 심어 찾았기에 원안 글대로면 놓친다. 받아들인 값: 코드 쪽 우연한 두 번째 감사는 사라짐(두 번 보기는 모든 페이즈에 따로 정할 규칙, 열지 않음) · 꼬리말은 실수 막이일 뿐. 오늘 전체 재실행도 R12 를 위험으로만 적어 거짓 줄이 착지했다(그래서 찾은 자리에서 고치는 손을 둠). 고침이 올 때까지는 E-030 그대로 확인마다 전부 다시 돈다. 다시 오르면 ADWS 줄로 흡수해 닫는다
 
 ## Done
 
