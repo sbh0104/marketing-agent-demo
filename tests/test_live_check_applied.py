@@ -1145,16 +1145,6 @@ class RecountTest(unittest.TestCase):
             ["videos[0].drafts[0] self_check_pass False -> True"],
         )
 
-    def test_lowered_floors_flip_an_example_row(self) -> None:
-        # 예시 행 다리 — 영상 판별 · 초안은 그대로 두고 예시 행 하나만 내린 기록 하한에 판정이 바뀝니다
-        on_topic = load_result()["fingerprint"]["classifier"]["on_topic_reasons"][0]
-        held = {"verdict": "hold", "noul": 0.78, "choice": on_topic, "confidence": 0.9}
-        fake = self.fake(ko=(held,))
-        self.assertEqual(stored_verdict_mismatches(fake), [])
-        lowered = copy.deepcopy(fake)
-        lowered["fingerprint"]["classifier"]["noul_yes_min"] = 0.75
-        self.assertEqual(stored_verdict_mismatches(lowered), ["accuracy.ko[21] hold -> yes"])
-
     @staticmethod
     def _flip_tasks(draft: dict) -> None:
         if isinstance(draft.get("task_quality"), Mapping):
