@@ -912,6 +912,20 @@ if result.draft is not None:
   같거나, `difflib.SequenceMatcher(autojunk=False)` 로 찾은 가장 긴 연속 공통 글자가
   `REPEAT_MIN_CHARS`(12, 코드 상수) 이상이면 반복입니다. 비교 대상은 `previous` 의 마지막
   `RECENT_WINDOW`(20)개 — Claude 가 `<my_previous_comments>` 에서 보는 바로 그 댓글들입니다.
+- **잰 값 (Phase 6B).** `docs/live-check/result.json` 에서 읽은 숫자입니다('주제 판별' 절의 기록과 같은
+  실행).
+  - 모델 이름: claude-sonnet-5-5 accepted · claude-haiku-5-5 accepted — 작성 claude-sonnet-5-5 · 채점 claude-haiku-5-5
+  - `comment.writer_model` 은 `claude-sonnet-5-5` 그대로입니다 — 설정한 이름이 `accepted` 입니다.
+  - 초안 운영 창: 쓴 영상 7 · SKIP 3 · 초안 10 · 정답 있음 0 (사람 칸 0 · Claude 채점 0) · 채점 오류 10 · 사람 칸과 Claude 채점이 다름 0 · 정답 bad 인데 통과 0 · 정답 ok 인데 탈락 0
+  - 초안 넓힌 창: 실행 없음
+  - 정답 있는 초안이 0 이라 `check_min_probability` 는 0.7 그대로입니다(표본 없음).
+  - 정답은 사람 칸(`ok` · `bad`)이 있으면 그것, 없으면 Claude 채점입니다. Claude 채점은 또 하나의 AI
+    의견이라, 그 정답에 맞춰 옮긴 통과선은 단단하지 못합니다.
+  - 통과선은 올리기만 하고 내리지 않습니다 — 정답이 `bad` 인데 jev 자체 검사를 통과한 초안이 있으면 그
+    초안의 세 점수 가운데 가장 낮은 것 + 0.05 로 올리고, 정답이 `ok` 인데 자체 검사에서 떨어진 초안은
+    숫자만 위에 적습니다. 내리는 쪽은 사람이 정합니다.
+  - `REPEAT_MIN_CHARS`(12) 는 그대로입니다 — 표본 부족: 최근 내 댓글 20개끼리 비교하는 값이라 초안 약
+    10개짜리 한 바퀴로는 잴 수 없습니다.
 - **자료** — 태그 블록 `<video_title>` · `<video_description>` · `<transcript>`(자막이 비었으면
   대신 `<top_comments>` — 비어 있지 않은 인기 댓글 앞 10개) · `<classification>` ·
   `<my_previous_comments>`(최근 댓글이 있을 때만). 시스템 프롬프트가 태그 안의 글을 지시가 아닌
