@@ -741,6 +741,9 @@ class RangeFailureTest(unittest.TestCase):
                 with self.assertRaises(ConfigError) as caught:
                     load_config(path)
                 self.assertIn(bad.needle, str(caught.exception))
+                if " 이하여야 합니다: " in bad.needle:
+                    # 상한 문구에는 값을 쓰지 않습니다(계약 · 값은 메시지에 쓰지 않음)
+                    self.assertEqual(str(caught.exception), bad.needle)
                 # 변환 중 터진 것이 아니라 규칙이 거부한 값입니다
                 self.assertIsNone(caught.exception.__cause__)
 
