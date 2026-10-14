@@ -38,12 +38,21 @@
    not escalated.** A line a phase adds to or changes in `docs/contracts.md` that
    contains 뿐 · 않 · 될 수 있 · 에만 is a promise unless the phase says why not.
    Lines no phase edits are out of scope until one does.
+   A caught line that says where text from outside — YouTube, jev, Claude, or a
+   file a person edits — ends up (only here · never there) is a **flow promise**.
+   Its paired test marks the boundary, not a list: every text field the fakes of
+   those services return carries a marker, fields the sentence never names
+   included. A field the code accepts only in a fixed shape (a video id) gets a
+   marker in that shape (`MRK…`); only a field the code turns into a number, date
+   or boolean goes unmarked, named with that reason.
    - **plan** — every such line `.adw/plan.md` writes is paired in `## Test plan`:
      `Promise: "<first words>" → tests/<file>::<test>` or
      `Promise: "<first words>" → not a promise: <why>`. The test lives in the
      suite, never only in `.adw/verify.sh`. The step that writes the line says:
      "paired test red while the code matches this plan → plan-miss: narrow the
      sentence to what the code does".
+     A flow promise's pair line ends with its tag:
+     `[boundary: <fakes> — unmarked: <field> <number|date|boolean> · …]`.
    - **implement** — such a red is a `plan-miss`: narrow the sentence through
      `.adw/plan-repairs.md`. Never change code to make a sentence true.
    - **verify-plan** — sweep the diff's added or changed contract lines for the
@@ -52,6 +61,9 @@
      `Promise: L<n> — not a promise: <why>`. A `V<m>` row ends
      `— red: narrow the sentence to the measured behavior (constitution 9), not
      drift`, so verify-run, which does not read this file, takes it as a bounded fix.
+     A caught flow promise whose pair line has no tag, or whose test leaves a text
+     field of its fakes unmarked, gets `Promise: L<n> — V<m>`, where `V<m>` runs the
+     code with every text field those fakes return marked; it ends the same way.
    - **ship-check** — each narrowed sentence (a plan-repairs entry or a verify-run
      fix) goes under `## Risks` with its original wording, not `## Human checks`.
      Widening a promise — changing code so a broader sentence holds — is a
