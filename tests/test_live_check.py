@@ -766,6 +766,16 @@ class VerdictTest(unittest.TestCase):
         )
         self.assertEqual(self.line(grade_errors_five_of_eleven()), "6B: go")
 
+    def test_grade_block_counts_parsed_drafts_only(self) -> None:
+        # 판 2 · 읽은 초안 10(채점 오류 6) + 읽지 못한 초안 4 — 분모는 읽은 초안만 셉니다
+        result = ten_drafts(6)
+        self.assertEqual(result["schema_version"], 2)
+        for item in result["videos"][6:]:
+            item["drafts"][0]["attempt"] = 2
+            item["drafts"].insert(0, {"attempt": 1, "parsed": False})
+        self.assertEqual(sum(len(item["drafts"]) for item in result["videos"]), 14)
+        self.assertEqual(self.line(result), "6B: stop — 채점 막힘(오류 6/10)")
+
     def test_schema_one_result_keeps_old_rule(self) -> None:
         result = grade_errors_schema_one()
         self.assertEqual(result["schema_version"], 1)
@@ -2802,6 +2812,7 @@ class AnswerShapeTest(LiveCheckCase):
         prose = "채점입니다 " + json.dumps(GRADE_ANSWER) + " 끝"
         extra_text = json.dumps({**GRADE_ANSWER, "extra": True})
         deep = "{" * 5000 + "}" * 5000
+        valid_deep = '{"a":' * 100000 + "1" + "}" * 100000  # 올바른 JSON — RecursionError 길
         success = (GRADE_OK, None, TASK_OK, None, None)
         both = (None, "응답 모양", None, "응답 모양")
         text_shape = {
@@ -2821,6 +2832,8 @@ class AnswerShapeTest(LiveCheckCase):
             "other_keys": 0,
             "non_bool": [],
         }
+        # record_grade 도구 블록인데 input 이 dict 가 아님 — 도구는 썼지만 JSON 객체는 못 읽음
+        not_dict_input = {**SHAPE_EXTRA_KEY, "json_read": False, "keys": [], "other_keys": 0}
         rows = {
             "도구 답": (GRADE_ANSWER, success),
             "설명 글 + JSON": (prose, success),
@@ -2843,6 +2856,16 @@ class AnswerShapeTest(LiveCheckCase):
             ),
             "빈 답": (SimpleNamespace(content=[]), (*both, nothing)),
             "깊은 중첩": (deep, (*both, {**nothing, "text_chars": len(deep)})),
+            "올바른 깊은 중첩": (valid_deep, (*both, {**nothing, "text_chars": len(valid_deep)})),
+            "도구 입력이 목록": (
+                tool_response("record_grade", [GRADE_ANSWER]),
+                (*both, not_dict_input),
+            ),
+            "도구 입력이 글자": (
+                tool_response("record_grade", json.dumps(GRADE_ANSWER)),
+                (*both, not_dict_input),
+            ),
+            "도구 입력이 None": (tool_response("record_grade", None), (*both, not_dict_input)),
         }
         for label, (response, expected) in rows.items():
             with self.subTest(label):
@@ -2916,6 +2939,16 @@ class AnswerShapeTest(LiveCheckCase):
                 )
                 self.assertEqual((grade_error, task_error), ("응답 모양", "응답 모양"))
                 self.assertEqual((shape["tool_used"], shape["json_read"]), (False, False))
+        # 같은 블록 뒤에 다섯 키 JSON 글 블록이 있으면 블록을 지나쳐 글 JSON 을 받습니다(트래커 6C)
+        for kind, name in (("tool_use", "Record_grade"), ("TOOL_USE", "record_grade")):
+            with self.subTest(kind=kind, name=name, text="다섯 키 JSON"):
+                response = block_response(kind, name)
+                response.content.append(
+                    SimpleNamespace(type="text", text=json.dumps(GRADE_ANSWER))
+                )
+                self.assertEqual(self.graded(response), green)
+                _, shape = live_check.read_answer(response, "record_grade", ANSWER_NAMES)
+                self.assertEqual((shape["tool_used"], shape["json_read"]), (False, True))
 
     def test_near_miss_topic_keys(self) -> None:
         def topic(response: object) -> tuple:
