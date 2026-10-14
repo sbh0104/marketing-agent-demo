@@ -780,7 +780,7 @@ other line is required on every item.
 - evidence: docs/live-check/README.md:28-29 — 두 명령이 따로 된 두 줄이라 붙여 넣으면 `cp` 가 실패해도 `git restore` 가 돈다. ship-check 보안 감사의 임시 저장소 재현: 없는 레인 경로로 `cp exit=1` → `restore exit=0` → result.json 이 "NEW-RUN" 에서 "old" 로 돌아감. 돈 들인 실제 실행 결과와 사람이 적은 `human` · `topic_human` 칸이 사라짐(.adw/ship-report.md § Risks R1)
 - direction: 두 줄을 `cp … && git restore …` 한 줄로 묶고, "복사가 실패하면(레인 경로가 없거나 6F 등 다른 이름) `git restore` 를 돌리지 않습니다" 한 문장을 35행 설명에 더한다 — 코드 · 계약 · 테스트 변경 없음
 - touches: docs/live-check/README.md
-- status: open
+- status: resolved
 - attempts: 0 · last failure: —
 - first seen: 2026-10-14 · last seen: 2026-10-14
 
@@ -789,7 +789,7 @@ other line is required on every item.
 - evidence: docs/live-check/README.md:20 — `ten_drafts(10)` 에 채점과 무관한 YouTube search 500 오류 한 줄을 더하면 `verdict_line` 이 `6B: stop — 재지 못함(호출 오류 1); 채점 막힘(오류 10/10)` 을 내고, 모든 `grade_error` 는 `응답 모양` 이며 claude/grade 오류 줄은 0 이다(ship-check 품질 감사 실행). 계약 docs/contracts.md:1275-1276 의 문장("채점 호출이 API 오류로 실패한 초안은 … 함께 셉니다")은 맞고 README 의 인과 문장만 넓다(.adw/ship-report.md § Risks R2)
 - direction: "함께 나오면 `재지 못함` 의 오류 줄부터 봅니다 — 그 줄에 `claude` · `grade` 가 있으면 채점 호출이 실패한 것이고, 없으면 채점 막힘의 원인은 `채점 답 모양:` 줄입니다" 로 고친다 — 코드 · 계약 · 테스트 변경 없음
 - touches: docs/live-check/README.md
-- status: open
+- status: resolved
 - attempts: 0 · last failure: —
 - first seen: 2026-10-14 · last seen: 2026-10-14
 
@@ -798,7 +798,7 @@ other line is required on every item.
 - evidence: tests/live_check.py:1272 — `self.popular < self.limits.popular_drafts_min` 을 `<=` 로 바꾼 변이가 초록(ship-check 감사의 사본 실행: 전체 스위트 660개 OK · ship-check 본인의 사본 실행: live-check 두 모듈 147개 OK, rc=0). 넓힌 창이 닫혀 있어야 하는 유일한 테스트 tests/test_live_check.py:2135 가 `popular_drafts_min=0` 으로 돌아 "최소 3 에 정확히 닿음" 을 아무 테스트도 재지 않음(.adw/guard-matrix.md Guard B 첫 줄도 `min 0`). tests/live_check.py:380 `if 2 * grade_errors > graded:` 를 `> graded + 1` 로 바꾼 변이도 147개 초록 — 경계 표본이 4/10 · 5/10 · 6/10 짝수뿐. tests/live_check.py:136-139 의 GRADE_SYSTEM 질문 4 · 5 글은 테스트가 기호로만 비교해 바꿔 써도 초록(.adw/ship-report.md § Test integrity)
 - direction: tests/test_live_check.py 에 ① 기본 `popular_drafts_min`(3)에서 운영 창이 `target_drafts` 와 인기 댓글 초안 정확히 3 에 닿으면 `list(result["windows"]) == ["operation"]` 인 실행 테스트 ② `ten_drafts` 꼴의 홀수 초안 결과(오류 6/11 → `채점 막힘(오류 6/11)`, 오류 5/11 → `go`)를 VerdictTest 와 G1_CASES 에 ③ GRADE_SYSTEM 의 질문 4 · 5 줄과 닫는 줄을 글자 그대로 단언하는 행을 더한다 ④ (2026-10-14 6C HC1 인터뷰 질문 1 A 가 더함) `test_near_miss_tool_block` 의 "정하지 않은 표본 — … 트래커 줄이 없어" 주석을 "빨강(거절) — 트래커 6C 결정 '도구 답은 … 글자 그대로 같을 때만'" 으로 고친다(단언은 그대로) — 코드 변경 없음, 지금 코드는 넷 다 기대대로
 - touches: tests/test_live_check.py
-- status: open
+- status: resolved
 - attempts: 0 · last failure: —
 - first seen: 2026-10-14 · last seen: 2026-10-14
 
@@ -807,7 +807,7 @@ other line is required on every item.
 - evidence: tests/live_check.py:379 `graded = len(graded_drafts)` 를 파싱 안 된 초안까지 센 수로 바꾼 변이가 live-check 두 모듈 147개 초록(ship-check 본인의 사본 실행 rc=0, 감사 5 의 전체 스위트 660개 OK) — 계약 docs/contracts.md:1269 의 "초안(`parsed` 인 초안)" 을 잠그는 테스트가 없고 .adw/guard-matrix.md Guard A 에도 파싱 안 된 초안이 섞인 행이 없음. tests/live_check.py:860 의 `RecursionError` 를 잡지 않게 한 변이와 :899 `json_read` 를 `data is not None` 으로 바꾼 변이도 전체 스위트 초록(감사 5) — tests/test_live_check.py:2790 "깊은 중첩" 표본 `"{"*5000+"}"*5000` 은 올바르지 않은 JSON 이라 `JSONDecodeError` 길만 타고, dict 아닌 도구 `input` 을 보내는 테스트가 없음. 트래커 :501(HC1 결정)의 "그 블록을 지나쳐 글 블록의 JSON 을 읽는다" 갈래는 코드가 하지만(감사 1 탐침 `near-miss block + text JSON -> 받음 · tool_used False · json_read True`) 테스트 표본이 없음(.adw/ship-report.md § Test integrity)
 - direction: tests/test_live_check.py 에 ① 판 2 결과에 파싱된 초안 10개(오류 6) + 파싱 안 된 초안 4개 → `채점 막힘(오류 6/10)` 인 VerdictTest 행 ② `'{"a":' * 100000 + '1' + '}' * 100000` 처럼 올바른 깊은 중첩 글 → `json_read` false · `응답 모양` 행 ③ `input` 이 목록 · 글자 · None 인 `record_grade` 도구 블록 → `tool_used` true · `json_read` false · 두 몫 `응답 모양` 행 ④ `Record_grade` · `TOOL_USE` 블록 + 맞는 다섯 키 JSON 글 블록 → 두 몫 받음 · `tool_used` false · `json_read` true 행을 더한다 — 코드 변경 없음, 지금 코드는 넷 다 기대대로(S-077 과 같은 파일이라 한 스윕에서 함께 고쳐도 됨)
 - touches: tests/test_live_check.py
-- status: open
+- status: resolved
 - attempts: 0 · last failure: —
 - first seen: 2026-10-14 · last seen: 2026-10-14
 
