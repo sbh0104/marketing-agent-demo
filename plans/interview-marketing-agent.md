@@ -433,7 +433,7 @@ Open questions
 ---
 
 ## Phase 6B — 진짜 결과 반영 · 정확도 기록 · 기준값 조정
-- Status: Not started
+- Status: Done
 - Slug: live-check-apply
 - After: Phase 6A
 - Goal: 사람이 커밋한 `docs/live-check/` 결과로 계약서의 정확도 기록을 채우고, 판별 기준값과 자체 검사 통과 하한을 잰 값으로 바꿔 테스트로 잠근다.
