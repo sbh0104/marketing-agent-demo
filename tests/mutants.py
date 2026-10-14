@@ -674,6 +674,25 @@ MUTANTS: dict[str, tuple[str, str, str, str]] = {
         "raise SystemExit(cli(sys.argv[1:]))",
         "raise SystemExit(main(sys.argv[1:]))",
     ),
+    "live-check-applied-yes-floor-lowered": (
+        "agent.config",
+        "tests.test_live_check_applied",
+        'section["noul_yes_min"], "classifier.noul_yes_min", 0.5, 1.0, inclusive=False',
+        'section["noul_yes_min"] - 0.05, "classifier.noul_yes_min", 0.5, 1.0, inclusive=False',
+    ),
+    "live-check-applied-floor-lowered": (
+        "agent.config",
+        "tests.test_live_check_applied",
+        'comment["check_min_probability"], "comment.check_min_probability", 0, 1',
+        'comment["check_min_probability"] - 0.05, "comment.check_min_probability", 0, 1',
+    ),
+    "live-check-applied-reads-jev-models": (
+        "tests.test_live_check_applied",
+        "tests.test_live_check_applied",
+        'GUARDED = ("questions", "examples_sha256", "classifier", "margin", "pass_correct")',
+        'GUARDED = ("questions", "examples_sha256", "classifier", "margin", "pass_correct",'
+        ' "jev_models")',
+    ),
 }
 
 

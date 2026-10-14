@@ -573,7 +573,7 @@ run_loop(cycle, reload, initial, *, on_error, sleep=time.sleep,
   인자와 이유, 로그 사건과 필수 필드)은 고정입니다.
 - 더하는 것은 그 필드를 쓰는 단계(Phase)가 `models.py` · `config.py` 에서, 테스트와 함께, 이
   문서도 함께 고칩니다. 이미 있는 이름의 뜻을 바꾸거나 지우지 않습니다.
-- 가드 · 저장소 · 설정 읽기 · 로그 한 줄 규칙 · 판별 규칙 · 쿼터 가드 · 탐지 입력 검사 · 인기 댓글 · 실제 호출 실행기가 테스트로 지켜지는지는 음성 대조로 확인합니다. 각 명령은 가드 한 줄을
+- 가드 · 저장소 · 설정 읽기 · 로그 한 줄 규칙 · 판별 규칙 · 쿼터 가드 · 탐지 입력 검사 · 인기 댓글 · 실제 호출 실행기 · 실제 결과 반영이 테스트로 지켜지는지는 음성 대조로 확인합니다. 각 명령은 가드 한 줄을
   메모리에서만 망가뜨리고 테스트를 돌리며, **종료 코드 1(테스트가 잡음)** 이어야 합니다. 2 는
   바꿀 글자를 찾지 못했다는 뜻이라 실패입니다:
 
@@ -676,6 +676,9 @@ run_loop(cycle, reload, initial, *, on_error, sleep=time.sleep,
   python3 -m tests.mutants live-check-grader-in-agent
   python3 -m tests.mutants live-check-cli-exception-only
   python3 -m tests.mutants live-check-entry-skips-cli
+  python3 -m tests.mutants live-check-applied-yes-floor-lowered
+  python3 -m tests.mutants live-check-applied-floor-lowered
+  python3 -m tests.mutants live-check-applied-reads-jev-models
   ```
 
   `classify` · `read_answers` · `build_state` · `is_error_hold` · `sdk_ask` ·
@@ -684,8 +687,10 @@ run_loop(cycle, reload, initial, *, on_error, sleep=time.sleep,
   `YouTubeClient._call` · `Watcher.run` · `YouTubeClient.top_comments` · `tests/live_check.py` 의
   `Calls.take` · `Redactor` · `best_correct` · `verdict_line` · `cli` · `main` · `write_comment` ·
   `code_failures` · `self_check_failure` · `link_fragment` · `repeated_run` 의 본문을 고칠 때는 이
-  명령들이 계속 1 로 끝나는지 함께 확인합니다. 음성 대조 실행기는 `agent.*` 모듈과
-  `tests.live_check` 를 메모리에서 바꿉니다.
+  명령들이 계속 1 로 끝나는지 함께 확인합니다. `tests/test_live_check_applied.py` 의
+  `measured_drift` 본문을 고칠 때도 `live-check-applied-*` 명령이 계속 1 로 끝나는지 함께
+  확인합니다. 음성 대조 실행기는 `agent.*` 모듈과 `tests.live_check` · `tests.test_live_check_applied`
+  를 메모리에서 바꿉니다.
 
 ## 탐지 · 조회수 추적 — env.py · youtube.py · watcher.py (Phase 2)
 
@@ -1180,4 +1185,19 @@ python3 -m tests.live_check --verdict <결과 파일>     # 호출 없이 판정
 - **알려진 한계.** jev 응답의 `answers[이름].noul` · `model`, Claude 의 404 `status_code`, typesafe 의
   다시 시도 · 제한 시간 정책은 문서와 SDK 소스로 맞춘 모양이고 첫 진짜 실행이 처음 확인합니다.
   Claude 채점은 정답이 아니라 또 하나의 의견입니다(트래커 Phase 6A).
+- **결과 반영 (Phase 6B).** 사람이 커밋한 결과를 `tests/test_live_check_applied.py` 가 계약 · 설정과
+  맞댑니다. 결과 파일과 요약이 BOM 없이 있고, `--verdict` 가 종료 코드 0 과 `6B: go` 한 줄을 내며,
+  요약 첫 줄이 같은 판정 줄이고, 언어마다 예시 행 수가 `example_count` 와 예시 묶음 수와 같아야 합니다.
+  - 지문 맞대기(`measured_drift`) — 판별 기록이 기대는 칸(`questions` · `examples_sha256` ·
+    `classifier` · `margin` · `pass_correct`)은 결과와 지금 코드 · `config.yaml` 이 같아야 합니다.
+  - 작성 쪽 칸(`check_questions` · `self_check_criteria` · `check_min_probability` · `trigger` ·
+    `grade_system` · `target_drafts` · `wide_window_hours` · `claude_max_retries`)과
+    `fingerprint.jev_models` 는 맞대기에서 보지 않습니다. 작성 쪽 기록은 정답 있는 초안이 0 이라 어느
+    값도 옮긴 것이 없고, 이 칸을 지키면 작성 질문이나 채점을 고치는 사이클마다 사람의 재실행이 먼저
+    있어야 합니다. 그래서 이 칸이 바뀐 뒤의 초안 숫자는 옛 질문 · 채점으로 잰 숫자입니다.
+    `check_min_probability` 는 '댓글 작성' 절의 기록 테스트가 결과의 값과 같은지 봅니다.
+  - 새 결과나 사람 칸을 고친 결과를 커밋하거나 맞대는 칸을 고치면 이 모듈이 빨강입니다 — 기록이 지금
+    코드를 잰 숫자가 아니라는 뜻입니다. 사이클 안에서는 `unmeasured` 로 멈춥니다. 초록으로 돌아오는
+    길은 사람이 실행기를 다시 돌려 결과를 커밋한 뒤, 이 페이즈와 같은 적용 사이클이 기록 줄과
+    기준값을 새 결과로 다시 쓰는 것입니다. 그 사이클을 맡을 페이즈는 트래커가 정합니다.
 - **음성 대조.** 10절 목록의 `youtube-comments-*` · `live-check-*` 명령.
