@@ -27,7 +27,7 @@
 
 ## To do
 
-- [~] [smoke] 스모크 스윕 — S-056
+- [x] [smoke] 스모크 스윕 — S-056
 - [x] [smoke] 스모크 스윕 — S-051, S-052, S-053, S-054, S-055
 - [x] [smoke] 스모크 스윕 — S-049, S-050
 - [x] [smoke] 스모크 스윕 — S-048
@@ -76,7 +76,7 @@
 
 - [x] ~~(retro 후보 · E-022) 열거한 꼴(정규식 · 이름 목록)로 판정하는 코드에 verify-plan 이 Property-based 를 N/A 로 두고, ship-check 감사가 목록 밖 가까운 꼴을 찾아서야 빈틈이 드러남 — 최소 계약 고침: `.claude/skills/verify-plan/references/test-taxonomy.md:116-118` Property-based 행 `applies:` 에 "열거한 꼴로 판정하는 코드(정규식 · 허용/금지 목록) — N/A 대신 목록 밖 가까운 꼴 표본을 점검 줄로 두고 각 꼴을 빨강/초록으로 정한다" 한 줄 (sightings: 20261013-163932-adw/phase-6-poster-chrome(E-019, verify-plan Property-based N/A "새 파서 없음" 이 가림) · 20261014-035724-adw/phase-1b-contract-section-names(verify-plan.md:127 N/A, ship-report Risks 2); 같은 부류 E-005(Phase 1 → Phase 1A) · E-017(Phase 5))~~ — 헌법 12조로 닫음 (2026-10-14 원격 인터뷰 · 슬롯 0bd7add3 · Q1–Q5 A) — 고칠 자리로 적힌 `test-taxonomy.md` 는 ADWS `template/` 사본과 글자까지 같은 하네스라 동기화가 덮으므로, 이 프로젝트 헌법 `.adw/constitution.md` 12조에 바로 두고 같은 고침을 `~/project/ADWS/.adw/backlog.md` 의 `(retro 후보 · marketing-agent-demo E-022 이관)` 줄로 넘김(상류가 들어오면 12조를 줄임). 12조: 이번 페이즈가 더하거나 고친, 바깥 글을 정해 둔 모양 목록으로 받거나 막는 코드(허용 목록 · `tests/` 안 판정 테스트 포함, 우리 값끼리의 비교 · `except` 목록 제외)마다 목록 밖 닮은 꼴 표본을 계획 `## Test plan` 에 `Near-miss:` 줄로 적고, 색은 트래커 줄 인용으로만(근거가 막으려던 꼴 빨강 · 이름으로 통과시킨 꼴 초록 · 둘 다 아니면 undecided → 사람), 빨강 · 초록은 스위트 테스트로; verify-plan 은 계획이 놓친 판정 코드를 같은 꼴로 더하고 Property-based 를 N/A 로 두지 않으며, ship-check 는 표본 유무 · 인용을 세고 undecided 를 Human checks 로 나름. 남은 빈틈: 1B 위험 2번의 제목 꼴 넷은 트래커 Phase 1B "출하 뒤 고침" 줄과 스모크 S-056(테스트 파일만, 12조 첫 본보기)으로, `### 11.` 소제목 번호는 1B 받아들인 사각지대로. 출하된 링크 검사 · 크롬 폴더 점검의 빈틈은 H-020 · H-029 그대로(12조는 고친 코드에만). 지금 도는 1C · 6B 레인은 12조 전에 떠서 보지 못함 — 처음 닿는 것은 Phase 7 · 8 · 스윕. 이 꼴이 다시 오르면 12조가 실제 사이클에서 어떻게 돌았는지부터 본다
 
-- [ ] (retro 후보 · E-009) 계약 설명 문장이 코드보다 넓게 약속한 꼴이 헌법 9조가 선 뒤에도 다시 오름 — 9조는 돌았고(약속 짝 있음 · 초록) 짝 테스트가 문장이 묶은 출처 하나(jev `model`)에 표시 글을 안 심어 못 봄(E-023) — 최소 계약 고침: `.adw/constitution.md:41-46`(9조 plan 줄)에 한 구 — "여러 출처를 묶는 약속(밖에서 온 글 · 모든 ~)은 짝 줄에 그 출처를 칸 이름으로 적고 짝 테스트가 출처마다 표시 글을 심는다; 심지 않은 출처는 `not a promise: <why>` 이거나 문장을 그만큼 줄인다" (sightings: 20261013-062542-adw/phase-1-foundation-contracts · 20261013-161358-adw/phase-4-trigger-timing · 20261014-035728-adw/phase-6a-live-check-prepare — 9조 뒤 첫 목격)
+- [x] ~~(retro 후보 · E-009) 계약 설명 문장이 코드보다 넓게 약속한 꼴이 헌법 9조가 선 뒤에도 다시 오름 — 9조는 돌았고(약속 짝 있음 · 초록) 짝 테스트가 문장이 묶은 출처 하나(jev `model`)에 표시 글을 안 심어 못 봄(E-023) — 최소 계약 고침: `.adw/constitution.md:41-46`(9조 plan 줄)에 한 구 — "여러 출처를 묶는 약속(밖에서 온 글 · 모든 ~)은 짝 줄에 그 출처를 칸 이름으로 적고 짝 테스트가 출처마다 표시 글을 심는다; 심지 않은 출처는 `not a promise: <why>` 이거나 문장을 그만큼 줄인다" (sightings: 20261013-062542-adw/phase-1-foundation-contracts · 20261013-161358-adw/phase-4-trigger-timing · 20261014-035728-adw/phase-6a-live-check-prepare — 9조 뒤 첫 목격)~~ — 헌법 9조 고침으로 닫음 (2026-10-14 원격 인터뷰 · 슬롯 0bb8fd92 · Q1–Q6 A · `0f84d40`) — 원안(출처를 칸 이름으로 나열)은 놓친 jev `model` 이 문장 괄호에도 없어 계획자가 떠올린 만큼만 잡으므로 경계에서 표시로 바꿈: 흐름 약속(바깥 글이 어디에만 / 어디에는 없다)은 계획이 뜻으로 가려 짝 줄에 `[boundary: … — unmarked: …]` 꼬리표, 짝 테스트는 가짜가 돌려주는 글 칸 모두에 표시(모양 칸은 `MRK…`, 숫자 · 날짜 · 참거짓 칸만 이유와 함께 뺌), 계획이 놓친 줄은 verify-plan 이 표시 검사 V<m> 로 메워 사이클 안에서 줄임. 길 축(1A 화면 접힘, E-026)은 넣지 않음 — 다시 목격되면 retro 가 올림. Phase 7 · 8 부터, 6B · 1C 레인은 옛 9조. 덧: 6A 의 영상 ID(`videos[].video_id` · `errors[].video_id`)도 계약 "`untrusted` 칸 안에만" 문장 밖 — H-049 를 정하는 6B 에 사람이 전함
 
 ## Done
 
