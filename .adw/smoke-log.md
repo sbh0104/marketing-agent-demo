@@ -856,7 +856,7 @@ other line is required on every item.
 - evidence: docs/contracts.md:1349-1350 · docs/live-check/README.md:19 — 6D 가 topic_human 을 기록 줄에서 읽기 시작해(tests/test_live_check_applied.py:425-458) 거짓이 됨; 커밋 결과의 일치 영상 하나에 topic_human "아님" → AccuracyRecordTest.test_accuracy_record_is_in_contract 빨강(`… 일치 7 중 정답 아님 1 · … · 사람 칸 1/18`)
 - direction: 두 문장에 topic_human 의 연애 · 아님 도 기록을 바꿔 이 모듈을 빨강으로 만든다고 적고("다른 값" 은 human 의 ok · bad 밖, topic_human 의 연애 · 아님 밖 글), 커밋 결과에 topic_human 하나를 심으면 빨강 · 엉뚱한 글이면 그대로인 짝 테스트를 더한다 — 코드 변경 없음
 - touches: docs/contracts.md, docs/live-check/README.md, tests/test_live_check_applied.py
-- status: open
+- status: resolved
 - attempts: 0 · last failure: —
 - first seen: 2026-10-15 · last seen: 2026-10-15
 
@@ -865,7 +865,7 @@ other line is required on every item.
 - evidence: tests/live_check.py:284-287 — round(abs(value - base.noul_no_max), 6) 이 지금 값보다 5e-7 안쪽으로 작은 noul 을 거리 0 으로 묶어 앞세움(setting_rows({"noul": 0.1999996}) → noul_no_max 0.1999996 · 맞음 22 = 지금 값 0.2 의 22); docs/contracts.md:1308 "거리가 같으면 작은 쪽" 은 표본 없음(정렬 키 value → -value 로 바꿔도 BestSettingTest · RecountTest · CommittedResultTest 초록)
 - direction: no_ceilings 정렬 키 앞에 value != base.noul_no_max 를 두고, BestSettingTest 에 지금 값에서 같은 거리의 두 후보(맞음이 같으면 작은 쪽)와 0.1999996 표본을 더한다 — best_correct 의 개수는 바뀌지 않음, 계약 10절대로 live-check 실행기 변이를 다시 돌림
 - touches: tests/live_check.py, tests/test_live_check.py
-- status: open
+- status: resolved
 - attempts: 0 · last failure: —
 - first seen: 2026-10-15 · last seen: 2026-10-15
 
@@ -874,7 +874,7 @@ other line is required on every item.
 - evidence: tests/test_live_check_applied.py:361 — return max(value, raised) → return raised 로 바꿔도 전체 698 초록(ship-check 변이 점검 (d)); docs/contracts.md:951 "통과선은 올리기만 하고 내리지 않습니다" 를 따로 재는 표본 없음
 - direction: RecountTest 에 정답 bad · self_check_pass True 인데 가장 낮은 비교 점수 + MARGIN 이 지금 통과선보다 낮은 가짜 초안을 더해 check_floor 가 지금 값 그대로임을 단언한다 — 코드 변경 없음
 - touches: tests/test_live_check_applied.py
-- status: open
+- status: resolved
 - attempts: 0 · last failure: —
 - first seen: 2026-10-15 · last seen: 2026-10-15
 
@@ -883,8 +883,8 @@ other line is required on every item.
 - evidence: tests/test_live_check_applied.py:128 — 예시 행을 다시 판정하는 고리를 통째로 지워도 전체 698 초록(ship-check 3차 변이 점검 b3); RecountTest.test_lowered_recorded_floors_are_caught 의 가짜는 영상 · 초안 다리만 빨강으로 만들고, CommittedResultTest.test_stored_verdicts_follow_recorded_floors 는 `[]` 만 단언함; docs/contracts.md:1336-1338 "결과의 판정 · `self_check_pass` 칸을 다시 판정한 값과 같아야 합니다" 의 예시 행 몫을 재는 표본 없음 · guard-matrix G5 에 예시 행 편집 줄 없음
 - direction: RecountTest 에 기록 하한을 내렸을 때 예시 행 하나만 판정이 바뀌는 가짜(영상 · 초안은 그대로)를 더해 `["accuracy.ko[i] hold -> yes"]` 꼴을 단언한다 — 코드 변경 없음
 - touches: tests/test_live_check_applied.py
-- status: open
-- attempts: 0 · last failure: —
+- status: reverted
+- attempts: 1 · last failure: reverted f01e433 — own check red (스윕 20261015-081303-adw/smoke-sweep-s083-s087)
 - first seen: 2026-10-15 · last seen: 2026-10-15
 
 ### S-087 — check_floor 의 정확히 1.0 경계와 todo_line 의 모든 창 셈을 테스트로 고정
@@ -892,6 +892,6 @@ other line is required on every item.
 - evidence: tests/test_live_check_applied.py:359 — `raised > 1` → `raised >= 1` 로 바꿔도 모듈 52 · 185 초록(ship-check 3차 변이 점검 a2 · 감사 N3); docs/contracts.md:953 "그 값이 1 을 넘으면" 은 1.0 을 막지 않고 config 도 1.0 을 받음(src/agent/config.py:313); tests/test_live_check_applied.py:561 — `task_counts(result, None)` → `task_counts(result, "operation")` 도 초록(변이 x1, 커밋 결과에 넓힌 창 없음)
 - direction: RecountTest 에 가장 낮은 비교 점수 0.95 인 막을 초안 하나로 check_floor == 1.0(None 아님)을 단언하고, 넓힌 창 초안이 있는 가짜로 todo_line 의 ⓐ · ⓑ · ⓒ 분모가 두 창의 합임을 단언한다 — 코드 변경 없음
 - touches: tests/test_live_check_applied.py
-- status: open
+- status: resolved
 - attempts: 0 · last failure: —
 - first seen: 2026-10-15 · last seen: 2026-10-15
