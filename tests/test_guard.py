@@ -46,6 +46,10 @@ REJECTED_REFS = (
     f"https://www.youtube.com/watch?x=1;v={REPRO_B}&v={REPRO_A}",
     f"https://youtu.be/{REPRO_A}?x=1;y=2;v={REPRO_B}",
     f"https://www.youtube.com/shorts/{REPRO_A}?a=1;b=2;v={REPRO_B}",
+    # 받는 이름만 든 쿼리 — 1A 뒤에도 ; 나누기 하나만이 B 를 드러냅니다
+    f"https://youtu.be/{REPRO_A}?si=x;t=1;v={REPRO_B}",
+    f"https://www.youtube.com/shorts/{REPRO_A}?feature=share;si=x;v={REPRO_B}",
+    f"https://www.youtube.com/watch?si=x;t=1;v={REPRO_B}&v={REPRO_A}",
     # ship-report R7 — 경로가 정확히 /watch 가 아닌 watch 닮은꼴
     f"https://www.youtube.com/watchx?v={REPRO_A}",
     f"https://www.youtube.com/watch/?v={REPRO_A}",
