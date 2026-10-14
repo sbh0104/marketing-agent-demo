@@ -596,3 +596,12 @@ other line is required on every item.
 - status: resolved
 - attempts: 0 · last failure: —
 - first seen: 2026-10-14 · last seen: 2026-10-14
+
+### S-056 — 계약 10절 뒤 번호 제목 검사를 마침표 없음 · 괄호 · 공백 둘 · 앞 공백 꼴까지 넓히기 (헌법 12조 첫 본보기)
+- source: cycle 20261014-035724-adw/phase-1b-contract-section-names · tracker plans/interview-marketing-agent.md#phase-1b · deferred by ship-check (Risks 2) → 색은 E-022 인터뷰가 정함(2026-10-14 · 슬롯 0bd7add3 질문 5 A, 트래커 Phase 1B "출하 뒤 고침" 줄)
+- evidence: tests/test_contract_sections.py:20 (`HEADING_RE = ^## ([0-9]+)\.` — `## 11 제목` · `## 11) 제목` · `##  11.` · `   ## 11.` 이 `[]` 로 읽혀 초록, journal 20261014-035724-adw-phase-1b-contract-section-names/ship-report.md:177-181 Risks 2); 계약 docs/contracts.md:564 "그 뒤에 더하는 절은 번호 없이 제목만" 이 이미 넷을 금지
+- direction: `HEADING_RE` 를 `^ {0,3}##[ \t]+(\d+)` (re.MULTILINE) 꼴로 넓히고 `numbered_headings` docstring 을 맞춘다(오늘 계약서에서 그대로 1–10 — 인터뷰가 잼). 헌법 12조 꼴로 표본을 스위트에 남긴다 — `FIRST_TEN` 뒤에 붙인 `## 11 제목` · `## 11) 제목` · `##  11.` · `   ## 11.` 은 각각 `numbered_headings(...) != NUMBERED` (red — 트래커 Phase 1B 출하 뒤 고침 줄), `TITLED` 뒤에 붙인 `### 1. 입력 확인` · `### 11.` 은 `== NUMBERED` (green — 같은 줄 · 1B Trade-offs accepted `### 11.` 줄); 표본 줄마다 주석으로 그 인용을 단다. 계약서 · src 변경 없음
+- touches: tests/test_contract_sections.py
+- status: open
+- attempts: 0 · last failure: —
+- first seen: 2026-10-14 · last seen: 2026-10-14
