@@ -106,6 +106,18 @@
 - evidence: `python3 -I -c "import yaml; n=yaml.safe_load('k: 0x'+'F'*3700)['k']; str(n)"` → 14,800비트 int 로 읽힌 뒤 `ValueError: Exceeds the limit (4300 digits) for integer string conversion` (이 retro 실측); Phase 1 ship-report R4 · 트래커 Phase 1A 결정 2 (cycle 20261014-035715-adw/phase-1a-parser-allow-rules)
 - first confirmed: 2026-10-14 · last confirmed: 2026-10-14
 
+### E-030 · tooling — 민감 확인 줄로 머지 앞에서 멈춘 사이클은 인터뷰가 트래커만 고치고 코드를 한 바이트도 바꾸지 않아도 허브가 verify-run 부터 다시 돌린다 — 같은 코드 트리에서 verify-run 과 ship-check 전체(감사 포함)가 한 번 더 돈다
+- evidence: 이번 사이클 `.adw/gate/history/20261014-140655-cycle-control.json` `{"action": "retry", "issued_by": "hub:move", "step": "verify-run"}`; ship-report § Verdict "코드는 첫 판정 때와 한 바이트도 다르지 않고(그 뒤 바뀐 것은 트래커 10줄)" — 인터뷰 커밋 `4e859be` 는 `plans/` 만(+10줄); retro-bundle Steps verify-run 시도 2 · ship-check 시도 2 $15.4151 · 감사 부름 8(시도 2권 합) (cycle 20261014-112313-adw/phase-1c-text-config-allow). 앞 목격: Phase 1A — 인터뷰가 문서만 두 커밋(`3a4a6e7` · `681acc5`), `git diff 2e58209 HEAD -- src tests` 0바이트인데 verify-run · ship-check 시도 2 (journal 20261014-035715-adw-phase-1a-parser-allow-rules summary.md:17)
+- first confirmed: 2026-10-14 · last confirmed: 2026-10-14
+
+### E-031 · codebase — 설정 읽기 `_construct_mapping` 은 중복 키 검사보다 먼저 `loader.flatten_mapping(node)` 를 부른다 — YAML 병합 키(`<<`)로 앵커를 겹겹이 이은 작은 파일이 항목을 기하급수로 복사해, "키가 두 번 나옵니다" 오류나 "이전 설정 유지"에 닿기 전에 메모리를 다 쓸 수 있다
+- evidence: `src/agent/config.py:84-85` (`def _construct_mapping` 첫 줄이 `loader.flatten_mapping(node)`, 중복 검사 `seen` 은 그 뒤 `:86-92`); ship-report R7 — 2,144바이트 파일 n=25 에서 2.97초 · 최대 RSS 1,081,456 KB 뒤 `키가 두 번 나옵니다`, n=30 은 약 32 GB 추정, base 와 HEAD 같음(n=22 0.36초 대 0.35초). 막으려면 설정 파일 형식(병합 키 · 별칭 금지) 결정이 필요해 주인 없음 (cycle 20261014-112313-adw/phase-1c-text-config-allow)
+- first confirmed: 2026-10-14 · last confirmed: 2026-10-14
+
+### E-032 · tooling — 글자 규칙(`logbook._is_raw`, 설정 `_text` 가 같은 함수)의 판정은 실행 중인 파이썬의 `unicodedata` 판을 따르는데, 이 기계의 파이썬은 판이 둘이다 — `/usr/bin/python3` · `python3.14` 는 3.14.4(유니코드 16.0.0), `~/.local/bin/python3.12` 는 3.12.13(15.0.0)이고 `python3.10` · `python3.13` 은 PATH 에 없다
+- evidence: 이 retro 실측 — `python3 -I -c "…unicodedata.unidata_version, unicodedata.category(chr(0x1FAE9))"` → `/usr/bin/python3 3.14.4 16.0.0 So` · `/home/sbh/.local/bin/python3.12 3.12.13 15.0.0 Cn` · `/usr/bin/python3.14 3.14.4 16.0.0 So`; 트래커 Phase 1C Trade-offs(HC1 질문 1 B) — `topic: "연애 고민 🫩"` 이 3.14.4 에서 `load OK`, 3.12.13 에서 `ConfigError`(인터뷰가 잰 3.10.20 은 PATH 밖 다른 경로) (cycle 20261014-112313-adw/phase-1c-text-config-allow)
+- first confirmed: 2026-10-14 · last confirmed: 2026-10-14
+
 ## Retired (history — one line each, never deleted)
 - E-005 · hazard — Phase 1 의 세 파서(가드 주소 읽기 · 로그 줄 이스케이프 · 설정 숫자 읽기)는 열거한 꼴 목록으로 막는다 — ship-check 네 번이 매번 목록 밖 꼴을 하나 이상 더 찾았다 — retired 2026-10-14 (contradicted by `src/agent/guard.py:23` `_SHARE_QUERY_NAMES = frozenset({"si", "t", "feature"})` · `src/agent/config.py:174` `_int(value, path, minimum, maximum)` 상한 필수 · `src/agent/logbook.py:59,70` 날 글자 범주 허용 목록(L·M·N·P·S + U+0020) — Phase 1A 가 세 파서를 받는 쪽 목록으로 바꿈 (cycle 20261014-035715-adw/phase-1a-parser-allow-rules))
 - E-014 · hazard — 계약의 새 절 번호는 레인마다 자기 base 에서 매긴다 — main 의 `## 11. 트리거 판정 — trigger.py` 와 이 브랜치의 `## 11. 주제 판별 — classifier.py (Phase 3)` 가 같은 번호라, 착지 때 절 번호와 `config.py` 키 꼬리 · `config.yaml` · `VALID` · `CommittedConfigTest` · `requirements.txt` 의 겹친 추가분을 합쳐야 한다 — retired 2026-10-14 (shipped Phase 1B (cycle 20261014-035724-adw/phase-1b-contract-section-names): 계약 10절 규칙 줄로 10절 뒤 절은 번호 없이 제목만 달고, `tests/test_contract_sections.py` 가 `## <숫자>.` 제목과 10 넘는 절 인용을 착지 전에 빨강으로 막는다 — 남은 틈은 E-022)

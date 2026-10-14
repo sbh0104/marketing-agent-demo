@@ -339,7 +339,7 @@ Open questions
 ---
 
 ## Phase 1C — 글자 설정값 허용 규칙 (설정 글자 칸도 받을 글자만 · topic 길이 상한)
-- Status: Not started
+- Status: Done
 - Slug: text-config-allow
 - After: Phase 1A
 - Goal: 설정 파일의 글자 값을 들이는 문지기(`config.py` `_text`)가 Phase 1A 로그의 날 글자 목록과 같은 글자만 받고 스페이스로 시작하거나 끝나는 값을 거절하며, 크롬 주소(`chrome_debug_url`)도 이 문지기를 거치게 하고, `topic` 에 길이 상한을 둔다. 문지기를 지난 나쁜 글자 값이 쓰는 자리에서 주기마다 터지거나(짝 없는 서로게이트), 아주 긴 `topic` 이 판별기의 영상 글 몫을 소리 없이 줄이는 일을, 읽는 순간의 `ConfigError`(실행 중이면 이전 설정 유지)로 바꾼다. Phase 1A 계획의 반대 의견석이 잰 빈틈(경험 장부 E-005 와 같은 "열거한 꼴" 부류)과 열린 사람 확인 H-014 를 닫는다.
