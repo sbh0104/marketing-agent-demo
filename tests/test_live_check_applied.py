@@ -1068,6 +1068,11 @@ class RecountTest(unittest.TestCase):
         )
         self.assertEqual(check_floor(fake), 0.85)
 
+    def test_check_floor_never_lowers_the_recorded_value(self) -> None:
+        # "결과의 값보다 내리지 않습니다" — 가장 낮은 비교 점수 0.5 + MARGIN 0.55 는 0.7 아래
+        fake = self.fake(drafts=(self.draft((0.5, 0.1, 0.9), claude="bad", passed=True),))
+        self.assertEqual(check_floor(fake), 0.7)
+
     def test_human_cell_beats_claude_grade(self) -> None:
         kept = self.fake(drafts=(self.draft(human="ok", claude="bad"),))
         self.assertEqual(check_floor(kept), 0.7)
