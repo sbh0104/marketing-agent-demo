@@ -27,7 +27,7 @@
 
 ## To do
 
-- [~] [smoke] 스모크 스윕 — S-057, S-058
+- [x] [smoke] 스모크 스윕 — S-057, S-058
 - [x] [smoke] 스모크 스윕 — S-056
 - [x] [smoke] 스모크 스윕 — S-051, S-052, S-053, S-054, S-055
 - [x] [smoke] 스모크 스윕 — S-049, S-050
@@ -56,6 +56,8 @@
 - [x] Phase 6A — 진짜 호출 준비 · 사람이 돌릴 실행기 (plans/interview-marketing-agent.md#phase-6a)
 - [x] Phase 1C — 글자 설정값 허용 규칙 (plans/interview-marketing-agent.md#phase-1c)
 - [~] Phase 6B — 진짜 결과 반영 · 정확도 기록 · 기준값 조정 (plans/interview-marketing-agent.md#phase-6b)
+- [ ] Phase 6C — 채점 고치기 · 다시 잴 준비 (plans/interview-marketing-agent.md#phase-6c)
+- [ ] Phase 6D — 다시 잰 결과 반영 (plans/interview-marketing-agent.md#phase-6d)
 - [ ] Phase 7 — 파이프라인 연결 · 운영 규칙 통합 (plans/interview-marketing-agent.md#phase-7)
 - [ ] Phase 8 — 제출물 (plans/interview-marketing-agent.md#phase-8)
 - [ ] (example) Add social login buttons to the login screen
@@ -79,7 +81,7 @@
 
 - [x] ~~(retro 후보 · E-009) 계약 설명 문장이 코드보다 넓게 약속한 꼴이 헌법 9조가 선 뒤에도 다시 오름 — 9조는 돌았고(약속 짝 있음 · 초록) 짝 테스트가 문장이 묶은 출처 하나(jev `model`)에 표시 글을 안 심어 못 봄(E-023) — 최소 계약 고침: `.adw/constitution.md:41-46`(9조 plan 줄)에 한 구 — "여러 출처를 묶는 약속(밖에서 온 글 · 모든 ~)은 짝 줄에 그 출처를 칸 이름으로 적고 짝 테스트가 출처마다 표시 글을 심는다; 심지 않은 출처는 `not a promise: <why>` 이거나 문장을 그만큼 줄인다" (sightings: 20261013-062542-adw/phase-1-foundation-contracts · 20261013-161358-adw/phase-4-trigger-timing · 20261014-035728-adw/phase-6a-live-check-prepare — 9조 뒤 첫 목격)~~ — 헌법 9조 고침으로 닫음 (2026-10-14 원격 인터뷰 · 슬롯 0bb8fd92 · Q1–Q6 A · `0f84d40`) — 원안(출처를 칸 이름으로 나열)은 놓친 jev `model` 이 문장 괄호에도 없어 계획자가 떠올린 만큼만 잡으므로 경계에서 표시로 바꿈: 흐름 약속(바깥 글이 어디에만 / 어디에는 없다)은 계획이 뜻으로 가려 짝 줄에 `[boundary: … — unmarked: …]` 꼬리표, 짝 테스트는 가짜가 돌려주는 글 칸 모두에 표시(모양 칸은 `MRK…`, 숫자 · 날짜 · 참거짓 칸만 이유와 함께 뺌), 계획이 놓친 줄은 verify-plan 이 표시 검사 V<m> 로 메워 사이클 안에서 줄임. 길 축(1A 화면 접힘, E-026)은 넣지 않음 — 다시 목격되면 retro 가 올림. Phase 7 · 8 부터, 6B · 1C 레인은 옛 9조. 덧: 6A 의 영상 ID(`videos[].video_id` · `errors[].video_id`)도 계약 "`untrusted` 칸 안에만" 문장 밖 — H-049 를 정하는 6B 에 사람이 전함
 
-- [ ] (retro 후보 · E-030) 인터뷰가 민감 확인 줄을 트래커만 고쳐 확정해도(코드 그대로) 사이클이 verify-run 부터 다시 돌아 같은 트리에서 verify-run · ship-check 전체를 한 번 더 함 — 최소 계약 고침: 허브의 확인 인터뷰 뒤 재개 자리(`hub:move` → `step: verify-run`)를, 판정한 트리와 HEAD 사이 `plans/` 밖 diff 가 비었을 때 ship-check 로 두고 ship-check 는 앞 보고서를 옮겨 새 트래커 결정 줄만 다시 추적 — 허브 · `.claude/skills/ship-check/SKILL.md` 는 ADWS 동기화 하네스라 고침은 상류에서(E-011 선례) (sightings: 20261014-035715-adw/phase-1a-parser-allow-rules · 20261014-112313-adw/phase-1c-text-config-allow)
+- [x] ~~(retro 후보 · E-030) 인터뷰가 민감 확인 줄을 트래커만 고쳐 확정해도(코드 그대로) 사이클이 verify-run 부터 다시 돌아 같은 트리에서 verify-run · ship-check 전체를 한 번 더 함 — 최소 계약 고침: 허브의 확인 인터뷰 뒤 재개 자리(`hub:move` → `step: verify-run`)를, 판정한 트리와 HEAD 사이 `plans/` 밖 diff 가 비었을 때 ship-check 로 두고 ship-check 는 앞 보고서를 옮겨 새 트래커 결정 줄만 다시 추적 — 허브 · `.claude/skills/ship-check/SKILL.md` 는 ADWS 동기화 하네스라 고침은 상류에서(E-011 선례) (sightings: 20261014-035715-adw/phase-1a-parser-allow-rules · 20261014-112313-adw/phase-1c-text-config-allow)~~ — ADWS 백로그로 이관 (2026-10-14 원격 인터뷰 · 슬롯 40effaa6 · Q1 A · Q2 A) — `~/project/ADWS/.adw/backlog.md` To do 끝의 `(retro 후보 · marketing-agent-demo E-030 이관)` 줄. 원인은 확인 도장 `human_checks.py confirm` 이 ship-report 만 다시 쓰는 것이었다: 인터뷰의 트래커 커밋 뒤 verify-report 가 "마지막 커밋보다 낡음"이 되어 허브 ↪ Move 의 R2″(`scripts/hub/lanemove.py:500-503`)가 ship-explain 을 막는다(커밋 없이 도장만 찍은 1B 는 다시 돌지 않음). 고침은 원안(재개 자리를 ship-check 로 · ship-check 옮겨 쓰기 모드, 세 곳)보다 작게 넘김: `confirm` 이, 판정 뒤 바뀐 경로가 모두 `plans/` 이고 PASS 일 때만 verify-report 도 이어받아 ↪ Move → ship-explain 이 열리게 하고, 허브 · 드라이버의 낡음 규칙은 그대로 둔다. 받아들인 값: 새 트래커 줄은 기계가 다시 대조하지 않고, 1C 에서 R7 · R8 을 건진 우연한 두 번째 감사도 사라짐. 1A 처럼 계약 문서도 고친 확인은 고침 뒤에도 전부 다시 돎(맞는 동작). 그 사이 헌법 임시 조항은 두지 않음 — 인터뷰가 verify-report 를 손으로 이어받으면 경로를 잘못 읽은 날 autonomy full 게이트가 검사 안 된 변경을 병합하므로. 고침이 올 때까지 인터뷰가 레인에 커밋한 민감 확인 정지마다 verify-run · ship-check 재실행(18–30분 · $9–15)을 감수한다. 다시 오르면 이 줄로 흡수해 닫는다
 
 ## Done
 

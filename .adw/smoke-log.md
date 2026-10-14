@@ -623,3 +623,154 @@ other line is required on every item.
 - status: resolved
 - attempts: 0 · last failure: —
 - first seen: 2026-10-14 · last seen: 2026-10-14
+
+### S-059 — 계약 '결과 반영' · README 의 "사람 칸을 고친 결과를 커밋하면 빨강" 을 `ok` · `bad` 를 적은 경우로 좁힘
+- source: cycle 20261014-112322-adw/phase-6b-live-check-apply · tracker plans/interview-marketing-agent.md#phase-6b · deferred by ship-check
+- evidence: tests/test_live_check_applied.py:165 (사람 칸이 정확히 `ok` · `bad` 가 아니면 답 없음으로 셈) — 첫 parsed 초안의 `human` 을 `Bad` · `OK` · `ok ` · `good` 로 바꾸면 `draft_counts` 의 answered=0 · 기록 줄 그대로라 모듈 16개 초록(`bad` 만 failures=2); 문장 docs/contracts.md:1234 "새 결과나 사람 칸을 고친 결과를 커밋하거나 … 이 모듈이 빨강입니다" · docs/live-check/README.md:19 "사람 칸을 고친 `result.json` 을 커밋하면 … 빨강이 됩니다"; 계약 :1192-1193 은 사람 칸 값을 `ok` · `bad` 로 정함(.adw/ship-report.md § Risks R2)
+- direction: 두 문장을 코드가 하는 만큼으로 좁힌다 — "사람 칸에 `ok` · `bad` 를 적은 결과" 로 쓰고, 그 밖의 값은 답 없음으로 세어 빨강이 되지 않는다고 덧붙인다(헌법 9 의 좁히기) — 코드 · 테스트 변경 없음
+- touches: docs/contracts.md, docs/live-check/README.md
+- status: open
+- attempts: 0 · last failure: —
+- first seen: 2026-10-14 · last seen: 2026-10-14
+
+### S-060 — 지문 맞대기가 지키는 칸 목록(GUARDED · WRITE_SIDE)을 계약의 두 목록과 맞대 테스트로 고정
+- source: cycle 20261014-112322-adw/phase-6b-live-check-apply · tracker plans/interview-marketing-agent.md#phase-6b · deferred by ship-check
+- evidence: tests/test_live_check_applied.py:28-30 — `margin` 을 GUARDED 에서 WRITE_SIDE 로 옮겨도 16개 초록(ship-check 메모리 재현 `(16, 0, 0)`); test_guarded_field_change_is_drift(:265)는 모듈의 GUARDED 를 그대로 돌고 test_every_fingerprint_key_is_sorted(:296)는 합집합만 봄; 계약 docs/contracts.md:1226-1229 의 두 칸 목록은 어느 테스트도 읽지 않음(.adw/ship-report.md § Risks R3)
+- direction: MeasuredDriftTest 에 GUARDED · WRITE_SIDE 로 계약의 두 칸 목록 글(`` " · ".join(f"`{k}`" for k in GUARDED) `` 꼴)을 만들어 assert_in_contract 로 맞대는 테스트를 더한다 — 코드 · 계약 변경 없음
+- touches: tests/test_live_check_applied.py
+- status: open
+- attempts: 0 · last failure: —
+- first seen: 2026-10-14 · last seen: 2026-10-14
+
+### S-061 — 초안 정답의 사람 칸 우선과 기준값 사이 경계(noul 이 정확히 0.2 · 0.8)를 심은 데이터로 테스트에 고정
+- source: cycle 20261014-112322-adw/phase-6b-live-check-apply · tracker plans/interview-marketing-agent.md#phase-6b · deferred by ship-check
+- evidence: tests/test_live_check_applied.py:167 — 우선순위를 뒤집은 변이(`answer = claude if claude is not None else human`)가 16개 초록(ship-check 감사의 사본 실행); 심은 초안(human ok · claude_grade bad · self_check_pass True)에서 지금 코드는 bad_passed 0, 변이는 1. :112 · :126 의 `lo < noul < hi` 를 `lo <= noul <= hi` 로 바꾼 변이도 초록 — 커밋된 결과에 답 있는 초안이 없고 noul 이 정확히 0.2 · 0.8 인 예시 · 영상이 없음; 계약 docs/contracts.md:922 "정답은 사람 칸 … 있으면 그것" · :1091-1094 "0.2 초과 0.8 미만"(.adw/ship-report.md § Risks R4)
+- direction: load_result() 의 deepcopy 에 초안 둘(human ok · claude_grade bad · self_check_pass True 와 그 반대)과 noul 0.2 · 0.8 인 예시 행 · 영상을 심어 draft_counts 와 gap_lines 의 셈을 정확한 값으로 단언하는 테스트를 더한다 — 코드 변경 없음
+- touches: tests/test_live_check_applied.py
+- status: open
+- attempts: 0 · last failure: —
+- first seen: 2026-10-14 · last seen: 2026-10-14
+
+### S-062 — 계약 기록 맞대기(assert_in_contract)가 숫자 뒤에 더 붙은 숫자를 놓침
+- source: cycle 20261014-112322-adw/phase-6b-live-check-apply · tracker plans/interview-marketing-agent.md#phase-6b · deferred by ship-check
+- evidence: tests/test_live_check_applied.py:210-214 (정규화한 계약 전체에서 부분 문자열로 찾음) — 계약의 `기준값 사이 영상 운영 창: 9/18` 을 `9/180` 으로 바꾼 사본으로도 16개 초록(ship-check 메모리 재현 `(16, 0, 0)`), `탈락 0` → `탈락 05` 도 초록(감사 사본); 트래커 Phase 6B Responsibilities 첫 줄 "계약에 적은 숫자와 결과 파일의 숫자가 같아야 한다"(.adw/ship-report.md § Risks R5)
+- direction: assert_in_contract 가 phrase 가 숫자로 끝날 때 바로 뒤에 숫자나 `.숫자` 가 오지 않는지까지 보게 고친다(정규식 경계) — 기록 줄 · 계약 변경 없음
+- touches: tests/test_live_check_applied.py
+- status: open
+- attempts: 0 · last failure: —
+- first seen: 2026-10-14 · last seen: 2026-10-14
+
+### S-063 — '주제 판별' 기록의 다섯 셈을 accuracy 행에서 다시 세어 accuracy_tally 와 맞댐
+- source: cycle 20261014-112322-adw/phase-6b-live-check-apply · tracker plans/interview-marketing-agent.md#phase-6b · deferred by ship-check
+- evidence: tests/test_live_check_applied.py:94-99 — 맞음 · 잘못된 일치 · 잘못된 불일치 · 보류 · 오류를 `accuracy_tally` 에서 그대로 옮김(행에서 다시 세지 않음; `correct` 만 :335 의 reach == correct 로 간접 확인); 계약 docs/contracts.md:1099 "기록의 숫자를 결과 파일에서 다시 세어 맞댑니다". ship-check 의 독립 재셈은 ko · en 모두 20/0/0/2/0 으로 지금 값과 같음(.adw/ship-report.md § Risks R6)
+- direction: AccuracyRecordTest 에 언어마다 accuracy 행(label · verdict · error, 또는 tests/jev_accuracy.py 의 tally)으로 다섯 칸을 다시 세어 accuracy_tally 와 같은지 단언하는 테스트를 더한다 — 코드 변경 없음
+- touches: tests/test_live_check_applied.py
+- status: open
+- attempts: 0 · last failure: —
+- first seen: 2026-10-14 · last seen: 2026-10-14
+
+### S-064 — 계약 '댓글 작성' 잰 값의 "세 점수 가운데 가장 낮은 것" 을 비교 점수로 · 여럿 · 1 넘음까지 적음
+- source: cycle 20261014-112322-adw/phase-6b-live-check-apply · tracker plans/interview-marketing-agent.md#phase-6b · deferred by deep-interview (HC1 질문 1 A)
+- evidence: docs/contracts.md:924-926 "그 초안의 세 점수 가운데 가장 낮은 것 + 0.05 로 올리고" — 결과 파일 `scores` 칸은 날 점수(P(예))라 광고 0.06 이 가장 낮게 읽혀 통과선이 0.11 로 내려갈 수 있음(.adw/ship-report.md § Risks R7); 하한 비교는 docs/contracts.md:893-894 · src/agent/writer.py:182 에서 광고를 1 − P(예) 로 뒤집음; 트래커 Phase 6B 결정 "(2026-10-14 6B HC1 인터뷰 질문 1 A …)" 이 뜻을 정함
+- direction: 그 문장을 트래커 줄과 같은 뜻으로 고친다 — "세 비교 점수(장면 · 고민은 P(예), 광고는 1 − P(예)) 가운데 가장 낮은 것 + 0.05; 그런 초안이 여럿이면 초안마다 가장 낮은 비교 점수 중 가장 높은 값 + 0.05; 그 값이 1 을 넘으면 고치지 않고 사람에게" — 코드 · 테스트 변경 없음
+- touches: docs/contracts.md
+- status: open
+- attempts: 0 · last failure: —
+- first seen: 2026-10-14 · last seen: 2026-10-14
+
+### S-065 — 계약 '결과 반영' 의 "그 사이클을 맡을 페이즈는 트래커가 정합니다" 를 Phase 6D · 레인에만 커밋으로 좁힘
+- source: cycle 20261014-112322-adw/phase-6b-live-check-apply · tracker plans/interview-marketing-agent.md#phase-6b · deferred by deep-interview (HC1 질문 2 A)
+- evidence: docs/contracts.md:1236 "그 사이클을 맡을 페이즈는 트래커가 정합니다" — 트래커에 그런 페이즈가 없었음(.adw/ship-report.md § Risks R8); 트래커 Phase 6B 결정 "(2026-10-14 6B HC1 인터뷰 질문 2 A …)" 과 Phase 6C · 6D 절이 주인과 길을 정함
+- direction: 그 문장을 "그 사이클은 Phase 6D(트래커)가 맡고, 새 결과는 main 이 아니라 그 페이즈의 레인 브랜치에만 커밋합니다 — 그 뒤의 재실행도 트래커에 다시 반영 페이즈를 열고 같은 길로" 로 고친다 — 코드 · 테스트 변경 없음(README 커밋 단계는 Phase 6C 가 고침)
+- touches: docs/contracts.md
+- status: open
+- attempts: 0 · last failure: —
+- first seen: 2026-10-14 · last seen: 2026-10-14
+
+### S-066 — 계약 기록 맞대기가 같은 머리에 다른 숫자를 단 모순된 중복 줄을 놓침
+- source: cycle 20261014-112322-adw/phase-6b-live-check-apply · tracker plans/interview-marketing-agent.md#phase-6b · deferred by ship-check
+- evidence: tests/test_live_check_applied.py:210-214 (`assert_in_contract` 는 맞는 줄이 계약 어딘가에 있는지만 봄) — 계약 사본의 `- en: 지금 기준값 맞음 20/22 …` 줄 아래에 `- en: 지금 기준값 맞음 12/22 · 잘못된 일치 3 · … — 미달` 을 더해도 AccuracyRecordTest 3개 초록(ship-check 재현 ran 3 · failures 0 · errors 0); S-062 의 숫자 경계 고침으로는 닫히지 않음; 트래커 Phase 6B Responsibilities 첫 줄 "계약에 적은 숫자와 결과 파일의 숫자가 같아야 한다"(.adw/ship-report.md § Risks R5)
+- direction: 기록 줄마다 머리(`ko: 지금 기준값 맞음` · `en: 지금 기준값 맞음` · `영상 판별 운영 창:` · `기준값 사이 영상 운영 창:` · `초안 운영 창:` · `모델 이름:` 등, 정규화한 글)가 계약 전체에 정확히 한 번 나오는지 단언하는 테스트를 더한다 — 코드 · 계약 변경 없음
+- touches: tests/test_live_check_applied.py
+- status: open
+- attempts: 0 · last failure: —
+- first seen: 2026-10-14 · last seen: 2026-10-14
+
+### S-067 — '주제 판별' 기록 줄의 다섯 칸 자리를 서로 다른 값을 심은 tally 로 고정
+- source: cycle 20261014-112322-adw/phase-6b-live-check-apply · tracker plans/interview-marketing-agent.md#phase-6b · deferred by ship-check
+- evidence: tests/test_live_check_applied.py:94-99 (`accuracy_lines` 가 tally 다섯 칸을 줄에 넣음) — 커밋된 tally 는 잘못된 일치 · 잘못된 불일치가 모두 0 이라 두 칸을 바꿔 넣는 변이도 16개 초록(ship-check 감사의 사본 실행 `(16,0,0)`); 계약의 기록은 이 도우미의 출력을 붙여 쓴 것이라 도우미가 틀리면 계약과 테스트가 함께 틀려 초록으로 남음(.adw/ship-report.md § Risks R6)
+- direction: load_result() deepcopy 의 accuracy_tally 에 서로 다른 다섯 값(예: 맞음 15 · 잘못된 일치 1 · 잘못된 불일치 2 · 보류 3 · 오류 1)을 심고 accuracy_lines 의 결과를 글자 그대로 단언하는 테스트를 더한다 — 코드 · 계약 변경 없음
+- touches: tests/test_live_check_applied.py
+- status: open
+- attempts: 0 · last failure: —
+- first seen: 2026-10-14 · last seen: 2026-10-14
+
+### S-068 — 계약 '결과 반영' · README 의 "사람 칸을 고친 결과를 커밋하면 빨강" 을 `ok` · `bad` 를 적은 경우로 좁힘 (S-059)
+- source: cycle 20261014-112322-adw/phase-6b-live-check-apply · tracker plans/interview-marketing-agent.md#phase-6b · filed by smoke-file (one-pass)
+- evidence: .adw/ship-report.md
+- direction: 두 문장을 "사람 칸에 `ok` · `bad` 를 적은 결과" 로 좁히고 그 밖의 값은 답 없음으로 센다고 덧붙임 — 코드 변경 없음
+- touches: docs/contracts.md, docs/live-check/README.md
+- base: adw/phase-6b-live-check-apply
+- phase: plans/interview-marketing-agent.md#phase-6b
+- status: open
+- attempts: 0 · last failure: —
+
+### S-069 — 지문 맞대기가 지키는 칸 목록(GUARDED · WRITE_SIDE)을 계약의 두 목록과 맞대 고정 (S-060)
+- source: cycle 20261014-112322-adw/phase-6b-live-check-apply · tracker plans/interview-marketing-agent.md#phase-6b · filed by smoke-file (one-pass)
+- evidence: .adw/ship-report.md
+- direction: 두 상수로 계약의 칸 목록 글을 만들어 assert_in_contract 로 맞대는 테스트 추가
+- touches: tests/test_live_check_applied.py
+- base: adw/phase-6b-live-check-apply
+- phase: plans/interview-marketing-agent.md#phase-6b
+- status: open
+- attempts: 0 · last failure: —
+
+### S-070 — 초안 정답의 사람 칸 우선 · 정답 목록 · 기준값 사이 경계를 심은 데이터로 고정 (S-061)
+- source: cycle 20261014-112322-adw/phase-6b-live-check-apply · tracker plans/interview-marketing-agent.md#phase-6b · filed by smoke-file (one-pass)
+- evidence: .adw/ship-report.md
+- direction: load_result() deepcopy 에 초안 둘과 경계값 행 · 영상을 심어 draft_counts · gap_lines 셈을 정확한 값으로 단언
+- touches: tests/test_live_check_applied.py
+- base: adw/phase-6b-live-check-apply
+- phase: plans/interview-marketing-agent.md#phase-6b
+- status: open
+- attempts: 0 · last failure: —
+
+### S-071 — 계약 기록 맞대기가 숫자 뒤에 더 붙은 숫자를 놓침 (S-062)
+- source: cycle 20261014-112322-adw/phase-6b-live-check-apply · tracker plans/interview-marketing-agent.md#phase-6b · filed by smoke-file (one-pass)
+- evidence: .adw/ship-report.md
+- direction: phrase 가 숫자로 끝날 때 바로 뒤에 숫자나 `.숫자` 가 오지 않는지까지 봄
+- touches: tests/test_live_check_applied.py
+- base: adw/phase-6b-live-check-apply
+- phase: plans/interview-marketing-agent.md#phase-6b
+- status: open
+- attempts: 0 · last failure: —
+
+### S-072 — '주제 판별' 기록의 다섯 셈을 accuracy 행에서 다시 세어 accuracy_tally 와 맞댐 (S-063)
+- source: cycle 20261014-112322-adw/phase-6b-live-check-apply · tracker plans/interview-marketing-agent.md#phase-6b · filed by smoke-file (one-pass)
+- evidence: .adw/ship-report.md
+- direction: 언어마다 행에서 다섯 칸을 다시 세어 accuracy_tally 와 같은지 단언하는 테스트 추가
+- touches: tests/test_live_check_applied.py
+- base: adw/phase-6b-live-check-apply
+- phase: plans/interview-marketing-agent.md#phase-6b
+- status: open
+- attempts: 0 · last failure: —
+
+### S-073 — 계약 기록 맞대기가 같은 머리의 모순된 중복 줄을 놓침 (S-066)
+- source: cycle 20261014-112322-adw/phase-6b-live-check-apply · tracker plans/interview-marketing-agent.md#phase-6b · filed by smoke-file (one-pass)
+- evidence: .adw/ship-report.md
+- direction: 기록 줄 머리마다 계약 전체에 정확히 한 번 나오는지 단언하는 테스트 추가
+- touches: tests/test_live_check_applied.py
+- base: adw/phase-6b-live-check-apply
+- phase: plans/interview-marketing-agent.md#phase-6b
+- status: open
+- attempts: 0 · last failure: —
+
+### S-074 — '주제 판별' 기록 줄의 다섯 칸 자리를 서로 다른 값을 심은 tally 로 고정 (S-067)
+- source: cycle 20261014-112322-adw/phase-6b-live-check-apply · tracker plans/interview-marketing-agent.md#phase-6b · filed by smoke-file (one-pass)
+- evidence: .adw/ship-report.md
+- direction: deepcopy 의 accuracy_tally 에 서로 다른 다섯 값을 심고 accuracy_lines 결과를 글자 그대로 단언
+- touches: tests/test_live_check_applied.py
+- base: adw/phase-6b-live-check-apply
+- phase: plans/interview-marketing-agent.md#phase-6b
+- status: open
+- attempts: 0 · last failure: —
