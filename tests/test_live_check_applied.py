@@ -1330,6 +1330,24 @@ class AccuracyRecordTest(ContractCase):
         for phrase in phrases:
             self.assert_in_contract(phrase)
 
+    def test_topic_human_value_moves_the_record_but_other_text_does_not(self) -> None:
+        # 약속 "사람 칸의 다른 값 … 이 모듈을 빨강으로 만들지 않습니다" — topic_human 의 연애 · 아님
+        # 은 기록 줄을 바꾸고(그래서 test_accuracy_record_is_in_contract 가 빨강), 다른 글은 그대로
+        result = self.result
+        index = next(
+            i
+            for i, video in enumerate(result["videos"])
+            if video["classification"] is not None and video["topic_human"] not in TOPIC_ANSWERS
+        )
+        for value, moves in (("아님", True), ("연애", True), ("엉뚱한 글", False)):
+            with self.subTest(topic_human=value):
+                changed = copy.deepcopy(result)
+                changed["videos"][index]["topic_human"] = value
+                if moves:
+                    self.assertNotEqual(topic_grade_lines(changed), topic_grade_lines(result))
+                else:
+                    self.assertEqual(topic_grade_lines(changed), topic_grade_lines(result))
+
     def test_accuracy_tally_is_recount_of_rows(self) -> None:
         keys = ("correct", "false_yes", "false_no", "hold", "error")
         for language in LANGUAGES:
