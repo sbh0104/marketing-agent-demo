@@ -9,6 +9,7 @@ import io
 import ntpath
 import os
 import shutil
+import subprocess
 import sys
 import tempfile
 import types
@@ -38,10 +39,13 @@ from agent.chrome import (
 )
 from agent.config import load_config
 from agent.poster import PageError
+from tests.test_config import TEXT_VALUES, variant, write_config
 
 ROOT = Path(__file__).resolve().parent.parent
 WARNING_PHRASE = "로그인된 계정의 쿠키를 읽을 수 있습니다"
 TEXT = "연락 텀이 길어질 때 불안한 마음, 저도 겪어 봐서 알아요."
+# Phase 1C 인터뷰의 크롬 주소 재현 입력 두 줄(폭 없는 공백 · 끝 스페이스)
+URL_ROWS = tuple(bad for bad in TEXT_VALUES if bad.label.startswith("debug_url_"))
 
 
 class DefaultDirsTest(unittest.TestCase):
@@ -250,6 +254,43 @@ class ChromeCliTest(ProfileCase):
 
     def test_missing_config_exits_2(self) -> None:
         self.assert_refused(self.run_cli("--config", "missing.yaml"))
+
+    def test_debug_url_bad_text_exits_2_naming_the_key(self) -> None:
+        self.assertEqual(len(URL_ROWS), 2)
+        for bad in URL_ROWS:
+            with self.subTest(bad.label):
+                write_config(self.repo, variant(bad.old, bad.new))
+                self.out = io.StringIO()
+                self.err = io.StringIO()
+                self.assert_refused(self.run_cli())
+                self.assertEqual(self.err.getvalue(), f"크롬 실행 준비 실패: {bad.needle}\n")
+
+
+class ChromeModuleEntryTest(unittest.TestCase):
+    """진짜 `python3 -m agent.chrome` — 모듈 입구까지 같은 설정 오류로 끝납니다(Popen 을 막지 않음)."""
+
+    def test_module_run_ends_with_the_config_error(self) -> None:
+        self.assertEqual(len(URL_ROWS), 2)
+        for bad in URL_ROWS:
+            with self.subTest(bad.label), tempfile.TemporaryDirectory() as tmp:
+                path = write_config(Path(tmp), variant(bad.old, bad.new))
+                result = subprocess.run(
+                    [sys.executable, "-m", "agent.chrome", "--config", str(path)],
+                    capture_output=True,
+                    encoding="utf-8",
+                    env={
+                        **os.environ,
+                        "PYTHONPATH": str(ROOT / "src"),
+                        "PYTHONIOENCODING": "utf-8",
+                    },
+                    cwd=tmp,
+                    check=False,
+                    timeout=60,
+                )
+                self.assertEqual(
+                    (result.returncode, result.stdout, result.stderr),
+                    (2, "", f"크롬 실행 준비 실패: {bad.needle}\n"),
+                )
 
 
 class FakeTimeout(Exception):
