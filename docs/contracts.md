@@ -695,6 +695,9 @@ run_loop(cycle, reload, initial, *, on_error, sleep=time.sleep,
   python3 -m tests.mutants live-check-grader-in-agent
   python3 -m tests.mutants live-check-cli-exception-only
   python3 -m tests.mutants live-check-entry-skips-cli
+  python3 -m tests.mutants live-check-grade-block-half-stops
+  python3 -m tests.mutants live-check-grade-block-schema-ignored
+  python3 -m tests.mutants live-check-popular-shortfall-ignored
   python3 -m tests.mutants live-check-applied-yes-floor-lowered
   python3 -m tests.mutants live-check-applied-floor-lowered
   python3 -m tests.mutants live-check-applied-reads-jev-models
@@ -1145,16 +1148,25 @@ python3 -m tests.live_check --verdict <결과 파일>     # 호출 없이 판정
   `trigger.min_views ≤ 조회수 ≤ trigger.max_views` 인 영상을 판별합니다.
   범위 밖 영상은 jev 에 보내지 않습니다.
   시간당 조회수는 표본이 둘 필요해 고르기 조건이 아닙니다.
-- **넓힌 창.** 운영 창을 다 돈 뒤 채점할 초안이 `TARGET_DRAFTS`(10)개보다 적으면 키워드마다 한
-  페이지를 `publishedAfter = now − WIDE_WINDOW_HOURS`(72시간) · `publishedBefore = now −
-  trigger.max_age_hours` 로 한 번 더 찾습니다. 세 번째 창은 없습니다. 영상마다 `window` 칸에
-  `operation` 또는 `widened` 를 적습니다.
-- **한도.** 판별은 실행마다 `CLASSIFY_MAX`(40)개, 댓글 작성은 `WRITE_MAX`(15)개 영상까지입니다.
-  초안이 `TARGET_DRAFTS` 에 닿으면 새 영상을 고르지 않습니다.
+- **넓힌 창.** 운영 창을 다 돈 뒤 초안이 `TARGET_DRAFTS`(10)개보다 적거나, 인기 댓글을 재료로 쓴
+  초안(`material = "top_comments"` 인 영상의 초안)이 `POPULAR_DRAFTS_MIN`(3)개보다 적으면 키워드마다
+  한 페이지를 `publishedAfter = now − WIDE_WINDOW_HOURS`(72시간) · `publishedBefore = now −
+  trigger.max_age_hours` 로 한 번 더 찾습니다. 넓힌 창은 두 수가 모두 닿을 때까지 영상을 고릅니다.
+  세 번째 창은 없습니다. 영상마다 `window` 칸에 `operation` 또는 `widened` 를 적습니다.
+- **한도.** 판별은 실행마다 `CLASSIFY_MAX`(40)개, 댓글 작성은 `WRITE_MAX`(15)개 영상까지이고 두 창이
+  함께 씁니다.
+  운영 창은 초안이 `TARGET_DRAFTS` 에 닿으면, 넓힌 창은 초안 수와 인기 댓글 재료 초안 수가 모두
+  닿으면 새 영상을 고르지 않습니다.
 - **재료.** 판별이 `yes` 인 영상마다 `top_comments(video_id, now, limits, TOP_COMMENTS_MAX)` 로 인기
-  댓글을 받아 `write_comment(…, transcript="", top_comments=…)` 에 넘깁니다. 댓글이 막힌
+  댓글을 받아 `write_comment(…, transcript="", top_comments=…)` 에 넘깁니다.
+  `previous` 는 이번 실행에서 앞서 통과한 초안(`write_comment` 가 돌려준 `draft.text`)의 목록입니다 —
+  운영의 `store.comments()` 자리이고, 실행기의 `code_pass` 도 같은 목록으로 셉니다. 댓글이 막힌
   영상(`None`)과 댓글이 하나도 없는 영상은 제목 · 설명으로 이어 씁니다(`material =
-  "title_description"`). 영상마다 `material` · `top_comment_count` · `comments_disabled` 를 적습니다.
+  "title_description"`).
+  영상마다 `material` · `top_comment_count`(읽은 글 수) · `comment_items`(`commentThreads.list` 가
+  돌려준 항목 수 — 댓글이 막혔거나 호출이 실패하면 `null`) · `comments_disabled` 를 적습니다.
+  항목 수는 실행기가 `YouTubeClient` 의 호출 한 번의 답에서 세고, `top_comments` 가 돌려주는 글은
+  바뀌지 않습니다.
   자막은 공식 API 로 남의 영상에서 받을 수 없어 비어 있습니다.
 - **jev 자체 검사 어댑터.** `jev_self_check(ask, model)` 이 '댓글 작성' 절의 `check` 포트를 채웁니다 —
   질문마다 `noul`(`criteria = {"true": "Yes, it does", "false": "No, it does not"}`)을 한 요청으로 묻고
@@ -1163,7 +1175,7 @@ python3 -m tests.live_check --verdict <결과 파일>     # 호출 없이 판정
   또는 `write_comment` 가 Claude 호출 오류 · jev 검사 호출 오류 · jev 답 모양 이상으로 끝남 — 실행기의
   감싸개가 보고 `error_cause` 에 `comments` · `claude` · `jev` · `jev_answer` 로 적음) · `not_written`
   (판별이 `yes` 가 아님)입니다.
-- **천장.** 실행 한 번의 서비스별 호출 수 천장은 실행기 상수 `CEILINGS`(jev 120 · claude 70 ·
+- **천장.** 실행 한 번의 서비스별 호출 수 천장은 실행기 상수 `CEILINGS`(jev 120 · claude 110 ·
   youtube 50)이고 설정 키가 아닙니다.
   천장이 세는 것은 실행기의 호출(감싸개 한 번)이고, SDK 안의 다시 시도는 그 밖입니다 — anthropic 은
   `max_retries=2`(호출당 요청 많아야 3번), typesafe 는 SDK 기본 정책입니다.
@@ -1193,7 +1205,7 @@ python3 -m tests.live_check --verdict <결과 파일>     # 호출 없이 판정
 
   | 칸 | 뜻 |
   |---|---|
-  | `schema_version` · `notice` · `run_at` · `example_count` | 모양 버전 · `untrusted` 칸 안내 · 실행 시각(UTC) · 예시 수 |
+  | `schema_version` · `notice` · `run_at` · `example_count` | 모양 버전(지금 2 — 판 2 부터 채점 막힘을 셈) · `untrusted` 칸 안내 · 실행 시각(UTC) · 예시 수 |
   | `verdict` | 판정 줄(아래) |
   | `stopped` | `null` · 천장 · 쿼터 · 중단 |
   | `calls` · `ceilings` | 서비스별 실행기 호출 수와 천장 |
@@ -1201,20 +1213,49 @@ python3 -m tests.live_check --verdict <결과 파일>     # 호출 없이 판정
   | `accuracy.<언어>[]` | 예시마다 `index` · `kind` · `label` · `verdict` · `error` · `noul` · `choice` · `probability` · `confidence` |
   | `accuracy_tally.<언어>` | 지금 기준값의 맞음 · 잘못된 일치 · 잘못된 불일치 · 보류 · 오류(`tally`) |
   | `windows.<창>` | 검색 수 · 찾은 영상 · 조회수 범위 안 · 판별한 영상 |
-  | `videos[]` | `window` · `views` · `published_at` · `age_hours` · `classification` · `material` · `top_comment_count` · `comments_disabled` · `result` · `error_cause` · `drafts[]` |
-  | `drafts[]` | `attempt` · `parsed` · `scores`(질문 → P(예)) · `self_check_pass` · `code_pass` · `passed` · `grade` · `claude_grade` · `grade_error` · `human` |
+  | `videos[]` | `window` · `views` · `published_at` · `age_hours` · `classification` · `topic_grade` · `topic_grade_error` · `topic_grade_shape` · `topic_human` · `material` · `top_comment_count` · `comment_items` · `comments_disabled` · `result` · `error_cause` · `drafts[]` |
+  | `drafts[]` | `attempt` · `parsed` · `scores`(질문 → P(예)) · `self_check_pass` · `code_pass` · `passed` · `grade` · `claude_grade` · `grade_error` · `task_quality` · `task_error` · `grade_shape` · `frame_overlap` · `human` |
   | `errors[]` | 실패한 호출마다 `service` · `stage` · `error`(예외 이름) · `status` · `video_id` |
   | `fingerprint` | 판별 질문 문구(ko · en) · 예시 묶음 SHA-256 · 판별 설정 값 · jev 가 알린 모델 · 자체 검사 질문 · 통과선 · 트리거 조회수 범위 · 채점 프롬프트 · `MARGIN` · `PASS_CORRECT` · `claude_max_retries` |
 
-- **Claude 채점.** 초안마다(다시 쓴 초안 포함) 채점 모델을 한 번 부릅니다(`GRADE_SYSTEM`). 세 질문
-  `scene_in_material`(초안이 짚은 장면이 재료에 있나) · `reads_like_ad` · `follows_concern` 의
-  true/false 가 `grade` 이고, `scene_in_material` 이 참 · `reads_like_ad` 가 거짓 · `follows_concern` 이
-  참이면 `claude_grade = "ok"`, 아니면 `"bad"` 입니다. 답 모양이 다르면 `grade_error = "응답 모양"`.
+- **Claude 채점.** 초안마다(다시 쓴 초안 포함) 채점 모델을 한 번 부릅니다(`GRADE_SYSTEM`, `max_tokens`
+  1024). 답은 도구 `record_grade` 의 입력으로 받습니다(`tool_choice` 로 그 도구를 정함 — 도구 블록이
+  없으면 글 블록에서 JSON 하나를 찾습니다).
+  다섯 질문 `scene_in_material`(초안이 짚은 장면이 재료에 있나) · `reads_like_ad` · `follows_concern` ·
+  `concern_is_love_worry`(고민 한 줄이 재료 속 연애 고민인가) · `saju_story_fits`(댓글에 비슷한 고민 때
+  연애사주를 봤던 경험이 있고 그 고민과 이어지나)의 true/false 가운데 앞 셋이 `grade`, 뒤 둘이
+  `task_quality` 입니다.
+  답에 다섯 이름 밖의 키가 있으면 두 몫 모두, 한 몫의 키가 빠졌거나 값이 참거짓이 아니면 그 몫만
+  응답 모양입니다(`grade_error` · `task_error = "응답 모양"`).
+  `scene_in_material` 이 참 · `reads_like_ad` 가 거짓 · `follows_concern` 이 참이면
+  `claude_grade = "ok"`, 아니면 `"bad"` 입니다.
+  `task_quality` · `task_error` 는 `claude_grade` 와 판정 줄에 들어가지 않습니다.
+  응답 모양이면 `grade_shape` 에 답의 모양(`stop_reason` — 정해진 낱말 밖은 `other` · 도구 블록이
+  있었나 · 글 블록 글자 수 · 답 객체를 읽었나 · 찾은 키 가운데 다섯 이름 · 그 밖 키 수 · 참거짓이 아닌
+  키)을 적습니다.
+  채점 답(초안 채점 · 영상 판별 채점)의 글 · 값 글자와 목록 밖 키 이름은 결과 파일 · 요약 어느
+  칸에도 남기지 않습니다.
   채점은 이 실행기 안의 측정 도구입니다.
   `src/agent/` 의 모듈은 채점을 부르거나 담지 않습니다.
-- **사람 칸.** 실행기는 `human` 을 빈 글자로 둡니다. 사람은 채점에 동의하지 못하는 초안의 `human` 에
-  `ok` 또는 `bad` 를 적습니다(건너뛰어도 됨).
-  판정 줄은 `human` 을 읽지 않습니다.
+- **영상 판별 채점.** 판별한 영상마다(판정과 상관없이) 채점 모델을 한 번 부릅니다(`TOPIC_SYSTEM`,
+  도구 `record_topic`).
+  재료는 제목 · 설명이고, 묻는 것은 "이 영상은 연애가 주제인가(키워드만 겹침이 아닌가)"
+  하나(`romance_topic`)입니다.
+  참이면 `topic_grade = "연애"`, 거짓이면 `"아님"`, 답 모양이 다르면 `topic_grade_error = "응답 모양"`
+  과 `topic_grade_shape` 입니다.
+  `topic_human` 은 빈 글자로 두고, 사람은 동의하지 못하는 영상에 `연애` 또는 `아님` 을 적습니다.
+  정답은 사람 칸이 있으면 그것, 없으면 채점입니다.
+  판정 줄과 판별 기준값 셈은 `topic_grade` · `topic_grade_error` · `topic_grade_shape` · `topic_human`
+  을 읽지 않습니다.
+  영상 판별 채점 호출이 API 오류로 실패하면 다른 호출처럼 `errors[]` 에 남아 재지 못함(호출 오류)으로
+  셉니다.
+  진짜 영상 숫자로 기준값을 내릴지는 사람이 정합니다(트래커 Phase 6C).
+- **다른 영상 초안과 겹침 (과제 품질 ⓒ).** 실행이 끝나면 초안마다 공백을 모두 뺀 6글자 조각 가운데
+  다른 영상의 초안에도 있는 조각 수를 `frame_overlap` 에 적습니다.
+  같은 영상의 다시 쓴 초안끼리는 세지 않고, AI 를 부르지 않습니다.
+- **사람 칸.** 실행기는 `human` 과 `topic_human` 을 빈 글자로 둡니다. 사람은 채점에 동의하지 못하는
+  초안의 `human` 에 `ok` 또는 `bad` 를 적습니다(건너뛰어도 됨).
+  판정 줄은 `human` · `topic_human` 을 읽지 않습니다.
 - **판정 줄.** `verdict_line(result)` 이 결과 하나로 셉니다. `summary.md` 의 첫 줄, 화면의 첫 줄,
   `result.json` 의 `verdict` 가 같은 줄입니다. 걸린 경우를 아래 차례로 `; ` 로 이어
   `6B: stop — <경우들>` 을, 하나도 없으면 `6B: go` 를 씁니다.
@@ -1225,10 +1266,17 @@ python3 -m tests.live_check --verdict <결과 파일>     # 호출 없이 판정
   | 판별 미달 | 어느 언어도 "올리기만" 범위에서 잘못된 일치 0 · 맞음 `PASS_CORRECT`(20) 이상을 이루지 못함 | `판별 미달(ko <최다 맞음>/<예시 수> · en …)`, 잘못된 일치를 막을 설정이 없는 언어는 `<언어> 잘못된 일치 못 막음` |
   | 작성 막힘 | `skip`(검사 두 번 탈락) × 2 > 쓴 영상(`comment` + `skip`, 두 창 모두) | `작성 막힘(SKIP <s>/<w>)` |
   | 모델 이름 | `claude-sonnet-5-5` · `claude-haiku-5-5` 가 둘 다 `rejected` | `모델 이름(claude-sonnet-5-5 · claude-haiku-5-5 둘 다 거절)` |
+  | 채점 막힘 | 판 2 이상 결과에서 채점 오류(`grade_error` 가 있는 초안) × 2 > 초안(`parsed` 인 초안, 두 창 모두) | `채점 막힘(오류 <n>/<m>)` |
 
   API 실패로 끝난 영상(`result: "error"`)은 작성 막힘에 세지 않고 재지 못함에 셉니다.
   쓴 영상이 0 이고 오류도 없으면 `go` 쪽이고, 6B 가 "표본 없음" 으로 다룹니다. 재지 못함의 예시 밖
   오류 · 영상 오류는 이 계약의 읽기입니다 — 트래커 Phase 6A 의 ① 은 예시 오류와 천장을 적습니다.
+  채점 막힘은 판 2 이상(`schema_version` ≥ 2) 결과에만 셉니다 — 판 1 결과는 옛 채점기로 잰 숫자라 위
+  네 경우로 셉니다(트래커 Phase 6C 질문 5 A).
+  초안이 0 이면 채점 막힘이 아닙니다.
+  `task_error` 와 영상 판별 채점의 오류는 채점 막힘에 세지 않습니다.
+  채점 호출이 API 오류로 실패한 초안은 재지 못함(호출 오류)과 채점 막힘에 함께 셉니다 — 둘이 함께
+  나오면 재지 못함을 먼저 봅니다.
 - **"올리기만" 범위.** 기준값의 출발점은 `fingerprint.classifier` 이고 판정은 `classifier._decide`
   그대로입니다. `noul_yes_min` 후보는 지금 값과, 정답이 `no` 인 예시마다 `noul + MARGIN`(0.05, 소수
   여섯째 자리 반올림) 가운데 지금 값보다 크고 1 이하인 값입니다. `choice_min_confidence` 도
@@ -1243,6 +1291,8 @@ python3 -m tests.live_check --verdict <결과 파일>     # 호출 없이 판정
 - **알려진 한계.** jev 응답의 `answers[이름].noul` · `model`, Claude 의 404 `status_code`, typesafe 의
   다시 시도 · 제한 시간 정책은 문서와 SDK 소스로 맞춘 모양이고 첫 진짜 실행이 처음 확인합니다.
   Claude 채점은 정답이 아니라 또 하나의 의견입니다(트래커 Phase 6A).
+  도구 강제(`tool_choice`)로 받은 채점 답의 모양은 SDK 로 맞춘 모양이고, 모델이 그 도구로 답하는지는
+  다음 진짜 실행이 처음 확인합니다.
 - **결과 반영 (Phase 6B).** 사람이 커밋한 결과를 `tests/test_live_check_applied.py` 가 계약 · 설정과
   맞댑니다. 결과 파일과 요약이 BOM 없이 있고, `--verdict` 가 종료 코드 0 과 `6B: go` 한 줄을 내며,
   요약 첫 줄이 같은 판정 줄이고, 언어마다 예시 행 수가 `example_count` 와 예시 묶음 수와 같아야 합니다.
