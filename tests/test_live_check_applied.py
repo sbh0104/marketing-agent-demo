@@ -9,10 +9,15 @@ from __future__ import annotations
 import copy
 import io
 import json
+import re
+import sys
+import tempfile
 import unittest
 from collections import Counter
 from collections.abc import Mapping
 from datetime import datetime, timezone
+from pathlib import Path
+from unittest import mock
 
 from agent.classifier import LANGUAGES, QUESTION_LANGUAGE
 from agent.config import load_config
@@ -208,10 +213,36 @@ class ContractCase(unittest.TestCase):
     """계약에 기록 문구가 있는지 — 공백을 하나로 접어 비교합니다."""
 
     def assert_in_contract(self, phrase: str) -> None:
-        self.assertTrue(
-            normalize(phrase) in normalize(CONTRACT_PATH.read_text(encoding="utf-8-sig")),
-            f"계약에 없는 기록: {phrase}",
-        )
+        """숫자로 끝나는 기록은 계약에서 뒤에 숫자나 `.숫자` 가 이어지지 않는 자리만 셉니다."""
+        normalized_phrase = normalize(phrase)
+        normalized_contract = normalize(CONTRACT_PATH.read_text(encoding="utf-8-sig"))
+        found = normalized_phrase in normalized_contract
+        if found and re.search(r"[0-9]\Z", normalized_phrase):
+            found = (
+                re.search(re.escape(normalized_phrase) + r"(?![0-9]|\.[0-9])", normalized_contract)
+                is not None
+            )
+        self.assertTrue(found, f"계약에 없는 기록: {phrase}")
+
+
+class ContractBoundaryTest(ContractCase):
+    """`assert_in_contract` 의 숫자 경계 — 숫자로 끝나는 기록 뒤에 숫자가 이어지면 없는 기록입니다."""
+
+    def _check(self, text: str, phrase: str) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "contracts.md"
+            path.write_text(text, encoding="utf-8")
+            with mock.patch.object(sys.modules[__name__], "CONTRACT_PATH", path):
+                self.assert_in_contract(phrase)
+
+    def test_longer_number_does_not_satisfy_phrase(self) -> None:
+        with self.assertRaises(AssertionError):
+            self._check("탈락 05", "탈락 0")
+
+    def test_number_followed_by_space_or_end_satisfies_phrase(self) -> None:
+        for text in ("탈락 0 · 끝", "탈락 0"):
+            with self.subTest(text=text):
+                self._check(text, "탈락 0")
 
 
 class CommittedResultTest(unittest.TestCase):
