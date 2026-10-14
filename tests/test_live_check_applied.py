@@ -435,6 +435,25 @@ class AccuracyRecordTest(ContractCase):
         for phrase in phrases:
             self.assert_in_contract(phrase)
 
+    def test_accuracy_tally_is_recount_of_rows(self) -> None:
+        keys = ("correct", "false_yes", "false_no", "hold", "error")
+        for language in LANGUAGES:
+            with self.subTest(language=language):
+                counts = dict.fromkeys(keys, 0)
+                for row in self.result["accuracy"][language]:
+                    if row["error"] is True:
+                        counts["error"] += 1
+                    elif row["verdict"] == "hold":
+                        counts["hold"] += 1
+                    elif row["verdict"] == row["label"]:
+                        counts["correct"] += 1
+                    elif row["verdict"] == "yes":
+                        counts["false_yes"] += 1
+                    else:
+                        counts["false_no"] += 1
+                tally = self.result["accuracy_tally"][language]
+                self.assertEqual(counts, {key: tally[key] for key in keys})
+
     def test_question_language_follows_record(self) -> None:
         passed = {language: passes(reach(self.result, language)) for language in LANGUAGES}
         self.assertTrue(any(passed.values()), "drift — 인터뷰")
