@@ -573,3 +573,51 @@
 - source: adw/phase-6b-live-check-apply
 - tag: plain
 - status: open
+
+### H-069 — main 체크아웃에서 `docs/live-check/README.md` 대로 `python3 -m tests.live_check` 를 돌리고, 결과 두 파일을 main 이 아니라 Phase 6D 레인 브랜치에 커밋합니다. 판정에 `채점 막힘` 이 있으면 인터뷰 전에 요약의 `채점 답 모양:` 줄과 `result.json` 초안의 `grade_shape` 칸을 먼저 봅니다. 결과를 처음 훑는 탐색 검사도 이 실행이 맡습니다.
+- project: marketing-agent-demo
+- when: 2026-10-14 · plans/interview-marketing-agent.md#phase-6c
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-6c-live-check-grader-fix
+- tag: plain
+- status: open
+
+### H-070 — README 9단계를 S-NEW-1 이 고치기 전에 돌린다면, `cp` 가 오류 없이 끝난 것을 본 뒤에만 `git restore` 를 칩니다. 레인 경로의 `6d` 가 실제 레인 이름인지도 먼저 봅니다.
+- project: marketing-agent-demo
+- when: 2026-10-14 · plans/interview-marketing-agent.md#phase-6c
+- from: ship-report.md § Human checks — .adw/ship-report.md § Risks
+- source: adw/phase-6c-live-check-grader-fix
+- tag: plain
+- status: open
+
+### H-071 — `claude-haiku-5-5` 가 강제 도구로 답하는지 실제 실행에서 확인합니다. 모양 칸이 생긴 초안이 있으면 그 `grade_shape.tool_used` 가 `true` 인지 봅니다.
+- project: marketing-agent-demo
+- when: 2026-10-14 · plans/interview-marketing-agent.md#phase-6c
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-6c-live-check-grader-fix
+- tag: plain
+- status: open
+
+### H-072 — (선택) 동의하지 않는 Claude 채점에만 `human`(`ok`/`bad`)과 `topic_human`(`연애`/`아님`)을 적습니다. 건너뛰어도 판정은 같습니다.
+- project: marketing-agent-demo
+- when: 2026-10-14 · plans/interview-marketing-agent.md#phase-6c
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-6c-live-check-grader-fix
+- tag: plain
+- status: open
+
+### H-073 — 영상 판별 채점 호출 최대 40번이 이제 측정 호출이라는 점을 받아들일지 정합니다. SDK 재시도 뒤에도 하나가 실패하면 실행 전체가 `재지 못함` 이 되어 다시 돌려야 합니다. 받아들이지 않으면 그 호출을 빼는 트래커 변경을 이름 지어 주세요.
+- project: marketing-agent-demo
+- when: 2026-10-14 · plans/interview-marketing-agent.md#phase-6c
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-6c-live-check-grader-fix
+- tag: plain
+- status: open
+
+### H-074 — Phase 6D 전에, ⓒ 의 "다른 영상 초안과 겹치는 6글자 조각 수 > 0" 을 6D 규칙의 "같은 틀 1쌍 이상" 으로 읽어도 되는지 실제 실행 숫자를 보고 판단합니다. 거의 모든 초안이 0 보다 크면 `6E: 할 일 있음` 이 늘 나옵니다(R5).
+- project: marketing-agent-demo
+- when: 2026-10-14 · plans/interview-marketing-agent.md#phase-6c
+- from: ship-report.md § Human checks — .adw/ship-report.md § Risks
+- source: adw/phase-6c-live-check-grader-fix
+- tag: plain
+- status: open
