@@ -93,6 +93,7 @@ CLASSIFY_MAX = 40
 WRITE_MAX = 15
 WIDE_WINDOW_HOURS = 72
 POPULAR_DRAFTS_MIN = 3  # 인기 댓글을 재료로 쓴 초안이 이보다 적으면 넓힌 창에서 더 찾습니다
+FRAME_CHARS = 6  # 과제 품질 ⓒ 조각 — 12글자 반복 검사가 놓치는 "저도연애사주에서" 꼴의 틀을 잡습니다
 MARGIN = 0.05
 KEY_FRAGMENT_MIN = 8
 PROBE_MAX_TOKENS = 1
@@ -397,6 +398,35 @@ def _error_summary(result: dict) -> str:
     return " · ".join(shown) if shown else "없음"
 
 
+def _frames(text: str) -> set[str]:
+    """공백을 모두 뺀 글의 FRAME_CHARS 글자 조각들 — 그보다 짧은 글은 빈 묶음."""
+    joined = "".join(text.split())
+    return {joined[start : start + FRAME_CHARS] for start in range(len(joined) - FRAME_CHARS + 1)}
+
+
+def mark_frame_overlaps(videos: Sequence[dict]) -> None:
+    """읽은 초안마다 다른 영상의 읽은 초안에도 있는 조각 수를 frame_overlap 에 — AI 없이 셉니다.
+
+    같은 영상의 다시 쓴 초안끼리는 비교하지 않습니다. 결과 파일만으로 다시 셀 수 있는 정수입니다.
+    """
+    pieces = [
+        [
+            (draft, _frames(draft["untrusted"]["comment"]))
+            for draft in video["drafts"]
+            if draft["parsed"]
+        ]
+        for video in videos
+    ]
+    for index, own in enumerate(pieces):
+        others: set[str] = set()
+        for other, entries in enumerate(pieces):
+            if other != index:
+                for _, frames in entries:
+                    others |= frames
+        for draft, frames in own:
+            draft["frame_overlap"] = len(frames & others)
+
+
 def _shape_line(drafts: Sequence[Mapping[str, object]]) -> str:
     """채점 답 모양 줄 — 모양 칸이 있는 초안 수와 모양 갈래 · stop_reason 낱말마다의 수."""
     shapes = [draft["grade_shape"] for draft in drafts if draft["grade_shape"] is not None]
@@ -505,6 +535,18 @@ def render_summary(result: dict) -> str:
         f" · 채점 오류 {grade_errors} · 사람 칸 {humans}/{len(drafts)}"
     )
     lines.append(_shape_line(drafts))
+    tasks = [draft["task_quality"] for draft in drafts if draft["task_quality"] is not None]
+    love = sum(1 for task in tasks if task["concern_is_love_worry"])
+    saju = sum(1 for task in tasks if task["saju_story_fits"])
+    task_errors = sum(1 for draft in drafts if draft["task_error"] is not None)
+    framed = sum(1 for draft in drafts if draft["frame_overlap"] > 0)
+    most = max((draft["frame_overlap"] for draft in drafts), default=0)
+    lines.append(
+        f"- 과제 품질: 고민이 연애 고민 {love}/{len(tasks)}"
+        f" · 연애사주 경험이 고민과 이어짐 {saju}/{len(tasks)} · 과제 칸 오류 {task_errors}"
+        f" · 다른 영상 초안과 겹치는 {FRAME_CHARS}글자 조각이 있는 초안 {framed}/{len(drafts)}"
+        f" · 겹친 조각 최다 {most}"
+    )
     popular = Counter(
         video["window"]
         for video in result["videos"]
@@ -1145,6 +1187,7 @@ def run_live_check(services: Services, config: Config, now: datetime, limits: Ru
         language: {name: getattr(counted, name) for name in names}
         for language, counted in ((language, tally(judged[language])) for language in LANGUAGES)
     }
+    mark_frame_overlaps(result["videos"])
     result["verdict"] = verdict_line(result)
     return result
 
@@ -1449,6 +1492,7 @@ class _VideoRound:
                     "grade_shape": (
                         asked.shape if "응답 모양" in (grade_error, task_error) else None
                     ),
+                    "frame_overlap": 0,  # 실행 끝에 mark_frame_overlaps 가 셉니다
                     "human": "",
                     "untrusted": {"concern": concern, "comment": text, "code_failures": failures},
                 }

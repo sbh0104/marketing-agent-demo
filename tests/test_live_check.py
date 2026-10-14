@@ -148,6 +148,7 @@ def draft(attempt: int, *, passed: bool, grade: str = "ok") -> dict:
         "task_quality": dict(TASK_OK),
         "task_error": None,
         "grade_shape": None,
+        "frame_overlap": 0,
         "human": "",
         "untrusted": {
             "concern": "연락 텀이 길어 불안한 썸",
@@ -820,6 +821,14 @@ class SummaryTest(unittest.TestCase):
         result["videos"][1]["drafts"][0].update(
             grade=None, claude_grade=None, grade_error="응답 모양", grade_shape=SHAPE_TRUNCATED
         )
+        # 과제 품질 — 고민이 연애 고민이 아닌 초안 하나 · 과제 칸 오류 하나 · 겹친 조각 3 과 5
+        result["videos"][2]["drafts"][0].update(
+            task_quality={"concern_is_love_worry": False, "saju_story_fits": True},
+            frame_overlap=3,
+        )
+        result["videos"][3]["drafts"][0].update(
+            task_quality=None, task_error="응답 모양", frame_overlap=5
+        )
         # 항목은 왔는데 글 0개인 영상 하나 · 댓글 막힌 영상 하나 — 둘 다 제목 · 설명 재료
         result["videos"][2].update(
             material="title_description", top_comment_count=0, comment_items=3
@@ -863,6 +872,9 @@ class SummaryTest(unittest.TestCase):
                 "- 초안: 7 · 채점 ok 2 · bad 4 · 채점 오류 1 · 사람 칸 1/7",
                 "- 채점 답 모양: 모양 칸 1/7 · 도구 블록 없음 1 · JSON 못 읽음 1 · 키 다름 0"
                 " · 참거짓 아님 0 · stop_reason max_tokens 1",
+                "- 과제 품질: 고민이 연애 고민 5/6 · 연애사주 경험이 고민과 이어짐 6/6"
+                " · 과제 칸 오류 1 · 다른 영상 초안과 겹치는 6글자 조각이 있는 초안 2/7"
+                " · 겹친 조각 최다 5",
                 "- 인기 댓글: 재료 초안 운영 창 2 · 넓힌 창 2 · 항목은 왔는데 글 0개인 영상 1"
                 " · 댓글 막힘 영상 1",
                 "- 영상 판별 채점: 일치 6 중 채점 아님 1 · 보류 1 중 채점 연애 1"
@@ -872,6 +884,13 @@ class SummaryTest(unittest.TestCase):
         )
         del result["accuracy_tally"]["en"]
         self.assertIn("- 판별 지금 기준값 en: 없음", self.summary(result))
+
+    def test_task_quality_line_with_no_draft(self) -> None:
+        self.assertIn(
+            "- 과제 품질: 고민이 연애 고민 0/0 · 연애사주 경험이 고민과 이어짐 0/0 · 과제 칸 오류 0"
+            " · 다른 영상 초안과 겹치는 6글자 조각이 있는 초안 0/0 · 겹친 조각 최다 0",
+            self.summary(nothing_written()),
+        )
 
     def test_shape_line_counts_key_drift(self) -> None:
         result = healthy_result()
@@ -1224,6 +1243,7 @@ SUMMARY_PREFIXES = (
     "- 창 widened: ",
     "- 초안: ",
     "- 채점 답 모양: ",
+    "- 과제 품질: ",
     "- 인기 댓글: ",
     "- 영상 판별 채점: ",
     "- 다음: ",
@@ -2259,6 +2279,8 @@ class VideoRoundTest(LiveCheckCase):
         first = videos[vid(1)]
         self.assertEqual((first["result"], first["error_cause"]), ("comment", None))
         untrusted = {"concern": CONCERN, "comment": COMMENT, "code_failures": []}
+        # frame_overlap 4 — 다른 영상 초안(DRAFT_POOL 0–2)과 겹친 조각 어요초안표식 · 요초안표식. ·
+        # 다는말을듣고 · 는말을듣고조
         self.assertEqual(
             first["drafts"],
             [
@@ -2275,6 +2297,7 @@ class VideoRoundTest(LiveCheckCase):
                     "task_quality": TASK_OK,
                     "task_error": None,
                     "grade_shape": None,
+                    "frame_overlap": 4,
                     "human": "",
                     "untrusted": untrusted,
                 },
@@ -2291,6 +2314,7 @@ class VideoRoundTest(LiveCheckCase):
                     "task_quality": TASK_OK,
                     "task_error": None,
                     "grade_shape": None,
+                    "frame_overlap": 4,
                     "human": "",
                     "untrusted": untrusted,
                 },
@@ -2512,6 +2536,22 @@ class VideoRoundTest(LiveCheckCase):
         for service, count in result["calls"].items():
             with self.subTest(service=service):
                 self.assertLessEqual(count, live_check.CEILINGS[service])
+
+    def test_every_parsed_draft_carries_frame_overlap(self) -> None:
+        self.claude.writes = ["JSON 이 아닌 답"]
+        code, out, err, result = self.run_main()
+        drafts = [draft for video in result["videos"] for draft in video["drafts"]]
+        parsed = [draft for draft in drafts if draft["parsed"]]
+        self.assertEqual(len(parsed), len(drafts) - 1)
+        for draft in parsed:
+            self.assertIs(type(draft["frame_overlap"]), int)
+        self.assertNotIn("frame_overlap", [draft for draft in drafts if not draft["parsed"]][0])
+        # 결과 파일만으로 다시 세어도 같은 수입니다(6D 의 다시 세기)
+        recount = copy.deepcopy(result["videos"])
+        for draft in (draft for video in recount for draft in video["drafts"] if draft["parsed"]):
+            draft["frame_overlap"] = 0
+        live_check.mark_frame_overlaps(recount)
+        self.assertEqual(recount, result["videos"])
 
     def test_default_write_replies_do_not_repeat(self) -> None:
         texts = (*DRAFT_POOL, COMMENT)
@@ -2872,6 +2912,54 @@ class AnswerShapeTest(LiveCheckCase):
         for odd in odd_words:
             with self.subTest(odd=odd):
                 self.assertEqual(live_check._stop_word(odd), "other")
+
+
+def overlap_video(*comments: str) -> dict:
+    """겹침 셈 시험의 영상 — 글마다 읽은 초안 하나(다시 쓴 초안이면 attempt 가 이어짐)."""
+    drafts = []
+    for attempt, text in enumerate(comments, 1):
+        entry = draft(attempt, passed=attempt == len(comments))
+        entry["untrusted"]["comment"] = text
+        drafts.append(entry)
+    return {"drafts": drafts}
+
+
+class FrameOverlapTest(unittest.TestCase):
+    """과제 품질 ⓒ — 다른 영상 초안과 겹치는 FRAME_CHARS 글자 조각 수(AI 없이)."""
+
+    def overlaps(self, videos: list[dict]) -> list[list[object]]:
+        live_check.mark_frame_overlaps(videos)
+        return [[entry.get("frame_overlap") for entry in item["drafts"]] for item in videos]
+
+    def test_shared_frame_across_videos_is_counted(self) -> None:
+        self.assertEqual(live_check.FRAME_CHARS, 6)
+        first = "예전에 저도 연애사주에서 들었는데 마음이 놓였어요. 저도 연애사주에서 또 봤어요"
+        second = "그날 저도 연애사주에서 봤는데 신기했어요"
+        # 같은 영상 밖의 겹친 조각: 저도연애사주 · 도연애사주에 · 연애사주에서 — 두 번 나와도 하나
+        videos = [overlap_video(first), overlap_video(second), overlap_video("전혀 다른 내용의 댓글")]
+        self.assertEqual(self.overlaps(videos), [[3], [3], [0]])
+
+    def test_same_video_retries_are_not_counted(self) -> None:
+        text = "카페에서 고백을 미루던 장면 보고 웃었어요"
+        videos = [overlap_video(text, text), overlap_video("이별 뒤 혼자 산책하는 장면")]
+        self.assertEqual(self.overlaps(videos), [[0, 0], [0]])
+
+    def test_whitespace_is_ignored_and_short_text_is_zero(self) -> None:
+        self.assertEqual(live_check._frames("짧은 글\t다섯"), set())
+        self.assertEqual(live_check._frames("가 나\n다라 마바"), {"가나다라마바"})
+        videos = [
+            overlap_video("저도 연애 사주에서"),
+            overlap_video("저도연애사주에서"),
+            overlap_video("저도 연애"),
+        ]
+        self.assertEqual(self.overlaps(videos), [[3], [3], [0]])
+
+    def test_unparsed_drafts_are_skipped(self) -> None:
+        text = "카페에서 고백을 미루던 장면 보고 웃었어요"
+        unparsed = {"attempt": 1, "parsed": False}
+        videos = [{"drafts": [unparsed]}, overlap_video(text)]
+        self.assertEqual(self.overlaps(videos), [[None], [0]])
+        self.assertEqual(unparsed, {"attempt": 1, "parsed": False})
 
 
 class KeyHidingTest(LiveCheckCase):
