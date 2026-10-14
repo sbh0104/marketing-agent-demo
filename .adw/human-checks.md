@@ -517,3 +517,59 @@
 - source: adw/phase-1c-text-config-allow
 - tag: plain
 - status: open
+
+### H-062 — 하한을 내리는 쪽 인터뷰를 열지 정하기 — 운영 창 영상 18개 중 11개 보류(9개는 noul 0.2–0.8 사이, 2개는 확신 0.5 미만); 예시로는 `choice_min_confidence` 를 0.47 이하로 내리면 두 언어 21/22 · 잘못된 일치 0(예시 16 풀림, 예시 21 은 보류 그대로) (R9)
+- project: marketing-agent-demo
+- when: 2026-10-14 · plans/interview-marketing-agent.md#phase-6b
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-6b-live-check-apply
+- tag: plain
+- status: open
+
+### H-063 — 채점 고침(6C) 착지 뒤 실제 호출 실행기를 다시 돌려 결과 두 파일을 Phase 6D 레인 브랜치에만 커밋하기 — main 에 커밋하면 `tests.test_live_check_applied` 가 빨강(트래커 HC1 질문 2 A); 진짜 jev · Claude · YouTube 호출과 비용(지난 실행 Claude 23 · jev 72 · YouTube 17)
+- project: marketing-agent-demo
+- when: 2026-10-14 · plans/interview-marketing-agent.md#phase-6b
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-6b-live-check-apply
+- tag: plain
+- status: open
+
+### H-064 — Phase 6C 결정 "이 페이즈가 채점을 고쳐도 main 은 초록 그대로다"(plans/interview-marketing-agent.md:477)를 고치거나 후보를 좁히기 — 6C 후보 "채점 오류를 판정 줄에 셈"이나 새 지문 칸은 커밋된 결과의 재셈을 바꿔 main 의 `tests.test_live_check_applied` 를 빨강으로 만듦(R12)
+- project: marketing-agent-demo
+- when: 2026-10-14 · plans/interview-marketing-agent.md#phase-6b
+- from: ship-report.md § Human checks — .adw/ship-report.md § Risks
+- source: adw/phase-6b-live-check-apply
+- tag: plain
+- status: open
+
+### H-065 — H-010 을 받아들이거나 주인을 정하기 — 예시 22개 라벨을 실행 전에 사람이 훑었는지는 결과로 알 수 없음; 이번 근거는 두 언어 20/22 · 잘못된 일치 0 · 잘못된 불일치 0 · 놓친 둘은 `no` 예시 16 · 21 의 보류
+- project: marketing-agent-demo
+- when: 2026-10-14 · plans/interview-marketing-agent.md#phase-6b
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-6b-live-check-apply
+- tag: plain
+- status: open
+
+### H-066 — H-018 을 받아들이거나 주인을 정하기 — 트래커는 작성 쪽 근거를 Phase 6D 보고서에 다시 남기게 함; 이번 기록은 모델 이름 둘 다 `accepted` · 0.7 "표본 없음" · 12 "표본 부족" · 광고 P(예) 0.04–0.25 · 자체 검사 탈락 6(장면 5 · 고민 1); R3(전각 가짜 태그)는 재지 않음
+- project: marketing-agent-demo
+- when: 2026-10-14 · plans/interview-marketing-agent.md#phase-6b
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-6b-live-check-apply
+- tag: plain
+- status: open
+
+### H-067 — H-043 을 받아들이거나 주인을 정하기 — 이번 실행은 예시 · 호출 · 영상 오류가 0 이라 ① "재지 못함" 읽기가 판정을 바꾸지 않았음; 트래커 6C 절은 이 항목을 고치지 않으면 장부에 그대로 둔다고 적음
+- project: marketing-agent-demo
+- when: 2026-10-14 · plans/interview-marketing-agent.md#phase-6b
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-6b-live-check-apply
+- tag: plain
+- status: open
+
+### H-068 — H-044 를 받아들이거나 주인을 정하기 — 트래커는 채점 몫(채점 오류를 판정 줄에 셀지)의 주인을 Phase 6C 로 정했고 영상 쪽 응답 모양 몫은 남음; 이번 실행은 채점 `응답 모양` 오류 10/10 이 ①에 세이지 않은 채 판정 `go`, 작성 쪽 정답 0 (R10)
+- project: marketing-agent-demo
+- when: 2026-10-14 · plans/interview-marketing-agent.md#phase-6b
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-6b-live-check-apply
+- tag: plain
+- status: open
