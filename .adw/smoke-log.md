@@ -674,7 +674,7 @@ other line is required on every item.
 - evidence: docs/contracts.md:924-926 "그 초안의 세 점수 가운데 가장 낮은 것 + 0.05 로 올리고" — 결과 파일 `scores` 칸은 날 점수(P(예))라 광고 0.06 이 가장 낮게 읽혀 통과선이 0.11 로 내려갈 수 있음(.adw/ship-report.md § Risks R7); 하한 비교는 docs/contracts.md:893-894 · src/agent/writer.py:182 에서 광고를 1 − P(예) 로 뒤집음; 트래커 Phase 6B 결정 "(2026-10-14 6B HC1 인터뷰 질문 1 A …)" 이 뜻을 정함
 - direction: 그 문장을 트래커 줄과 같은 뜻으로 고친다 — "세 비교 점수(장면 · 고민은 P(예), 광고는 1 − P(예)) 가운데 가장 낮은 것 + 0.05; 그런 초안이 여럿이면 초안마다 가장 낮은 비교 점수 중 가장 높은 값 + 0.05; 그 값이 1 을 넘으면 고치지 않고 사람에게" — 코드 · 테스트 변경 없음
 - touches: docs/contracts.md
-- status: open
+- status: resolved
 - attempts: 0 · last failure: —
 - first seen: 2026-10-14 · last seen: 2026-10-14
 
@@ -683,7 +683,7 @@ other line is required on every item.
 - evidence: docs/contracts.md:1236 "그 사이클을 맡을 페이즈는 트래커가 정합니다" — 트래커에 그런 페이즈가 없었음(.adw/ship-report.md § Risks R8); 트래커 Phase 6B 결정 "(2026-10-14 6B HC1 인터뷰 질문 2 A …)" 과 Phase 6C · 6D 절이 주인과 길을 정함
 - direction: 그 문장을 "그 사이클은 Phase 6D(트래커)가 맡고, 새 결과는 main 이 아니라 그 페이즈의 레인 브랜치에만 커밋합니다 — 그 뒤의 재실행도 트래커에 다시 반영 페이즈를 열고 같은 길로" 로 고친다 — 코드 · 테스트 변경 없음(README 커밋 단계는 Phase 6C 가 고침)
 - touches: docs/contracts.md
-- status: open
+- status: resolved
 - attempts: 0 · last failure: —
 - first seen: 2026-10-14 · last seen: 2026-10-14
 
@@ -692,7 +692,7 @@ other line is required on every item.
 - evidence: tests/test_live_check_applied.py:210-214 (`assert_in_contract` 는 맞는 줄이 계약 어딘가에 있는지만 봄) — 계약 사본의 `- en: 지금 기준값 맞음 20/22 …` 줄 아래에 `- en: 지금 기준값 맞음 12/22 · 잘못된 일치 3 · … — 미달` 을 더해도 AccuracyRecordTest 3개 초록(ship-check 재현 ran 3 · failures 0 · errors 0); S-062 의 숫자 경계 고침으로는 닫히지 않음; 트래커 Phase 6B Responsibilities 첫 줄 "계약에 적은 숫자와 결과 파일의 숫자가 같아야 한다"(.adw/ship-report.md § Risks R5)
 - direction: 기록 줄마다 머리(`ko: 지금 기준값 맞음` · `en: 지금 기준값 맞음` · `영상 판별 운영 창:` · `기준값 사이 영상 운영 창:` · `초안 운영 창:` · `모델 이름:` 등, 정규화한 글)가 계약 전체에 정확히 한 번 나오는지 단언하는 테스트를 더한다 — 코드 · 계약 변경 없음
 - touches: tests/test_live_check_applied.py
-- status: open
+- status: resolved
 - attempts: 0 · last failure: —
 - first seen: 2026-10-14 · last seen: 2026-10-14
 
@@ -701,7 +701,7 @@ other line is required on every item.
 - evidence: tests/test_live_check_applied.py:94-99 (`accuracy_lines` 가 tally 다섯 칸을 줄에 넣음) — 커밋된 tally 는 잘못된 일치 · 잘못된 불일치가 모두 0 이라 두 칸을 바꿔 넣는 변이도 16개 초록(ship-check 감사의 사본 실행 `(16,0,0)`); 계약의 기록은 이 도우미의 출력을 붙여 쓴 것이라 도우미가 틀리면 계약과 테스트가 함께 틀려 초록으로 남음(.adw/ship-report.md § Risks R6)
 - direction: load_result() deepcopy 의 accuracy_tally 에 서로 다른 다섯 값(예: 맞음 15 · 잘못된 일치 1 · 잘못된 불일치 2 · 보류 3 · 오류 1)을 심고 accuracy_lines 의 결과를 글자 그대로 단언하는 테스트를 더한다 — 코드 · 계약 변경 없음
 - touches: tests/test_live_check_applied.py
-- status: open
+- status: resolved
 - attempts: 0 · last failure: —
 - first seen: 2026-10-14 · last seen: 2026-10-14
 

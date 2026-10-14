@@ -209,6 +209,23 @@ def normalize(text: str) -> str:
     return " ".join(text.split())
 
 
+def record_heads() -> list[str]:
+    """기록 줄의 머리 — 기록 줄을 만드는 함수들의 앞머리를 `LANGUAGES` · `WINDOW_LABELS` 로 만듭니다."""
+    heads: list[str] = []
+    for language in LANGUAGES:
+        heads += [f"{language}: 지금 기준값 맞음", f"{language}: 기준값 사이"]
+    for label in WINDOW_LABELS.values():
+        heads += [f"기준값 사이 영상 {label}:", f"영상 판별 {label}:", f"초안 {label}:"]
+    heads.append("모델 이름:")
+    return heads
+
+
+def head_counts(text: str) -> dict[str, int]:
+    """머리마다 그 머리로 시작하는 줄 수 — 줄은 공백을 접고 앞의 `- ` 를 뗀 뒤 봅니다."""
+    lines = [normalize(line).removeprefix("- ") for line in text.splitlines()]
+    return {head: sum(1 for line in lines if line.startswith(head)) for head in record_heads()}
+
+
 class ContractCase(unittest.TestCase):
     """계약에 기록 문구가 있는지 — 공백을 하나로 접어 비교합니다."""
 
@@ -243,6 +260,38 @@ class ContractBoundaryTest(ContractCase):
         for text in ("탈락 0 · 끝", "탈락 0"):
             with self.subTest(text=text):
                 self._check(text, "탈락 0")
+
+
+class ContractHeadTest(unittest.TestCase):
+    """기록 머리는 계약에 한 번씩 — 같은 머리에 다른 숫자를 단 모순된 중복 줄을 잡습니다."""
+
+    def test_each_record_head_appears_once(self) -> None:
+        counts = head_counts(CONTRACT_PATH.read_text(encoding="utf-8-sig"))
+        for head, count in counts.items():
+            with self.subTest(head=head):
+                self.assertEqual(count, 1, f"계약에 이 머리의 기록 줄이 {count}개입니다: {head}")
+
+    def test_every_record_line_starts_with_one_head(self) -> None:
+        result = load_result()
+        heads = record_heads()
+        lines = [
+            *accuracy_lines(result),
+            *gap_lines(result),
+            *classification_lines(result),
+            *draft_lines(result),
+            model_line(result),
+        ]
+        for line in lines:
+            with self.subTest(line=line):
+                self.assertEqual(sum(1 for head in heads if line.startswith(head)), 1)
+
+    def test_contradicting_duplicate_line_is_counted(self) -> None:
+        duplicate = (
+            "- en: 지금 기준값 맞음 12/22 · 잘못된 일치 3 · 잘못된 불일치 0 · 보류 7 · 오류 0"
+            " · 올리기만 범위 최다 맞음 12/22 — 미달"
+        )
+        text = CONTRACT_PATH.read_text(encoding="utf-8-sig") + "\n" + duplicate + "\n"
+        self.assertEqual(head_counts(text)["en: 지금 기준값 맞음"], 2)
 
 
 class CommittedResultTest(unittest.TestCase):
@@ -453,6 +502,27 @@ class AccuracyRecordTest(ContractCase):
                         counts["false_no"] += 1
                 tally = self.result["accuracy_tally"][language]
                 self.assertEqual(counts, {key: tally[key] for key in keys})
+
+    def test_tally_slots_follow_record_lines(self) -> None:
+        result = copy.deepcopy(self.result)
+        result["accuracy_tally"]["ko"] = {
+            "correct": 15, "false_yes": 1, "false_no": 2, "hold": 3, "error": 1
+        }
+        result["accuracy_tally"]["en"] = {
+            "correct": 11, "false_yes": 6, "false_no": 2, "hold": 1, "error": 2
+        }
+        n = result["example_count"]
+        expected = {
+            "ko": f"ko: 지금 기준값 맞음 15/{n} · 잘못된 일치 1 · 잘못된 불일치 2 · 보류 3 · 오류 1"
+            " · 올리기만 범위 최다 맞음",
+            "en": f"en: 지금 기준값 맞음 11/{n} · 잘못된 일치 6 · 잘못된 불일치 2 · 보류 1 · 오류 2"
+            " · 올리기만 범위 최다 맞음",
+        }
+        lines = accuracy_lines(result)
+        self.assertEqual(len(lines), len(LANGUAGES))
+        for language, line in zip(LANGUAGES, lines):
+            with self.subTest(language=language):
+                self.assertTrue(line.startswith(expected[language]), line)
 
     def test_question_language_follows_record(self) -> None:
         passed = {language: passes(reach(self.result, language)) for language in LANGUAGES}
