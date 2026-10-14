@@ -4,6 +4,7 @@ from __future__ import annotations
 import copy
 import inspect
 import tempfile
+import unicodedata
 import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -11,6 +12,7 @@ from typing import NamedTuple
 from unittest import mock
 
 from agent import config as config_module
+from agent import logbook as logbook_module
 from agent.config import (
     ClassifierConfig,
     CommentConfig,
@@ -281,6 +283,153 @@ OUT_OF_RANGE_VALUES: tuple[RangeValue, ...] = (
         "  max_chars: 120\n",
         "  max_chars: 10001\n",
         "10000 이하여야 합니다: comment.max_chars",
+    ),
+)
+
+TEXT_CHARS = (
+    "글자 · 숫자 · 문장부호 · 기호와 보통 스페이스만 쓸 수 있습니다 "
+    "(줄바꿈 · 탭 · 전각 공백 · 폭 없는 공백 등은 안 됩니다)"
+)
+EDGE_SPACE = "스페이스로 시작하거나 끝나면 안 됩니다"
+
+# Phase 1C 인터뷰(2026-10-14) 재현 입력 — 실제 파일에 그대로 씁니다
+TEXT_VALUES: tuple[RangeValue, ...] = (
+    RangeValue(
+        "topic_lone_surrogate",
+        "topic: 연애\n",
+        'topic: "연애 고민\\ud800"\n',
+        f"{TEXT_CHARS}: topic",
+    ),
+    RangeValue(
+        "topic_tab",
+        "topic: 연애\n",
+        'topic: "연애\\t고민"\n',
+        f"{TEXT_CHARS}: topic",
+    ),
+    RangeValue(
+        "keyword_newline",
+        "keywords: [연애, ",
+        'keywords: ["연애\\n", ',
+        f"{TEXT_CHARS}: keywords[0]",
+    ),
+    RangeValue(
+        "topic_ideographic_space",
+        "topic: 연애\n",
+        'topic: "연애　고민"\n',
+        f"{TEXT_CHARS}: topic",
+    ),
+    RangeValue(
+        "topic_spaces_only",
+        "topic: 연애\n",
+        'topic: "   "\n',
+        f"{EDGE_SPACE}: topic",
+    ),
+    RangeValue(
+        "topic_edge_spaces",
+        "topic: 연애\n",
+        'topic: " 연애 고민 "\n',
+        f"{EDGE_SPACE}: topic",
+    ),
+    RangeValue(
+        "keyword_trailing_space",
+        "keywords: [연애, ",
+        'keywords: [연애, "연애 ", ',
+        f"{EDGE_SPACE}: keywords[1]",
+    ),
+    RangeValue(
+        "reason_trailing_space",
+        "    - 연애 경험담\n",
+        '    - "연애 경험담 "\n',
+        f"{EDGE_SPACE}: classifier.on_topic_reasons[1]",
+    ),
+    RangeValue(
+        "debug_url_zero_width_space",
+        "chrome_debug_url: http://localhost:9222\n",
+        'chrome_debug_url: "http://localhost​:9222"\n',
+        f"{TEXT_CHARS}: chrome_debug_url",
+    ),
+    RangeValue(
+        "debug_url_trailing_space",
+        "chrome_debug_url: http://localhost:9222\n",
+        'chrome_debug_url: "http://localhost:9222 "\n',
+        f"{EDGE_SPACE}: chrome_debug_url",
+    ),
+)
+
+# 글자 규칙이 받는 범주마다 글자 하나(22) — 범주 L · M · N · P · S
+ALLOWED_BY_CATEGORY: dict[str, str] = {
+    "Lu": "A",
+    "Ll": "a",
+    "Lt": "ǅ",
+    "Lm": "ʰ",
+    "Lo": "가",
+    "Mn": "́",
+    "Mc": "ः",
+    "Me": "⃝",
+    "Nd": "0",
+    "Nl": "Ⅰ",
+    "No": "²",
+    "Pc": "_",
+    "Pd": "-",
+    "Ps": "(",
+    "Pe": ")",
+    "Pi": "«",
+    "Pf": "»",
+    "Po": "!",
+    "Sm": "+",
+    "Sc": "$",
+    "Sk": "^",
+    "So": "\U0001f600",
+}
+# 글자 규칙이 거절하는 범주(8) — 두 표를 합치면 일반 범주 30개 전부입니다
+REJECTED_BY_CATEGORY: dict[str, tuple[str, ...]] = {
+    "Cc": ("\t", "\n"),
+    "Cf": ("​",),
+    "Cs": ("\ud800",),
+    "Co": ("",),
+    "Cn": ("͸",),
+    "Zs": (" ", "　"),
+    "Zl": (" ",),
+    "Zp": (" ",),
+}
+# 글자 키마다 (점으로 이은 경로, 정상 값, valid() 에 값을 넣는 함수, Config 에서 값을 꺼내는 함수)
+TEXT_KEYS = (
+    ("topic", "연애", lambda d, v: d.update(topic=v), lambda c: c.topic),
+    (
+        "keywords[1]",
+        "연애",
+        lambda d, v: d.update(keywords=["연애", v]),
+        lambda c: c.keywords[1],
+    ),
+    (
+        "comment.writer_model",
+        "연애",
+        lambda d, v: d["comment"].update(writer_model=v),
+        lambda c: c.comment.writer_model,
+    ),
+    (
+        "classifier.model",
+        "연애",
+        lambda d, v: d["classifier"].update(model=v),
+        lambda c: c.classifier.model,
+    ),
+    (
+        "classifier.on_topic_reasons[1]",
+        "연애",
+        lambda d, v: d["classifier"].update(on_topic_reasons=["연애 고민 상담", v]),
+        lambda c: c.classifier.on_topic_reasons[1],
+    ),
+    (
+        "classifier.off_topic_reasons[0]",
+        "연애",
+        lambda d, v: d["classifier"].update(off_topic_reasons=[v, "연애와 관계없음"]),
+        lambda c: c.classifier.off_topic_reasons[0],
+    ),
+    (
+        "chrome_debug_url",
+        "http://localhost:9222",
+        lambda d, v: d.update(chrome_debug_url=v),
+        lambda c: c.chrome_debug_url,
     ),
 )
 
@@ -660,6 +809,56 @@ class ClassifierConfigTest(unittest.TestCase):
                 self.assert_rejected(data, "비어 있지 않은 글자여야 합니다: classifier.model")
 
 
+class TextKeyTest(unittest.TestCase):
+    """글자 키의 문지기 — 모든 글자 키가 같은 글자 규칙과 앞뒤 스페이스 규칙을 받습니다."""
+
+    def test_every_text_key_takes_the_same_rule(self) -> None:
+        rejected = [char for chars in REJECTED_BY_CATEGORY.values() for char in chars]
+        for path, healthy, setter, _ in TEXT_KEYS:
+            rows = [("", f"비어 있지 않은 글자여야 합니다: {path}")]
+            rows += [
+                (healthy[:1] + char + healthy[1:], f"{TEXT_CHARS}: {path}") for char in rejected
+            ]
+            rows += [
+                (value, f"{EDGE_SPACE}: {path}") for value in ("   ", " " + healthy, healthy + " ")
+            ]
+            for value, message in rows:
+                with self.subTest(path=path, value=value):
+                    data = valid()
+                    setter(data, value)
+                    with self.assertRaises(ConfigError) as caught:
+                        config_from_mapping(data)
+                    self.assertEqual(str(caught.exception), message)
+
+    def test_every_allowed_category_loads_in_every_text_key(self) -> None:
+        text = "연애  상담" + "".join(ALLOWED_BY_CATEGORY.values())
+        for path, _, setter, getter in TEXT_KEYS:
+            value = "http://localhost:9222/" + text if path == "chrome_debug_url" else text
+            with self.subTest(path=path):
+                data = valid()
+                setter(data, value)
+                self.assertEqual(getter(config_from_mapping(data)), value)
+
+    def test_text_rule_is_the_log_raw_rule(self) -> None:
+        # 두 목록이 갈라지지 않습니다 — 설정 문지기의 판정은 로그 날 글자 판정 함수 그 자체입니다
+        self.assertIs(config_module._is_raw, logbook_module._is_raw)
+        for category, char in ALLOWED_BY_CATEGORY.items():
+            with self.subTest(category=category):
+                self.assertEqual(unicodedata.category(char), category)
+        for category, chars in REJECTED_BY_CATEGORY.items():
+            for char in chars:
+                with self.subTest(category=category, char=char):
+                    self.assertEqual(unicodedata.category(char), category)
+        self.assertEqual(set(ALLOWED_BY_CATEGORY) & set(REJECTED_BY_CATEGORY), set())
+        self.assertEqual(len(set(ALLOWED_BY_CATEGORY) | set(REJECTED_BY_CATEGORY)), 30)
+
+    def test_allowed_videos_skip_the_text_rule(self) -> None:
+        items = [" https://youtu.be/AAAAAAAAAAA ", "https://youtu.be/AAAAAAAAAAA​"]
+        data = valid()
+        data["allowed_videos"] = items
+        self.assertEqual(config_from_mapping(data).allowed_videos, tuple(items))
+
+
 class LoadConfigTest(unittest.TestCase):
     def setUp(self) -> None:
         tmp = tempfile.TemporaryDirectory()
@@ -838,6 +1037,37 @@ class RangeFailureTest(unittest.TestCase):
         self.assertEqual(errors, [])
         self.assertLessEqual(max(sleeps), 86400.0)
         self.assertEqual(sum(sleeps), 100 * 365 * 86400 - 10.0)
+
+
+class TextRuleTest(unittest.TestCase):
+    def setUp(self) -> None:
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.dir = Path(tmp.name)
+
+    def test_every_bad_text_value_is_config_error(self) -> None:
+        for bad in TEXT_VALUES:
+            with self.subTest(bad.label):
+                path = write_config(self.dir, variant(bad.old, bad.new))
+                with self.assertRaises(ConfigError) as caught:
+                    load_config(path)
+                # 문구가 정확히 같으므로 값은 메시지에 없습니다
+                self.assertEqual(str(caught.exception), bad.needle)
+                # 변환 중 터진 것이 아니라 규칙이 거부한 값입니다
+                self.assertIsNone(caught.exception.__cause__)
+
+    def test_good_text_values_load(self) -> None:
+        rows = (
+            ('topic: "연애  상담 😀 고민!"\n', "연애  상담 😀 고민!"),
+            # 따옴표 없는 값의 앞뒤 공백은 YAML 이 스스로 뗍니다
+            ("topic: 연애   \n", "연애"),
+            # 한글 채움 문자(U+3164) — 빈칸으로 그려지지만 범주 Lo 라 규칙을 지납니다
+            ('topic: "연애ㅤ"\n', "연애ㅤ"),
+        )
+        for new, topic in rows:
+            with self.subTest(new=new):
+                path = write_config(self.dir, variant("topic: 연애\n", new))
+                self.assertEqual(load_config(path).topic, topic)
 
 
 if __name__ == "__main__":
