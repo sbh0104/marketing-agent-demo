@@ -477,7 +477,7 @@ Open questions
 ---
 
 ## Phase 6C — 채점 고치기 · 다시 잴 준비 (live check grader)
-- Status: Not started
+- Status: Done
 - Slug: live-check-grader-fix
 - After: Phase 6B
 - Goal: 6A 실행기의 Claude 채점이 10/10 `응답 모양` 오류로 떨어진 원인을 찾아 고치고, 다음 사람 실행의 결과를 main 이 아니라 Phase 6D 레인 브랜치에 커밋하도록 실행 안내를 고친다. (2026-10-14 6C 인터뷰) 같은 실행이 과제 ④ · 평가표 '댓글 품질'의 빠진 세 칸, 인기 댓글 0개의 이유, 진짜 영상의 판별 정답을 숫자로 남기게 한다 — 통과선 · 판별 기준값은 이 숫자로 움직이지 않는다. 이 사이클 안에서는 진짜 호출을 하지 않는다(6A 와 같음).

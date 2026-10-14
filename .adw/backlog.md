@@ -61,7 +61,7 @@
 - [x] Phase 6A — 진짜 호출 준비 · 사람이 돌릴 실행기 (plans/interview-marketing-agent.md#phase-6a)
 - [x] Phase 1C — 글자 설정값 허용 규칙 (plans/interview-marketing-agent.md#phase-1c)
 - [x] Phase 6B — 진짜 결과 반영 · 정확도 기록 · 기준값 조정 (plans/interview-marketing-agent.md#phase-6b)
-- [~] Phase 6C — 채점 고치기 · 다시 잴 준비 (plans/interview-marketing-agent.md#phase-6c)
+- [x] Phase 6C — 채점 고치기 · 다시 잴 준비 (plans/interview-marketing-agent.md#phase-6c)
 - [ ] Phase 6D — 다시 잰 결과 반영 (plans/interview-marketing-agent.md#phase-6d)
 - [ ] Phase 6E — 댓글 품질 고치기 (작성 프롬프트 · 6D 숫자가 나쁠 때만) (plans/interview-marketing-agent.md#phase-6e)
 - [ ] Phase 6F — 고친 뒤 다시 반영 (전후 숫자) (plans/interview-marketing-agent.md#phase-6f)
