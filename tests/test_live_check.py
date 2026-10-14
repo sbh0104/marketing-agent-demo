@@ -1030,7 +1030,8 @@ def writer_reply(concern: str = CONCERN, comment: str = COMMENT) -> str:
 
 def text_response(text: str, stop_reason: str | None = None) -> SimpleNamespace:
     """anthropic Message 모양 — 글 블록 하나."""
-    return SimpleNamespace(content=[SimpleNamespace(type="text", text=text)], stop_reason=stop_reason)
+    block = SimpleNamespace(type="text", text=text)
+    return SimpleNamespace(content=[block], stop_reason=stop_reason)
 
 
 def tool_response(name: str, data: object, stop_reason: str = "tool_use") -> SimpleNamespace:
