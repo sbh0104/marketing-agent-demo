@@ -4,7 +4,7 @@
 
 ### E-002 · tooling — 계획 밖 파일 · T4 경보 ⑷ 는 `main..브랜치` 전체 diff 를 **마지막** plan.md 의 `Files:` 줄과만 대조한다 — 앞 사이클이나 understand 부터 다시 돈 사이클이 남긴 커밋의 파일은 모두 "계획 밖"으로 센다
 - evidence: 이번 ⑷ 13개(`.env.example` · `.gitignore` · `config.yaml` · `src/agent/store.py` · `src/agent/scheduler.py` · `tests/test_gitignore.py` …)는 모두 `1baaf13` 앞 커밋(첫 implement `63fab05`…`bce162f`, 07:08 복구 plan 의 `9a4b6c5` · `2262eca` · `56eec24`)의 파일이고, 11:09 에 다시 쓴 plan.md:402-473 의 `Files:` 줄은 HC1 고침 10개만 이름 붙인다 — verify-run V18 이 `git diff --name-only 1baaf13 7e39c3a` = 정확히 그 10개로 초록 (cycle 20261013-062542-adw/phase-1-foundation-contracts)
-- first confirmed: 2026-10-13 · last confirmed: 2026-10-13
+- first confirmed: 2026-10-13 · last confirmed: 2026-10-15
 
 ### E-003 · gotcha — `verify-run` 부터 다시(control retry)는 옛 verify-plan 을 그대로 쓴다 — 그 사이 인터뷰가 트래커만 커밋해도 범위 끝을 `HEAD` 로 둔 검사는 빨개진다
 - evidence: 14:28 retry 본 패스에서 V18(`git diff --name-only 1baaf13 HEAD` = 10개)이 HC1-2 트래커 커밋 `a35981b` 때문에 11줄로 빨강; 범위를 verify-plan 이 잰 `7e39c3a` 로 고정하고 "그 뒤는 트래커 하나만"을 단언하자 초록, 음성 대조 3개는 그대로 빨강 (verify-report.md Fixes applied 1). `.adw/verify.sh` 는 git 이 무시해(`.adw/.gitignore:23`) 이 고침엔 커밋 SHA 가 없다 (cycle 20261013-062542-adw/phase-1-foundation-contracts)
@@ -22,13 +22,9 @@
 - evidence: `src/agent/trigger.py:48,51,53` 이 `:57`(`too_old`)보다 앞; `docs/contracts.md:485-492`; ship-report Q2 재현 — 72h 500→600 `('no', 'views_below_min')` · 72h 기록 한 번 `('hold', 'too_few_samples')` · 1450→0 삭제 `('no', 'views_below_min')`. 표(차례)는 결정대로, 틀린 것은 문장 — 고칠 방향은 Human checks 1 (cycle 20261013-161358-adw/phase-4-trigger-timing)
 - first confirmed: 2026-10-13 · last confirmed: 2026-10-14
 
-### E-008 · codebase — `VideoRecord` 는 일반(`frozen` 아님) dataclass 이고 `__post_init__` 에서만 검증한다 — 생성 뒤 필드 대입은 검증을 건너뛰고, `view_history` 검증(`_items`)은 원소 타입만 볼 뿐 시각 순서 · 중복 · 시간대 종류를 보지 않는다
-- evidence: `src/agent/models.py:231-256` (`@dataclass` 인자 없음, `_items` 는 `isinstance` 만); `src/agent/trigger.py:23` 이 `(at, count)` 로 직접 정렬해 순서를 스스로 정함; verify-plan Fuzzing N/A 가 이 검증에 기대 DST 구멍(Q1 → `S-011`)을 숨김 (ship-report Coverage settlement) (cycle 20261013-161358-adw/phase-4-trigger-timing)
-- first confirmed: 2026-10-13 · last confirmed: 2026-10-13
-
 ### E-009 · reviewer — ship-check 가 두 페이즈 연속 계약 문서의 설명 문장이 코드보다 넓게 약속한 것(보장 · "바뀌지 않음" · "~에만" 꼴)을 찾아 사람 확인으로 올렸다 — 코드와 표는 맞고 그 아래 문장이 틀린 꼴이며, 고치는 길이 공개 계약을 건드려 스모크 통에 못 들어간다
 - evidence: Phase 1 — 계약 2절 "비교와 셈에만"(R4) · 7절 문단(R5) (journal 20261013-062542-adw-phase-1-foundation-contracts summary flagged ②③); Phase 4 — '트리거 판정' 절 세 문장 R1/Q2 → Human checks 1 (E-007) (cycle 20261013-161358-adw/phase-4-trigger-timing)
-- first confirmed: 2026-10-13 · last confirmed: 2026-10-14
+- first confirmed: 2026-10-13 · last confirmed: 2026-10-15
 
 ### E-010 · reviewer — 페이즈가 하류 페이즈에 넘긴 일과 주인 없이 받아들인 위험이 `plan.md` · 계약에만 남고 트래커의 하류 페이즈 절에는 오르지 않는다 — ship-check 가 두 페이즈 연속 "트래커 Phase 2 · 7 절에 주인 줄 적기"를 사람 확인으로 올렸고, Phase 1 에서는 주인 없이 받아들인 위험이 다음 ship-check 에 돌아왔다
 - evidence: Phase 1 summary flagged ②④ · Coverage ①(R3 · R6 가 두 번째 ship-check 에 돌아와 understand 부터 다시); Phase 4 ship-report R4 · R5 → Human checks 2 — 트래커 Phase 2 · 7 절 `간격|spacing` 검색 → 없음, 넘긴 일은 `.adw/plan.md:573-588` 과 계약 '트리거 판정' 절에만 (cycle 20261013-161358-adw/phase-4-trigger-timing)
@@ -72,11 +68,11 @@
 
 ### E-023 · reviewer — 헌법 9조의 약속 짝은 짝 테스트가 초록이면 지나간다 — "밖에서 온 글 … 에만"처럼 여러 출처를 묶는 약속은 짝 테스트의 가짜가 표시 글을 심은 출처까지만 재고, 심지 않은 출처(가짜 jev 의 `model`)로 넓은 문장이 남아 ship-check 가 E-009 꼴로 다시 사람 확인에 올린다
 - evidence: `.adw/plan.md:1042` `Promise: "밖에서 온 글과 모델이 쓴 글은 \`untrusted\` 칸 안에만" → tests/test_live_check.py::ResultShapeTest::test_untrusted_text_only_under_untrusted`(`tests/test_live_check.py:2118`, 초록) · 코드는 jev 답의 `model` 을 검사 없이 100자까지 `fingerprint.jev_models` 에 둔다(`tests/live_check.py:503-509`) · `docs/contracts.md:1078-1080` · ship-report R3 "짝지은 약속 테스트 … 가짜 jev 의 모델 이름에 표시 글을 넣지 않아 이것을 보지 못합니다" (cycle 20261014-035728-adw/phase-6a-live-check-prepare)
-- first confirmed: 2026-10-14 · last confirmed: 2026-10-14
+- first confirmed: 2026-10-14 · last confirmed: 2026-10-15
 
 ### E-024 · codebase — 저장소의 손편집 파일 읽기는 모두 `utf-8-sig`(BOM 허용)이고 이 관례는 코드에만 있다 — 새 읽기 `tests/live_check.py:445`(`--verdict`)는 `utf-8` 이라, 사람이 사람 칸을 고친 `result.json` 에 편집기가 BOM 을 붙이면 종료 2 "읽을 수 없음"이 난다
 - evidence: `grep -rn utf-8-sig src/` → `src/agent/config.py:322` · `src/agent/store.py:59` · `src/agent/env.py:25` · `src/agent/youtube.py:155`; `tests/live_check.py:445` `json.loads(Path(path).read_text(encoding="utf-8"))`; ship-report Quality review 3 · R4 (cycle 20261014-035728-adw/phase-6a-live-check-prepare)
-- first confirmed: 2026-10-14 · last confirmed: 2026-10-14
+- first confirmed: 2026-10-14 · last confirmed: 2026-10-15
 
 ### E-025 · codebase — `YouTubeError` 는 글자열 두 개(`call` · `reason`)만 든다(상태 코드 · 오류 이유 속성 없음) — 403 종류 구분은 글자열 같음 비교(`exc.reason == COMMENTS_DISABLED`)에 기대고, 200 모양 오류도 같은 예외라 받는 쪽이 오류 종류를 가르지 못한다
 - evidence: `src/agent/youtube.py:69-75`(`__init__(self, call, reason)`) · `:41` `COMMENTS_DISABLED = "HTTP 403 commentsDisabled"` · `:277` `if exc.reason == COMMENTS_DISABLED:`; 모양 오류가 `except YouTubeError: continue` 로 삼켜지는 자리는 ship-report R1(`tests/live_check.py:1026-1029`) (cycle 20261014-035728-adw/phase-6a-live-check-prepare · understand 후보 2)
@@ -100,7 +96,7 @@
 
 ### E-030 · tooling — 민감 확인 줄로 머지 앞에서 멈춘 사이클은 인터뷰가 트래커만 고치고 코드를 한 바이트도 바꾸지 않아도 허브가 verify-run 부터 다시 돌린다 — 같은 코드 트리에서 verify-run 과 ship-check 전체(감사 포함)가 한 번 더 돈다
 - evidence: 이번 사이클 `.adw/gate/history/20261014-140655-cycle-control.json` `{"action": "retry", "issued_by": "hub:move", "step": "verify-run"}`; ship-report § Verdict "코드는 첫 판정 때와 한 바이트도 다르지 않고(그 뒤 바뀐 것은 트래커 10줄)" — 인터뷰 커밋 `4e859be` 는 `plans/` 만(+10줄); retro-bundle Steps verify-run 시도 2 · ship-check 시도 2 $15.4151 · 감사 부름 8(시도 2권 합) (cycle 20261014-112313-adw/phase-1c-text-config-allow). 앞 목격: Phase 1A — 인터뷰가 문서만 두 커밋(`3a4a6e7` · `681acc5`), `git diff 2e58209 HEAD -- src tests` 0바이트인데 verify-run · ship-check 시도 2 (journal 20261014-035715-adw-phase-1a-parser-allow-rules summary.md:17)
-- first confirmed: 2026-10-14 · last confirmed: 2026-10-14
+- first confirmed: 2026-10-14 · last confirmed: 2026-10-15
 
 ### E-031 · codebase — 설정 읽기 `_construct_mapping` 은 중복 키 검사보다 먼저 `loader.flatten_mapping(node)` 를 부른다 — YAML 병합 키(`<<`)로 앵커를 겹겹이 이은 작은 파일이 항목을 기하급수로 복사해, "키가 두 번 나옵니다" 오류나 "이전 설정 유지"에 닿기 전에 메모리를 다 쓸 수 있다
 - evidence: `src/agent/config.py:84-85` (`def _construct_mapping` 첫 줄이 `loader.flatten_mapping(node)`, 중복 검사 `seen` 은 그 뒤 `:86-92`); ship-report R7 — 2,144바이트 파일 n=25 에서 2.97초 · 최대 RSS 1,081,456 KB 뒤 `키가 두 번 나옵니다`, n=30 은 약 32 GB 추정, base 와 HEAD 같음(n=22 0.36초 대 0.35초). 막으려면 설정 파일 형식(병합 키 · 별칭 금지) 결정이 필요해 주인 없음 (cycle 20261014-112313-adw/phase-1c-text-config-allow)
@@ -112,17 +108,22 @@
 
 ### E-034 · reviewer — 트래커만 고친 확인 인터뷰 뒤의 두 번째 ship-check 는 코드가 같은 트리에서도 새 결함을 찾는다 — 6B 에서는 인터뷰가 막 쓴 트래커 줄 자체(Phase 6C 결정 문장, R12)가 6B 테스트보다 넓었다. E-030 상류 고침이 받아들인 "새 트래커 줄은 기계가 다시 대조하지 않음"이 이런 결함을 잃는다
 - evidence: 이번 ship-report R12 — `plans/interview-marketing-agent.md:477` "이 페이즈가 채점을 고쳐도 main 은 초록 그대로다"를 감사 3 이 재현했다: 6C 후보 ① → `test_verdict_recount_is_go_with_one_line` · `test_summary_first_line_is_the_recount` FAIL, 새 지문 칸 → `test_every_fingerprint_key_is_sorted` FAIL. 같은 두 번째 실행이 R5 의 중복 줄 꼴(S-075)도 새로 찾았다. 인터뷰 커밋 `7bdb488` 은 `plans/` 만; retro-bundle Steps ship-check 시도 2 $26.0421 (cycle 20261014-112322-adw/phase-6b-live-check-apply). 앞 목격: 1C — 홈 `.adw/backlog.md` E-030 이관 줄 "1C 에서 R7 · R8 을 건진 우연한 두 번째 감사도 사라짐" (journal 20261014-112313-adw-phase-1c-text-config-allow)
-- first confirmed: 2026-10-14 · last confirmed: 2026-10-14
+- first confirmed: 2026-10-14 · last confirmed: 2026-10-15
 
 ### E-033 · tooling — 이 기계에는 여전히 `typesafe_sdk` 도 `anthropic` 도 없어 진짜 jev · Claude 호출은 사람 환경에서만 돈다 — 진짜 호출의 기록은 사람이 커밋한 `docs/live-check/result.json` 하나뿐이고(6A 실행기 `tests/live_check.py`), 스위트는 가짜 SDK(`tests/test_classifier.py`) · 가짜 Claude(`tests/test_writer.py`)로만 돈다. 다시 재려면 사람 재실행이 필요하다(트래커 6C → 6D 길)
 - evidence: `python3 -I -c "import typesafe_sdk"` · `python3 -I -c "import anthropic"` → 둘 다 `ModuleNotFoundError` (이 retro 실측, 2026-10-14); `docs/live-check/result.json` `run_at 2026-10-14T04:28:16.180435+00:00` · `calls {'claude': 23, 'jev': 72, 'youtube': 17}` · `models` 두 이름 `accepted`; `tests/live_check.py:72` `from tests.jev_accuracy import PASS_CORRECT, REPO_CONFIG, judge_examples, tally`. E-012 · E-016 을 잇는다 (cycle 20261014-112322-adw/phase-6b-live-check-apply)
-- first confirmed: 2026-10-14 · last confirmed: 2026-10-14
+- first confirmed: 2026-10-14 · last confirmed: 2026-10-15
 
 ### E-035 · codebase — 실행기 테스트의 가짜 Claude(`tests/test_live_check.py` `FakeClaude.create`)는 `system` 글이 `GRADE_SYSTEM` · `TOPIC_SYSTEM` 과 같은지로 호출 종류를 가리고, 둘 다 아니면 오류 없이 `write`(작성)로 센다 — 실행기에 새 system 글로 Claude 를 부르는 호출을 더하는 페이즈가 가짜에 갈래를 더하지 않으면 그 호출은 작성 큐의 답을 받는다. 최악 호출 수를 글자로 잠근 `test_default_limits_fit_under_ceilings` 도 함께 고쳐야 한다
 - evidence: `tests/test_live_check.py:1417-1426` (`system is None` → probe · `== live_check.GRADE_SYSTEM` → grade · `== live_check.TOPIC_SYSTEM` → topic · `else` → write) · `:2044-2051` (`self.assertEqual(worst, {"jev": 114, "claude": 103, "youtube": 35})`). 6C 는 영상 판별 채점(`TOPIC_SYSTEM`)을 더하면서 `topic` 갈래와 큐를 넣었고, 그 결과 최악 Claude 수가 63 → 103 이 됐다. understand 시점의 근거는 notes.md Expertise check 후보 2 · 3(`:1091-1126` · `:1669-1695`, claude 63/70)이다 (cycle 20261014-172227-adw/phase-6c-live-check-grader-fix)
-- first confirmed: 2026-10-14 · last confirmed: 2026-10-14
+- first confirmed: 2026-10-14 · last confirmed: 2026-10-15
+
+### E-036 · gotcha — 레인 착지는 squash 없는 `merge --no-ff` 라(`.claude/skills/plan/scripts/finalize_step.py:1054`), 레인 끝 판에서만 지운 내용은 앞 레인 커밋마다 남아 main 기록에 붙는다(제출 때 공개) — 실행기는 영상마다 `untrusted.description` 을 `_clean` · 길이 자르기만 하고 결과 파일에 쓰므로(`tests/live_check.py:1380`), 사람이 커밋한 `docs/live-check/result.json` 에 채널 주인 연락처가 그대로 들어갈 수 있다
+- evidence: 6D 결과의 영상 셋(`jO2wSna2Xi8` · `ZC74ENMS1nE` · `N0RyQJG9vdI`) 설명 글에 이메일 3 · 후원 계좌 · 예금주 실명. 허브 🤖 가 끝 판만 지움(`f5cef6a`, gate `20261015-055623-cycle-control.json` "지우고 출하") → ship-check 06:13 BLOCKED(앞 커밋 9개에 그대로) → 드리프트 인터뷰 2 가 레인 기록을 다시 씀(`d9cd05b→6626629` …, 트래커 6D 2026-10-15 질문 1 A) → 세 번째 ship-check 이 레인 커밋 11개 모두 이메일 · 계좌 모양 0. main 의 6B 결과(판 1, 설명 글 17개)는 같은 모양 검사로 0. 실행기 쪽 가림의 주인은 Phase 6G (cycle 20261014-225050-adw/phase-6d-live-check-reapply)
+- first confirmed: 2026-10-15 · last confirmed: 2026-10-15
 
 ## Retired (history — one line each, never deleted)
+- E-008 · codebase — `VideoRecord` 는 일반(`frozen` 아님) dataclass 이고 `__post_init__` 에서만 검증한다 — 생성 뒤 필드 대입은 검증을 건너뛰고, `view_history` 검증(`_items`)은 원소 타입만 볼 뿐 시각 순서 · 중복 · 시간대 종류를 보지 않는다 — retired 2026-10-15 (over cap; unconfirmed since 2026-10-13)
 - E-012 · tooling — 이 기계에는 `typesafe_sdk` 도 `pip-audit` 도 없고 `TYPESAFE_API_KEY` 도 없다 — 판별 테스트는 `tests/test_classifier.py` 의 가짜 SDK 로만 돌고, 정확도 러너 `python3 -m tests.jev_accuracy` 와 의존성 감사는 아직 한 번도 돌지 않았다 — retired 2026-10-14 (contradicted by `docs/live-check/result.json` — 사람이 6A 실행기로 진짜 jev 를 불렀다(`run_at 2026-10-14T04:28:16Z` · `calls` jev 72 · Claude 23 · YouTube 17; 예시 판정은 `tests/live_check.py:72` 가 들여오는 `tests.jev_accuracy.judge_examples`) — 정확도 러너는 돌았다. 이 기계의 SDK 없음은 E-033 로, `pip-audit` 없음은 E-018 로 남는다 (cycle 20261014-112322-adw/phase-6b-live-check-apply))
 - E-016 · tooling — 이 기계에는 `anthropic` 도 없다 — 댓글 작성기 테스트는 `tests/test_writer.py` 의 가짜 Claude 로만 돌고, `anthropic_client()` · 모델 id `claude-sonnet-5-5` · 통과 하한 0.7 은 실제 API 로 한 번도 돌지 않았다 (jev 쪽은 E-012) — retired 2026-10-14 (contradicted by `docs/live-check/result.json` `models` — `claude-sonnet-5-5` · `claude-haiku-5-5` 둘 다 `accepted`, 작성 sonnet · 채점 haiku 로 진짜 Claude API 를 불렀다. 이 기계의 `anthropic` 없음은 E-033 로 남는다 (cycle 20261014-112322-adw/phase-6b-live-check-apply))
 - E-005 · hazard — Phase 1 의 세 파서(가드 주소 읽기 · 로그 줄 이스케이프 · 설정 숫자 읽기)는 열거한 꼴 목록으로 막는다 — ship-check 네 번이 매번 목록 밖 꼴을 하나 이상 더 찾았다 — retired 2026-10-14 (contradicted by `src/agent/guard.py:23` `_SHARE_QUERY_NAMES = frozenset({"si", "t", "feature"})` · `src/agent/config.py:174` `_int(value, path, minimum, maximum)` 상한 필수 · `src/agent/logbook.py:59,70` 날 글자 범주 허용 목록(L·M·N·P·S + U+0020) — Phase 1A 가 세 파서를 받는 쪽 목록으로 바꿈 (cycle 20261014-035715-adw/phase-1a-parser-allow-rules))

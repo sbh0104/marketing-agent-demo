@@ -531,7 +531,7 @@ Open questions
 ---
 
 ## Phase 6D — 다시 잰 결과 반영
-- Status: Not started
+- Status: Done
 - Slug: live-check-reapply
 - After: Phase 6C
 - Goal: 사람이 6C 의 실행기로 다시 돌려 이 페이즈의 레인 브랜치에 커밋한 결과로, 계약의 정확도 · 작성 기록과 기준값을 6B 와 같은 규칙으로 다시 쓰고, 결과와 기록을 함께 착지시킨다.
