@@ -299,6 +299,15 @@ class MeasuredDriftTest(unittest.TestCase):
         self.assertEqual(partition, set(self.recorded))
         self.assertFalse(set(GUARDED) & set(WRITE_SIDE))
 
+    def test_contract_lists_match_guarded_and_write_side(self) -> None:
+        contract = normalize(CONTRACT_PATH.read_text(encoding="utf-8-sig"))
+        for name, keys in (("GUARDED", GUARDED), ("WRITE_SIDE", WRITE_SIDE)):
+            with self.subTest(keys=name):
+                listed = " · ".join(f"`{key}`" for key in keys)
+                self.assertTrue(
+                    listed in contract, f"계약 '결과 반영' 의 칸 목록이 {name} 와 다릅니다: {listed}"
+                )
+
 
 class AccuracyRecordTest(ContractCase):
     """'주제 판별' 절의 정확도 기록 — 결과 파일에서 다시 센 숫자가 계약에 있고 기준값은 그대로."""
