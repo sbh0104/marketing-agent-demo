@@ -716,6 +716,12 @@ MUTANTS: dict[str, tuple[str, str, str, str]] = {
         "self.drafts < self.limits.target_drafts or self.popular < self.limits.popular_drafts_min",
         "self.drafts < self.limits.target_drafts",
     ),
+    "live-check-best-setting-tie-raised": (
+        "tests.live_check",
+        "tests.test_live_check",
+        "if false_yes == 0 and (best is None or correct > best[1]):",
+        "if false_yes == 0 and (best is None or correct >= best[1]):",
+    ),
     "live-check-applied-yes-floor-lowered": (
         "agent.config",
         "tests.test_live_check_applied",
@@ -731,9 +737,26 @@ MUTANTS: dict[str, tuple[str, str, str, str]] = {
     "live-check-applied-reads-jev-models": (
         "tests.test_live_check_applied",
         "tests.test_live_check_applied",
-        'GUARDED = ("questions", "examples_sha256", "classifier", "margin", "pass_correct")',
-        'GUARDED = ("questions", "examples_sha256", "classifier", "margin", "pass_correct",'
-        ' "jev_models")',
+        '"classifier.off_topic_reasons", "margin", "pass_correct")',
+        '"classifier.off_topic_reasons", "margin", "pass_correct", "jev_models")',
+    ),
+    "live-check-applied-recount-ignored": (
+        "tests.test_live_check_applied",
+        "tests.test_live_check_applied",
+        "return drift + [key for key in RECOUNTED if cell(current, key) != recounted.get(key)]",
+        "return drift",
+    ),
+    "live-check-applied-exception-any-run": (
+        "tests.test_live_check_applied",
+        "tests.test_live_check_applied",
+        "(run_at == BEFORE_FIX_RUN_AT and line == BEFORE_FIX_LINE)",
+        "(line == BEFORE_FIX_LINE)",
+    ),
+    "live-check-applied-stored-verdicts-unchecked": (
+        "tests.test_live_check_applied",
+        "tests.test_live_check_applied",
+        "return mismatches",
+        "return []",
     ),
 }
 
