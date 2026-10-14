@@ -25,11 +25,10 @@
 8. 판정이 `stop` 이면 결과를 9 처럼 레인 브랜치에 커밋하되 그 페이즈를 진행하지 않고 인터뷰로 옵니다. `go` 면 커밋한 뒤 그 페이즈를 시작합니다.
 9. 결과 두 파일을 다시 반영 페이즈의 레인 브랜치에 커밋합니다. 허브가 그 페이즈의 레인을 아직 만들지 않았으면 먼저 만듭니다 — 레인을 만들면 그 페이즈의 사이클이 시작되어 결과 커밋 전에 `unmeasured` 로 한 번 멈출 수 있고, 두 파일을 커밋한 뒤 이어 갑니다. main 체크아웃의 뿌리에서:
 
-       cp docs/live-check/result.json docs/live-check/summary.md ~/adw-lanes/marketing-agent-demo/6d/marketing-agent-demo/docs/live-check/
-       git restore docs/live-check/result.json docs/live-check/summary.md
+       cp docs/live-check/result.json docs/live-check/summary.md ~/adw-lanes/marketing-agent-demo/6d/marketing-agent-demo/docs/live-check/ && git restore docs/live-check/result.json docs/live-check/summary.md
 
    그다음 레인 worktree 의 뿌리에서:
 
        git add docs/live-check/result.json docs/live-check/summary.md && git commit -m "docs(live-check): 실제 호출 결과 — Phase 6C 실행기"
 
-   `git restore` 는 main 체크아웃의 두 파일을 커밋된 옛 결과로 되돌립니다 — main 은 옛 결과 그대로여야 초록입니다. 레인 경로의 `6d` 는 허브가 만든 레인 이름입니다.
+   `git restore` 는 main 체크아웃의 두 파일을 커밋된 옛 결과로 되돌립니다 — main 은 옛 결과 그대로여야 초록입니다. 복사가 실패하면(레인 경로가 없거나 6F 등 다른 이름) `git restore` 를 돌리지 않습니다. 레인 경로의 `6d` 는 허브가 만든 레인 이름입니다.
