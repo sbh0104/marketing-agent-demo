@@ -96,6 +96,45 @@
      `## Risks` citing the line, never `## Human checks`; it blocks nothing. Same site
      or same input class with a different consequence is a new risk, and so is a
      finding whose consequence is unclear to be the same.
+12. **A list judge is tried with the near-miss shapes outside its list; every sample's
+    color comes from a tracker line, never from the writer's own judgment.** Until the
+    upstream harness carries this rule (ADWS backlog line
+    `marketing-agent-demo E-022 이관`), it lives here.
+    A **list judge** is code a phase adds or changes that accepts or rejects text a
+    person or the outside wrote (a web address, a config value, a document another lane
+    wrote) by matching it against an enumerated set of shapes — a regex, a list of
+    names, characters or paths, a Unicode category or name set. Allow-lists count, and
+    so do judges inside `tests/`. Comparisons between values this code produced, and
+    `except` tuples (article 11), do not. Code no phase edits is out of scope until one
+    does. A **near-miss sample** is an input one edit away from a listed shape — case,
+    spacing or leading whitespace, punctuation dropped or swapped, a look-alike or
+    full-width character, a sibling the list left out (another browser channel's
+    folder) — and, for an allow-list, a normal input it might wrongly refuse. Each
+    sample gets one color and one cite:
+    `red — <tracker line>` when a decision's reason names the mistake this shape makes
+    (it must be refused, or the test must fail) · `green — <tracker line>` when a
+    decision or a `Trade-offs accepted` line names this shape as passing ·
+    `undecided — <why>` when neither does.
+   - **plan** — for every list judge `.adw/plan.md` writes, `## Test plan` carries one
+     line per sample: `Near-miss: <file>::<judge> — "<sample>" → red — <cite>`,
+     `→ green — <cite>` or `→ undecided — <why>`, at least one sample for each edit
+     kind above that applies. Red and green samples are suite tests, never only
+     `.adw/verify.sh`. The step that writes the judge says: "a red sample that passes
+     is a code miss in this step".
+   - **implement** — write the red and green samples as suite tests before the judge;
+     a red sample that passes is fixed in code, except in a sensitive area, where the
+     step stops as it does today.
+   - **verify-plan** — sweep the diff for list judges the plan did not sample; each
+     gets its samples as `## Checks` lines in the same shape, and every red line ends
+     `— red sample passes: code miss — bounded fix with a failing suite test first;
+     sensitive area: stop (constitution 12)`, since verify-run does not read this
+     file. Property-based is never `N/A` for a diff that holds a list judge; it
+     cites these lines.
+   - **ship-check** — count: every list judge in the diff has samples (plan or
+     verify-plan); a judge with none is a `## Risks` line. Check that each cite
+     carries the color it is given; one that does not is a `## Risks` line. Every
+     `undecided` sample goes into `## Human checks`, one line per judge listing its
+     samples, asking the person for the colors — the answer is a tracker decision.
 
 ## Never
 
