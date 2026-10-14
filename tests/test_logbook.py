@@ -380,11 +380,30 @@ class ReadLogTest(unittest.TestCase):
         self.assertEqual(len(read_log(self.path)), 2)
         self.assert_error(f"{self.good}\n\ngarbage\n", "3번째 줄: ")
 
+    def test_whitespace_only_line_is_an_error_not_skipped(self) -> None:
+        # 빈 줄만 건너뜁니다 — 공백 · 탭 · 폼 피드만 있는 줄은 빈 줄이 아닙니다(계약 7절)
+        for blank in (chr(0x20), chr(0x09), chr(0x0C)):
+            with self.subTest(line=f"U+{ord(blank):04X}"):
+                self.assert_error(f"{self.good}\n{blank}\n", "2번째 줄: ")
+
+    def test_line_break_titles_read_back_as_one_detect_each(self) -> None:
+        # 여러 줄짜리 댓글도, 영상 제목에 숨긴 U+2028 도 read_log 의 읽기로 한 사건 한 줄
+        titles = ("a\nb", "a" + chr(0x2028) + "b")
+        book = Logbook(self.path, clock=lambda: AT)
+        for title in titles:
+            book.write(Event.DETECT, **{**DETECT, "title": title})
+        expected = [(AT, Event.DETECT, {**DETECT, "title": title}) for title in titles]
+        self.assertEqual(read_log(self.path), expected)
+
     def test_last_line_without_newline_is_an_error(self) -> None:
         message = self.assert_error(f"{self.good}\n{self.good}", "2번째 줄: ")
         self.assertIn("줄바꿈", message)
         cut = format_line(AT, Event.POST, POSTED)[:-3]
         self.assert_error(f"{self.good}\n{cut}", "2번째 줄: ")
+        # 공백 · 탭 · 폼 피드만 남은 꼬리도 끊긴 줄입니다
+        for tail in (chr(0x20), chr(0x09), chr(0x0C)):
+            with self.subTest(tail=f"U+{ord(tail):04X}"):
+                self.assert_error(f"{self.good}\n{tail}", "2번째 줄: ")
 
     def test_empty_file_reads_as_no_events(self) -> None:
         for text in ("", "\n"):
