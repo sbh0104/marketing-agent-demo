@@ -818,8 +818,8 @@ other line is required on every item.
 - touches: docs/live-check/README.md
 - base: adw/phase-6c-live-check-grader-fix
 - phase: plans/interview-marketing-agent.md#phase-6c
-- status: open
-- attempts: 0 · last failure: —
+- status: escalated
+- attempts: 0 · last failure: entry criterion fails on inspection (스윕 20261014-224055-adw/smoke-sweep-s079-s082)
 
 ### S-080 — README 5단계의 "함께 나오면 채점 호출 자체가 실패" 를 오류 줄에 claude/grade 가 있을 때로 좁히기
 - source: cycle 20261014-172227-adw/phase-6c-live-check-grader-fix · tracker plans/interview-marketing-agent.md#phase-6c · filed by smoke-file (one-pass)
@@ -828,8 +828,8 @@ other line is required on every item.
 - touches: docs/live-check/README.md
 - base: adw/phase-6c-live-check-grader-fix
 - phase: plans/interview-marketing-agent.md#phase-6c
-- status: open
-- attempts: 0 · last failure: —
+- status: escalated
+- attempts: 0 · last failure: entry criterion fails on inspection (스윕 20261014-224055-adw/smoke-sweep-s079-s082)
 
 ### S-081 — 넓힌 창 조건의 popular == 최소 경계 · 채점 막힘 홀수 초안 경계 · GRADE_SYSTEM 질문 4·5 글을 테스트로 고정
 - source: cycle 20261014-172227-adw/phase-6c-live-check-grader-fix · tracker plans/interview-marketing-agent.md#phase-6c · filed by smoke-file (one-pass)
@@ -838,8 +838,8 @@ other line is required on every item.
 - touches: tests/test_live_check.py
 - base: adw/phase-6c-live-check-grader-fix
 - phase: plans/interview-marketing-agent.md#phase-6c
-- status: open
-- attempts: 0 · last failure: —
+- status: escalated
+- attempts: 0 · last failure: entry criterion fails on inspection (스윕 20261014-224055-adw/smoke-sweep-s079-s082)
 
 ### S-082 — 채점 막힘 분모(파싱된 초안만) · 올바른 깊은 중첩 JSON · dict 아닌 도구 입력 · 이름이 다른 도구 블록 + 글 JSON 을 테스트로 고정
 - source: cycle 20261014-172227-adw/phase-6c-live-check-grader-fix · tracker plans/interview-marketing-agent.md#phase-6c · filed by smoke-file (one-pass)
@@ -848,5 +848,5 @@ other line is required on every item.
 - touches: tests/test_live_check.py
 - base: adw/phase-6c-live-check-grader-fix
 - phase: plans/interview-marketing-agent.md#phase-6c
-- status: open
-- attempts: 0 · last failure: —
+- status: escalated
+- attempts: 0 · last failure: entry criterion fails on inspection (스윕 20261014-224055-adw/smoke-sweep-s079-s082)
