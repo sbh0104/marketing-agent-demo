@@ -370,7 +370,7 @@ class DraftBoundaryTest(unittest.TestCase):
             self._video(
                 self.lo,
                 "comment",
-                [self._draft("ok", "bad", True), self._draft("bad", "ok", True)],
+                [self._draft("ok", "bad", False), self._draft("bad", "ok", True)],
             ),
             self._video(
                 self.hi,
@@ -395,7 +395,7 @@ class DraftBoundaryTest(unittest.TestCase):
                 "grade_errors": 1,
                 "differ": 2,
                 "bad_passed": 2,
-                "ok_failed": 0,
+                "ok_failed": 1,
             },
         )
 
