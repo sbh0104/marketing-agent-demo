@@ -33,6 +33,10 @@ BOM = b"\xef\xbb\xbf"
 GUARDED = ("questions", "examples_sha256", "classifier", "margin", "pass_correct")
 WRITE_SIDE = ("check_questions", "self_check_criteria", "check_min_probability", "trigger",
               "grade_system", "target_drafts", "wide_window_hours", "claude_max_retries")
+GO_LINE = "6B: go"
+# 트래커 Phase 6D 드리프트 인터뷰 질문 1 A — 작성 막힘인 채로 '고치기 전' 기록으로 반영한 단 한 실행
+BEFORE_FIX_RUN_AT = "2026-10-14T14:09:02.882902+00:00"
+BEFORE_FIX_LINE = "6B: stop — 작성 막힘(SKIP 5/7)"
 WINDOW_LABELS = {"operation": "운영 창", "widened": "넓힌 창"}
 ANSWERS = ("ok", "bad")
 _NOW = datetime(2026, 1, 1, tzinfo=timezone.utc)
@@ -56,6 +60,14 @@ def current_fingerprint() -> dict:
             ensure_ascii=False,
         )
     )
+
+
+def admitted(run_at: object, line: str) -> bool:
+    """반영하는 판정 줄인지 — `6B: go` 이거나, 고치기 전 기록으로 반영한 한 실행의 그 판정 줄.
+
+    실행 시각과 판정 줄은 글자 그대로 같아야 합니다 — 다른 실행이거나 다른 경우가 섞이면 멈춥니다.
+    """
+    return line == GO_LINE or (run_at == BEFORE_FIX_RUN_AT and line == BEFORE_FIX_LINE)
 
 
 def measured_drift(recorded: Mapping[str, object], current: Mapping[str, object]) -> list[str]:
@@ -305,15 +317,29 @@ class CommittedResultTest(unittest.TestCase):
                     path.read_bytes().startswith(BOM), f"BOM 이 있습니다 — unmeasured: {path.name}"
                 )
 
-    def test_verdict_recount_is_go_with_one_line(self) -> None:
+    def test_result_is_schema_two(self) -> None:
+        self.assertGreaterEqual(
+            load_result()["schema_version"],
+            live_check.GRADE_BLOCK_SCHEMA,
+            "판 1 결과입니다 — unmeasured(6C 뒤의 실행기로 다시 돌려 레인 브랜치에 커밋)",
+        )
+
+    def test_verdict_recount_is_admitted(self) -> None:
+        result = load_result()
+        line = live_check.verdict_line(result)
+        self.assertTrue(admitted(result["run_at"], line), f"반영하지 않는 판정 줄입니다: {line}")
         out, err = io.StringIO(), io.StringIO()
         code = live_check.verdict_from_file(RESULT_PATH, out, err)
-        self.assertEqual((code, out.getvalue(), err.getvalue()), (0, "6B: go\n", ""))
+        self.assertEqual(
+            (code, out.getvalue(), err.getvalue()),
+            (0 if line == GO_LINE else 1, line + "\n", ""),
+        )
 
     def test_summary_first_line_is_the_recount(self) -> None:
+        result = load_result()
         first = SUMMARY_PATH.read_text(encoding="utf-8-sig").splitlines()[0]
-        self.assertEqual(first, live_check.verdict_line(load_result()))
-        self.assertEqual(first, "6B: go")
+        self.assertEqual(first, live_check.verdict_line(result))
+        self.assertTrue(admitted(result["run_at"], first), f"반영하지 않는 판정 줄입니다: {first}")
 
     def test_example_rows_match_example_count(self) -> None:
         result = load_result()
@@ -327,6 +353,47 @@ class CommittedResultTest(unittest.TestCase):
             measured_drift(load_result()["fingerprint"], current_fingerprint()),
             [],
             "결과의 지문이 지금 코드와 다릅니다 — unmeasured('실제 호출 실행기' 절의 '결과 반영')",
+        )
+
+
+class AdmittedTest(ContractCase):
+    """`admitted` — `6B: go` 와, 고치기 전 기록으로 반영한 한 실행의 한 판정 줄만(트래커 Phase 6D
+    드리프트 인터뷰 질문 1 A)."""
+
+    RUN = "2026-10-14T14:09:02.882902+00:00"
+    LINE = "6B: stop — 작성 막힘(SKIP 5/7)"
+    GREEN = (
+        ("2026-10-20T00:00:00+00:00", "6B: go"),
+        (RUN, LINE),
+    )
+    RED = (
+        ("2026-10-14T04:28:16.180435+00:00", LINE),
+        ("2026-10-14T14:09:02+00:00", LINE),
+        ("2026-10-14T14:09:02.882902Z", LINE),
+        (" 2026-10-14T14:09:02.882902+00:00", LINE),
+        (RUN, "6B: stop — 작성 막힘(SKIP 5/7); 채점 막힘(오류 6/11)"),
+        (RUN, "6B: stop — 작성 막힘(SKIP 6/7)"),
+        (RUN, "6B: stop - 작성 막힘(SKIP 5/7)"),
+        (RUN, "6B: stop – 작성 막힘(SKIP 5/7)"),
+        (RUN, "6B: stop — 작성 막힘(SKIP ５/7)"),
+        (RUN, "6B: stop —  작성 막힘(SKIP 5/7)"),
+        (RUN, "6b: stop — 작성 막힘(SKIP 5/7)"),
+        (RUN, "6B: stop — 작성 막힘(SKIP 5/7) "),
+    )
+
+    def test_green_samples_are_admitted(self) -> None:
+        for run_at, line in self.GREEN:
+            with self.subTest(run_at=run_at, line=line):
+                self.assertTrue(admitted(run_at, line))
+
+    def test_near_miss_samples_are_refused(self) -> None:
+        for run_at, line in self.RED:
+            with self.subTest(run_at=run_at, line=line):
+                self.assertFalse(admitted(run_at, line))
+
+    def test_exception_is_written_in_contract(self) -> None:
+        self.assert_in_contract(
+            f"예외는 하나뿐입니다 — 실행 `{BEFORE_FIX_RUN_AT}` 의 `{BEFORE_FIX_LINE}`"
         )
 
 
