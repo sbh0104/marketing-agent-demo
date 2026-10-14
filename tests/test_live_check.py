@@ -13,6 +13,7 @@ import copy
 import hashlib
 import importlib
 import io
+import itertools
 import json
 import os
 import pkgutil
@@ -32,7 +33,13 @@ import agent
 from agent.classifier import LANGUAGES, MATCH_ID, REASON_ID, JevError, build_questions
 from agent.config import load_config
 from agent.models import Verdict, VideoRecord
-from agent.writer import CHECK_QUESTIONS, TOP_COMMENTS_MAX
+from agent.writer import (
+    CHECK_QUESTIONS,
+    REPEAT_MIN_CHARS,
+    TOP_COMMENTS_MAX,
+    code_failures,
+    repeated_run,
+)
 from agent.youtube import MAX_IDS_PER_CALL, PAGE_SIZE, QuotaLedger, YouTubeClient
 from tests import live_check
 from tests.classifier_examples import EXAMPLES
@@ -1076,6 +1083,21 @@ COMMENT = (
     "영상에서 답장이 세 시간이나 늦었다는 장면이 너무 공감됐어요 초안표식. 저도 연애사주 봤을 때"
     " 서로 표현 속도가 다르다는 말을 듣고 조급함을 내려놨어요."
 )
+# 가짜 Claude 의 기본 작성 답 — 차례로 돌려 써서, 앞서 통과한 초안(previous)과 겹치지 않습니다
+DRAFT_POOL = (
+    "카페에서 고백을 미루던 장면 보고 웃었어요 초안표식. 연애사주에서 타이밍을 기다리라는 풀이를"
+    " 듣고 마음이 편해졌던 기억이 나요.",
+    "전화 끊고 한참 화면만 보던 순간이 짠했어요 초안표식. 예전에 연애사주를 봤는데 서두르면"
+    " 어긋난다고 해서 천천히 다가갔어요.",
+    "친구에게 썸 얘기를 털어놓는 장면에 공감했어요 초안표식. 연애사주 상담에서 인연이 늦게"
+    " 트인다는 말을 듣고 조바심을 덜었거든요.",
+    "이별 뒤 혼자 산책하는 장면이 오래 남네요 초안표식. 저는 그때 연애사주를 보며 다시 만날"
+    " 인연이 있다는 말에 힘을 얻었어요.",
+    "첫 데이트에서 메뉴 고르다 망설이던 모습이 귀여웠다 초안표식. 연애사주 볼 때 서로 배려가"
+    " 깊은 궁합이라고 해서 안심했던 적 있어요.",
+    "소개팅 끝나고 집에 가는 길 장면 보며 설렜어요 초안표식. 지난봄 연애사주로 상대 마음을"
+    " 짐작해 보고 먼저 연락할 용기를 냈어요.",
+)
 SHORT = "짧은 초안표식"
 COMMENTS = ["영상 속 답장 기다리던 장면 공감해요 댓글표식", "저도 썸 탈 때 그랬어요 댓글표식"]
 GRADE_OK = {"scene_in_material": True, "reads_like_ad": False, "follows_concern": True}
@@ -1259,8 +1281,9 @@ class FakeClaude:
     """anthropic.Anthropic 모양의 가짜 — system 으로 이름 확인(없음) · 채점(GRADE_SYSTEM) · 작성을 가립니다.
 
     이름 확인은 probe_status 에 적은 이름만 그 상태로 거절하고, 작성 · 채점은 준비한 답을
-    차례로(다 쓰면 기본 답) 돌려줍니다. 답 자리의 dict 는 그 종류의 도구 답, 글은 글 블록 답,
-    예외는 그 예외를 내고, 그 밖의 객체는 미리 만든 응답이라 그대로 돌려줍니다.
+    차례로(다 쓰면 기본 답 — 작성은 DRAFT_POOL 을 돌려 씀) 돌려줍니다. 답 자리의 dict 는 그
+    종류의 도구 답, 글은 글 블록 답, 예외는 그 예외를 내고, 그 밖의 객체는 미리 만든 응답이라
+    그대로 돌려줍니다.
     """
 
     TOOLS = {"grade": "record_grade"}
@@ -1272,6 +1295,7 @@ class FakeClaude:
         self.probe_status: dict[str, int] = {}
         self.writes: list[object] = []
         self.grades: list[object] = []
+        self.default_writes = 0
 
     def create(self, **kwargs: object) -> object:
         system = kwargs.get("system")
@@ -1289,7 +1313,13 @@ class FakeClaude:
                 raise FakeApiError(f"model: {kwargs['model']}", status)
             return text_response("네")
         queue = self.writes if kind == "write" else self.grades
-        answer = queue.pop(0) if queue else (writer_reply() if kind == "write" else GRADE_ANSWER)
+        if queue:
+            answer = queue.pop(0)
+        elif kind == "write":
+            answer = writer_reply(comment=DRAFT_POOL[self.default_writes % len(DRAFT_POOL)])
+            self.default_writes += 1
+        else:
+            answer = GRADE_ANSWER
         if isinstance(answer, BaseException):
             raise answer
         if isinstance(answer, dict):
@@ -1338,6 +1368,17 @@ class World:
         else:
             raise AssertionError(f"모르는 호출입니다: {endpoint}")
         return answer(url) if callable(answer) else answer
+
+
+def previous_of(content: str) -> list[str] | None:
+    """작성 요청의 <my_previous_comments> 안 댓글들 — 블록이 없으면 None."""
+    head = "<my_previous_comments>\n"
+    if head not in content:
+        return None
+    block = content.split(head, 1)[1].split("\n</my_previous_comments>", 1)[0]
+    return [
+        line.removeprefix("<comment>").removesuffix("</comment>") for line in block.split("\n")
+    ]
 
 
 def query_of(url: str) -> dict[str, str]:
@@ -2182,6 +2223,44 @@ class VideoRoundTest(LiveCheckCase):
             result["verdict"], "6B: stop — 재지 못함(호출 오류 3); 채점 막힘(오류 3/3)"
         )
         self.assertEqual(code, 1)
+
+    def test_default_write_replies_do_not_repeat(self) -> None:
+        texts = (*DRAFT_POOL, COMMENT)
+        for text in DRAFT_POOL:
+            self.assertEqual(code_failures(text, [], self.config.comment), [], text)
+            self.assertIn("초안표식", text)
+            self.assertIn("연애사주", text)
+        for first, second in itertools.permutations(texts, 2):
+            with self.subTest(first=first[:10], second=second[:10]):
+                self.assertIsNone(repeated_run(first, [second], REPEAT_MIN_CHARS))
+
+    def test_only_passed_drafts_become_previous(self) -> None:
+        self.jev.checks = [PASSING, FAILING, FAILING, PASSING]
+        code, out, err, result = self.run_main()
+        videos = self.by_id(result)
+        self.assertEqual(
+            [videos[vid(number)]["result"] for number in (1, 2, 5)], ["comment", "skip", "comment"]
+        )
+        passed = DRAFT_POOL[0]
+        self.assertIsNone(previous_of(self.content("write", 1)))
+        second = self.claude_for("write", 2)
+        self.assertEqual(len(second), 2)
+        self.assertEqual(
+            [previous_of(call["messages"][0]["content"]) for call in second], [[passed]] * 2
+        )
+        self.assertEqual(previous_of(self.content("write", 5)), [passed])
+
+    def test_runner_code_check_uses_the_same_previous(self) -> None:
+        passed = DRAFT_POOL[0]
+        self.claude.writes = [writer_reply(comment=passed), writer_reply(comment=passed)]
+        code, out, err, result = self.run_main()
+        videos = self.by_id(result)
+        self.assertTrue(videos[vid(1)]["drafts"][0]["code_pass"])
+        repeat = videos[vid(2)]["drafts"][0]
+        expected = code_failures(passed, [passed], self.config.comment)
+        self.assertTrue(expected)
+        self.assertEqual(repeat["untrusted"]["code_failures"], expected)
+        self.assertFalse(repeat["code_pass"])
 
     def test_task_quality_does_not_move_claude_grade(self) -> None:
         self.claude.grades = [answer5(GRADE_OK, TASK_NO), answer5(GRADE_BAD, TASK_OK)]

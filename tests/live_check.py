@@ -48,6 +48,7 @@ from agent.writer import (
     CLAUDE_TIMEOUT_S,
     DESCRIPTION_LIMIT,
     ITEM_LIMIT,
+    RECENT_WINDOW,
     TITLE_LIMIT,
     TOP_COMMENTS_MAX,
     ClaudeClient,
@@ -1114,6 +1115,7 @@ class _VideoRound:
         self.drafts = 0
         self.classified = 0
         self.written = 0
+        self.previous: list[str] = []  # 이번 실행에서 앞서 통과한 초안 — 운영의 store.comments() 자리
 
     def run(self) -> None:
         writer_model = self.result["writer_model"]
@@ -1244,18 +1246,21 @@ class _VideoRound:
         recording = _Recording(self.claude, self.check)
         track.stage["claude"] = "write"
         track.stage["jev"] = "self_check"
+        recent = self.previous[-RECENT_WINDOW:]  # write_comment 이 반복 검사에 쓰는 그 목록
         with tempfile.TemporaryDirectory() as folder:
             outcome = write_comment(
                 record,
                 config=self.comment_config,
                 claude=recording,
                 check=recording.check,
-                previous=(),
+                previous=tuple(self.previous),
                 logbook=Logbook(Path(folder) / "live-check.log", lambda: self.now),
                 now=self.now,
                 transcript="",
                 top_comments=comments,
             )
+        if outcome.draft is not None:
+            self.previous.append(outcome.draft.text)
         error_cause = recording.error_cause()
         if outcome.draft is not None:
             video["result"] = "comment"
@@ -1263,10 +1268,15 @@ class _VideoRound:
             video["result"] = "error" if error_cause is not None else "skip"
         video["error_cause"] = error_cause
         video["untrusted"]["skip_reason"] = outcome.skip_reason
-        self._drafts(video, recording, record, comments)
+        self._drafts(video, recording, record, comments, recent)
 
     def _drafts(
-        self, video: dict, recording: _Recording, record: VideoRecord, comments: list[str]
+        self,
+        video: dict,
+        recording: _Recording,
+        record: VideoRecord,
+        comments: list[str],
+        recent: Sequence[str],
     ) -> None:
         """Claude 답마다 초안 한 줄 — 읽은 초안은 자체 검사 점수 · 코드 검사 · 채점 두 몫 · 빈 사람 칸."""
         self.track.stage["claude"] = "grade"
@@ -1287,7 +1297,7 @@ class _VideoRound:
             self_check_pass = (
                 None if scores is None else self_check_failure(scores, threshold) is None
             )
-            failures = code_failures(text, [], self.comment_config)
+            failures = code_failures(text, recent, self.comment_config)
             asked = grade_draft(
                 self.claude, self.result["grader_model"], record, comments, concern, text
             )
