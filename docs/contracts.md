@@ -701,16 +701,21 @@ run_loop(cycle, reload, initial, *, on_error, sleep=time.sleep,
   python3 -m tests.mutants live-check-applied-yes-floor-lowered
   python3 -m tests.mutants live-check-applied-floor-lowered
   python3 -m tests.mutants live-check-applied-reads-jev-models
+  python3 -m tests.mutants live-check-best-setting-tie-raised
+  python3 -m tests.mutants live-check-applied-recount-ignored
+  python3 -m tests.mutants live-check-applied-exception-any-run
+  python3 -m tests.mutants live-check-applied-stored-verdicts-unchecked
   ```
 
   `classify` · `read_answers` · `build_state` · `is_error_hold` · `sdk_ask` ·
   `decide_post` · `video_id_from_ref` · `put` · `reserve_live` · `check_post` · `load_config` ·
   `config_from_mapping` · `run_loop` · `format_line` · `QuotaLedger.reserve` ·
   `YouTubeClient._call` · `Watcher.run` · `YouTubeClient.top_comments` · `tests/live_check.py` 의
-  `Calls.take` · `Redactor` · `best_correct` · `verdict_line` · `cli` · `main` · `write_comment` ·
-  `code_failures` · `self_check_failure` · `link_fragment` · `repeated_run` 의 본문을 고칠 때는 이
-  명령들이 계속 1 로 끝나는지 함께 확인합니다. `tests/test_live_check_applied.py` 의
-  `measured_drift` 본문을 고칠 때도 `live-check-applied-*` 명령이 계속 1 로 끝나는지 함께
+  `Calls.take` · `Redactor` · `best_correct` · `best_setting` · `verdict_line` · `cli` · `main` ·
+  `write_comment` · `code_failures` · `self_check_failure` · `link_fragment` · `repeated_run` 의
+  본문을 고칠 때는 이 명령들이 계속 1 로 끝나는지 함께 확인합니다. `tests/test_live_check_applied.py` 의
+  `measured_drift` · `recount` · `admitted` · `stored_verdict_mismatches` 본문을 고칠 때도
+  `live-check-applied-*` 명령이 계속 1 로 끝나는지 함께
   확인합니다. 음성 대조 실행기는 `agent.*` 모듈과 `tests.live_check` · `tests.test_live_check_applied`
   를 메모리에서 바꿉니다.
 
@@ -934,13 +939,13 @@ if result.draft is not None:
   같거나, `difflib.SequenceMatcher(autojunk=False)` 로 찾은 가장 긴 연속 공통 글자가
   `REPEAT_MIN_CHARS`(12, 코드 상수) 이상이면 반복입니다. 비교 대상은 `previous` 의 마지막
   `RECENT_WINDOW`(20)개 — Claude 가 `<my_previous_comments>` 에서 보는 바로 그 댓글들입니다.
-- **잰 값 (Phase 6B).** `docs/live-check/result.json` 에서 읽은 숫자입니다('주제 판별' 절의 기록과 같은
-  실행).
+- **잰 값 (Phase 6D).** `docs/live-check/result.json` 에서 읽은 숫자입니다('주제 판별' 절의 기록과 같은
+  실행). 6E 가 고칠 작성기의 숫자라 '고치기 전' 기록입니다(트래커 Phase 6D 드리프트 인터뷰 질문 1 A).
   - 모델 이름: claude-sonnet-5-5 accepted · claude-haiku-5-5 accepted — 작성 claude-sonnet-5-5 · 채점 claude-haiku-5-5
   - `comment.writer_model` 은 `claude-sonnet-5-5` 그대로입니다 — 설정한 이름이 `accepted` 입니다.
-  - 초안 운영 창: 쓴 영상 7 · SKIP 3 · 초안 10 · 정답 있음 0 (사람 칸 0 · Claude 채점 0) · 채점 오류 10 · 사람 칸과 Claude 채점이 다름 0 · 정답 bad 인데 통과 0 · 정답 ok 인데 탈락 0
+  - 초안 운영 창: 쓴 영상 7 · SKIP 5 · 초안 11 · 정답 있음 11 (사람 칸 1 · Claude 채점 11) · 채점 오류 0 · 사람 칸과 Claude 채점이 다름 1 · 정답 bad 인데 통과 0 · 정답 ok 인데 탈락 0
   - 초안 넓힌 창: 실행 없음
-  - 정답 있는 초안이 0 이라 `check_min_probability` 는 0.7 그대로입니다(표본 없음).
+  - 정답 있고 자체 검사를 통과한 초안 2(사람 칸 1) 가운데 정답 bad 가 0 이라 `check_min_probability` 는 0.7 그대로입니다(근거가 있어 그대로).
   - 정답은 사람 칸(`ok` · `bad`)이 있으면 그것, 없으면 Claude 채점입니다. Claude 채점은 또 하나의 AI
     의견이라, 그 정답에 맞춰 옮긴 통과선은 단단하지 못합니다.
   - 통과선은 올리기만 하고 내리지 않습니다 — 정답이 `bad` 인데 jev 자체 검사를 통과한 초안이 있으면 세
@@ -950,6 +955,11 @@ if result.draft is not None:
     쪽은 사람이 정합니다.
   - `REPEAT_MIN_CHARS`(12) 는 그대로입니다 — 표본 부족: 최근 내 댓글 20개끼리 비교하는 값이라 초안 약
     10개짜리 한 바퀴로는 잴 수 없습니다.
+  - 과제 품질 운영 창: ⓐ 고민 한 줄이 연애 고민 4/11 · ⓑ 연애사주 경험이 고민과 이어짐 4/11 · 과제 칸 오류 0 · ⓒ 다른 영상 초안과 겹치는 6글자 조각이 있는 초안 10/11 · 겹친 조각 최다 9
+  - 과제 품질 넓힌 창: 실행 없음
+  - 인기 댓글 운영 창: 재료 초안 9 · 항목은 왔는데 글 0개인 영상 0
+  - 인기 댓글 넓힌 창: 실행 없음
+  - 과제 품질 · 인기 댓글 숫자는 기록입니다 — 통과선은 이 숫자로 움직이지 않습니다(트래커 Phase 6C 질문 1 A).
 - **자료** — 태그 블록 `<video_title>` · `<video_description>` · `<transcript>`(자막이 비었으면
   대신 `<top_comments>` — 비어 있지 않은 인기 댓글 앞 10개) · `<classification>` ·
   `<my_previous_comments>`(최근 댓글이 있을 때만). 시스템 프롬프트가 태그 안의 글을 지시가 아닌
@@ -1101,28 +1111,39 @@ judge_trigger(record, config, now) -> Judgement     # config 는 Config.trigger
   - 통과는 잘못된 일치가 없고 22개 중 20개 이상 맞는 것입니다.
   - 종료 코드: 0 ko 통과 · 1 ko 미달 · 2 재지 않음 · 3 측정 실패(오류가 있음 — 모델 문제가
     아님).
-  - 기록 — Phase 6B 가 `docs/live-check/result.json`(실행 2026-10-14T04:28:16.180435+00:00, 판정 줄
-    `6B: go`)에서 읽은 숫자입니다. 지금 기준값은 `noul_yes_min` 0.8 · `noul_no_max` 0.2 ·
-    `choice_min_confidence` 0.5 입니다.
+  - 기록 — Phase 6D 가 `docs/live-check/result.json`(실행 2026-10-14T14:09:02.882902+00:00, 판정 줄
+    `6B: stop — 작성 막힘(SKIP 5/7)`)에서 읽은 숫자입니다. 이 실행의 작성 막힘은 트래커 Phase 6D 의
+    드리프트 인터뷰(질문 1 A)가 보고 '고치기 전'(6E 전) 기록으로 반영했습니다('실제 호출 실행기' 절의
+    '결과 반영'). 지금 기준값은 `noul_yes_min` 0.8 · `noul_no_max` 0.2 · `choice_min_confidence` 0.5
+    입니다.
     - ko: 지금 기준값 맞음 20/22 · 잘못된 일치 0 · 잘못된 불일치 0 · 보류 2 · 오류 0 · 올리기만 범위 최다 맞음 20/22 — 통과
-    - en: 지금 기준값 맞음 20/22 · 잘못된 일치 0 · 잘못된 불일치 0 · 보류 2 · 오류 0 · 올리기만 범위 최다 맞음 20/22 — 통과
+    - en: 지금 기준값 맞음 19/22 · 잘못된 일치 0 · 잘못된 불일치 0 · 보류 3 · 오류 0 · 올리기만 범위 최다 맞음 19/22 — 미달
+    - 다시 셈한 기준값(ko 예시 행): `noul_yes_min` 0.8 · `noul_no_max` 0.2 · `choice_min_confidence` 0.5 · 맞음 20/22 — 같은 jev 답을 6B 규칙으로 다시 셈한 값이고, 진짜 jev 를 이 설정으로 돌린 숫자가 아닙니다
     - 영상 판별 운영 창: 판별 18 · 일치 7 · 보류 11 · 불일치 0
     - 영상 판별 넓힌 창: 실행 없음
-    - `QUESTION_LANGUAGE` 는 `ko` 그대로입니다 — 두 언어 모두 통과입니다.
+    - `QUESTION_LANGUAGE` 는 `ko` 그대로입니다 — 통과 ko · 미달 en.
     - 기준값 셋은 그대로입니다. 잘못된 일치가 0 이라 올릴 하한이 없고, 올리기만 범위의 최다 맞음이
       지금 기준값의 맞음과 같아 `noul_no_max` 를 옮겨 더 맞는 자리가 없습니다.
     - 표본 부족 — 두 `noul` 기준값 0.2 · 0.8 은 이 실행이 잰 값이 아니라 그대로 둔 값입니다. 예시의
       `noul` 이 두 기준값 사이에 없어, 0.2 · 0.8 과 그 사이의 다른 값이 같은 판정을 냅니다. 실제 영상은
-      그 사이에 많지만 정답이 없어 기준값을 옮길 근거가 되지 못합니다.
-      - ko: 기준값 사이(0.2 초과 0.8 미만) 예시 0개 · 가장 가까운 예시 0.16 · 0.87
-      - en: 기준값 사이(0.2 초과 0.8 미만) 예시 0개 · 가장 가까운 예시 0.10 · 0.81
+      그 사이에 많고 채점(아래 진짜 영상 판별 채점)도 있지만 예시 22개와 다른 표본입니다.
+      - ko: 기준값 사이(0.2 초과 0.8 미만) 예시 0개 · 가장 가까운 예시 0.12 · 0.87
+      - en: 기준값 사이(0.2 초과 0.8 미만) 예시 0개 · 가장 가까운 예시 0.08 · 0.80
       - 기준값 사이 영상 운영 창: 9/18
       - 기준값 사이 영상 넓힌 창: 실행 없음
+    - 진짜 영상 판별 채점 — 정답은 사람 칸(`topic_human`)이 있으면 그것, 없으면 Claude 채점(`topic_grade`)입니다.
+      예시 22개의 숫자와 다른 표본이며 기준값을 움직이지 않습니다.
+      하한을 내릴지는 사람이 이 숫자를 보고 정합니다(트래커 Phase 6C).
+      - 영상 판별 채점 운영 창: 일치 7 중 정답 아님 0 · 보류 11 중 정답 연애 6 · 불일치 0 중 정답 연애 0 · 정답 없음 0 · 사람 칸 0/18
+      - 영상 판별 채점 넓힌 창: 실행 없음
+      - 보류 영상 하한 내림 운영 창: `noul_yes_min` 0.75 이면 새 일치 — 정답 연애 1 · 정답 아님 0 · 정답 없음 0 / `noul_yes_min` 0.6 이면 새 일치 — 정답 연애 2 · 정답 아님 2 · 정답 없음 0
+      - 보류 영상 하한 내림 넓힌 창: 실행 없음
+      - '보류 영상 하한 내림' 은 트래커 Phase 6D 의 기록 줄(결정 아님)이 본 두 하한으로 `noul_yes_min` 만 내리면(확신 · 이유 보기는 지금 기준 그대로) 새로 일치가 되는 보류 영상 수입니다.
     - `noul_yes_min` · `choice_min_confidence` 는 올리기만 하고, 내리는 쪽은 표본 22개로 정하지 않습니다 —
       보류를 줄여 댓글을 늘리는 쪽은 사람이 결과 숫자를 보고 정합니다(트래커 Phase 6B).
   - ko 가 미달이고 en 이 통과하면 `QUESTION_LANGUAGE` 를 `"en"` 으로 바꿉니다. 둘 다 미달이면
     사람이 정합니다(트래커 cross-cutting).
-  - 실제 호출 실행기('실제 호출 실행기' 절)가 같은 측정(`tests/jev_accuracy.py` 의 `judge_examples` · `tally`)을 진짜 jev 로 돌려 예시마다 `docs/live-check/result.json` 에 남기고, 위 기록은 Phase 6B 가 그 파일에서 읽어 썼습니다 — `tests/test_live_check_applied.py` 가 기록의 숫자를 결과 파일에서 다시 세어 맞댑니다('실제 호출 실행기' 절의 '결과 반영').
+  - 실제 호출 실행기('실제 호출 실행기' 절)가 같은 측정(`tests/jev_accuracy.py` 의 `judge_examples` · `tally`)을 진짜 jev 로 돌려 예시마다 `docs/live-check/result.json` 에 남기고, 위 기록은 Phase 6D 가 그 파일에서 읽어 썼습니다 — `tests/test_live_check_applied.py` 가 기록의 숫자를 결과 파일에서 다시 세어 맞댑니다('실제 호출 실행기' 절의 '결과 반영').
 - **음성 대조.** 음성 대조는 10절 목록.
 
 ## 실제 호출 실행기 — `tests/live_check.py` (Phase 6A)
@@ -1284,6 +1305,7 @@ python3 -m tests.live_check --verdict <결과 파일>     # 호출 없이 판정
   `noul` 가운데 `noul_yes_min` 후보보다 작은 값입니다. 1 을 넘는 하한은 후보가 아니므로, 그 하한으로
   막아야 하는 잘못된 일치가 남은 언어는 미달입니다. 오류 보류 예시는 어느 설정에서도 맞음이
   아닙니다.
+  맞음이 같은 설정이 여럿이면 덜 올린 쪽 하나입니다(`best_setting`) — `noul_yes_min` 이 작은 쪽, 그다음 `choice_min_confidence` 가 작은 쪽, 그다음 `noul_no_max` 가 지금 값에 가까운 쪽(거리가 같으면 작은 쪽).
 - **종료 코드.** 실행: 0 `go` · 1 `stop` · 2 시작 전 멈춤(인자 · 설정 · 키 · SDK · 키 모양 — 호출 0번,
   파일 없음) · 3 결과 파일을 쓰지 못함, 키 조각이 보여 지움, 또는 실행기 오류(예: 결과 파일을 읽다
   `RecursionError`). `--verdict`: 0 `go` · 1 `stop` · 2 파일을 읽을 수 없음. 판정 줄과 다르게 저장된
@@ -1293,21 +1315,36 @@ python3 -m tests.live_check --verdict <결과 파일>     # 호출 없이 판정
   Claude 채점은 정답이 아니라 또 하나의 의견입니다(트래커 Phase 6A).
   도구 강제(`tool_choice`)로 받은 채점 답의 모양은 SDK 로 맞춘 모양이고, 모델이 그 도구로 답하는지는
   다음 진짜 실행이 처음 확인합니다.
-- **결과 반영 (Phase 6B).** 사람이 커밋한 결과를 `tests/test_live_check_applied.py` 가 계약 · 설정과
-  맞댑니다. 결과 파일과 요약이 BOM 없이 있고, `--verdict` 가 종료 코드 0 과 `6B: go` 한 줄을 내며,
-  요약 첫 줄이 같은 판정 줄이고, 언어마다 예시 행 수가 `example_count` 와 예시 묶음 수와 같아야 합니다.
-  - 지문 맞대기(`measured_drift`) — 판별 기록이 기대는 칸(`questions` · `examples_sha256` ·
-    `classifier` · `margin` · `pass_correct`)은 결과와 지금 코드 · `config.yaml` 이 같아야 합니다.
-  - 작성 쪽 칸(`check_questions` · `self_check_criteria` · `check_min_probability` · `trigger` ·
-    `grade_system` · `target_drafts` · `wide_window_hours` · `claude_max_retries`)과
-    `fingerprint.jev_models` 는 맞대기에서 보지 않습니다. 작성 쪽 기록은 정답 있는 초안이 0 이라 어느
-    값도 옮긴 것이 없고, 이 칸을 지키면 작성 질문이나 채점을 고치는 사이클마다 사람의 재실행이 먼저
-    있어야 합니다. 그래서 이 칸이 바뀐 뒤의 초안 숫자는 옛 질문 · 채점으로 잰 숫자입니다.
-    `check_min_probability` 는 '댓글 작성' 절의 기록 테스트가 결과의 값과 같은지 봅니다.
+- **결과 반영 (Phase 6B · 6D).** 사람이 커밋한 결과를 `tests/test_live_check_applied.py` 가 계약 · 설정과
+  맞댑니다. 결과 파일과 요약이 BOM 없이 있고, 결과가 판 2 이상(`schema_version` ≥ 2)이며, `--verdict` 가
+  결과 파일로 다시 센 판정 줄 한 줄을 내고 요약 첫 줄이 같은 줄이며, 언어마다 예시 행 수가 `example_count` 와
+  예시 묶음 수와 같아야 합니다.
+  - 판정 줄은 `6B: go`(종료 코드 0)여야 합니다.
+    예외는 하나뿐입니다 — 실행 `2026-10-14T14:09:02.882902+00:00` 의 `6B: stop — 작성 막힘(SKIP 5/7)`(종료 코드 1).
+    트래커 Phase 6D 의 드리프트 인터뷰(질문 1 A)가 이 실행을 보고 '고치기 전'(6E 전) 기록으로 반영했고, 다른
+    실행이거나 다시 센 판정 줄이 한 글자라도 다르면 빨강입니다.
+  - 지문 맞대기(`measured_drift`) — jev 의 답을 바꾸는 칸(`questions` · `examples_sha256` · `classifier.model` ·
+    `classifier.on_topic_reasons` · `classifier.off_topic_reasons` · `margin` · `pass_correct`)은 결과와 지금 코드 ·
+    `config.yaml` 이 같아야 합니다.
+  - 다시 셈한 칸(`classifier.noul_yes_min` · `classifier.noul_no_max` · `classifier.choice_min_confidence` ·
+    `check_min_probability`)은 결과 파일로 규칙을 다시 셈한 값(`recount`)과 지금 `config.yaml` 이 같아야 합니다.
+    하한 셋은 질문 언어(ko 가 통과면 ko, en 만 통과면 en)의 예시 행에서 위 "올리기만" 범위의 최다 맞음 설정
+    (`best_setting`)이고, 통과선은 '댓글 작성' 절의 규칙으로 다시 셈한 값(막을 초안이 없으면 결과의 값)입니다.
+    그 값과 다른 설정은 손으로 넣은 값이든 뒤 페이즈가 바꾼 값이든 빨강입니다. 하한은 jev 답 위에 코드가
+    나중에 대는 값(`classifier._decide`)이라 다시 셈한 판정은 같은 jev 답에서 코드가 낼 판정 그대로이고, 그
+    설정으로 진짜 jev 를 돌린 숫자는 아닙니다.
+    다시 셈의 출발점인 결과의 기준값(`fingerprint.classifier` 의 하한 셋 · `check_min_probability`)은 결과의 판정 ·
+    `self_check_pass` 칸을 다시 판정한 값과 같아야 합니다(`stored_verdict_mismatches`) — 저장된 판정을 바꾸는 만큼
+    옮긴 기준값은 결과와 설정을 함께 고쳐도 빨강입니다.
+  - 작성 쪽 칸(`check_questions` · `self_check_criteria` · `trigger` · `grade_system` · `target_drafts` ·
+    `wide_window_hours` · `claude_max_retries`)과
+    `fingerprint.jev_models` 는 맞대기에서 보지 않습니다.
+    이 칸을 지키면 작성 질문이나 채점을 고치는 사이클마다 사람의 재실행이 먼저 있어야 합니다. 그래서 이 칸이
+    바뀐 뒤의 초안 숫자는 옛 질문 · 채점으로 잰 숫자입니다.
   - 새 결과나 사람 칸에 `ok` · `bad` 를 적은 결과를 커밋하거나 맞대는 칸을 고치면 이 모듈이 빨강입니다
     — 기록이 지금 코드를 잰 숫자가 아니라는 뜻입니다. 사이클 안에서는 `unmeasured` 로 멈춥니다. 초록으로
     돌아오는 길은 사람이 실행기를 다시 돌려 결과를 커밋한 뒤, 이 페이즈와 같은 적용 사이클이 기록 줄과
-    기준값을 새 결과로 다시 쓰는 것입니다. 그 사이클은 Phase 6D(트래커)가 맡고, 새 결과는 main 이
+    기준값을 새 결과로 다시 쓰는 것입니다. 그 사이클은 다시 반영 페이즈(트래커 — 6D 다음은 6F)가 맡고, 새 결과는 main 이
     아니라 그 페이즈의 레인 브랜치에만 커밋합니다 — 그 뒤의 재실행도 트래커에 다시 반영 페이즈를 열고
     같은 길로 갑니다. 사람 칸의 다른 값(`ok` · `bad` 밖의 글)은 정답 없음으로 세어 이 모듈을 빨강으로
     만들지 않습니다.
