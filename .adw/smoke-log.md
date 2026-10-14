@@ -883,7 +883,7 @@ other line is required on every item.
 - evidence: tests/test_live_check_applied.py:128 — 예시 행을 다시 판정하는 고리를 통째로 지워도 전체 698 초록(ship-check 3차 변이 점검 b3); RecountTest.test_lowered_recorded_floors_are_caught 의 가짜는 영상 · 초안 다리만 빨강으로 만들고, CommittedResultTest.test_stored_verdicts_follow_recorded_floors 는 `[]` 만 단언함; docs/contracts.md:1336-1338 "결과의 판정 · `self_check_pass` 칸을 다시 판정한 값과 같아야 합니다" 의 예시 행 몫을 재는 표본 없음 · guard-matrix G5 에 예시 행 편집 줄 없음
 - direction: RecountTest 에 기록 하한을 내렸을 때 예시 행 하나만 판정이 바뀌는 가짜(영상 · 초안은 그대로)를 더해 `["accuracy.ko[i] hold -> yes"]` 꼴을 단언한다 — 코드 변경 없음
 - touches: tests/test_live_check_applied.py
-- status: reverted
+- status: resolved
 - attempts: 1 · last failure: reverted f01e433 — own check red (스윕 20261015-081303-adw/smoke-sweep-s083-s087)
 - first seen: 2026-10-15 · last seen: 2026-10-15
 
