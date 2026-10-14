@@ -901,6 +901,16 @@ class BestSettingTest(unittest.TestCase):
         self.assertEqual(self.found(rows), first)
         self.assertEqual(first, ((0.8, 0.2, 0.65), 21))
 
+    def test_equal_distance_takes_the_smaller_ceiling(self) -> None:
+        # hold 행 0.2 가 지금 값을 동점 밖으로 — 거리가 같은 0.15 와 0.25 가 둘 다 21, 작은 쪽
+        rows = setting_rows({"noul": 0.15}, {"noul": 0.25}, {"noul": 0.2, "label": "hold"})
+        self.assertEqual(self.found(rows), ((0.8, 0.15, 0.5), 21))
+
+    def test_near_current_noul_does_not_displace_current_value(self) -> None:
+        # 0.1999996 은 지금 값 0.2 와 5e-7 안 — 맞음이 같은 22 라도 지금 값이 먼저입니다
+        rows = setting_rows({"noul": 0.1999996})
+        self.assertEqual(self.found(rows), ((0.8, 0.2, 0.5), 22))
+
     def test_best_correct_is_the_setting_count(self) -> None:
         for name, rows in self.cases().items():
             with self.subTest(case=name):

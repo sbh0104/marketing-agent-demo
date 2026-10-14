@@ -1068,6 +1068,11 @@ class RecountTest(unittest.TestCase):
         )
         self.assertEqual(check_floor(fake), 0.85)
 
+    def test_check_floor_never_lowers_the_recorded_value(self) -> None:
+        # "결과의 값보다 내리지 않습니다" — 가장 낮은 비교 점수 0.5 + MARGIN 0.55 는 0.7 아래
+        fake = self.fake(drafts=(self.draft((0.5, 0.1, 0.9), claude="bad", passed=True),))
+        self.assertEqual(check_floor(fake), 0.7)
+
     def test_human_cell_beats_claude_grade(self) -> None:
         kept = self.fake(drafts=(self.draft(human="ok", claude="bad"),))
         self.assertEqual(check_floor(kept), 0.7)
@@ -1079,6 +1084,29 @@ class RecountTest(unittest.TestCase):
         fake = self.fake(drafts=(self.draft((0.97, 0.01, 0.98), claude="bad"),))
         self.assertIsNone(check_floor(fake))
         self.assertEqual(self.drift(fake), ["check_min_probability"])
+
+    def test_check_floor_exactly_one_is_kept(self) -> None:
+        # "1 을 넘으면" — 가장 낮은 비교 점수 0.95 + MARGIN 은 정확히 1.0 이라 막을 수 있습니다
+        fake = self.fake(drafts=(self.draft((0.95, 0.05, 0.95), claude="bad"),))
+        self.assertEqual(check_floor(fake), 1.0)
+
+    def test_todo_line_counts_both_windows(self) -> None:
+        # 6E 줄은 모든 창의 셈 — 운영 창 초안 하나와 넓힌 창 초안 하나의 분모는 2
+        fake = self.fake(drafts=(self.draft(),))
+        widened = copy.deepcopy(fake["videos"][0])
+        widened["window"] = "widened"
+        fake["videos"].append(widened)
+        both, operation = task_counts(fake, None), task_counts(fake, "operation")
+        self.assertEqual((both["tasks"], both["drafts"]), (2, 2))
+        self.assertEqual((operation["tasks"], operation["drafts"]), (1, 1))
+        line = todo_line(fake)
+        for phrase in (
+            f"ⓐ 고민 한 줄이 연애 고민 {both['love']}/{both['tasks']} ·",
+            f"ⓑ 연애사주 경험이 고민과 이어짐 {both['saju']}/{both['tasks']} ·",
+            f"글자 조각이 있는 초안 {both['framed']}/{both['drafts']} ·",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, line)
 
     def test_draft_answer_samples(self) -> None:
         samples = (
@@ -1329,6 +1357,24 @@ class AccuracyRecordTest(ContractCase):
         ]
         for phrase in phrases:
             self.assert_in_contract(phrase)
+
+    def test_topic_human_value_moves_the_record_but_other_text_does_not(self) -> None:
+        # 약속 "사람 칸의 다른 값 … 이 모듈을 빨강으로 만들지 않습니다" — topic_human 의 연애 · 아님
+        # 은 기록 줄을 바꾸고(그래서 test_accuracy_record_is_in_contract 가 빨강), 다른 글은 그대로
+        result = self.result
+        index = next(
+            i
+            for i, video in enumerate(result["videos"])
+            if video["classification"] is not None and video["topic_human"] not in TOPIC_ANSWERS
+        )
+        for value, moves in (("아님", True), ("연애", True), ("엉뚱한 글", False)):
+            with self.subTest(topic_human=value):
+                changed = copy.deepcopy(result)
+                changed["videos"][index]["topic_human"] = value
+                if moves:
+                    self.assertNotEqual(topic_grade_lines(changed), topic_grade_lines(result))
+                else:
+                    self.assertEqual(topic_grade_lines(changed), topic_grade_lines(result))
 
     def test_accuracy_tally_is_recount_of_rows(self) -> None:
         keys = ("correct", "false_yes", "false_no", "hold", "error")

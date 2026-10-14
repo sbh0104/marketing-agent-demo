@@ -271,9 +271,10 @@ def best_setting(
     """올리기만 범위에서 잘못된 일치 0 인 설정 가운데 가장 많은 맞음의 설정과 그 맞음 수.
 
     그런 설정이 없으면 None. 맞음이 같은 설정이 여럿이면 덜 올린 쪽 하나입니다 — `noul_yes_min`
-    이 작은 쪽, 그다음 `choice_min_confidence` 가 작은 쪽, 그다음 `noul_no_max` 가 지금 값에 가까운
-    쪽(거리가 같으면 작은 쪽). 더 많은 맞음만 앞의 설정을 바꾸므로 지금 값이 동점 안에 있으면 지금
-    값입니다. 같은 행이면 늘 같은 설정 하나가 나옵니다.
+    이 작은 쪽, 그다음 `choice_min_confidence` 가 작은 쪽, 그다음 `noul_no_max` 가 지금 값인 쪽,
+    그다음 지금 값에 가까운 쪽(거리가 같으면 작은 쪽). 지금 값은 거리와 따로 명시적으로 맨 앞에
+    두므로(5e-7 안의 이웃 값도 밀어내지 못합니다) 더 많은 맞음만 앞의 설정을 바꾸는 이 순서에서
+    지금 값이 동점 안에 있으면 지금 값입니다. 같은 행이면 늘 같은 설정 하나가 나옵니다.
     """
     measured = [row for row in rows if not row["error"] and row["noul"] is not None]
     negatives = [row for row in measured if row["label"] != "yes"]
@@ -283,7 +284,9 @@ def best_setting(
     )
     no_ceilings = sorted(
         {base.noul_no_max, 0.0, *(row["noul"] for row in negatives)},
-        key=lambda value: (round(abs(value - base.noul_no_max), 6), value),
+        key=lambda value: (
+            value != base.noul_no_max, round(abs(value - base.noul_no_max), 6), value
+        ),
     )
     best: tuple[ClassifierConfig, int] | None = None
     for yes_min in yes_floors:
