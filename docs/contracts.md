@@ -588,7 +588,7 @@ run_loop(cycle, reload, initial, *, on_error, sleep=time.sleep,
   인자와 이유, 로그 사건과 필수 필드)은 고정입니다.
 - 더하는 것은 그 필드를 쓰는 단계(Phase)가 `models.py` · `config.py` 에서, 테스트와 함께, 이
   문서도 함께 고칩니다. 이미 있는 이름의 뜻을 바꾸거나 지우지 않습니다.
-- 가드 · 저장소 · 설정 읽기 · 로그 한 줄 규칙 · 판별 규칙 · 쿼터 가드 · 탐지 입력 검사 · 인기 댓글 · 실제 호출 실행기가 테스트로 지켜지는지는 음성 대조로 확인합니다. 각 명령은 가드 한 줄을
+- 가드 · 저장소 · 설정 읽기 · 로그 한 줄 규칙 · 판별 규칙 · 쿼터 가드 · 탐지 입력 검사 · 인기 댓글 · 실제 호출 실행기 · 실제 결과 반영이 테스트로 지켜지는지는 음성 대조로 확인합니다. 각 명령은 가드 한 줄을
   메모리에서만 망가뜨리고 테스트를 돌리며, **종료 코드 1(테스트가 잡음)** 이어야 합니다. 2 는
   바꿀 글자를 찾지 못했다는 뜻이라 실패입니다:
 
@@ -695,6 +695,9 @@ run_loop(cycle, reload, initial, *, on_error, sleep=time.sleep,
   python3 -m tests.mutants live-check-grader-in-agent
   python3 -m tests.mutants live-check-cli-exception-only
   python3 -m tests.mutants live-check-entry-skips-cli
+  python3 -m tests.mutants live-check-applied-yes-floor-lowered
+  python3 -m tests.mutants live-check-applied-floor-lowered
+  python3 -m tests.mutants live-check-applied-reads-jev-models
   ```
 
   `classify` · `read_answers` · `build_state` · `is_error_hold` · `sdk_ask` ·
@@ -703,8 +706,10 @@ run_loop(cycle, reload, initial, *, on_error, sleep=time.sleep,
   `YouTubeClient._call` · `Watcher.run` · `YouTubeClient.top_comments` · `tests/live_check.py` 의
   `Calls.take` · `Redactor` · `best_correct` · `verdict_line` · `cli` · `main` · `write_comment` ·
   `code_failures` · `self_check_failure` · `link_fragment` · `repeated_run` 의 본문을 고칠 때는 이
-  명령들이 계속 1 로 끝나는지 함께 확인합니다. 음성 대조 실행기는 `agent.*` 모듈과
-  `tests.live_check` 를 메모리에서 바꿉니다.
+  명령들이 계속 1 로 끝나는지 함께 확인합니다. `tests/test_live_check_applied.py` 의
+  `measured_drift` 본문을 고칠 때도 `live-check-applied-*` 명령이 계속 1 로 끝나는지 함께
+  확인합니다. 음성 대조 실행기는 `agent.*` 모듈과 `tests.live_check` · `tests.test_live_check_applied`
+  를 메모리에서 바꿉니다.
 
 ## 탐지 · 조회수 추적 — env.py · youtube.py · watcher.py (Phase 2)
 
@@ -926,6 +931,20 @@ if result.draft is not None:
   같거나, `difflib.SequenceMatcher(autojunk=False)` 로 찾은 가장 긴 연속 공통 글자가
   `REPEAT_MIN_CHARS`(12, 코드 상수) 이상이면 반복입니다. 비교 대상은 `previous` 의 마지막
   `RECENT_WINDOW`(20)개 — Claude 가 `<my_previous_comments>` 에서 보는 바로 그 댓글들입니다.
+- **잰 값 (Phase 6B).** `docs/live-check/result.json` 에서 읽은 숫자입니다('주제 판별' 절의 기록과 같은
+  실행).
+  - 모델 이름: claude-sonnet-5-5 accepted · claude-haiku-5-5 accepted — 작성 claude-sonnet-5-5 · 채점 claude-haiku-5-5
+  - `comment.writer_model` 은 `claude-sonnet-5-5` 그대로입니다 — 설정한 이름이 `accepted` 입니다.
+  - 초안 운영 창: 쓴 영상 7 · SKIP 3 · 초안 10 · 정답 있음 0 (사람 칸 0 · Claude 채점 0) · 채점 오류 10 · 사람 칸과 Claude 채점이 다름 0 · 정답 bad 인데 통과 0 · 정답 ok 인데 탈락 0
+  - 초안 넓힌 창: 실행 없음
+  - 정답 있는 초안이 0 이라 `check_min_probability` 는 0.7 그대로입니다(표본 없음).
+  - 정답은 사람 칸(`ok` · `bad`)이 있으면 그것, 없으면 Claude 채점입니다. Claude 채점은 또 하나의 AI
+    의견이라, 그 정답에 맞춰 옮긴 통과선은 단단하지 못합니다.
+  - 통과선은 올리기만 하고 내리지 않습니다 — 정답이 `bad` 인데 jev 자체 검사를 통과한 초안이 있으면 그
+    초안의 세 점수 가운데 가장 낮은 것 + 0.05 로 올리고, 정답이 `ok` 인데 자체 검사에서 떨어진 초안은
+    숫자만 위에 적습니다. 내리는 쪽은 사람이 정합니다.
+  - `REPEAT_MIN_CHARS`(12) 는 그대로입니다 — 표본 부족: 최근 내 댓글 20개끼리 비교하는 값이라 초안 약
+    10개짜리 한 바퀴로는 잴 수 없습니다.
 - **자료** — 태그 블록 `<video_title>` · `<video_description>` · `<transcript>`(자막이 비었으면
   대신 `<top_comments>` — 비어 있지 않은 인기 댓글 앞 10개) · `<classification>` ·
   `<my_previous_comments>`(최근 댓글이 있을 때만). 시스템 프롬프트가 태그 안의 글을 지시가 아닌
@@ -1077,10 +1096,28 @@ judge_trigger(record, config, now) -> Judgement     # config 는 Config.trigger
   - 통과는 잘못된 일치가 없고 22개 중 20개 이상 맞는 것입니다.
   - 종료 코드: 0 ko 통과 · 1 ko 미달 · 2 재지 않음 · 3 측정 실패(오류가 있음 — 모델 문제가
     아님).
-  - 기록: 아직 재지 않음 — 2026-10-13 키 없음.
+  - 기록 — Phase 6B 가 `docs/live-check/result.json`(실행 2026-10-14T04:28:16.180435+00:00, 판정 줄
+    `6B: go`)에서 읽은 숫자입니다. 지금 기준값은 `noul_yes_min` 0.8 · `noul_no_max` 0.2 ·
+    `choice_min_confidence` 0.5 입니다.
+    - ko: 지금 기준값 맞음 20/22 · 잘못된 일치 0 · 잘못된 불일치 0 · 보류 2 · 오류 0 · 올리기만 범위 최다 맞음 20/22 — 통과
+    - en: 지금 기준값 맞음 20/22 · 잘못된 일치 0 · 잘못된 불일치 0 · 보류 2 · 오류 0 · 올리기만 범위 최다 맞음 20/22 — 통과
+    - 영상 판별 운영 창: 판별 18 · 일치 7 · 보류 11 · 불일치 0
+    - 영상 판별 넓힌 창: 실행 없음
+    - `QUESTION_LANGUAGE` 는 `ko` 그대로입니다 — 두 언어 모두 통과입니다.
+    - 기준값 셋은 그대로입니다. 잘못된 일치가 0 이라 올릴 하한이 없고, 올리기만 범위의 최다 맞음이
+      지금 기준값의 맞음과 같아 `noul_no_max` 를 옮겨 더 맞는 자리가 없습니다.
+    - 표본 부족 — 두 `noul` 기준값 0.2 · 0.8 은 이 실행이 잰 값이 아니라 그대로 둔 값입니다. 예시의
+      `noul` 이 두 기준값 사이에 없어, 0.2 · 0.8 과 그 사이의 다른 값이 같은 판정을 냅니다. 실제 영상은
+      그 사이에 많지만 정답이 없어 기준값을 옮길 근거가 되지 못합니다.
+      - ko: 기준값 사이(0.2 초과 0.8 미만) 예시 0개 · 가장 가까운 예시 0.16 · 0.87
+      - en: 기준값 사이(0.2 초과 0.8 미만) 예시 0개 · 가장 가까운 예시 0.10 · 0.81
+      - 기준값 사이 영상 운영 창: 9/18
+      - 기준값 사이 영상 넓힌 창: 실행 없음
+    - `noul_yes_min` · `choice_min_confidence` 는 올리기만 하고, 내리는 쪽은 표본 22개로 정하지 않습니다 —
+      보류를 줄여 댓글을 늘리는 쪽은 사람이 결과 숫자를 보고 정합니다(트래커 Phase 6B).
   - ko 가 미달이고 en 이 통과하면 `QUESTION_LANGUAGE` 를 `"en"` 으로 바꿉니다. 둘 다 미달이면
     사람이 정합니다(트래커 cross-cutting).
-  - 실제 호출 실행기('실제 호출 실행기' 절)가 같은 측정(`tests/jev_accuracy.py` 의 `judge_examples` · `tally`)을 진짜 jev 로 돌려 예시마다 `docs/live-check/result.json` 에 남기고, 기록 줄은 Phase 6B 가 그 파일로 씁니다.
+  - 실제 호출 실행기('실제 호출 실행기' 절)가 같은 측정(`tests/jev_accuracy.py` 의 `judge_examples` · `tally`)을 진짜 jev 로 돌려 예시마다 `docs/live-check/result.json` 에 남기고, 위 기록은 Phase 6B 가 그 파일에서 읽어 썼습니다 — `tests/test_live_check_applied.py` 가 기록의 숫자를 결과 파일에서 다시 세어 맞댑니다('실제 호출 실행기' 절의 '결과 반영').
 - **음성 대조.** 음성 대조는 10절 목록.
 
 ## 실제 호출 실행기 — `tests/live_check.py` (Phase 6A)
@@ -1145,8 +1182,11 @@ python3 -m tests.live_check --verdict <결과 파일>     # 호출 없이 판정
   `summary.md` 는 사람용 숫자 요약이고 같은 실행이 둘을 덮어씁니다.
   `summary.md` 에는 영상 · 인기 댓글 · 초안의 글이 들어가지 않습니다.
   밖에서 온 글과 모델이 쓴 글은 `untrusted` 칸 안에만 둡니다(제목 · 설명 · 인기 댓글 · 고민 · 초안 ·
-  판정 이유 · 건너뛴 이유 · 코드 검사 이유). `untrusted` 밖의 칸은 숫자 · 참거짓 · 정해진 낱말과
-  실행기가 만든 글(오류 이름)이고, 6B 는 판정과 기준값 계산에 이 칸들을 씁니다. 댓글 작성자 이름 ·
+  판정 이유 · 건너뛴 이유 · 코드 검사 이유). 예외는 둘입니다. jev 가 답에 알린 모델 이름은 검사 없이
+  `fingerprint.jev_models` 에 들어갑니다. YouTube 가 준 영상 ID 는 허용 모양(`VIDEO_ID_RE`, 11자)을
+  거친 것이 `videos[].video_id` · `errors[].video_id` 에 들어갑니다. `untrusted` 밖의 칸은 이 둘을
+  빼면 숫자 · 참거짓 · 정해진 낱말과 실행기가 만든 글(오류 이름)이고, 6B 는 판정과 기준값 계산에 이
+  칸들을 쓰며 `jev_models` 는 믿을 수 없는 글로 보아 읽지 않습니다(아래 '결과 반영'). 댓글 작성자 이름 ·
   채널 ID 는 어느 칸에도 없습니다. 제목은 300자, 설명은 2000자, 인기 댓글은 하나에 300자까지입니다.
 
   | 칸 | 뜻 |
@@ -1201,4 +1241,19 @@ python3 -m tests.live_check --verdict <결과 파일>     # 호출 없이 판정
 - **알려진 한계.** jev 응답의 `answers[이름].noul` · `model`, Claude 의 404 `status_code`, typesafe 의
   다시 시도 · 제한 시간 정책은 문서와 SDK 소스로 맞춘 모양이고 첫 진짜 실행이 처음 확인합니다.
   Claude 채점은 정답이 아니라 또 하나의 의견입니다(트래커 Phase 6A).
+- **결과 반영 (Phase 6B).** 사람이 커밋한 결과를 `tests/test_live_check_applied.py` 가 계약 · 설정과
+  맞댑니다. 결과 파일과 요약이 BOM 없이 있고, `--verdict` 가 종료 코드 0 과 `6B: go` 한 줄을 내며,
+  요약 첫 줄이 같은 판정 줄이고, 언어마다 예시 행 수가 `example_count` 와 예시 묶음 수와 같아야 합니다.
+  - 지문 맞대기(`measured_drift`) — 판별 기록이 기대는 칸(`questions` · `examples_sha256` ·
+    `classifier` · `margin` · `pass_correct`)은 결과와 지금 코드 · `config.yaml` 이 같아야 합니다.
+  - 작성 쪽 칸(`check_questions` · `self_check_criteria` · `check_min_probability` · `trigger` ·
+    `grade_system` · `target_drafts` · `wide_window_hours` · `claude_max_retries`)과
+    `fingerprint.jev_models` 는 맞대기에서 보지 않습니다. 작성 쪽 기록은 정답 있는 초안이 0 이라 어느
+    값도 옮긴 것이 없고, 이 칸을 지키면 작성 질문이나 채점을 고치는 사이클마다 사람의 재실행이 먼저
+    있어야 합니다. 그래서 이 칸이 바뀐 뒤의 초안 숫자는 옛 질문 · 채점으로 잰 숫자입니다.
+    `check_min_probability` 는 '댓글 작성' 절의 기록 테스트가 결과의 값과 같은지 봅니다.
+  - 새 결과나 사람 칸을 고친 결과를 커밋하거나 맞대는 칸을 고치면 이 모듈이 빨강입니다 — 기록이 지금
+    코드를 잰 숫자가 아니라는 뜻입니다. 사이클 안에서는 `unmeasured` 로 멈춥니다. 초록으로 돌아오는
+    길은 사람이 실행기를 다시 돌려 결과를 커밋한 뒤, 이 페이즈와 같은 적용 사이클이 기록 줄과
+    기준값을 새 결과로 다시 쓰는 것입니다. 그 사이클을 맡을 페이즈는 트래커가 정합니다.
 - **음성 대조.** 10절 목록의 `youtube-comments-*` · `live-check-*` 명령.
