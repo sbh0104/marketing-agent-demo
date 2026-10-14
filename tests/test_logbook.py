@@ -400,6 +400,10 @@ class ReadLogTest(unittest.TestCase):
         self.assertIn("줄바꿈", message)
         cut = format_line(AT, Event.POST, POSTED)[:-3]
         self.assert_error(f"{self.good}\n{cut}", "2번째 줄: ")
+        # 공백 · 탭 · 폼 피드만 남은 꼬리도 끊긴 줄입니다
+        for tail in (chr(0x20), chr(0x09), chr(0x0C)):
+            with self.subTest(tail=f"U+{ord(tail):04X}"):
+                self.assert_error(f"{self.good}\n{tail}", "2번째 줄: ")
 
     def test_empty_file_reads_as_no_events(self) -> None:
         for text in ("", "\n"):
