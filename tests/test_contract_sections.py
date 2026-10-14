@@ -17,7 +17,7 @@ SCAN_DIRS = ("src", "tests")
 LAST_NUMBERED = 10
 NUMBERED = [str(number) for number in range(1, LAST_NUMBERED + 1)]
 
-HEADING_RE = re.compile(r"^## ([0-9]+)\.", re.MULTILINE)
+HEADING_RE = re.compile(r"^ {0,3}##[ \t]+(\d+)", re.MULTILINE)
 CITATION_RE = re.compile(r"(?<![0-9])([0-9]+)절")
 
 
@@ -27,7 +27,11 @@ def section(number: int) -> str:
 
 
 def numbered_headings(text: str) -> list[str]:
-    """줄 맨 앞 `## <숫자>.` 제목의 번호 — 나온 차례대로."""
+    """앞 공백 0–3칸, `##`, 공백 한 칸 이상 뒤에 숫자로 시작하는 제목의 번호 — 나온 차례대로.
+
+    숫자 뒤는 무엇이든(마침표 · 괄호 · 공백 · 줄 끝) 같은 번호로 셉니다. `###` 이하 소제목은
+    `##` 바로 뒤가 공백이 아니라 세지 않습니다.
+    """
     return HEADING_RE.findall(text)
 
 
@@ -66,6 +70,20 @@ OLD_MAIN = FIRST_TEN + (
 )
 TITLED = OLD_MAIN.replace("## 11. ", "## ").replace("## 12. ", "## ")
 
+# 10절 뒤 번호 붙은 제목의 목록 밖 꼴 — 빨강 (FIRST_TEN 뒤에 하나씩 붙여 잽니다)
+ODD_SHAPES = (
+    "## 11 제목\n",  # 마침표 없음 — 트래커 Phase 1B "출하 뒤 고침" 줄
+    "## 11) 제목\n",  # 괄호 — 트래커 Phase 1B "출하 뒤 고침" 줄
+    "##  11.\n",  # `##` 뒤 공백 둘 — 트래커 Phase 1B "출하 뒤 고침" 줄
+    "   ## 11.\n",  # 앞 공백 셋 — 트래커 Phase 1B "출하 뒤 고침" 줄
+)
+
+# `###` 이하 소제목의 번호 — 절 안에서만 세는 번호라 초록 (TITLED 뒤에 붙여 잽니다)
+DEEPER = (
+    "### 1. 입력 확인\n"  # 트래커 Phase 1B "출하 뒤 고침" 줄
+    "### 11.\n"  # 트래커 Phase 1B "출하 뒤 고침" 줄 · 1B Trade-offs accepted `### 11.` 줄
+)
+
 # 10보다 큰 번호의 인용 — 고치기 전 watcher.py · 주제 판별 절에 있던 꼴
 HIGH = "\n".join(
     (
@@ -102,6 +120,14 @@ class ContractSectionNamesTest(unittest.TestCase):
 
     def test_titled_headings_are_green(self) -> None:
         self.assertEqual(numbered_headings(TITLED), NUMBERED)
+
+    def test_odd_numbered_shapes_are_red(self) -> None:
+        for specimen in ODD_SHAPES:
+            with self.subTest(specimen=specimen):
+                self.assertNotEqual(numbered_headings(FIRST_TEN + specimen), NUMBERED)
+
+    def test_deeper_headings_are_green(self) -> None:
+        self.assertEqual(numbered_headings(TITLED + DEEPER), NUMBERED)
 
     def test_citations_above_ten_are_red(self) -> None:
         self.assertEqual([number for number, _ in high_citations(HIGH)], [1, 2, 3, 4])
