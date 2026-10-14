@@ -354,6 +354,12 @@ TEXT_VALUES: tuple[RangeValue, ...] = (
         'chrome_debug_url: "http://localhost:9222 "\n',
         f"{EDGE_SPACE}: chrome_debug_url",
     ),
+    RangeValue(
+        "topic_over_ceiling",
+        "topic: 연애\n",
+        "topic: " + "가" * 501 + "\n",
+        "500자 이하여야 합니다: topic",
+    ),
 )
 
 # 글자 규칙이 받는 범주마다 글자 하나(22) — 범주 L · M · N · P · S
@@ -1063,6 +1069,8 @@ class TextRuleTest(unittest.TestCase):
             ("topic: 연애   \n", "연애"),
             # 한글 채움 문자(U+3164) — 빈칸으로 그려지지만 범주 Lo 라 규칙을 지납니다
             ('topic: "연애ㅤ"\n', "연애ㅤ"),
+            # 주제 글자 수 상한 500자까지
+            ("topic: " + "가" * 500 + "\n", "가" * 500),
         )
         for new, topic in rows:
             with self.subTest(new=new):
