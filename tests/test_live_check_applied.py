@@ -14,7 +14,7 @@ from collections import Counter
 from collections.abc import Mapping
 from datetime import datetime, timezone
 
-from agent.classifier import LANGUAGES
+from agent.classifier import LANGUAGES, QUESTION_LANGUAGE
 from agent.config import load_config
 from tests import live_check
 from tests.classifier_examples import EXAMPLES
@@ -297,6 +297,49 @@ class MeasuredDriftTest(unittest.TestCase):
         self.assertEqual(partition, set(self.current))
         self.assertEqual(partition, set(self.recorded))
         self.assertFalse(set(GUARDED) & set(WRITE_SIDE))
+
+
+class AccuracyRecordTest(ContractCase):
+    """'주제 판별' 절의 정확도 기록 — 결과 파일에서 다시 센 숫자가 계약에 있고 기준값은 그대로."""
+
+    def setUp(self) -> None:
+        self.result = load_result()
+
+    def test_accuracy_record_is_in_contract(self) -> None:
+        result = self.result
+        classifier = result["fingerprint"]["classifier"]
+        phrases = [
+            f"`docs/live-check/result.json`(실행 {result['run_at']}, 판정 줄 `{result['verdict']}`)",
+            f"지금 기준값은 `noul_yes_min` {classifier['noul_yes_min']}"
+            f" · `noul_no_max` {classifier['noul_no_max']}"
+            f" · `choice_min_confidence` {classifier['choice_min_confidence']} 입니다",
+            *accuracy_lines(result),
+            *gap_lines(result),
+            *classification_lines(result),
+        ]
+        for phrase in phrases:
+            self.assert_in_contract(phrase)
+
+    def test_question_language_follows_record(self) -> None:
+        passed = {language: passes(reach(self.result, language)) for language in LANGUAGES}
+        self.assertTrue(any(passed.values()), "drift — 인터뷰")
+        self.assertEqual(QUESTION_LANGUAGE, "ko" if passed["ko"] else "en")
+        self.assertEqual(QUESTION_LANGUAGE, "ko")
+        self.assert_in_contract(f"`QUESTION_LANGUAGE` 는 `{QUESTION_LANGUAGE}` 그대로입니다")
+
+    def test_floors_stay_when_no_false_yes(self) -> None:
+        for language in LANGUAGES:
+            counts = self.result["accuracy_tally"][language]
+            self.assertTrue(
+                counts["false_yes"] == 0 and reach(self.result, language) == counts["correct"],
+                "6B 규칙으로 기준값을 다시 정하세요",
+            )
+        config = load_config(REPO_CONFIG).classifier
+        recorded = self.result["fingerprint"]["classifier"]
+        self.assertEqual(
+            (config.noul_yes_min, config.noul_no_max, config.choice_min_confidence),
+            (recorded["noul_yes_min"], recorded["noul_no_max"], recorded["choice_min_confidence"]),
+        )
 
 
 if __name__ == "__main__":
