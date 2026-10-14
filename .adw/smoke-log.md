@@ -712,7 +712,7 @@ other line is required on every item.
 - touches: docs/contracts.md, docs/live-check/README.md
 - base: adw/phase-6b-live-check-apply
 - phase: plans/interview-marketing-agent.md#phase-6b
-- status: open
+- status: resolved
 - attempts: 0 · last failure: —
 
 ### S-069 — 지문 맞대기가 지키는 칸 목록(GUARDED · WRITE_SIDE)을 계약의 두 목록과 맞대 고정 (S-060)
@@ -722,7 +722,7 @@ other line is required on every item.
 - touches: tests/test_live_check_applied.py
 - base: adw/phase-6b-live-check-apply
 - phase: plans/interview-marketing-agent.md#phase-6b
-- status: open
+- status: resolved
 - attempts: 0 · last failure: —
 
 ### S-070 — 초안 정답의 사람 칸 우선 · 정답 목록 · 기준값 사이 경계를 심은 데이터로 고정 (S-061)
@@ -732,7 +732,7 @@ other line is required on every item.
 - touches: tests/test_live_check_applied.py
 - base: adw/phase-6b-live-check-apply
 - phase: plans/interview-marketing-agent.md#phase-6b
-- status: open
+- status: resolved
 - attempts: 0 · last failure: —
 
 ### S-071 — 계약 기록 맞대기가 숫자 뒤에 더 붙은 숫자를 놓침 (S-062)
@@ -742,7 +742,7 @@ other line is required on every item.
 - touches: tests/test_live_check_applied.py
 - base: adw/phase-6b-live-check-apply
 - phase: plans/interview-marketing-agent.md#phase-6b
-- status: open
+- status: resolved
 - attempts: 0 · last failure: —
 
 ### S-072 — '주제 판별' 기록의 다섯 셈을 accuracy 행에서 다시 세어 accuracy_tally 와 맞댐 (S-063)
@@ -752,7 +752,7 @@ other line is required on every item.
 - touches: tests/test_live_check_applied.py
 - base: adw/phase-6b-live-check-apply
 - phase: plans/interview-marketing-agent.md#phase-6b
-- status: open
+- status: resolved
 - attempts: 0 · last failure: —
 
 ### S-073 — 계약 기록 맞대기가 같은 머리의 모순된 중복 줄을 놓침 (S-066)
