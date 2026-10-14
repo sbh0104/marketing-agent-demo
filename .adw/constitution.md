@@ -80,6 +80,22 @@
      is carried like a bare line. A hand-off ship-check finds on its own also names
      its receiving phase by number. Never write a Human checks line only to close an
      entry — landing turns every line into a new entry.
+11. **An accepted ship-check risk is written as a site, an input class and a
+    consequence; the inputs that reproduced it are examples, never its boundary.**
+    Until the upstream harness carries this rule (ADWS backlog line
+    `marketing-agent-demo E-021 이관`), it lives here.
+   - **deep-interview** (and any session writing a tracker `Trade-offs accepted` line
+     for a ship-check finding) — the line names the code site (`file:function` and the
+     handling line, e.g. `src/agent/youtube.py:245` `except`), the input class ("a
+     broken or tampered Google response") and the consequence ("the cycle ends without
+     its `ERROR` line"), then `examples: …` for the reproduced inputs. A line a later
+     finding re-opens is rewritten into this shape, never extended input by input;
+     older lines stay as they are until then.
+   - **ship-check** — a finding that matches an accepted line on all three (same site,
+     same input class, same consequence) is that line's new example: list it under
+     `## Risks` citing the line, never `## Human checks`; it blocks nothing. Same site
+     or same input class with a different consequence is a new risk, and so is a
+     finding whose consequence is unclear to be the same.
 
 ## Never
 
