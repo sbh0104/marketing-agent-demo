@@ -15,12 +15,14 @@ import tempfile
 import unittest
 from collections import Counter
 from collections.abc import Mapping
+from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
 from unittest import mock
 
 from agent.classifier import LANGUAGES, QUESTION_LANGUAGE, _decide
 from agent.config import ClassifierConfig, load_config
+from agent.models import Verdict
 from agent.writer import (
     CHECK_QUESTIONS,
     INVERTED_QUESTIONS,
@@ -44,6 +46,9 @@ RECOUNTED = ("classifier.noul_yes_min", "classifier.noul_no_max",
 WRITE_SIDE = ("check_questions", "self_check_criteria", "trigger", "grade_system", "target_drafts",
               "wide_window_hours", "claude_max_retries")
 FLOORS = ("noul_yes_min", "noul_no_max", "choice_min_confidence")
+TOPIC_ANSWERS = ("연애", "아님")
+TRACKER_FLOORS = (0.75, 0.6)  # 트래커 Phase 6D 의 기록 줄(결정 아님)이 본 두 하한 — 기록만
+DATE_KEYS = frozenset({"published_at", "published_after", "published_before"})
 GO_LINE = "6B: go"
 # 트래커 Phase 6D 드리프트 인터뷰 질문 1 A — 작성 막힘인 채로 '고치기 전' 기록으로 반영한 단 한 실행
 BEFORE_FIX_RUN_AT = "2026-10-14T14:09:02.882902+00:00"
@@ -417,6 +422,176 @@ def check_floor_line(result: dict) -> str:
     )
 
 
+def topic_answer(video: Mapping[str, object]) -> str | None:
+    """영상 판별의 정답 — 사람 칸(`연애` · `아님`)이 있으면 그것, 없으면 Claude 채점, 둘 다 없으면 None."""
+    if video["topic_human"] in TOPIC_ANSWERS:
+        return video["topic_human"]
+    if video["topic_grade"] in TOPIC_ANSWERS:
+        return video["topic_grade"]
+    return None
+
+
+def topic_grade_lines(result: dict) -> list[str]:
+    """창마다 진짜 영상 판별의 일치 · 보류 · 불일치와 정답이 엇갈린 수 — 기록만."""
+    lines: list[str] = []
+    for window, label in WINDOW_LABELS.items():
+        if window not in result["windows"]:
+            lines.append(f"영상 판별 채점 {label}: 실행 없음")
+            continue
+        judged = [
+            video
+            for video in _window_videos(result, window)
+            if video["classification"] is not None
+        ]
+
+        def among(verdict: str, answer: str) -> tuple[int, int]:
+            group = [video for video in judged if video["classification"]["verdict"] == verdict]
+            return len(group), sum(1 for video in group if topic_answer(video) == answer)
+
+        (y, a), (h, b), (n, c) = among("yes", "아님"), among("hold", "연애"), among("no", "연애")
+        none = sum(1 for video in judged if topic_answer(video) is None)
+        humans = sum(1 for video in judged if video["topic_human"] in TOPIC_ANSWERS)
+        lines.append(
+            f"영상 판별 채점 {label}: 일치 {y} 중 정답 아님 {a} · 보류 {h} 중 정답 연애 {b}"
+            f" · 불일치 {n} 중 정답 연애 {c} · 정답 없음 {none} · 사람 칸 {humans}/{len(judged)}"
+        )
+    return lines
+
+
+def lowering_lines(result: dict) -> list[str]:
+    """창마다 `noul_yes_min` 만 트래커가 본 두 하한으로 내리면 새로 일치가 되는 보류 영상 수 — 기록만."""
+    base = live_check.classifier_config(result["fingerprint"]["classifier"])
+    lines: list[str] = []
+    for window, label in WINDOW_LABELS.items():
+        if window not in result["windows"]:
+            lines.append(f"보류 영상 하한 내림 {label}: 실행 없음")
+            continue
+        holds = [
+            video
+            for video in _window_videos(result, window)
+            if video["classification"] is not None
+            and video["classification"]["verdict"] == "hold"
+            and not video["classification"]["error"]
+            and _number(video["classification"]["noul"])
+        ]
+        parts: list[str] = []
+        for floor in TRACKER_FLOORS:
+            lowered = replace(base, noul_yes_min=floor)
+            turned = Counter(
+                topic_answer(video)
+                for video in holds
+                if _decide(
+                    video["classification"]["noul"],
+                    video["classification"]["choice"],
+                    video["classification"]["probability"],
+                    video["classification"]["confidence"],
+                    lowered,
+                )[0]
+                is Verdict.YES
+            )
+            parts.append(
+                f"`noul_yes_min` {floor} 이면 새 일치 — 정답 연애 {turned['연애']}"
+                f" · 정답 아님 {turned['아님']} · 정답 없음 {turned[None]}"
+            )
+        lines.append(f"보류 영상 하한 내림 {label}: " + " / ".join(parts))
+    return lines
+
+
+def task_counts(result: dict, window: str | None) -> dict[str, int]:
+    """과제 품질 · 인기 댓글 · 작성 수 — `window` 가 None 이면 모든 영상."""
+    videos = result["videos"] if window is None else _window_videos(result, window)
+    outcomes = Counter(video["result"] for video in videos)
+    attempts = [draft for video in videos for draft in video["drafts"]]
+    drafts = [draft for draft in attempts if draft["parsed"] is True]
+    tasks = [
+        draft["task_quality"] for draft in drafts if isinstance(draft["task_quality"], Mapping)
+    ]
+    overlaps = [draft["frame_overlap"] for draft in drafts if _number(draft["frame_overlap"])]
+    return {
+        "written": outcomes["comment"] + outcomes["skip"],
+        "skip": outcomes["skip"],
+        "drafts": len(drafts),
+        "unparsed": len(attempts) - len(drafts),
+        "tasks": len(tasks),
+        "love": sum(1 for task in tasks if task.get("concern_is_love_worry") is True),
+        "saju": sum(1 for task in tasks if task.get("saju_story_fits") is True),
+        "task_errors": sum(1 for draft in drafts if draft["task_error"] is not None),
+        "framed": sum(1 for overlap in overlaps if overlap > 0),
+        "most": max(overlaps, default=0),
+        "popular": sum(
+            1
+            for video in videos
+            if video["material"] == "top_comments"
+            for draft in video["drafts"]
+            if draft["parsed"] is True
+        ),
+        "empty_items": sum(
+            1
+            for video in videos
+            if isinstance(video["comment_items"], int)
+            and not isinstance(video["comment_items"], bool)
+            and video["comment_items"] > 0
+            and video["top_comment_count"] == 0
+        ),
+    }
+
+
+def task_lines(result: dict) -> list[str]:
+    """창마다 과제 품질 · 인기 댓글 기록 두 줄 — 기록만이고 통과선을 움직이지 않습니다."""
+    lines: list[str] = []
+    for window, label in WINDOW_LABELS.items():
+        if window not in result["windows"]:
+            lines += [f"과제 품질 {label}: 실행 없음", f"인기 댓글 {label}: 실행 없음"]
+            continue
+        c = task_counts(result, window)
+        lines += [
+            f"과제 품질 {label}: ⓐ 고민 한 줄이 연애 고민 {c['love']}/{c['tasks']}"
+            f" · ⓑ 연애사주 경험이 고민과 이어짐 {c['saju']}/{c['tasks']}"
+            f" · 과제 칸 오류 {c['task_errors']}"
+            f" · ⓒ 다른 영상 초안과 겹치는 {live_check.FRAME_CHARS}글자 조각이 있는 초안"
+            f" {c['framed']}/{c['drafts']} · 겹친 조각 최다 {c['most']}",
+            f"인기 댓글 {label}: 재료 초안 {c['popular']}"
+            f" · 항목은 왔는데 글 0개인 영상 {c['empty_items']}",
+        ]
+    return lines
+
+
+def todo_line(result: dict) -> str:
+    """보고서 첫머리의 6E 줄 — 이번 결과는 늘 "할 일 있음"(트래커 Phase 6D 드리프트 인터뷰 질문 3 A)."""
+    c = task_counts(result, None)
+    return (
+        f"6E: 할 일 있음 — ⓐ 고민 한 줄이 연애 고민 {c['love']}/{c['tasks']}"
+        f" · ⓑ 연애사주 경험이 고민과 이어짐 {c['saju']}/{c['tasks']}"
+        f" · ⓒ 다른 영상 초안과 겹치는 {live_check.FRAME_CHARS}글자 조각이 있는 초안"
+        f" {c['framed']}/{c['drafts']} · 건너뜀 SKIP {c['skip']}/{c['written']}"
+        f" · 작성기 답을 JSON 으로 못 읽은 초안 {c['unparsed']}/{c['drafts']}"
+    )
+
+
+def mark_text(value: object, path: str = "") -> object:
+    """글 칸마다 표식을 심은 복사본 — 모든 글 잎은 `MRK·<경로>` 가 됩니다.
+
+    `video_id` 는 `MRK` 와 그 영상 차례 8자리(11글자), DATE_KEYS 아래 값과 수 · 참거짓 · None 은
+    그대로입니다.
+    """
+    if isinstance(value, Mapping):
+        marked: dict[str, object] = {}
+        for key, item in value.items():
+            if key in DATE_KEYS:
+                marked[key] = item
+            elif key == "video_id" and isinstance(item, str):
+                index = re.search(r"\[([0-9]+)\]\Z", path)
+                marked[key] = f"MRK{int(index.group(1)) if index else 0:08d}"
+            else:
+                marked[key] = mark_text(item, f"{path}.{key}" if path else key)
+        return marked
+    if isinstance(value, list):
+        return [mark_text(item, f"{path}[{index}]") for index, item in enumerate(value)]
+    if isinstance(value, str):
+        return f"MRK·{path}"
+    return value
+
+
 def normalize(text: str) -> str:
     return " ".join(text.split())
 
@@ -429,6 +604,12 @@ def record_heads() -> list[str]:
     heads.append("다시 셈한 기준값")
     for label in WINDOW_LABELS.values():
         heads += [f"기준값 사이 영상 {label}:", f"영상 판별 {label}:", f"초안 {label}:"]
+        heads += [
+            f"영상 판별 채점 {label}:",
+            f"보류 영상 하한 내림 {label}:",
+            f"과제 품질 {label}:",
+            f"인기 댓글 {label}:",
+        ]
     heads.append("모델 이름:")
     return heads
 
@@ -492,7 +673,10 @@ class ContractHeadTest(unittest.TestCase):
             recount_line(result),
             *gap_lines(result),
             *classification_lines(result),
+            *topic_grade_lines(result),
+            *lowering_lines(result),
             *draft_lines(result),
+            *task_lines(result),
             model_line(result),
         ]
         for line in lines:
@@ -686,6 +870,10 @@ class MeasuredDriftTest(unittest.TestCase):
             recount_line,
             check_floor_line,
             language_phrase,
+            topic_grade_lines,
+            lowering_lines,
+            task_lines,
+            todo_line,
         )
         for render in renders:
             with self.subTest(render=render.__name__):
@@ -929,6 +1117,71 @@ class RecountTest(unittest.TestCase):
             ["videos[0].drafts[0] self_check_pass False -> True"],
         )
 
+    @staticmethod
+    def _flip_tasks(draft: dict) -> None:
+        if isinstance(draft.get("task_quality"), Mapping):
+            draft["task_quality"] = {
+                key: not value for key, value in draft["task_quality"].items()
+            }
+
+    @staticmethod
+    def _text_leaves(value: object, key: str = "") -> list[tuple[str, str]]:
+        if isinstance(value, Mapping):
+            return [
+                leaf
+                for name, item in value.items()
+                for leaf in RecountTest._text_leaves(item, name)
+            ]
+        if isinstance(value, list):
+            return [leaf for item in value for leaf in RecountTest._text_leaves(item, key)]
+        return [(key, value)] if isinstance(value, str) else []
+
+    def test_video_cells_do_not_move_floor_recount(self) -> None:
+        # 약속 "예시 22개의 숫자와 다른 표본이며 기준값을 움직이지 않습니다" — 영상 칸은 하한 셋을 옮기지 않습니다
+        result = load_result()
+        tampered = copy.deepcopy(result)
+        tampered["videos"] = mark_text(tampered["videos"], "videos")
+        tampered["windows"] = mark_text(tampered["windows"], "windows")
+        for video in tampered["videos"]:
+            if video["classification"] is not None:
+                video["classification"].update(noul=0.5, confidence=0.99)
+            for draft in video["drafts"]:
+                self._flip_tasks(draft)
+        leaves = self._text_leaves(tampered["videos"]) + self._text_leaves(tampered["windows"])
+        self.assertTrue(leaves)
+        for key, text in leaves:
+            with self.subTest(key=key, text=text):
+                self.assertTrue(key in DATE_KEYS or text.startswith("MRK"), text)
+        ids = [video["video_id"] for video in tampered["videos"]]
+        self.assertEqual(ids, [f"MRK{index:08d}" for index in range(len(ids))])
+
+        def floors(data: dict) -> dict[str, object]:
+            return {
+                key: value for key, value in recount(data).items() if key.startswith("classifier.")
+            }
+
+        self.assertEqual(floors(tampered), floors(result))
+
+    def test_task_cells_do_not_move_check_floor(self) -> None:
+        # 약속 "과제 품질 · 인기 댓글 숫자는 기록입니다 — 통과선은 이 숫자로 움직이지 않습니다"
+        raised = self.fake(drafts=(self.draft((0.71, 0.1, 0.9), claude="bad"),))
+        swap = {"top_comments": "title_description", "title_description": "top_comments"}
+        cases = (("committed", load_result(), 0.7), ("raised", raised, 0.76))
+        for name, result, expected in cases:
+            with self.subTest(result=name):
+                self.assertEqual(check_floor(result), expected)
+                changed = copy.deepcopy(result)
+                for video in changed["videos"]:
+                    video["material"] = swap.get(video["material"], video["material"])
+                    video.update(top_comment_count=0, comment_items=7)
+                    for draft in video["drafts"]:
+                        if draft["parsed"] is not True:
+                            continue
+                        self._flip_tasks(draft)
+                        draft.update(task_error="응답 모양", frame_overlap=99)
+                self.assertNotEqual(task_lines(changed), task_lines(result))
+                self.assertEqual(check_floor(changed), expected)
+
 
 class DraftBoundaryTest(unittest.TestCase):
     """심은 초안 · 행의 경계 — 사람 칸이 Claude 채점보다 먼저, 기준값과 같은 `noul` 은 사이가 아님."""
@@ -1004,6 +1257,55 @@ class DraftBoundaryTest(unittest.TestCase):
         )
 
 
+class TopicBoundaryTest(unittest.TestCase):
+    """영상 판별 정답 · 하한 내림 기록의 경계 — 사람 칸 먼저, 내림은 확신 있는 같은 주제 보류만."""
+
+    def test_topic_answer_samples(self) -> None:
+        samples = (
+            ({"topic_human": "연애", "topic_grade": "아님"}, "연애"),
+            ({"topic_human": "아님", "topic_grade": "연애"}, "아님"),
+            ({"topic_human": "", "topic_grade": "연애"}, "연애"),
+        )
+        for video, expected in samples:
+            with self.subTest(video=video):
+                self.assertEqual(topic_answer(video), expected)
+
+    def test_lowering_counts_holds_the_tracker_floors_turn_yes(self) -> None:
+        result = copy.deepcopy(load_result())
+        classifier = result["fingerprint"]["classifier"]
+        on, off = classifier["on_topic_reasons"][0], classifier["off_topic_reasons"][0]
+
+        def video(verdict: str, noul: float | None, choice: str | None, confidence: float | None,
+                  grade: str, error: bool = False) -> dict:
+            return {
+                "window": "operation",
+                "classification": {
+                    "verdict": verdict,
+                    "error": error,
+                    "noul": noul,
+                    "choice": choice,
+                    "probability": None if noul is None else 0.9,
+                    "confidence": confidence,
+                },
+                "topic_grade": grade,
+                "topic_human": "",
+            }
+
+        result["videos"] = [
+            video("hold", 0.76, on, 0.9, "연애"),
+            video("hold", 0.65, on, 0.9, "아님"),
+            video("hold", 0.78, on, 0.3, "연애"),
+            video("hold", 0.7, off, 0.9, "연애"),
+            video("yes", 0.95, on, 0.9, "연애"),
+            video("hold", None, None, None, "연애", error=True),
+        ]
+        self.assertEqual(
+            lowering_lines(result)[0],
+            "보류 영상 하한 내림 운영 창: `noul_yes_min` 0.75 이면 새 일치 — 정답 연애 1 · 정답 아님 0"
+            " · 정답 없음 0 / `noul_yes_min` 0.6 이면 새 일치 — 정답 연애 1 · 정답 아님 1 · 정답 없음 0",
+        )
+
+
 class AccuracyRecordTest(ContractCase):
     """'주제 판별' 절의 정확도 기록 — 결과 파일에서 다시 센 숫자가 계약에 있고 기준값은 그대로."""
 
@@ -1022,6 +1324,8 @@ class AccuracyRecordTest(ContractCase):
             recount_line(result),
             *gap_lines(result),
             *classification_lines(result),
+            *topic_grade_lines(result),
+            *lowering_lines(result),
         ]
         for phrase in phrases:
             self.assert_in_contract(phrase)
@@ -1101,7 +1405,7 @@ class WriterRecordTest(ContractCase):
         self.assert_in_contract(f"`comment.writer_model` 은 `{writer}` 그대로입니다")
 
     def test_draft_record_is_in_contract(self) -> None:
-        for phrase in draft_lines(self.result):
+        for phrase in (*draft_lines(self.result), *task_lines(self.result)):
             self.assert_in_contract(phrase)
 
     def test_check_floor_is_the_recount(self) -> None:
@@ -1113,6 +1417,43 @@ class WriterRecordTest(ContractCase):
             "6B 규칙으로 다시 셈한 통과선과 config.yaml 이 다릅니다",
         )
         self.assert_in_contract(check_floor_line(self.result))
+
+    def test_todo_line_counts_come_from_the_result(self) -> None:
+        line = todo_line(self.result)
+        self.assertTrue(line.startswith("6E: 할 일 있음 — "), line)
+        found = re.fullmatch(
+            r"6E: 할 일 있음 — ⓐ 고민 한 줄이 연애 고민 ([0-9]+)/([0-9]+)"
+            r" · ⓑ 연애사주 경험이 고민과 이어짐 ([0-9]+)/([0-9]+)"
+            rf" · ⓒ 다른 영상 초안과 겹치는 {live_check.FRAME_CHARS}글자 조각이 있는 초안"
+            r" ([0-9]+)/([0-9]+) · 건너뜀 SKIP ([0-9]+)/([0-9]+)"
+            r" · 작성기 답을 JSON 으로 못 읽은 초안 ([0-9]+)/([0-9]+)",
+            line,
+        )
+        self.assertIsNotNone(found, line)
+        love, tasks, saju, tasks_b, framed, drafts, skip, written, unparsed, drafts_b = (
+            found.groups()
+        )
+        self.assertEqual((tasks_b, drafts_b), (tasks, drafts))
+        summary = live_check.render_summary(self.result).splitlines()
+        task_line = next(text for text in summary if text.startswith("- 과제 품질:"))
+        for phrase in (
+            f"고민이 연애 고민 {love}/{tasks}",
+            f"연애사주 경험이 고민과 이어짐 {saju}/{tasks}",
+            f"조각이 있는 초안 {framed}/{drafts}",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, task_line)
+        self.assertIn(f"SKIP {skip}/{written}", live_check.verdict_line(self.result))
+        attempts = [draft for video in self.result["videos"] for draft in video["drafts"]]
+        self.assertEqual(
+            int(unparsed), sum(1 for draft in attempts if draft["parsed"] is not True)
+        )
+        tampered = copy.deepcopy(self.result)
+        for video in tampered["videos"]:
+            for draft in video["drafts"]:
+                if isinstance(draft.get("task_quality"), Mapping):
+                    draft["task_quality"]["concern_is_love_worry"] = True
+        self.assertIn(f"ⓐ 고민 한 줄이 연애 고민 {tasks}/{tasks} ·", todo_line(tampered))
 
     def test_repeat_min_chars_stays_unmeasured(self) -> None:
         self.assert_in_contract(
