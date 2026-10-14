@@ -551,3 +551,48 @@ other line is required on every item.
 - status: resolved
 - attempts: 0 · last failure: —
 - first seen: 2026-10-14 · last seen: 2026-10-14
+
+### S-NEW-1 — youtu.be · shorts 쿼리 이름의 "셋뿐 · 정확히 같을 때" 를 테스트로 고정
+- source: cycle 20261014-035715-adw/phase-1a-parser-allow-rules · tracker plans/interview-marketing-agent.md#phase-1a · deferred by ship-check
+- evidence: src/agent/guard.py:23 (`_SHARE_QUERY_NAMES` 에 `"index"` 를 더한 변이 초록 — `?index=2` 가 A 로 읽힘), src/agent/guard.py:66 (`key in` 을 `key.strip() in` 으로 바꾼 변이 초록 — `?+si=x` · `?si%20=x` · `?%20t=1` 이 A 로 읽힘); 계약 docs/contracts.md:299-300 "셋뿐 … 대소문자까지 같을 때"(.adw/ship-report.md § Test integrity)
+- direction: tests/test_guard.py 의 REJECTED_SHARE_QUERIES 에 `?index=2` · `?t=1&index=2` · `?start=5` · `?+si=x` · `?si%20=x` · `?%20t=1` 을 더해 두 형식 모두 `invalid_video` 인지 단언한다 — 코드 변경 없음
+- touches: tests/test_guard.py
+- status: open
+- attempts: 0 · last failure: —
+- first seen: 2026-10-14 · last seen: 2026-10-14
+
+### S-NEW-2 — read_log 의 공백만 있는 줄과 줄 바꿈 · U+2028 제목의 한 사건 읽기를 테스트로 고정
+- source: cycle 20261014-035715-adw/phase-1a-parser-allow-rules · tracker plans/interview-marketing-agent.md#phase-1a · deferred by ship-check
+- evidence: src/agent/logbook.py:180 (`if not line:` 을 `if not line.strip():` 으로 바꾼 변이 초록 — `good\n   \ngood\n` 이 오류 없이 사건 2개; 계약 docs/contracts.md:453 "빈 줄을 뺀 모든 줄 … 건너뛰지 않고"), tests/test_logbook.py RawCharacterTest::test_repro_titles_leave_no_raw_control_or_surrogate_and_read_back 의 제목에 `\n` · U+2028 이 없음(계약 L446 "여러 줄짜리 댓글도, 영상 제목에 숨긴 U+2028 도 read_log 의 읽기로 한 사건 한 줄")(.adw/ship-report.md § Test integrity)
+- direction: tests/test_logbook.py ReadLogTest 에 공백 · 탭 · `\x0c` 만 있는 둘째 줄이 각각 `2번째 줄: ` 로 시작하는 ValueError 인지, `Logbook` 으로 제목 `"a\nb"` · `"a" + chr(0x2028) + "b"` 를 쓴 파일을 read_log 가 DETECT 하나씩 원래 값으로 돌려주는지 단언한다(글자는 chr() 로 씀) — 코드 변경 없음
+- touches: tests/test_logbook.py
+- status: open
+- attempts: 0 · last failure: —
+- first seen: 2026-10-14 · last seen: 2026-10-14
+
+### S-NEW-3 — 가드의 `;` 나누기를 받는 이름만 든 쿼리로 다시 테스트에 고정 (S-003 의 잠금이 1A 뒤 풀림)
+- source: cycle 20261014-035715-adw/phase-1a-parser-allow-rules · tracker plans/interview-marketing-agent.md#phase-1a · deferred by ship-check
+- evidence: src/agent/guard.py:65 (`parts.query.replace(";", "&")` 를 `replace(";", "&", 1)` 로 바꾼 변이가 스위트 461개 초록 — `https://youtu.be/AAAAAAAAAAA?si=x;t=1;v=BBBBBBBBBBB` · `https://www.youtube.com/shorts/AAAAAAAAAAA?feature=share;si=x;v=BBBBBBBBBBB` · `https://www.youtube.com/watch?si=x;t=1;v=BBBBBBBBBBB&v=AAAAAAAAAAA` 가 A 로 읽힘, HEAD 는 셋 다 None), tests/test_guard.py:47-48 (S-003 가 이 변이를 잡으려 더한 `?x=1;y=2;v=B` · `?a=1;b=2;v=B` 행은 1A 뒤 `x` · `a` 가 받는 이름 밖이라 `;` 나누기와 상관없이 막혀 더는 가리지 못함 — 같은 변이가 base `d9a3d0f` 에서는 빨강); 계약 docs/contracts.md:309-310 "숨는 이름을 놓치지 않으려는 것"(.adw/ship-report.md § Test integrity)
+- direction: tests/test_guard.py 의 REJECTED_REFS `;` 묶음에 `f"https://youtu.be/{REPRO_A}?si=x;t=1;v={REPRO_B}"` · `f"https://www.youtube.com/shorts/{REPRO_A}?feature=share;si=x;v={REPRO_B}"` · `f"https://www.youtube.com/watch?si=x;t=1;v={REPRO_B}&v={REPRO_A}"` 행을 더한다 — 코드 변경 없음, 지금 코드는 셋 다 None
+- touches: tests/test_guard.py
+- status: open
+- attempts: 0 · last failure: —
+- first seen: 2026-10-14 · last seen: 2026-10-14
+
+### S-NEW-4 — read_log 의 끝 `\n` 없는 공백만 있는 마지막 줄을 테스트로 고정
+- source: cycle 20261014-035715-adw/phase-1a-parser-allow-rules · tracker plans/interview-marketing-agent.md#phase-1a · deferred by ship-check
+- evidence: src/agent/logbook.py:176 (`if tail:` 을 `if tail.strip():` 으로 바꾼 변이가 스위트 461개 초록 — `<정상 줄>\n` 뒤에 줄바꿈 없는 ` ` · `\t` · `\r` 만 남은 파일이 HEAD 에서는 `2번째 줄: 끝에 줄바꿈이 없습니다 (쓰기 중 끊긴 줄)` ValueError 인데 변이에서는 오류 없이 사건 1개); 계약 docs/contracts.md:456-457 "끝 `\n` 이 없는 마지막 줄 … 건너뛰지 않고"(.adw/ship-report.md § Test integrity). S-NEW-2 의 둘째 줄 행은 줄바꿈으로 끝나는 꼴이라 이 변이를 잡지 못함
+- direction: tests/test_logbook.py ReadLogTest::test_last_line_without_newline_is_an_error 에 정상 줄 하나 뒤 줄바꿈 없는 `" "` · `"\t"` · `"\x0c"` 꼬리를 쓴 파일이 각각 `2번째 줄: ` 로 시작하는 ValueError 인지 보는 행을 더한다(글자는 chr() 로 써도 됨) — 코드 변경 없음
+- touches: tests/test_logbook.py
+- status: open
+- attempts: 0 · last failure: —
+- first seen: 2026-10-14 · last seen: 2026-10-14
+
+### S-NEW-5 — 정수 상한 오류 문구 "값은 메시지에 쓰지 않음" 을 10진수 행에서도 정확한 문자열로 고정
+- source: cycle 20261014-035715-adw/phase-1a-parser-allow-rules · tracker plans/interview-marketing-agent.md#phase-1a · deferred by ship-check
+- evidence: src/agent/config.py:180 (값이 `10**100` 보다 작을 때만 메시지에 `(값 {value})` 를 붙인 변이가 스위트 461개 초록 — `poll_interval_min: 52560001` 이 `52560000 이하여야 합니다: poll_interval_min (값 52560001)`); tests/test_config.py:743 이 `assertIn`(부분 문자열)으로만 보고, 값 빼기는 16진수 두 행에서만 잼; 계약 docs/contracts.md:73 "(값은 메시지에 쓰지 않음)"(.adw/ship-report.md § Test integrity)
+- direction: tests/test_config.py RangeFailureTest::test_every_out_of_range_value_is_config_error 에서 상한+1 행마다 `str(exc)` 가 `<상한> 이하여야 합니다: <키>` 와 정확히 같은지(assertEqual) 단언한다 — 코드 변경 없음
+- touches: tests/test_config.py
+- status: open
+- attempts: 0 · last failure: —
+- first seen: 2026-10-14 · last seen: 2026-10-14

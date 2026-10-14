@@ -141,13 +141,13 @@ MUTANTS: dict[str, tuple[str, str, str, str]] = {
     "guard-youtu-be-ignores-query-v": (
         "agent.guard",
         "tests.test_guard",
-        'if host == "youtu.be" and not names_v:',
+        'if host == "youtu.be" and share_query:',
         'if host == "youtu.be":',
     ),
     "guard-shorts-ignores-query-v": (
         "agent.guard",
         "tests.test_guard",
-        "parts.path.startswith(_SHORTS_PREFIX) and not names_v:",
+        "parts.path.startswith(_SHORTS_PREFIX) and share_query:",
         "parts.path.startswith(_SHORTS_PREFIX):",
     ),
     "guard-query-ampersand-only": (
@@ -155,6 +155,18 @@ MUTANTS: dict[str, tuple[str, str, str, str]] = {
         "tests.test_guard",
         'parse_qsl(parts.query.replace(";", "&"), keep_blank_values=True)',
         "parse_qsl(parts.query, keep_blank_values=True)",
+    ),
+    "guard-share-names-blocklist": (
+        "agent.guard",
+        "tests.test_guard",
+        "share_query = all(key in _SHARE_QUERY_NAMES for key, _ in pairs)",
+        'share_query = not any(key == "v" for key, _ in pairs)',
+    ),
+    "guard-share-names-ignore-case": (
+        "agent.guard",
+        "tests.test_guard",
+        "key in _SHARE_QUERY_NAMES",
+        "key.lower() in _SHARE_QUERY_NAMES",
     ),
     "store-no-dedupe": (
         "agent.store",
@@ -204,6 +216,12 @@ MUTANTS: dict[str, tuple[str, str, str, str]] = {
         "if not number <= maximum:",
         "if False:",
     ),
+    "config-no-int-ceiling": (
+        "agent.config",
+        "tests.test_config",
+        "if value > maximum:",
+        "if False:",
+    ),
     "scheduler-one-sleep": (
         "agent.scheduler",
         "tests.test_scheduler",
@@ -219,8 +237,38 @@ MUTANTS: dict[str, tuple[str, str, str, str]] = {
     "logbook-raw-line-breaks": (
         "agent.logbook",
         "tests.test_logbook",
-        "json.dumps(value, ensure_ascii=False).translate(_LINE_BREAK_ESCAPES)",
-        "json.dumps(value, ensure_ascii=False)",
+        'return "".join(char if _is_raw(char) else json.dumps(char)[1:-1] for char in quoted)',
+        "return quoted",
+    ),
+    "logbook-bare-control-chars": (
+        "agent.logbook",
+        "tests.test_logbook",
+        "_BARE_RE.fullmatch(value) and all(map(_is_raw, value))",
+        "_BARE_RE.fullmatch(value)",
+    ),
+    "logbook-read-latin1": (
+        "agent.logbook",
+        "tests.test_logbook",
+        'text = data.decode("utf-8")',
+        'text = data.decode("latin-1")',
+    ),
+    "logbook-read-splitlines": (
+        "agent.logbook",
+        "tests.test_logbook",
+        r'*lines, tail = text.split("\n")',
+        r'*lines, tail = [*text.splitlines(), ""]',
+    ),
+    "logbook-read-skips-bad-lines": (
+        "agent.logbook",
+        "tests.test_logbook",
+        'raise ValueError(f"{number}번째 줄: {exc}") from exc',
+        "continue",
+    ),
+    "logbook-read-keeps-cut-line": (
+        "agent.logbook",
+        "tests.test_logbook",
+        "if tail:",
+        "if False:",
     ),
     "youtube-no-search-cap": (
         "agent.youtube",

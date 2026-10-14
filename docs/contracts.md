@@ -36,16 +36,16 @@ Phase 2–7 의 모든 단계가 기대는 계약입니다. 설정 읽기, 영�
 |---|---|---|---|
 | `topic` | 글자 | 비어 있지 않음 | `연애` |
 | `keywords` | 글자 목록 | 1개 이상, 각 항목 비어 있지 않음 | `[연애, 썸, 연애 상담, 이별, 소개팅]` |
-| `poll_interval_min` | 정수 | ≥ 1 (상한 없음 — 대기는 9절이 약 100년으로 묶음) | `120` (과제 예시 `30` — 아래) |
-| `trigger.min_views` | 정수 | ≥ 0 | `1000` |
-| `trigger.max_views` | 정수 | ≥ `min_views` | `5000` |
+| `poll_interval_min` | 정수 | ≥ 1, ≤ 52560000 | `120` (과제 예시 `30` — 아래) |
+| `trigger.min_views` | 정수 | ≥ 0, ≤ 1000000000000 | `1000` |
+| `trigger.max_views` | 정수 | ≥ `min_views`, ≤ 1000000000000 | `5000` |
 | `trigger.max_age_hours` | 숫자 | > 0, ≤ 876000 | `12` |
 | `trigger.min_views_per_hour` | 숫자 | ≥ 0, ≤ 1000000000 | `150` |
-| `limits.daily_max_comments` | 정수 | ≥ 0 | `10` |
+| `limits.daily_max_comments` | 정수 | ≥ 0, ≤ 86400 | `10` |
 | `limits.channel_cooldown_hours` | 숫자 | ≥ 0, ≤ 876000 | `24` |
-| `limits.daily_max_searches` | 정수 | ≥ 0 | `90` (과제 밖에서 더한 키) |
-| `comment.min_chars` | 정수 | ≥ 1 | `40` |
-| `comment.max_chars` | 정수 | ≥ `min_chars` | `120` |
+| `limits.daily_max_searches` | 정수 | ≥ 0, ≤ 86400 | `90` (과제 밖에서 더한 키) |
+| `comment.min_chars` | 정수 | ≥ 1, ≤ 10000 | `40` |
+| `comment.max_chars` | 정수 | ≥ `min_chars`, ≤ 10000 | `120` |
 | `comment.writer_model` | 글자 | 비어 있지 않음 — 댓글을 쓰는 Claude 모델 이름 ('댓글 작성' 절) | `claude-sonnet-5-5` |
 | `comment.check_min_probability` | 숫자 | ≥ 0, ≤ 1 — jev 자체 검사 통과 하한 ('댓글 작성' 절) | `0.7` |
 | `classifier.model` | 글자 | 비어 있지 않음 — jev 모델 이름 | `jev-latest` |
@@ -64,8 +64,20 @@ Phase 2–7 의 모든 단계가 기대는 계약입니다. 설정 읽기, 영�
   (`check_post` 의 채널 대기, Phase 4 의 나이 창)가 날짜 범위 안에 있습니다 — 2026년 기준 약
   1800만 시간부터 `OverflowError` 입니다. `trigger.min_views_per_hour` 의 1000000000 은 실제
   영상이 닿지 않는 값입니다. 넘으면 `<상한> 이하여야 합니다: <키>` 오류이고, 실행 중이면 이전
-  설정을 유지합니다. 정수 키에는 상한이 없습니다 — 비교와 셈에만 쓰이고, `poll_interval_min` 의
-  대기는 9절이 묶습니다.
+  설정을 유지합니다.
+- 정수 키도 모두 상한이 있습니다 — 정수는 비교와 셈 말고도 글자로 쓰입니다: `START interval_min=` ·
+  `QUOTA limit=` 로그 줄(7절), 댓글 작성 지시문과 코드 검사의 글자 수 문구('댓글 작성' 절). YAML 의
+  16진수 · 60진수 표기(`0x…`, `1:30`)는 파이썬의 4,300자리 한도와 상관없이 정수로 읽혀서, 상한이
+  없으면 `0x` 뒤에 `F` 3,700개를 쓴 값이 읽기를 통과한 뒤 글자로 바꾸는 자리에서 `ValueError` 를
+  냅니다. 상한은 `_int` 의 필수 인자라 정수 키를 더하는 단계가 빠뜨릴 수 없습니다. 넘으면
+  `<상한> 이하여야 합니다: <키>` 오류(값은 메시지에 쓰지 않음)이고, 실행 중이면 이전 설정을
+  유지합니다. 키마다 근거:
+  - `poll_interval_min` 52560000 — 100 × 365 × 24 × 60 분(약 100년), 9절의 대기 상한과 같은 크기.
+  - `trigger.min_views` · `trigger.max_views` 1000000000000 — 지구 인구의 100배가 넘는 값, 어떤
+    영상의 조회수보다도 큼.
+  - `limits.daily_max_comments` · `limits.daily_max_searches` 86400 — 하루의 초 수. 게시는 한 번이
+    1초보다 오래 걸려 이 수에 닿을 수 없고, 검색은 그보다 훨씬 앞서 쿼터 장부가 막습니다(아래).
+  - `comment.min_chars` · `comment.max_chars` 10000 — 유튜브 댓글 한 개의 최대 길이.
 - `limits.daily_max_searches` 는 과제 예시에 없는 키로, 최근 24시간(굴러가는 창) 안의
   `search.list` 호출 수 — 페이지 넘김 한 번도 한 번 — 의 상한입니다. 닿으면 호출하지 않고
   `QUOTA` 를 남깁니다('탐지 · 조회수 추적' 절). Google 은 2026-10-08 부터 `search.list` 를
@@ -273,25 +285,31 @@ Phase 3–5 가 정합니다.)
 - 허용 목록 항목과 영상 주소는 모두 11자 영상 ID 로 바꿔 비교합니다(`video_id_from_ref`).
   받는 형식은 아래뿐이고 정확히 이 모양이어야 합니다:
   - 맨 ID `abcdefghijk`
-  - `https://youtu.be/abcdefghijk` — 경로가 정확히 `/<ID>` (뒤에 `?si=…` 등 매개변수는
-    붙어도 됨, 단 `v` 는 안 됨)
+  - `https://youtu.be/abcdefghijk` — 경로가 정확히 `/<ID>` (쿼리가 붙으면 이름이 모두 `si` ·
+    `t` · `feature` 중 하나 — 아래)
   - `https://www.youtube.com/watch?v=abcdefghijk` — 경로가 정확히 `/watch`, `v` 값이 정확히
     하나 (`&t=…` 등 다른 매개변수 무시)
-  - `https://www.youtube.com/shorts/abcdefghijk` — 뒤 `/` 하나까지 (`?feature=…` 등 매개변수는
-    붙어도 됨, 단 `v` 는 안 됨)
+  - `https://www.youtube.com/shorts/abcdefghijk` — 뒤 `/` 하나까지 (쿼리는 youtu.be 와 같은
+    규칙 — 아래)
   - 호스트는 `youtu.be` · `youtube.com` · `www.youtube.com` · `m.youtube.com` 그대로(대소문자
     무시) — 사용자 정보(`…@`)나 포트(`:443`)가 붙으면 읽지 않습니다. 스킴은 `http`/`https` 만.
 - 쿼리의 `%` 인코딩은 서버처럼 한 번 풀어 읽습니다 — `v` 의 수는 푼 뒤에 세므로
-  `?%76=B&v=A` 는 `v` 가 두 개라 읽을 수 없고, `&pp=…%3D%3D` · `&ab_channel=%EC…` 같은 다른
-  매개변수는 무시됩니다.
-- youtu.be · shorts 주소의 쿼리에 `v` 가 있으면 읽을 수 없습니다 — `v` 는 쿼리를 푼 뒤에
-  세므로 `?%76=…` 도, 빈 `?v=` 도 `v` 입니다. 유튜브는 `youtu.be/A?v=B` 를 `watch?v=B&v=A` 로,
-  `/shorts/A?v=B` 를 `watch?v=B` 로 보내 B 를 재생하기 때문입니다. 쿼리는 `&` 와 `;` 를 모두
-  매개변수 구분으로 봅니다 — 서버가 `;` 로도 나눌 때 숨는 `v` 를 놓치지 않기 위해서이고
-  (`?x=1;v=B`, HTML 에서 복사한 `?si=x&amp;v=B`), 그래서 `watch?v=<ID>;t=…` 도 `&` 와 같이
-  읽힙니다. 막는 이름은 `v` 하나이고 `si` · `t` · `feature` 같은 다른 매개변수는 무시합니다 —
-  유튜브가 다른 이름(대소문자 · 공백 · 전각 변형 포함)으로 재생 영상을 바꾸는 경우가 발견되면
-  그때 더합니다.
+  `?%76=B&v=A` 는 `v` 가 두 개라 읽을 수 없고, watch 주소의 `&pp=…%3D%3D` · `&ab_channel=%EC…`
+  같은 다른 매개변수는 무시됩니다.
+- youtu.be · shorts 주소의 쿼리에서 받는 이름은 `si` · `t` · `feature` 셋뿐입니다. 쿼리를 한 번
+  푼 뒤 `&` 와 `;` 로 나눈 이름이 모두 이 셋 중 하나와 대소문자까지 같을 때 읽고, 값은 보지
+  않습니다 — `?si`, 빈 `?si=` 도 받습니다. 그 밖의 이름이 하나라도 있으면 읽을 수 없습니다:
+  `v`, 풀면 `v` 인 `%76`, 빈 `?v=`, 대소문자가 다른 `V` · `SI`, 풀면 공백이 붙는 `+v`, 전각 `ｖ`,
+  제어 문자가 붙은 `v\x01`, `list` 같은 다른 매개변수, 빈 이름(`?=x`), 처음 보는 이름 모두.
+  유튜브는 `youtu.be/A?v=B` 를 `watch?v=B&v=A` 로, `/shorts/A?v=B` 를 `watch?v=B` 로 보내 B 를
+  재생합니다 — 막을 이름 대신 받을 이름을 적어, 유튜브가 어떤 이름으로 재생 영상을 바꾸든 처음
+  보는 꼴은 읽을 수 없는 쪽에 떨어집니다. 그래서 재생목록에서 복사한 `?list=…` 처럼 셋 밖의 꼬리가
+  붙은 허용 목록 항목은 어떤 영상과도 맞지 않아 테스트 모드로만 돕니다 — 맨 ID 나 공유 버튼 주소를
+  그대로 적으세요.
+- 쿼리는 `&` 와 `;` 를 모두 매개변수 구분으로 봅니다 — 서버가 `;` 로도 나눌 때 숨는 이름을
+  놓치지 않으려는 것이고(`?x=1;v=B`, HTML 에서 복사한 `?si=x&amp;v=B`), 그래서 `watch?v=<ID>;t=…`
+  도 `&` 와 같이 읽힙니다. watch 주소는 `v` 값이 정확히 하나인지를 보고 다른 이름은 무시합니다 —
+  클릭 직전 다시 묻기가 읽는 크롬 주소의 꼬리를 아직 재기 전이라서입니다(H-023).
 - 그 밖의 호스트(`youtube.com.evil.example`, `youtube.com@evil.example` 같은 닮은꼴 포함),
   `ftp:` 같은 다른 스킴, 11자가 아닌 ID 는 읽을 수 없는 것으로 칩니다.
 - 형식에서 벗어난 이웃 모양도 읽을 수 없는 것입니다: ID 뒤의 다른 경로 칸(`/<ID>/x`,
@@ -413,17 +431,33 @@ post_video(record, *, config, dry_run, store, logbook, open_page, clock,
   | 정수 | 그대로 |
   | 실수 | 소수 둘째 자리 (`181.25`) |
   | 시각 | KST ISO 8601 초 |
-  | 글자 | 공백 · `"` · `=` · `\` 가 없고 `-` 가 아니면 그대로, 아니면 JSON 따옴표(한글 그대로) |
+  | 글자 | 아래 날 글자로만 되어 있고 공백 · `"` · `=` · `\` 가 없으며 `-` 가 아니면 그대로, 아니면 JSON 따옴표(한글 그대로) |
   | 그 밖 | `TypeError` |
 
-  따옴표 값 안에서는 `str.splitlines()` 가 줄 경계로 세는 글자 — `\n` `\r` `\v` `\f` `\x1c`
-  `\x1d` `\x1e` `\x85` `U+2028` `U+2029` — 를 모두 이스케이프로 씁니다(`\n` · `\r` · `\f` 는
-  JSON 그대로, 나머지는 `\u000b` · `\u001c` · `\u0085` · `\u2028` 처럼 `\uXXXX`). 그래서 여러
-  줄짜리 댓글도, 영상 제목에 숨긴 `U+2028` 도 한 사건을 어떤 읽기 방식으로든 한 줄로 남기고,
-  `parse_line` 이 원래 값을 되돌립니다. 줄 모양은 그대로입니다. 글자 `-` 는 `"-"` 로 써서
-  `None` 과 구분됩니다.
+  값 안에 날 글자로 남는 것은 유니코드 범주 L(글자) · M(결합 표시) · N(숫자) · P(문장부호) ·
+  S(기호)와 보통 공백 U+0020 뿐입니다. 그 밖의 모든 글자 — Cc(NUL · ESC · DEL · C1, `\n` 같은
+  줄 경계 포함) · Cf(U+202E 같은 양방향 제어 · U+200B · U+200D) · 다른 공백 Zs(U+00A0 · U+3000) ·
+  Zl · Zp · Co · Cn · Cs(짝 없는 서로게이트) — 는 언제나 따옴표 값 안의 이스케이프로 씁니다
+  (`\n` · `\r` · `\t` · `\f` · `\b` 는 JSON 그대로, 나머지는 `\u0000` · `\u001b` · `\u0085` ·
+  `\u2028` · `\u3000` · `\ud800` 처럼 `\uXXXX`, U+FFFF 위의 글자는 서로게이트 두 개). 그런 글자가
+  든 값은 공백이 없어도 따옴표로 씁니다. 범주는 실행 중인 파이썬의 `unicodedata` 판정을 따르고,
+  그 판이 모르는 글자(Cn)는 이스케이프 쪽입니다. 그래서 로그 파일에는 날 제어 문자도 서로게이트도
+  없어, UTF-8 로캘의 GNU grep(`/usr/bin/grep`)이 파일을 바이너리로 보지 않고 제어 문자로 터미널에
+  가짜 줄을 그릴 수 없습니다. 다만 긴 값이 화면 폭에서 접혀 줄처럼 보이는 것은 막지 않으므로, 게시
+  증명은 화면이 아니라 `read_log` 로 읽습니다.
+  여러 줄짜리 댓글도, 영상 제목에 숨긴 `U+2028` 도 `read_log` 의 읽기(UTF-8 ·
+  `\n`)로 한 사건 한 줄이고, `parse_line` 이 원래 값을 되돌립니다(따로 들어온 서로게이트 두 개가
+  짝을 이루면 한 글자로 읽힘). 줄 모양은 그대로입니다. 글자 `-` 는 `"-"` 로 써서 `None` 과
+  구분됩니다.
 - `parse_line(line)` 은 `format_line` 의 정확한 역으로 `(시각, Event, {키: 글자})` 를 돌려줍니다.
-  Phase 7/8 은 이것으로 로그만 보고 허용 목록 밖 영상이 게시되지 않았음을 확인할 수 있습니다.
+  이 규칙 전에 쓰인 줄(맨 값 속 날 제어 문자 등)도 그대로 읽습니다.
+- `read_log(path)` 는 로그 파일을 읽는 단 하나의 방법입니다. 바이트를 UTF-8 로 엄격히 풀고
+  `\n` 에서만 줄을 나눠, 빈 줄을 뺀 모든 줄을 `parse_line` 으로 읽은 `(시각, Event, {키: 글자})`
+  목록을 파일 순서대로 돌려줍니다. 잘못된 UTF-8 바이트, 해석할 수 없는 줄, 끝 `\n` 이 없는
+  마지막 줄(쓰기 중 끊긴 줄)은 건너뛰지 않고 `<n>번째 줄: …` `ValueError` 입니다. 파일을 열 수
+  없으면 `OSError` 그대로입니다. Phase 7 · Phase 8 의 로그 증명(허용 목록 밖 영상의 게시 0건)은
+  `read_log` 로 읽습니다 — latin-1 처럼 다른 글자 코드로 풀거나 `str.splitlines()` 로 나누면
+  `갅`(`ea b0 85`) 같은 한글 속 `0x85` 가 줄 경계가 되어 제목 속 글이 가짜 줄로 읽힙니다.
 - `Logbook(path, clock, echo)` 의 `write(event, **fields)` 는 줄을 만들어 파일에 UTF-8 로
   덧붙이고 같은 줄을 `echo` 로 냅니다. 실행 로그는 `logs/agent.log`(git 무시), 제출용 예시는
   `logs/sample.log`(커밋 가능)입니다.
@@ -520,8 +554,8 @@ run_loop(cycle, reload, initial, *, on_error, sleep=time.sleep,
   돕니다.
 - 아주 큰 `poll_interval_min` 도 루프를 죽이지 않습니다 — sleep 한 번은 하루까지(운영체제마다
   다른 sleep 한도에 닿지 않게), 대기 전체는 약 100년까지(아주 큰 정수를 실수로 바꾸다 나는
-  OverflowError 방지). 하루 이하 주기는 지금처럼 sleep 한 번이고, 설정 규칙
-  (`poll_interval_min ≥ 1`)은 그대로입니다.
+  OverflowError 방지). 하루 이하 주기는 지금처럼 sleep 한 번입니다. 설정에서 읽은 주기는 2절의
+  상한(52560000분)이 이미 이 크기로 묶고, 이 묶음은 코드로 만든 설정에도 남습니다.
 - `poll_interval_min` 만 고치면 재시작이나 OS 설정 없이 다음 대기부터 주기가 바뀝니다.
 - 신호 처리나 fork 는 쓰지 않습니다. Phase 7 의 진입점이 `run_loop` 를 부릅니다.
 
@@ -566,6 +600,8 @@ run_loop(cycle, reload, initial, *, on_error, sleep=time.sleep,
   python3 -m tests.mutants guard-youtu-be-ignores-query-v
   python3 -m tests.mutants guard-shorts-ignores-query-v
   python3 -m tests.mutants guard-query-ampersand-only
+  python3 -m tests.mutants guard-share-names-blocklist
+  python3 -m tests.mutants guard-share-names-ignore-case
   python3 -m tests.mutants store-no-dedupe
   python3 -m tests.mutants store-no-cap
   python3 -m tests.mutants store-no-cooldown
@@ -574,9 +610,15 @@ run_loop(cycle, reload, initial, *, on_error, sleep=time.sleep,
   python3 -m tests.mutants store-double-reserve
   python3 -m tests.mutants config-narrow-read-errors
   python3 -m tests.mutants config-no-ceiling
+  python3 -m tests.mutants config-no-int-ceiling
   python3 -m tests.mutants scheduler-one-sleep
   python3 -m tests.mutants scheduler-unclamped-wait
   python3 -m tests.mutants logbook-raw-line-breaks
+  python3 -m tests.mutants logbook-bare-control-chars
+  python3 -m tests.mutants logbook-read-latin1
+  python3 -m tests.mutants logbook-read-splitlines
+  python3 -m tests.mutants logbook-read-skips-bad-lines
+  python3 -m tests.mutants logbook-read-keeps-cut-line
   python3 -m tests.mutants youtube-no-search-cap
   python3 -m tests.mutants youtube-no-unit-cap
   python3 -m tests.mutants youtube-unguarded-call

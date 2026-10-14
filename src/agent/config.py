@@ -3,7 +3,7 @@
 모든 키가 필요하고, 모르는 키는 오류이며, 타입은 정확해야 합니다. 그래서 YAML 1.1 이 글자
 자리에 몰래 바꿔 넣는 값(`no`/`yes` → bool, 날짜, 따옴표 없는 숫자 ID)은 조용히 지나가지 않고
 오류가 됩니다. 숫자 자리의 YAML 1.1 숫자 표기(`017` → 15, `1:30` → 90)는 그대로 읽고 범위만
-검사합니다. 숫자는 유한값만 받고 키마다 상한이 있습니다 — 계약 2절.
+검사합니다. 숫자는 유한값만 받고, 숫자 · 정수 키는 모두 상한이 있습니다 — 계약 2절.
 """
 from __future__ import annotations
 
@@ -141,6 +141,17 @@ _MAX_VIEWS_PER_HOUR = 1_000_000_000.0
 # 이유 보기 수 · 이름 길이 상한 — 50개 × 40자면 가장 긴 질문이 1만 바이트를 넘지 않아 state 에 2만 2천 바이트 이상이 남습니다(계약 '주제 판별' 절).
 _MAX_REASONS = 50
 _MAX_REASON_CHARS = 40
+# 정수 키의 상한 — 정수는 로그 줄(START interval_min · QUOTA limit) · 댓글 지시문 · 검사 문구에 글자로
+# 쓰이므로, 16진수 표기로 4,300자리 한도를 비켜 읽힌 큰 정수가 그 자리에서 터지지 않게 키마다 둡니다(계약 2절).
+# 주기(분) — 100 × 365 × 24 × 60 분(약 100년), 주기 대기의 상한과 같은 크기입니다.
+_MAX_INTERVAL_MIN = 52_560_000
+# 조회수 — 지구 인구의 100배가 넘는 값, 어떤 영상의 조회수보다도 큽니다.
+_MAX_VIEWS = 1_000_000_000_000
+# 하루 횟수(게시 · 검색) — 하루의 초 수. 게시는 한 번이 1초보다 오래 걸려 닿을 수 없고, 검색은 그보다
+# 훨씬 앞서 쿼터 장부가 막습니다.
+_MAX_PER_DAY = 86_400
+# 댓글 글자 수 — 유튜브 댓글 한 개의 최대 길이입니다.
+_MAX_COMMENT_CHARS = 10_000
 
 
 def _check_keys(data: Mapping[object, object], allowed: tuple[str, ...], prefix: str) -> None:
@@ -160,11 +171,13 @@ def _section(data: Mapping[str, object], name: str) -> Mapping[object, object]:
     return value
 
 
-def _int(value: object, path: str, minimum: int) -> int:
+def _int(value: object, path: str, minimum: int, maximum: int) -> int:
     if isinstance(value, bool) or not isinstance(value, int):
         raise ConfigError(f"정수여야 합니다: {path}")
     if value < minimum:
         raise ConfigError(f"{minimum} 이상이어야 합니다: {path}")
+    if value > maximum:  # 값은 메시지에 쓰지 않습니다 — 4,300자리를 넘는 정수는 글자로 바꿀 수 없습니다
+        raise ConfigError(f"{maximum} 이하여야 합니다: {path}")
     return value
 
 
@@ -247,10 +260,10 @@ def config_from_mapping(data: Mapping[str, object]) -> Config:
     keyword_items = tuple(_text(item, f"keywords[{i}]") for i, item in enumerate(keywords))
 
     trigger = _section(data, "trigger")
-    min_views = _int(trigger["min_views"], "trigger.min_views", 0)
+    min_views = _int(trigger["min_views"], "trigger.min_views", 0, _MAX_VIEWS)
     trigger_config = TriggerConfig(
         min_views=min_views,
-        max_views=_int(trigger["max_views"], "trigger.max_views", min_views),
+        max_views=_int(trigger["max_views"], "trigger.max_views", min_views, _MAX_VIEWS),
         max_age_hours=_number(
             trigger["max_age_hours"], "trigger.max_age_hours", 0, _MAX_HOURS, inclusive=False
         ),
@@ -261,19 +274,23 @@ def config_from_mapping(data: Mapping[str, object]) -> Config:
 
     limits = _section(data, "limits")
     limits_config = LimitsConfig(
-        daily_max_comments=_int(limits["daily_max_comments"], "limits.daily_max_comments", 0),
+        daily_max_comments=_int(
+            limits["daily_max_comments"], "limits.daily_max_comments", 0, _MAX_PER_DAY
+        ),
         channel_cooldown_hours=_number(
             limits["channel_cooldown_hours"], "limits.channel_cooldown_hours", 0, _MAX_HOURS
         ),
-        daily_max_searches=_int(limits["daily_max_searches"], "limits.daily_max_searches", 0),
+        daily_max_searches=_int(
+            limits["daily_max_searches"], "limits.daily_max_searches", 0, _MAX_PER_DAY
+        ),
     )
 
     comment = _section(data, "comment")
-    min_chars = _int(comment["min_chars"], "comment.min_chars", 1)
+    min_chars = _int(comment["min_chars"], "comment.min_chars", 1, _MAX_COMMENT_CHARS)
     # check_min_probability 의 상한 1 은 확률의 끝입니다 — 숫자 키는 모두 상한을 둡니다.
     comment_config = CommentConfig(
         min_chars=min_chars,
-        max_chars=_int(comment["max_chars"], "comment.max_chars", min_chars),
+        max_chars=_int(comment["max_chars"], "comment.max_chars", min_chars, _MAX_COMMENT_CHARS),
         writer_model=_text(comment["writer_model"], "comment.writer_model"),
         check_min_probability=_number(
             comment["check_min_probability"], "comment.check_min_probability", 0, 1
@@ -299,7 +316,9 @@ def config_from_mapping(data: Mapping[str, object]) -> Config:
     return Config(
         topic=_text(data["topic"], "topic"),
         keywords=keyword_items,
-        poll_interval_min=_int(data["poll_interval_min"], "poll_interval_min", 1),
+        poll_interval_min=_int(
+            data["poll_interval_min"], "poll_interval_min", 1, _MAX_INTERVAL_MIN
+        ),
         trigger=trigger_config,
         limits=limits_config,
         comment=comment_config,
