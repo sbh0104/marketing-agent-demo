@@ -762,7 +762,7 @@ other line is required on every item.
 - touches: tests/test_live_check_applied.py
 - base: adw/phase-6b-live-check-apply
 - phase: plans/interview-marketing-agent.md#phase-6b
-- status: open
+- status: resolved
 - attempts: 0 · last failure: —
 
 ### S-074 — '주제 판별' 기록 줄의 다섯 칸 자리를 서로 다른 값을 심은 tally 로 고정 (S-067)
@@ -772,5 +772,5 @@ other line is required on every item.
 - touches: tests/test_live_check_applied.py
 - base: adw/phase-6b-live-check-apply
 - phase: plans/interview-marketing-agent.md#phase-6b
-- status: open
+- status: resolved
 - attempts: 0 · last failure: —
