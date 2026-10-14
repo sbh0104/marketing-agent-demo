@@ -629,7 +629,7 @@ other line is required on every item.
 - evidence: tests/test_live_check_applied.py:165 (사람 칸이 정확히 `ok` · `bad` 가 아니면 답 없음으로 셈) — 첫 parsed 초안의 `human` 을 `Bad` · `OK` · `ok ` · `good` 로 바꾸면 `draft_counts` 의 answered=0 · 기록 줄 그대로라 모듈 16개 초록(`bad` 만 failures=2); 문장 docs/contracts.md:1234 "새 결과나 사람 칸을 고친 결과를 커밋하거나 … 이 모듈이 빨강입니다" · docs/live-check/README.md:19 "사람 칸을 고친 `result.json` 을 커밋하면 … 빨강이 됩니다"; 계약 :1192-1193 은 사람 칸 값을 `ok` · `bad` 로 정함(.adw/ship-report.md § Risks R2)
 - direction: 두 문장을 코드가 하는 만큼으로 좁힌다 — "사람 칸에 `ok` · `bad` 를 적은 결과" 로 쓰고, 그 밖의 값은 답 없음으로 세어 빨강이 되지 않는다고 덧붙인다(헌법 9 의 좁히기) — 코드 · 테스트 변경 없음
 - touches: docs/contracts.md, docs/live-check/README.md
-- status: open
+- status: resolved
 - attempts: 0 · last failure: —
 - first seen: 2026-10-14 · last seen: 2026-10-14
 
@@ -638,7 +638,7 @@ other line is required on every item.
 - evidence: tests/test_live_check_applied.py:28-30 — `margin` 을 GUARDED 에서 WRITE_SIDE 로 옮겨도 16개 초록(ship-check 메모리 재현 `(16, 0, 0)`); test_guarded_field_change_is_drift(:265)는 모듈의 GUARDED 를 그대로 돌고 test_every_fingerprint_key_is_sorted(:296)는 합집합만 봄; 계약 docs/contracts.md:1226-1229 의 두 칸 목록은 어느 테스트도 읽지 않음(.adw/ship-report.md § Risks R3)
 - direction: MeasuredDriftTest 에 GUARDED · WRITE_SIDE 로 계약의 두 칸 목록 글(`` " · ".join(f"`{k}`" for k in GUARDED) `` 꼴)을 만들어 assert_in_contract 로 맞대는 테스트를 더한다 — 코드 · 계약 변경 없음
 - touches: tests/test_live_check_applied.py
-- status: open
+- status: resolved
 - attempts: 0 · last failure: —
 - first seen: 2026-10-14 · last seen: 2026-10-14
 
@@ -647,7 +647,7 @@ other line is required on every item.
 - evidence: tests/test_live_check_applied.py:167 — 우선순위를 뒤집은 변이(`answer = claude if claude is not None else human`)가 16개 초록(ship-check 감사의 사본 실행); 심은 초안(human ok · claude_grade bad · self_check_pass True)에서 지금 코드는 bad_passed 0, 변이는 1. :112 · :126 의 `lo < noul < hi` 를 `lo <= noul <= hi` 로 바꾼 변이도 초록 — 커밋된 결과에 답 있는 초안이 없고 noul 이 정확히 0.2 · 0.8 인 예시 · 영상이 없음; 계약 docs/contracts.md:922 "정답은 사람 칸 … 있으면 그것" · :1091-1094 "0.2 초과 0.8 미만"(.adw/ship-report.md § Risks R4)
 - direction: load_result() 의 deepcopy 에 초안 둘(human ok · claude_grade bad · self_check_pass True 와 그 반대)과 noul 0.2 · 0.8 인 예시 행 · 영상을 심어 draft_counts 와 gap_lines 의 셈을 정확한 값으로 단언하는 테스트를 더한다 — 코드 변경 없음
 - touches: tests/test_live_check_applied.py
-- status: open
+- status: resolved
 - attempts: 0 · last failure: —
 - first seen: 2026-10-14 · last seen: 2026-10-14
 
@@ -656,7 +656,7 @@ other line is required on every item.
 - evidence: tests/test_live_check_applied.py:210-214 (정규화한 계약 전체에서 부분 문자열로 찾음) — 계약의 `기준값 사이 영상 운영 창: 9/18` 을 `9/180` 으로 바꾼 사본으로도 16개 초록(ship-check 메모리 재현 `(16, 0, 0)`), `탈락 0` → `탈락 05` 도 초록(감사 사본); 트래커 Phase 6B Responsibilities 첫 줄 "계약에 적은 숫자와 결과 파일의 숫자가 같아야 한다"(.adw/ship-report.md § Risks R5)
 - direction: assert_in_contract 가 phrase 가 숫자로 끝날 때 바로 뒤에 숫자나 `.숫자` 가 오지 않는지까지 보게 고친다(정규식 경계) — 기록 줄 · 계약 변경 없음
 - touches: tests/test_live_check_applied.py
-- status: open
+- status: resolved
 - attempts: 0 · last failure: —
 - first seen: 2026-10-14 · last seen: 2026-10-14
 
@@ -665,7 +665,7 @@ other line is required on every item.
 - evidence: tests/test_live_check_applied.py:94-99 — 맞음 · 잘못된 일치 · 잘못된 불일치 · 보류 · 오류를 `accuracy_tally` 에서 그대로 옮김(행에서 다시 세지 않음; `correct` 만 :335 의 reach == correct 로 간접 확인); 계약 docs/contracts.md:1099 "기록의 숫자를 결과 파일에서 다시 세어 맞댑니다". ship-check 의 독립 재셈은 ko · en 모두 20/0/0/2/0 으로 지금 값과 같음(.adw/ship-report.md § Risks R6)
 - direction: AccuracyRecordTest 에 언어마다 accuracy 행(label · verdict · error, 또는 tests/jev_accuracy.py 의 tally)으로 다섯 칸을 다시 세어 accuracy_tally 와 같은지 단언하는 테스트를 더한다 — 코드 변경 없음
 - touches: tests/test_live_check_applied.py
-- status: open
+- status: resolved
 - attempts: 0 · last failure: —
 - first seen: 2026-10-14 · last seen: 2026-10-14
 

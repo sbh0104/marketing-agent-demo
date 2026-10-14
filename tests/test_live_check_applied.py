@@ -9,10 +9,15 @@ from __future__ import annotations
 import copy
 import io
 import json
+import re
+import sys
+import tempfile
 import unittest
 from collections import Counter
 from collections.abc import Mapping
 from datetime import datetime, timezone
+from pathlib import Path
+from unittest import mock
 
 from agent.classifier import LANGUAGES, QUESTION_LANGUAGE
 from agent.config import load_config
@@ -208,10 +213,36 @@ class ContractCase(unittest.TestCase):
     """계약에 기록 문구가 있는지 — 공백을 하나로 접어 비교합니다."""
 
     def assert_in_contract(self, phrase: str) -> None:
-        self.assertTrue(
-            normalize(phrase) in normalize(CONTRACT_PATH.read_text(encoding="utf-8-sig")),
-            f"계약에 없는 기록: {phrase}",
-        )
+        """숫자로 끝나는 기록은 계약에서 뒤에 숫자나 `.숫자` 가 이어지지 않는 자리만 셉니다."""
+        normalized_phrase = normalize(phrase)
+        normalized_contract = normalize(CONTRACT_PATH.read_text(encoding="utf-8-sig"))
+        found = normalized_phrase in normalized_contract
+        if found and re.search(r"[0-9]\Z", normalized_phrase):
+            found = (
+                re.search(re.escape(normalized_phrase) + r"(?![0-9]|\.[0-9])", normalized_contract)
+                is not None
+            )
+        self.assertTrue(found, f"계약에 없는 기록: {phrase}")
+
+
+class ContractBoundaryTest(ContractCase):
+    """`assert_in_contract` 의 숫자 경계 — 숫자로 끝나는 기록 뒤에 숫자가 이어지면 없는 기록입니다."""
+
+    def _check(self, text: str, phrase: str) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "contracts.md"
+            path.write_text(text, encoding="utf-8")
+            with mock.patch.object(sys.modules[__name__], "CONTRACT_PATH", path):
+                self.assert_in_contract(phrase)
+
+    def test_longer_number_does_not_satisfy_phrase(self) -> None:
+        with self.assertRaises(AssertionError):
+            self._check("탈락 05", "탈락 0")
+
+    def test_number_followed_by_space_or_end_satisfies_phrase(self) -> None:
+        for text in ("탈락 0 · 끝", "탈락 0"):
+            with self.subTest(text=text):
+                self._check(text, "탈락 0")
 
 
 class CommittedResultTest(unittest.TestCase):
@@ -299,6 +330,89 @@ class MeasuredDriftTest(unittest.TestCase):
         self.assertEqual(partition, set(self.recorded))
         self.assertFalse(set(GUARDED) & set(WRITE_SIDE))
 
+    def test_contract_lists_match_guarded_and_write_side(self) -> None:
+        contract = normalize(CONTRACT_PATH.read_text(encoding="utf-8-sig"))
+        for name, keys in (("GUARDED", GUARDED), ("WRITE_SIDE", WRITE_SIDE)):
+            with self.subTest(keys=name):
+                listed = " · ".join(f"`{key}`" for key in keys)
+                self.assertTrue(
+                    listed in contract, f"계약 '결과 반영' 의 칸 목록이 {name} 와 다릅니다: {listed}"
+                )
+
+
+class DraftBoundaryTest(unittest.TestCase):
+    """심은 초안 · 행의 경계 — 사람 칸이 Claude 채점보다 먼저, 기준값과 같은 `noul` 은 사이가 아님."""
+
+    @staticmethod
+    def _draft(human: str, claude: str | None, self_check: bool) -> dict:
+        return {
+            "parsed": True,
+            "human": human,
+            "claude_grade": claude,
+            "grade_error": None if claude is not None else "응답 모양",
+            "self_check_pass": self_check,
+        }
+
+    @staticmethod
+    def _video(noul: float, outcome: str, drafts: list[dict]) -> dict:
+        return {
+            "window": "operation",
+            "result": outcome,
+            "classification": {"noul": noul},
+            "drafts": drafts,
+        }
+
+    def setUp(self) -> None:
+        self.result = copy.deepcopy(load_result())
+        classifier = self.result["fingerprint"]["classifier"]
+        self.lo, self.hi = classifier["noul_no_max"], classifier["noul_yes_min"]
+        self.result["videos"] = [
+            self._video(
+                self.lo,
+                "comment",
+                [self._draft("ok", "bad", False), self._draft("bad", "ok", True)],
+            ),
+            self._video(
+                self.hi,
+                "skip",
+                [self._draft("", "bad", True), self._draft("Bad", None, False)],
+            ),
+        ]
+        for language in LANGUAGES:
+            rows = self.result["accuracy"][language]
+            rows += [dict(rows[0], noul=self.lo), dict(rows[0], noul=self.hi)]
+
+    def test_human_answer_beats_claude_grade(self) -> None:
+        self.assertEqual(
+            draft_counts(self.result, "operation"),
+            {
+                "written": 2,
+                "skip": 1,
+                "drafts": 4,
+                "human": 2,
+                "claude": 3,
+                "answered": 3,
+                "grade_errors": 1,
+                "differ": 2,
+                "bad_passed": 2,
+                "ok_failed": 1,
+            },
+        )
+
+    def test_threshold_equal_noul_is_not_between(self) -> None:
+        before = gap_lines(load_result())
+        after = gap_lines(self.result)
+        for index, language in enumerate(LANGUAGES):
+            with self.subTest(language=language):
+                head = before[index].split(" · 가장 가까운 예시")[0]
+                self.assertEqual(
+                    after[index], f"{head} · 가장 가까운 예시 {self.lo:.2f} · {self.hi:.2f}"
+                )
+        self.assertEqual(
+            after[len(LANGUAGES)],
+            f"기준값 사이 영상 {WINDOW_LABELS['operation']}: 0/{len(self.result['videos'])}",
+        )
+
 
 class AccuracyRecordTest(ContractCase):
     """'주제 판별' 절의 정확도 기록 — 결과 파일에서 다시 센 숫자가 계약에 있고 기준값은 그대로."""
@@ -320,6 +434,25 @@ class AccuracyRecordTest(ContractCase):
         ]
         for phrase in phrases:
             self.assert_in_contract(phrase)
+
+    def test_accuracy_tally_is_recount_of_rows(self) -> None:
+        keys = ("correct", "false_yes", "false_no", "hold", "error")
+        for language in LANGUAGES:
+            with self.subTest(language=language):
+                counts = dict.fromkeys(keys, 0)
+                for row in self.result["accuracy"][language]:
+                    if row["error"] is True:
+                        counts["error"] += 1
+                    elif row["verdict"] == "hold":
+                        counts["hold"] += 1
+                    elif row["verdict"] == row["label"]:
+                        counts["correct"] += 1
+                    elif row["verdict"] == "yes":
+                        counts["false_yes"] += 1
+                    else:
+                        counts["false_no"] += 1
+                tally = self.result["accuracy_tally"][language]
+                self.assertEqual(counts, {key: tally[key] for key in keys})
 
     def test_question_language_follows_record(self) -> None:
         passed = {language: passes(reach(self.result, language)) for language in LANGUAGES}
