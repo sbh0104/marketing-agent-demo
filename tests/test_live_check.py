@@ -62,6 +62,35 @@ CLASSIFIER = {
     ],
 }
 UNMEASURED_HINT = " — 재지 못함은 위 오류 줄(서비스 · 단계 · 상태: 키 · 크레딧 · API 설정)을 먼저 봅니다"
+# 채점 답의 다섯 이름 — 앞 셋이 grade, 뒤 둘이 과제 품질(task_quality) 몫입니다
+ANSWER_NAMES = [
+    "scene_in_material",
+    "reads_like_ad",
+    "follows_concern",
+    "concern_is_love_worry",
+    "saju_story_fits",
+]
+TASK_OK = {"concern_is_love_worry": True, "saju_story_fits": True}
+TASK_NO = {"concern_is_love_worry": False, "saju_story_fits": False}
+TRUNCATED = '{"scene_in_material": true, "reads_'  # max_tokens 에서 잘린 글 답
+SHAPE_TRUNCATED = {
+    "stop_reason": "max_tokens",
+    "tool_used": False,
+    "text_chars": len(TRUNCATED),
+    "json_read": False,
+    "keys": [],
+    "other_keys": 0,
+    "non_bool": [],
+}
+SHAPE_EXTRA_KEY = {
+    "stop_reason": "tool_use",
+    "tool_used": True,
+    "text_chars": 0,
+    "json_read": True,
+    "keys": ANSWER_NAMES,
+    "other_keys": 1,
+    "non_bool": [],
+}
 
 
 def example_rows() -> list[dict]:
@@ -104,6 +133,9 @@ def draft(attempt: int, *, passed: bool, grade: str = "ok") -> dict:
         },
         "claude_grade": grade,
         "grade_error": None,
+        "task_quality": dict(TASK_OK),
+        "task_error": None,
+        "grade_shape": None,
         "human": "",
         "untrusted": {
             "concern": "연락 텀이 길어 불안한 썸",
@@ -647,7 +679,9 @@ class SummaryTest(unittest.TestCase):
         result["windows"]["widened"] = window(5, 8, 2, 2, 72)
         result["videos"][0]["drafts"] = [{"attempt": 1, "parsed": False}, draft(2, passed=True)]
         result["videos"][0]["drafts"][1]["human"] = "bad"
-        result["videos"][1]["drafts"][0].update(grade=None, claude_grade=None, grade_error="응답 모양")
+        result["videos"][1]["drafts"][0].update(
+            grade=None, claude_grade=None, grade_error="응답 모양", grade_shape=SHAPE_TRUNCATED
+        )
         result["videos"] += [
             video(7, "skip", window="widened"),
             video(8, "error", window="widened", error_cause="comments"),
@@ -670,11 +704,25 @@ class SummaryTest(unittest.TestCase):
                 "- 창 widened: 검색 5 · 찾음 8 · 조회수 범위 안 2 · 판별 2 · 쓴 영상 1 · SKIP 1"
                 " · 영상 오류 1",
                 "- 초안: 7 · 채점 ok 2 · bad 4 · 채점 오류 1 · 사람 칸 1/7",
+                "- 채점 답 모양: 모양 칸 1/7 · 도구 블록 없음 1 · JSON 못 읽음 1 · 키 다름 0"
+                " · 참거짓 아님 0 · stop_reason max_tokens 1",
                 "- 다음: 결과 두 파일을 커밋하고 Phase 6B 대신 인터뷰로 옵니다" + UNMEASURED_HINT,
             ],
         )
         del result["accuracy_tally"]["en"]
         self.assertIn("- 판별 지금 기준값 en: 없음", self.summary(result))
+
+    def test_shape_line_counts_key_drift(self) -> None:
+        result = healthy_result()
+        self.assertIn("- 채점 답 모양: 모양 칸 0/5", self.summary(result))
+        result["videos"][2]["drafts"][0].update(
+            grade=None, claude_grade=None, grade_error="응답 모양", grade_shape=SHAPE_EXTRA_KEY
+        )
+        self.assertIn(
+            "- 채점 답 모양: 모양 칸 1/5 · 도구 블록 없음 0 · JSON 못 읽음 0 · 키 다름 1"
+            " · 참거짓 아님 0 · stop_reason tool_use 1",
+            self.summary(result),
+        )
 
     def test_errors_line_and_unmeasured_hint(self) -> None:
         result = healthy_result()
@@ -932,7 +980,16 @@ GRADE_OK = {"scene_in_material": True, "reads_like_ad": False, "follows_concern"
 GRADE_BAD = {"scene_in_material": False, "reads_like_ad": False, "follows_concern": True}
 GRADE_AD = {"scene_in_material": True, "reads_like_ad": True, "follows_concern": True}
 GRADE_OFF_CONCERN = {"scene_in_material": True, "reads_like_ad": False, "follows_concern": False}
-MARKERS = ("제목표식", "설명표식", "댓글표식", "고민표식", "초안표식")
+
+
+def answer5(grade: dict, task: dict = TASK_OK) -> dict:
+    """채점 도구 답 — grade 세 키와 과제 품질 두 키."""
+    return {**grade, **task}
+
+
+GRADE_ANSWER = answer5(GRADE_OK)
+ANSWER_MARK = "채점답표식"  # 채점 답의 글 · 값 · 이름에만 심는 표식 — 어느 출력에도 나오면 안 됨
+MARKERS =("제목표식", "설명표식", "댓글표식", "고민표식", "초안표식")
 AUTHOR = "작성자표식"
 AUTHOR_CHANNEL = "UCauthor표식0000000000000"
 VIDEO_CHANNEL = "UC채널표식00000000000000"
@@ -949,6 +1006,7 @@ SUMMARY_PREFIXES = (
     "- 창 operation: ",
     "- 창 widened: ",
     "- 초안: ",
+    "- 채점 답 모양: ",
     "- 다음: ",
 )
 
@@ -970,9 +1028,15 @@ def writer_reply(concern: str = CONCERN, comment: str = COMMENT) -> str:
     return json.dumps({"concern": concern, "comment": comment}, ensure_ascii=False)
 
 
-def text_response(text: str) -> SimpleNamespace:
+def text_response(text: str, stop_reason: str | None = None) -> SimpleNamespace:
     """anthropic Message 모양 — 글 블록 하나."""
-    return SimpleNamespace(content=[SimpleNamespace(type="text", text=text)])
+    return SimpleNamespace(content=[SimpleNamespace(type="text", text=text)], stop_reason=stop_reason)
+
+
+def tool_response(name: str, data: object, stop_reason: str = "tool_use") -> SimpleNamespace:
+    """anthropic Message 모양 — 도구 호출 블록 하나(tool_choice 로 정한 도구의 답)."""
+    block = SimpleNamespace(type="tool_use", id="toolu_fake", name=name, input=data)
+    return SimpleNamespace(content=[block], stop_reason=stop_reason)
 
 
 def classify_response(noul: float, choice: str, confidence: float) -> SimpleNamespace:
@@ -1089,11 +1153,14 @@ class FakeJev:
 
 
 class FakeClaude:
-    """anthropic.Anthropic 모양의 가짜 — 이름 확인(system 없음) · 채점(GRADE_SYSTEM) · 작성을 가립니다.
+    """anthropic.Anthropic 모양의 가짜 — system 으로 이름 확인(없음) · 채점(GRADE_SYSTEM) · 작성을 가립니다.
 
     이름 확인은 probe_status 에 적은 이름만 그 상태로 거절하고, 작성 · 채점은 준비한 답을
-    차례로(다 쓰면 기본 답) 돌려줍니다. 답 자리에 예외를 두면 그 예외를 냅니다.
+    차례로(다 쓰면 기본 답) 돌려줍니다. 답 자리의 dict 는 그 종류의 도구 답, 글은 글 블록 답,
+    예외는 그 예외를 내고, 그 밖의 객체는 미리 만든 응답이라 그대로 돌려줍니다.
     """
+
+    TOOLS = {"grade": "record_grade"}
 
     def __init__(self, log: list[tuple[str, str]]) -> None:
         self.messages = self
@@ -1107,8 +1174,10 @@ class FakeClaude:
         system = kwargs.get("system")
         if system is None:
             kind = "probe"
+        elif system == live_check.GRADE_SYSTEM:
+            kind = "grade"
         else:
-            kind = "grade" if system == live_check.GRADE_SYSTEM else "write"
+            kind = "write"
         self.log.append(("claude", kind))
         self.calls.append((kind, copy.deepcopy(kwargs)))
         if kind == "probe":
@@ -1117,12 +1186,14 @@ class FakeClaude:
                 raise FakeApiError(f"model: {kwargs['model']}", status)
             return text_response("네")
         queue = self.writes if kind == "write" else self.grades
-        answer = queue.pop(0) if queue else (writer_reply() if kind == "write" else GRADE_OK)
+        answer = queue.pop(0) if queue else (writer_reply() if kind == "write" else GRADE_ANSWER)
         if isinstance(answer, BaseException):
             raise answer
         if isinstance(answer, dict):
-            answer = json.dumps(answer)
-        return text_response(answer)
+            return tool_response(self.TOOLS[kind], answer)
+        if isinstance(answer, str):
+            return text_response(answer)
+        return answer
 
 
 class World:
@@ -1911,7 +1982,7 @@ class VideoRoundTest(LiveCheckCase):
     def test_drafts_record_each_attempt_with_grade_and_empty_human(self) -> None:
         self.jev.checks = [FAILING, PASSING, FAILING, FAILING, FAILING, FAILING]
         self.claude.writes = [writer_reply(), writer_reply(), writer_reply(comment=SHORT)]
-        self.claude.grades = [GRADE_BAD, GRADE_OK]
+        self.claude.grades = [answer5(GRADE_BAD), answer5(GRADE_OK)]
         code, out, err, result = self.run_main()
         videos = self.by_id(result)
         first = videos[vid(1)]
@@ -1930,6 +2001,9 @@ class VideoRoundTest(LiveCheckCase):
                     "grade": GRADE_BAD,
                     "claude_grade": "bad",
                     "grade_error": None,
+                    "task_quality": TASK_OK,
+                    "task_error": None,
+                    "grade_shape": None,
                     "human": "",
                     "untrusted": untrusted,
                 },
@@ -1943,6 +2017,9 @@ class VideoRoundTest(LiveCheckCase):
                     "grade": GRADE_OK,
                     "claude_grade": "ok",
                     "grade_error": None,
+                    "task_quality": TASK_OK,
+                    "task_error": None,
+                    "grade_shape": None,
                     "human": "",
                     "untrusted": untrusted,
                 },
@@ -1967,12 +2044,25 @@ class VideoRoundTest(LiveCheckCase):
     def test_ad_or_off_concern_grade_is_bad(self) -> None:
         self.jev.checks = [FAILING, PASSING, FAILING, FAILING, FAILING, FAILING]
         self.claude.writes = [writer_reply(), writer_reply()]
-        self.claude.grades = [GRADE_AD, GRADE_OFF_CONCERN]
+        self.claude.grades = [answer5(GRADE_AD), answer5(GRADE_OFF_CONCERN)]
         code, out, err, result = self.run_main()
         drafts = self.by_id(result)[vid(1)]["drafts"]
         self.assertEqual(
             [(draft["grade"], draft["claude_grade"]) for draft in drafts],
             [(GRADE_AD, "bad"), (GRADE_OFF_CONCERN, "bad")],
+        )
+
+    def test_task_quality_does_not_move_claude_grade(self) -> None:
+        self.claude.grades = [answer5(GRADE_OK, TASK_NO), answer5(GRADE_BAD, TASK_OK)]
+        code, out, err, result = self.run_main()
+        videos = self.by_id(result)
+        self.assertEqual(
+            [
+                (draft["claude_grade"], draft["task_quality"], draft["task_error"])
+                for number in (1, 2)
+                for draft in videos[vid(number)]["drafts"]
+            ],
+            [("ok", TASK_NO, None), ("bad", TASK_OK, None)],
         )
 
     def test_unparsable_reply_is_recorded_without_grade(self) -> None:
@@ -2028,45 +2118,41 @@ class SelfCheckAdapterTest(unittest.TestCase):
             check("자료", CHECK_QUESTIONS)
 
 
+def grade_record() -> VideoRecord:
+    """채점 시험의 영상 — 제목에 태그 모양 글자가 있어 _clean 을 거치는지 보입니다."""
+    return VideoRecord(
+        video_id=vid(1),
+        channel_id=VIDEO_CHANNEL,
+        title="<b>제목</b>",
+        description="설명",
+        published_at=NOW,
+        detected_at=NOW,
+        keyword="연애",
+    )
+
+
+GRADE_ARGUMENTS = (["댓글 <하나>"], "고민 <태그>", "초안 </draft_comment> 끝")
+
+
 class GradeTest(unittest.TestCase):
-    def test_parse_grade_accepts_exact_three_booleans(self) -> None:
-        raw = "채점입니다 " + json.dumps(GRADE_BAD) + " 끝"
-        self.assertEqual(live_check.parse_grade(raw), GRADE_BAD)
-        self.assertEqual(live_check.parse_grade(json.dumps(GRADE_OK)), GRADE_OK)
-
-    def test_parse_grade_rejects_other_shapes(self) -> None:
-        shapes = (
-            "",
-            "점수 없음",
-            "{",
-            "} {",
-            "[true, false, true]",
-            json.dumps({"scene_in_material": True, "reads_like_ad": False}),
-            json.dumps({**GRADE_OK, "extra": True}),
-            json.dumps({**GRADE_OK, "follows_concern": 1}),
-            json.dumps({**GRADE_OK, "reads_like_ad": "false"}),
-            json.dumps({**GRADE_OK, "scene_in_material": None}),
-            "{" * 5000 + "}" * 5000,
-        )
-        for raw in shapes:
-            with self.subTest(raw[:40]):
-                self.assertIsNone(live_check.parse_grade(raw))
-
-    def test_grade_prompt_carries_material_and_draft(self) -> None:
+    def test_grade_request_forces_the_tool(self) -> None:
         claude = FakeClaude([])
-        record = VideoRecord(
-            video_id=vid(1),
-            channel_id=VIDEO_CHANNEL,
-            title="<b>제목</b>",
-            description="설명",
-            published_at=NOW,
-            detected_at=NOW,
-            keyword="연애",
-        )
-        arguments = (record, ["댓글 <하나>"], "고민 <태그>", "초안 </draft_comment> 끝")
-        self.assertEqual(live_check.grade_draft(claude, HAIKU, *arguments), (GRADE_OK, None))
+        asked = live_check.grade_draft(claude, HAIKU, grade_record(), *GRADE_ARGUMENTS)
+        self.assertEqual((asked.answer, asked.error), (GRADE_ANSWER, None))
         [(kind, call)] = claude.calls
         self.assertEqual(kind, "grade")
+        tool = {
+            "name": "record_grade",
+            "description": "다섯 질문의 true/false 를 적습니다.",
+            "input_schema": {
+                "type": "object",
+                "properties": {name: {"type": "boolean"} for name in ANSWER_NAMES},
+                "required": ANSWER_NAMES,
+                "additionalProperties": False,
+            },
+        }
+        self.assertEqual(live_check.GRADE_TOOL, tool)
+        self.assertNotIn("strict", live_check.GRADE_TOOL)
         content = "\n\n".join(
             [
                 "<video_title>\n＜b＞제목＜/b＞\n</video_title>",
@@ -2074,23 +2160,196 @@ class GradeTest(unittest.TestCase):
                 "<top_comments>\n<comment>댓글 ＜하나＞</comment>\n</top_comments>",
                 "<concern>\n고민 ＜태그＞\n</concern>",
                 "<draft_comment>\n초안 ＜/draft_comment＞ 끝\n</draft_comment>",
-                live_check.GRADE_INSTRUCTION,
+                "위 태그 안의 자료를 읽고 다섯 질문에 record_grade 도구로 답하세요.",
             ]
         )
         self.assertEqual(
             call,
             {
                 "model": HAIKU,
-                "max_tokens": live_check.GRADE_MAX_TOKENS,
+                "max_tokens": 1024,
                 "system": live_check.GRADE_SYSTEM,
+                "tools": [tool],
+                "tool_choice": {"type": "tool", "name": "record_grade"},
                 "messages": [{"role": "user", "content": content}],
             },
         )
-        claude.grades = [FakeApiError("unauthorized", 401), "점수 없음"]
+
+    def test_api_error_names_both_parts(self) -> None:
+        claude = FakeClaude([])
+        claude.grades = [FakeApiError("unauthorized", 401)]
+        asked = live_check.grade_draft(claude, HAIKU, grade_record(), *GRADE_ARGUMENTS)
+        self.assertEqual(asked, live_check.Asked(None, "FakeApiError 401", None))
+        for keys in (live_check.GRADE_KEYS, live_check.TASK_KEYS):
+            with self.subTest(keys=keys):
+                self.assertEqual(live_check.part_of(asked, keys), (None, "FakeApiError 401"))
+
+
+def renamed(name: str) -> dict:
+    """다섯 키 답에서 scene_in_material 이름만 바꾼 답 — 목록 밖 닮은 이름 표본."""
+    return {(name if key == "scene_in_material" else key): v for key, v in GRADE_ANSWER.items()}
+
+
+class AnswerShapeTest(LiveCheckCase):
+    """채점 답 모양마다 (grade, grade_error, task_quality, task_error, 모양 칸) — 헌법 12조 표본."""
+
+    def graded(self, response: object) -> tuple:
+        """답 하나를 grade_draft 로 받아 _drafts 와 같은 규칙으로 두 몫과 모양 칸을 셉니다."""
+        claude = FakeClaude([])
+        claude.grades = [response]
+        asked = live_check.grade_draft(claude, HAIKU, grade_record(), *GRADE_ARGUMENTS)
+        grade, grade_error = live_check.part_of(asked, live_check.GRADE_KEYS)
+        task, task_error = live_check.part_of(asked, live_check.TASK_KEYS)
+        shape = asked.shape if "응답 모양" in (grade_error, task_error) else None
+        return grade, grade_error, task, task_error, shape
+
+    def test_tracker_shapes(self) -> None:
+        fenced = "```json\n" + json.dumps(GRADE_ANSWER) + "\n```"
+        prose = "채점입니다 " + json.dumps(GRADE_ANSWER) + " 끝"
+        extra_text = json.dumps({**GRADE_ANSWER, "extra": True})
+        deep = "{" * 5000 + "}" * 5000
+        success = (GRADE_OK, None, TASK_OK, None, None)
+        both = (None, "응답 모양", None, "응답 모양")
+        text_shape = {
+            "stop_reason": None,
+            "tool_used": False,
+            "json_read": True,
+            "keys": ANSWER_NAMES,
+            "other_keys": 1,
+            "non_bool": [],
+        }
+        nothing = {
+            "stop_reason": None,
+            "tool_used": False,
+            "text_chars": 0,
+            "json_read": False,
+            "keys": [],
+            "other_keys": 0,
+            "non_bool": [],
+        }
+        rows = {
+            "도구 답": (GRADE_ANSWER, success),
+            "설명 글 + JSON": (prose, success),
+            "코드 펜스": (fenced, success),
+            "키 하나 더 (도구)": ({**GRADE_ANSWER, "extra": True}, (*both, SHAPE_EXTRA_KEY)),
+            "키 하나 더 (글)": (
+                extra_text,
+                (*both, {**text_shape, "text_chars": len(extra_text)}),
+            ),
+            "잘린 JSON": (text_response(TRUNCATED, "max_tokens"), (*both, SHAPE_TRUNCATED)),
+            "참거짓 대신 글자": (
+                {**GRADE_ANSWER, "reads_like_ad": "false"},
+                (
+                    None,
+                    "응답 모양",
+                    TASK_OK,
+                    None,
+                    {**SHAPE_EXTRA_KEY, "other_keys": 0, "non_bool": ["reads_like_ad"]},
+                ),
+            ),
+            "빈 답": (SimpleNamespace(content=[]), (*both, nothing)),
+            "깊은 중첩": (deep, (*both, {**nothing, "text_chars": len(deep)})),
+        }
+        for label, (response, expected) in rows.items():
+            with self.subTest(label):
+                self.assertEqual(self.graded(response), expected)
+
+    def test_missing_task_key_keeps_grade(self) -> None:
+        self.claude.grades = [{**GRADE_OK, "concern_is_love_worry": True}]
+        code, out, err, result = self.run_main()
+        draft = self.by_id(result)[vid(1)]["drafts"][0]
         self.assertEqual(
-            live_check.grade_draft(claude, HAIKU, *arguments), (None, "FakeApiError 401")
+            (draft["grade"], draft["claude_grade"], draft["grade_error"]), (GRADE_OK, "ok", None)
         )
-        self.assertEqual(live_check.grade_draft(claude, HAIKU, *arguments), (None, "응답 모양"))
+        self.assertEqual((draft["task_quality"], draft["task_error"]), (None, "응답 모양"))
+        self.assertEqual(
+            draft["grade_shape"],
+            {**SHAPE_EXTRA_KEY, "keys": ANSWER_NAMES[:4], "other_keys": 0},
+        )
+
+    def test_near_miss_keys(self) -> None:
+        reordered = dict(reversed(list(GRADE_ANSWER.items())))
+        self.assertEqual(list(reordered), ANSWER_NAMES[::-1])
+        samples = {
+            "다섯 이름 · 도구": (GRADE_ANSWER, True, True),
+            "다른 차례": (reordered, True, True),
+            "설명 글 안의 JSON": ("채점입니다 " + json.dumps(GRADE_ANSWER) + " 끝", True, True),
+            "코드 펜스": ("```json\n" + json.dumps(GRADE_ANSWER) + "\n```", True, True),
+            "키 하나 더": ({**GRADE_ANSWER, "extra": True}, False, False),
+            "옛 세 키 답": (GRADE_OK, True, False),
+            "첫 글자 대문자": (renamed("Scene_in_material"), False, False),
+            "앞 공백": (renamed(" scene_in_material"), False, False),
+            "밑줄 대신 하이픈": (renamed("scene-in-material"), False, False),
+            "전각 글자": (renamed("ｓcene_in_material"), False, False),
+            "자체 검사 이름": (renamed("mentions_scene"), False, False),
+            "reads_like_ad 가 글자": ({**GRADE_ANSWER, "reads_like_ad": "false"}, False, True),
+            "follows_concern 이 1": ({**GRADE_ANSWER, "follows_concern": 1}, False, True),
+            "잘린 JSON": (text_response(TRUNCATED, "max_tokens"), False, False),
+        }
+        for label, (response, grade_ok, task_ok) in samples.items():
+            with self.subTest(label):
+                grade, grade_error, task, task_error, _ = self.graded(response)
+                self.assertEqual(
+                    (grade, grade_error), (GRADE_OK, None) if grade_ok else (None, "응답 모양")
+                )
+                self.assertEqual(
+                    (task, task_error), (TASK_OK, None) if task_ok else (None, "응답 모양")
+                )
+        pick, grade_keys, task_keys = live_check.pick, live_check.GRADE_KEYS, live_check.TASK_KEYS
+        self.assertEqual(pick(GRADE_OK, grade_keys), GRADE_OK)
+        self.assertIsNone(pick(GRADE_OK, task_keys))
+        self.assertIsNone(pick(None, grade_keys))
+        self.assertIsNone(pick({**GRADE_OK, "reads_like_ad": "false"}, grade_keys))
+        self.assertIsNone(pick({**GRADE_OK, "follows_concern": 1}, grade_keys))
+
+    def test_near_miss_tool_block(self) -> None:
+        def block_response(kind: str, name: str) -> SimpleNamespace:
+            block = SimpleNamespace(type=kind, id="toolu_fake", name=name, input=GRADE_ANSWER)
+            return SimpleNamespace(content=[block], stop_reason="tool_use")
+
+        green = (GRADE_OK, None, TASK_OK, None, None)
+        self.assertEqual(self.graded(block_response("tool_use", "record_grade")), green)
+        # 도구 블록이 글 블록보다 먼저 읽힙니다 — 글 블록의 다른 JSON 은 보지 않습니다
+        both = tool_response("record_grade", GRADE_ANSWER)
+        both.content.insert(0, SimpleNamespace(type="text", text=json.dumps({"x": 1})))
+        self.assertEqual(self.graded(both), green)
+        # 정하지 않은 표본 — 이름 · 종류가 다른 도구 블록을 받을지 트래커 줄이 없어, 지금 코드는
+        # 글 블록으로 넘어가 응답 모양이 됩니다(그 동작을 적어 둡니다)
+        for kind, name in (("tool_use", "Record_grade"), ("TOOL_USE", "record_grade")):
+            with self.subTest(kind=kind, name=name):
+                grade, grade_error, task, task_error, shape = self.graded(
+                    block_response(kind, name)
+                )
+                self.assertEqual((grade_error, task_error), ("응답 모양", "응답 모양"))
+                self.assertEqual((shape["tool_used"], shape["json_read"]), (False, False))
+
+    def test_stop_reason_words(self) -> None:
+        for word in live_check.STOP_REASONS:
+            self.assertEqual(live_check._stop_word(word), word)
+        self.assertEqual(
+            live_check.STOP_REASONS,
+            (
+                "end_turn",
+                "max_tokens",
+                "stop_sequence",
+                "tool_use",
+                "pause_turn",
+                "refusal",
+                "model_context_window_exceeded",
+            ),
+        )
+        self.assertIsNone(live_check._stop_word(None))
+        odd_words = (
+            "MAX_TOKENS",
+            " max_tokens",
+            "max-tokens",
+            "ｍａｘ_tokens",
+            "max_tokens_exceeded",
+            5,
+        )
+        for odd in odd_words:
+            with self.subTest(odd=odd):
+                self.assertEqual(live_check._stop_word(odd), "other")
 
 
 class KeyHidingTest(LiveCheckCase):
@@ -2105,6 +2364,8 @@ class KeyHidingTest(LiveCheckCase):
         cut = FakeApiError("가" * 190 + anthropic + " 뒤 글", 401)
         cut.__context__ = OSError(anthropic)
         self.claude.writes = [cut]
+        # 채점 답의 글과 stop_reason 에 키 — 첫 채점은 넓힌 창 vid5 의 초안입니다
+        self.claude.grades = [text_response(f"채점 {anthropic}", f"stop {anthropic}")]
         self.world.comments[vid(2)] = reset
         self.world.search_answers["썸"] = reset
 
@@ -2117,6 +2378,9 @@ class KeyHidingTest(LiveCheckCase):
         # 키가 결과까지 닿았고 가림이 바꿨습니다 — 가림 없이 지나간 것이 아닙니다
         self.assertIn("API 오류: FakeSdkError 401 <TYPESAFE_API_KEY>", saved)
         self.assertIn("가<ANTHROPIC_API_KEY>", saved)
+        keyed = self.by_id(result)[vid(5)]["drafts"][0]
+        self.assertEqual(keyed["grade_error"], "응답 모양")
+        self.assertEqual(keyed["grade_shape"]["stop_reason"], "other")
         self.assertIn(error_entry("youtube", "search", "YouTubeError", None), result["errors"])
         self.assertIn(
             error_entry("youtube", "comments", "YouTubeError", None, vid(2)), result["errors"]
@@ -2198,6 +2462,45 @@ class ResultShapeTest(LiveCheckCase):
         self.assertEqual(
             out, summary + f"결과: {result_path} · {summary_path}\n키 검사: 결과 파일에 키 없음\n"
         )
+
+    def test_claude_answer_text_never_stored(self) -> None:
+        mark = ANSWER_MARK
+        prose = f"{mark} 설명 글"
+        response = SimpleNamespace(
+            content=[
+                SimpleNamespace(type="text", text=prose),
+                SimpleNamespace(type=f"{mark}_block", text=mark),
+                SimpleNamespace(
+                    type="tool_use", id=f"toolu_{mark}", name=f"record_{mark}", input={mark: 1}
+                ),
+                SimpleNamespace(
+                    type="tool_use",
+                    id=f"toolu_{mark}",
+                    name="record_grade",
+                    input={**GRADE_ANSWER, "reads_like_ad": mark, f"{mark}_key": True},
+                ),
+            ],
+            stop_reason=f"{mark}_stop",
+        )
+        self.claude.grades = [response] * 3
+        code, out, err, result = self.run_main()
+        drafts = [draft for video in result["videos"] for draft in video["drafts"]]
+        self.assertEqual(len(drafts), 3)
+        for draft in drafts:
+            self.assertEqual((draft["grade_error"], draft["task_error"]), ("응답 모양",) * 2)
+            self.assertEqual(
+                draft["grade_shape"],
+                {
+                    "stop_reason": "other",
+                    "tool_used": True,
+                    "text_chars": len(prose),
+                    "json_read": True,
+                    "keys": ANSWER_NAMES,
+                    "other_keys": 1,
+                    "non_bool": ["reads_like_ad"],
+                },
+            )
+        self.assertNotIn(mark, self.outputs(out, err))
 
     def test_top_comment_authors_never_stored(self) -> None:
         code, out, err, result = self.run_main()
