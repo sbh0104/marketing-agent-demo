@@ -11,7 +11,14 @@ from pathlib import Path
 from agent.config import Config, ConfigError, load_config
 from agent.scheduler import run_loop
 from agent.store import Store
-from tests.test_config import BAD_VALUES, OUT_OF_RANGE_VALUES, REPO_CONFIG, variant, write_config
+from tests.test_config import (
+    BAD_VALUES,
+    OUT_OF_RANGE_VALUES,
+    REPO_CONFIG,
+    TEXT_VALUES,
+    variant,
+    write_config,
+)
 
 BASE = load_config(Path(__file__).resolve().parent.parent / "config.yaml")
 FIVE = dataclasses.replace(BASE, poll_interval_min=5)
@@ -191,7 +198,7 @@ class RealFileReloadTest(unittest.TestCase):
         return done, cycles, errors, sleeps, initial
 
     def test_bad_edit_keeps_previous_config_and_fix_is_picked_up(self) -> None:
-        for bad in (*BAD_VALUES, *OUT_OF_RANGE_VALUES):
+        for bad in (*BAD_VALUES, *OUT_OF_RANGE_VALUES, *TEXT_VALUES):
             with self.subTest(bad.label):
                 done, cycles, errors, sleeps, initial = self.run_three_cycles(
                     variant(bad.old, bad.new)

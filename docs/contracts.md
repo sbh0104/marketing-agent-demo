@@ -34,8 +34,8 @@ Phase 2–7 의 모든 단계가 기대는 계약입니다. 설정 읽기, 영�
 
 | 키 | 타입 | 규칙 | 과제 기본값 |
 |---|---|---|---|
-| `topic` | 글자 | 비어 있지 않음 | `연애` |
-| `keywords` | 글자 목록 | 1개 이상, 각 항목 비어 있지 않음 | `[연애, 썸, 연애 상담, 이별, 소개팅]` |
+| `topic` | 글자 | 비어 있지 않고, 스페이스로 시작하거나 끝나지 않음, 글자 규칙(아래), 500자 이하 — 판별 질문에 세 번 들어가므로 한 글자 4바이트로 채워도 영상 글 몫이 22000 바이트 이상 남는 길이('주제 판별' 절) | `연애` |
+| `keywords` | 글자 목록 | 1개 이상, 각 항목 비어 있지 않고, 스페이스로 시작하거나 끝나지 않음, 글자 규칙(아래) | `[연애, 썸, 연애 상담, 이별, 소개팅]` |
 | `poll_interval_min` | 정수 | ≥ 1, ≤ 52560000 | `120` (과제 예시 `30` — 아래) |
 | `trigger.min_views` | 정수 | ≥ 0, ≤ 1000000000000 | `1000` |
 | `trigger.max_views` | 정수 | ≥ `min_views`, ≤ 1000000000000 | `5000` |
@@ -46,16 +46,16 @@ Phase 2–7 의 모든 단계가 기대는 계약입니다. 설정 읽기, 영�
 | `limits.daily_max_searches` | 정수 | ≥ 0, ≤ 86400 | `90` (과제 밖에서 더한 키) |
 | `comment.min_chars` | 정수 | ≥ 1, ≤ 10000 | `40` |
 | `comment.max_chars` | 정수 | ≥ `min_chars`, ≤ 10000 | `120` |
-| `comment.writer_model` | 글자 | 비어 있지 않음 — 댓글을 쓰는 Claude 모델 이름 ('댓글 작성' 절) | `claude-sonnet-5-5` |
+| `comment.writer_model` | 글자 | 비어 있지 않고, 스페이스로 시작하거나 끝나지 않음, 글자 규칙(아래) — 댓글을 쓰는 Claude 모델 이름 ('댓글 작성' 절) | `claude-sonnet-5-5` |
 | `comment.check_min_probability` | 숫자 | ≥ 0, ≤ 1 — jev 자체 검사 통과 하한 ('댓글 작성' 절) | `0.7` |
-| `classifier.model` | 글자 | 비어 있지 않음 — jev 모델 이름 | `jev-latest` |
+| `classifier.model` | 글자 | 비어 있지 않고, 스페이스로 시작하거나 끝나지 않음, 글자 규칙(아래) — jev 모델 이름 | `jev-latest` |
 | `classifier.noul_yes_min` | 숫자 | > 0.5, ≤ 1 — 주제 일치 확률이 이 값 이상이어야 일치 | `0.8` |
 | `classifier.noul_no_max` | 숫자 | ≥ 0, < `noul_yes_min` — 이 값 이하여야 불일치, 사이는 보류 | `0.2` |
 | `classifier.choice_min_confidence` | 숫자 | ≥ 0, ≤ 1 — 이유 보기 확신이 이보다 낮으면 보류 | `0.5` |
-| `classifier.on_topic_reasons` | 글자 목록 | 1개 이상, 각 1–40자, 두 목록 합쳐 50개 이하, 이름 겹침 금지 | 4개 (config.yaml) |
+| `classifier.on_topic_reasons` | 글자 목록 | 1개 이상, 각 1–40자이고 스페이스로 시작하거나 끝나지 않음, 글자 규칙(아래), 두 목록 합쳐 50개 이하, 이름 겹침 금지 | 4개 (config.yaml) |
 | `classifier.off_topic_reasons` | 글자 목록 | 같은 규칙 — jev 에 먼저 보임 | 4개 (config.yaml) |
-| `chrome_debug_url` | 글자 | `http://` 또는 `https://` 로 시작 | `http://localhost:9222` |
-| `allowed_videos` | 글자 목록 | 비워 두면 `()`; 항목은 쓴 그대로 보관 | `- https://youtu.be/내-테스트-영상-ID` |
+| `chrome_debug_url` | 글자 | 비어 있지 않고, 스페이스로 시작하거나 끝나지 않음, 글자 규칙(아래), `http://` 또는 `https://` 로 시작 | `http://localhost:9222` |
+| `allowed_videos` | 글자 목록 | 비워 두면 `()`; 항목은 쓴 그대로 보관 (글자 규칙 밖) | `- https://youtu.be/내-테스트-영상-ID` |
 
 - "정수"는 bool 을 받지 않습니다. "숫자"는 정수나 실수(bool 제외)이고 실수로 저장되며,
   유한값만 받습니다 — `.inf` · `-.inf` · `.nan` 은 `유한한 숫자여야 합니다: <키>` 오류입니다.
@@ -108,6 +108,21 @@ Phase 2–7 의 모든 단계가 기대는 계약입니다. 설정 읽기, 영�
 - 보기 이름에 `: ` 가 들어가면 따옴표로 감싸세요 — 따옴표 없는 `- 키워드만 겹침: 게임` 은
   YAML 이 '키: 값' 묶음으로 읽어
   `비어 있지 않은 글자여야 합니다: classifier.off_topic_reasons[0]` 오류입니다.
+- **글자 규칙.** 글자 키 — `topic` · `keywords` 각 항목 · `comment.writer_model` ·
+  `classifier.model` · 판별 보기 이름 · `chrome_debug_url` — 는 유니코드 범주 L(글자) · M(결합 표시) ·
+  N(숫자) · P(문장부호) · S(기호)의 글자와 보통 스페이스(U+0020)로 씁니다 — 7절 로그의 날 글자와 같은 목록입니다.
+  그 밖의 글자 — 줄바꿈 · 탭 같은 제어 글자, 폭 없는 공백(U+200B) 같은 서식 글자, U+0020 밖의 공백
+  (U+00A0 · 전각 공백 U+3000), 줄 · 문단 구분, 사용자 정의 · 미할당 글자, 짝 없는 서로게이트(`"\ud800"`) — 가
+  하나라도 들면 `글자 · 숫자 · 문장부호 · 기호와 보통 스페이스만 쓸 수 있습니다 (…): <키>` 오류입니다.
+  범주는 실행 중인 파이썬의 `unicodedata` 판정을 따르므로, 그 판이 모르는 글자(Cn)는 다른 판에서 읽히던 값이라도
+  이 오류입니다 — 예: U+1FAE9 는 파이썬 3.14(유니코드 16.0)에서 S 이고 3.12(유니코드 15.0)에서 Cn 입니다.
+  범주 L · M · S 안에도 빈칸으로 그려지는 글자(한글 채움 문자 U+3164, 점자 빈칸 U+2800, 변형 선택자 U+FE0F 등)가
+  있어, 이런 글자는 이 규칙을 지납니다.
+  스페이스로 시작하거나 끝나는 값(`"   "` 포함)은 `스페이스로 시작하거나 끝나면 안 됩니다: <키>` 오류입니다.
+  가운데 스페이스는 연속이어도 받고, 앞뒤 스페이스를 잘라 쓰지 않고 오류로 알립니다.
+  두 오류 모두 메시지에 값을 쓰지 않으며, 실행 중이면 이전 설정을 유지합니다.
+  YAML 은 따옴표 없는 값의 앞뒤 공백을 스스로 떼므로, 스페이스 규칙은 따옴표 안의 값에서 걸립니다.
+  `allowed_videos` 항목은 이 규칙을 받지 않고 쓴 그대로 보관합니다 — 항목은 가드가 읽습니다.
 - 같은 키가 두 번 나오면 두 번째 줄 번호와 함께 오류입니다. 윈도우 메모장이 붙이는 BOM 은
   떼어 내고 읽습니다. UTF-8 이 아닌 저장(메모장의 ANSI·Unicode)은 `ConfigError` 입니다.
 - 읽는 중 나는 그 밖의 모든 오류도 `ConfigError` 입니다 — 날짜 모양의 틀린 값
@@ -611,6 +626,10 @@ run_loop(cycle, reload, initial, *, on_error, sleep=time.sleep,
   python3 -m tests.mutants config-narrow-read-errors
   python3 -m tests.mutants config-no-ceiling
   python3 -m tests.mutants config-no-int-ceiling
+  python3 -m tests.mutants config-text-any-char
+  python3 -m tests.mutants config-text-edge-spaces
+  python3 -m tests.mutants config-debug-url-skips-text
+  python3 -m tests.mutants config-no-topic-ceiling
   python3 -m tests.mutants scheduler-one-sleep
   python3 -m tests.mutants scheduler-unclamped-wait
   python3 -m tests.mutants logbook-raw-line-breaks
@@ -1048,6 +1067,8 @@ judge_trigger(record, config, now) -> Judgement     # config 는 Config.trigger
 - **자르기.** `state` 와 가장 긴 질문(JSON 을 UTF-8 바이트로 잰 것)의 합은 32000 바이트
   이하입니다 — 토큰 수는 UTF-8 바이트 수를 넘지 않습니다. 자막부터, 그다음 설명, 그다음 제목
   순으로 끝에서 잘라 내며 글자를 쪼개지 않습니다.
+  설정 상한(2절의 `topic` 500자, 보기 50개 × 40자) 안에서는 한 글자가 4바이트여도 가장 긴 질문이
+  10000 바이트 이하라서 state 에 22000 바이트 이상이 남습니다.
 - 세기와 날짜 비교는 jev 에 묻지 않습니다.
 - **질문 언어.** `QUESTION_LANGUAGE` 상수이고 기본값은 `ko` 입니다.
 - **한국어 정확도.** 예시 묶음은 22개(일치 10 · 불일치 12, 그중 주입 2)입니다.

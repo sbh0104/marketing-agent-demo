@@ -4,6 +4,8 @@
 자리에 몰래 바꿔 넣는 값(`no`/`yes` → bool, 날짜, 따옴표 없는 숫자 ID)은 조용히 지나가지 않고
 오류가 됩니다. 숫자 자리의 YAML 1.1 숫자 표기(`017` → 15, `1:30` → 90)는 그대로 읽고 범위만
 검사합니다. 숫자는 유한값만 받고, 숫자 · 정수 키는 모두 상한이 있습니다 — 계약 2절.
+글자 키는 범주 L · M · N · P · S 의 글자와 U+0020 만 받고, 스페이스로 시작하거나 끝나는 값은
+잘라 쓰지 않고 오류이며(허용 목록 항목은 쓴 그대로), 주제(topic)는 500자까지입니다.
 """
 from __future__ import annotations
 
@@ -14,6 +16,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import yaml
+
+# 글자 키의 글자 규칙은 로그의 날 글자 규칙과 같은 함수입니다 — 범주 L · M · N · P · S 와 U+0020(계약 2절 · 7절).
+# 막을 글자 대신 남길 글자를 적은 규칙이라, 아직 아무도 찾지 않은 글자도 거절 쪽에 떨어집니다.
+from agent.logbook import _is_raw
 
 
 class ConfigError(Exception):
@@ -152,6 +158,9 @@ _MAX_VIEWS = 1_000_000_000_000
 _MAX_PER_DAY = 86_400
 # 댓글 글자 수 — 유튜브 댓글 한 개의 최대 길이입니다.
 _MAX_COMMENT_CHARS = 10_000
+# 주제 글자 수 상한 — 주제는 판별 질문에 세 번 들어갑니다. 500자면 한 글자가 4바이트여도 그 질문이 보기 상한(50개 × 40자)이
+# 이미 허용하는 가장 긴 질문보다 짧아, state 몫이 2만 2천 바이트 아래로 내려가지 않습니다(계약 '주제 판별' 절).
+_MAX_TOPIC_CHARS = 500
 
 
 def _check_keys(data: Mapping[object, object], allowed: tuple[str, ...], prefix: str) -> None:
@@ -201,6 +210,14 @@ def _number(
 def _text(value: object, path: str) -> str:
     if not isinstance(value, str) or not value:
         raise ConfigError(f"비어 있지 않은 글자여야 합니다: {path}")
+    # 값은 메시지에 쓰지 않습니다 — 보이지 않는 글자는 메시지에서도 보이지 않고, 짝 없는 서로게이트는 출력에서 터집니다
+    if not all(map(_is_raw, value)):
+        raise ConfigError(
+            "글자 · 숫자 · 문장부호 · 기호와 보통 스페이스만 쓸 수 있습니다 "
+            f"(줄바꿈 · 탭 · 전각 공백 · 폭 없는 공백 등은 안 됩니다): {path}"
+        )
+    if value[0] == " " or value[-1] == " ":  # 잘라 쓰지 않습니다 — 조용히 지나가지 않고 오류
+        raise ConfigError(f"스페이스로 시작하거나 끝나면 안 됩니다: {path}")
     return value
 
 
@@ -298,8 +315,9 @@ def config_from_mapping(data: Mapping[str, object]) -> Config:
     )
     classifier_config = _classifier(data)
 
-    url = data["chrome_debug_url"]
-    if not isinstance(url, str) or not url.startswith(("http://", "https://")):
+    # 크롬 주소도 글자 규칙을 거칩니다 — 폭 없는 공백이 든 주소는 포트 읽기를 지나 게시마다 chrome_unreachable 로 멈췄습니다
+    url = _text(data["chrome_debug_url"], "chrome_debug_url")
+    if not url.startswith(("http://", "https://")):
         raise ConfigError("http:// 또는 https:// 로 시작해야 합니다: chrome_debug_url")
 
     allowed = data["allowed_videos"]
@@ -313,8 +331,12 @@ def config_from_mapping(data: Mapping[str, object]) -> Config:
     else:
         raise ConfigError("영상 목록이어야 합니다: allowed_videos")
 
+    topic = _text(data["topic"], "topic")
+    if len(topic) > _MAX_TOPIC_CHARS:
+        raise ConfigError(f"{_MAX_TOPIC_CHARS}자 이하여야 합니다: topic")
+
     return Config(
-        topic=_text(data["topic"], "topic"),
+        topic=topic,
         keywords=keyword_items,
         poll_interval_min=_int(
             data["poll_interval_min"], "poll_interval_min", 1, _MAX_INTERVAL_MIN

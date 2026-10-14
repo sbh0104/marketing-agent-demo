@@ -31,7 +31,7 @@ from agent.classifier import (
     sdk_ask,
     state_budget,
 )
-from agent.config import Config, config_from_mapping, load_config
+from agent.config import Config, ConfigError, config_from_mapping, load_config
 from agent.logbook import Event, format_line, parse_line
 from agent.models import Verdict, VideoRecord
 from agent.store import Store
@@ -300,6 +300,32 @@ class StateTest(unittest.TestCase):
         for language in LANGUAGES:
             with self.subTest(language=language):
                 self.assertGreaterEqual(state_budget(build_questions(cfg, language)), 22000)
+
+    def test_topic_at_ceiling_leaves_room_for_state(self) -> None:
+        # 설정이 허용하는 가장 긴 보기 — 서로 다른 이름 50개, 4바이트 글자 40자(160 바이트)씩
+        names = [chr(0x1F600 + i) + "😀" * 39 for i in range(50)]
+        self.assertEqual(len(set(names)), 50)
+        self.assertEqual({len(name) for name in names}, {40})
+        for fill in ("가", "😀", '"'):
+            data = valid()
+            data["topic"] = fill * 500
+            data["classifier"]["on_topic_reasons"] = names[:25]
+            data["classifier"]["off_topic_reasons"] = names[25:]
+            cfg = config_from_mapping(data)
+            for language in LANGUAGES:
+                with self.subTest(fill=fill, language=language):
+                    questions = build_questions(cfg, language)
+                    longest = max(
+                        len(json.dumps(question, ensure_ascii=False).encode("utf-8"))
+                        for question in questions.values()
+                    )
+                    self.assertLessEqual(longest, 10000)
+                    self.assertGreaterEqual(state_budget(questions), 22000)
+        data = valid()
+        data["topic"] = "😀" * 501
+        with self.assertRaises(ConfigError) as caught:
+            config_from_mapping(data)
+        self.assertEqual(str(caught.exception), "500자 이하여야 합니다: topic")
 
     def test_lone_surrogate_in_title_does_not_crash(self) -> None:
         fake = FakeJev()
