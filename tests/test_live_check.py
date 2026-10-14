@@ -502,6 +502,20 @@ def grade_errors_over_half() -> dict:
     return ten_drafts(6)
 
 
+def grade_errors_six_of_eleven() -> dict:
+    """홀수 초안 — ten_drafts(6) 에 채점이 맞은 초안 하나를 더한 11개 중 오류 6(절반 넘음)."""
+    result = ten_drafts(6)
+    result["videos"].append(video(11, "comment"))
+    return result
+
+
+def grade_errors_five_of_eleven() -> dict:
+    """홀수 초안 — ten_drafts(5) 에 채점이 맞은 초안 하나를 더한 11개 중 오류 5(절반 아래)."""
+    result = ten_drafts(5)
+    result["videos"].append(video(11, "comment"))
+    return result
+
+
 def grade_errors_schema_one() -> dict:
     # 판 1 결과는 옛 채점기로 잰 숫자라 채점 막힘을 세지 않습니다(트래커 Phase 6C 질문 5 A)
     return ten_drafts(10, schema=1)
@@ -583,6 +597,8 @@ G1_CASES: tuple[Callable[[], dict], ...] = (
     grade_errors_under_half,
     grade_errors_half,
     grade_errors_over_half,
+    grade_errors_six_of_eleven,
+    grade_errors_five_of_eleven,
     grade_errors_schema_one,
     task_errors_only,
     topic_shape_errors,
@@ -743,6 +759,22 @@ class VerdictTest(unittest.TestCase):
 
     def test_grade_errors_over_half_stops(self) -> None:
         self.assertEqual(self.line(grade_errors_over_half()), "6B: stop — 채점 막힘(오류 6/10)")
+
+    def test_grade_errors_odd_drafts_boundary(self) -> None:
+        self.assertEqual(
+            self.line(grade_errors_six_of_eleven()), "6B: stop — 채점 막힘(오류 6/11)"
+        )
+        self.assertEqual(self.line(grade_errors_five_of_eleven()), "6B: go")
+
+    def test_grade_block_counts_parsed_drafts_only(self) -> None:
+        # 판 2 · 읽은 초안 10(채점 오류 6) + 읽지 못한 초안 4 — 분모는 읽은 초안만 셉니다
+        result = ten_drafts(6)
+        self.assertEqual(result["schema_version"], 2)
+        for item in result["videos"][6:]:
+            item["drafts"][0]["attempt"] = 2
+            item["drafts"].insert(0, {"attempt": 1, "parsed": False})
+        self.assertEqual(sum(len(item["drafts"]) for item in result["videos"]), 14)
+        self.assertEqual(self.line(result), "6B: stop — 채점 막힘(오류 6/10)")
 
     def test_schema_one_result_keeps_old_rule(self) -> None:
         result = grade_errors_schema_one()
@@ -2145,6 +2177,24 @@ class VideoRoundTest(LiveCheckCase):
                 else:
                     self.assertEqual(result["windows"]["widened"]["searches"], 0)
 
+    def test_popular_minimum_reached_exactly_keeps_widened_closed(self) -> None:
+        # 인기 댓글 초안 최소 수는 기본 3 — 운영 창이 목표 초안 4 와 인기 댓글 재료 초안 정확히
+        # 3 에 닿으면 넓힌 창을 열지 않습니다
+        limits = replace(live_check.DEFAULT_LIMITS, target_drafts=4)
+        self.assertEqual(limits.popular_drafts_min, 3)
+        for number in (6, 7):
+            self.add_video("연애", "operation", number, 2000)
+        self.world.comments[vid(6)] = (403, google_error("commentsDisabled"))
+        code, out, err, result = self.run_main(limits=limits)
+        drafts = [draft for video in result["videos"] for draft in video["drafts"]]
+        self.assertEqual(len(drafts), 4)
+        popular = [
+            video["video_id"] for video in result["videos"] if video["material"] == "top_comments"
+        ]
+        self.assertEqual(popular, [vid(1), vid(2), vid(7)])
+        self.assertEqual(list(result["windows"]), ["operation"])
+        self.assertEqual(result["verdict"], "6B: go")
+
     def test_top_comments_reach_the_writer(self) -> None:
         self.world.comments[vid(1)] = [*COMMENTS, "   ", "길" * 400]
         code, out, err, result = self.run_main()
@@ -2714,6 +2764,21 @@ class GradeTest(unittest.TestCase):
             },
         )
 
+    def test_grade_system_task_questions_text(self) -> None:
+        # 과제 품질 질문 4 · 5 와 닫는 줄을 글자 그대로 — 기호만 비교하면 바꿔 써도 초록입니다
+        self.assertEqual(
+            live_check.GRADE_SYSTEM.split("\n")[-5:],
+            [
+                "4. concern_is_love_worry — <concern> 이 자료 속 사람의 연애 고민입니까?"
+                " 줄거리나 장면 요약이면 false 입니다.",
+                "5. saju_story_fits — <draft_comment> 에 비슷한 고민이 있었을 때 연애사주를 봤던"
+                " 자기 경험이 있고, 그 경험이 <concern> 의 고민과 자연스럽게 이어집니까?",
+                "",
+                "답은 record_grade 도구 하나로만 합니다. 설명 글은 쓰지 않습니다.",
+                "",
+            ],
+        )
+
     def test_api_error_names_both_parts(self) -> None:
         claude = FakeClaude([])
         claude.grades = [FakeApiError("unauthorized", 401)]
@@ -2747,6 +2812,7 @@ class AnswerShapeTest(LiveCheckCase):
         prose = "채점입니다 " + json.dumps(GRADE_ANSWER) + " 끝"
         extra_text = json.dumps({**GRADE_ANSWER, "extra": True})
         deep = "{" * 5000 + "}" * 5000
+        valid_deep = '{"a":' * 100000 + "1" + "}" * 100000  # 올바른 JSON — RecursionError 길
         success = (GRADE_OK, None, TASK_OK, None, None)
         both = (None, "응답 모양", None, "응답 모양")
         text_shape = {
@@ -2766,6 +2832,8 @@ class AnswerShapeTest(LiveCheckCase):
             "other_keys": 0,
             "non_bool": [],
         }
+        # record_grade 도구 블록인데 input 이 dict 가 아님 — 도구는 썼지만 JSON 객체는 못 읽음
+        not_dict_input = {**SHAPE_EXTRA_KEY, "json_read": False, "keys": [], "other_keys": 0}
         rows = {
             "도구 답": (GRADE_ANSWER, success),
             "설명 글 + JSON": (prose, success),
@@ -2788,6 +2856,16 @@ class AnswerShapeTest(LiveCheckCase):
             ),
             "빈 답": (SimpleNamespace(content=[]), (*both, nothing)),
             "깊은 중첩": (deep, (*both, {**nothing, "text_chars": len(deep)})),
+            "올바른 깊은 중첩": (valid_deep, (*both, {**nothing, "text_chars": len(valid_deep)})),
+            "도구 입력이 목록": (
+                tool_response("record_grade", [GRADE_ANSWER]),
+                (*both, not_dict_input),
+            ),
+            "도구 입력이 글자": (
+                tool_response("record_grade", json.dumps(GRADE_ANSWER)),
+                (*both, not_dict_input),
+            ),
+            "도구 입력이 None": (tool_response("record_grade", None), (*both, not_dict_input)),
         }
         for label, (response, expected) in rows.items():
             with self.subTest(label):
@@ -2852,7 +2930,7 @@ class AnswerShapeTest(LiveCheckCase):
         both = tool_response("record_grade", GRADE_ANSWER)
         both.content.insert(0, SimpleNamespace(type="text", text=json.dumps({"x": 1})))
         self.assertEqual(self.graded(both), green)
-        # 정하지 않은 표본 — 이름 · 종류가 다른 도구 블록을 받을지 트래커 줄이 없어, 지금 코드는
+        # 빨강(거절) — 트래커 6C 결정 '도구 답은 … 글자 그대로 같을 때만', 지금 코드는
         # 글 블록으로 넘어가 응답 모양이 됩니다(그 동작을 적어 둡니다)
         for kind, name in (("tool_use", "Record_grade"), ("TOOL_USE", "record_grade")):
             with self.subTest(kind=kind, name=name):
@@ -2861,6 +2939,16 @@ class AnswerShapeTest(LiveCheckCase):
                 )
                 self.assertEqual((grade_error, task_error), ("응답 모양", "응답 모양"))
                 self.assertEqual((shape["tool_used"], shape["json_read"]), (False, False))
+        # 같은 블록 뒤에 다섯 키 JSON 글 블록이 있으면 블록을 지나쳐 글 JSON 을 받습니다(트래커 6C)
+        for kind, name in (("tool_use", "Record_grade"), ("TOOL_USE", "record_grade")):
+            with self.subTest(kind=kind, name=name, text="다섯 키 JSON"):
+                response = block_response(kind, name)
+                response.content.append(
+                    SimpleNamespace(type="text", text=json.dumps(GRADE_ANSWER))
+                )
+                self.assertEqual(self.graded(response), green)
+                _, shape = live_check.read_answer(response, "record_grade", ANSWER_NAMES)
+                self.assertEqual((shape["tool_used"], shape["json_read"]), (False, True))
 
     def test_near_miss_topic_keys(self) -> None:
         def topic(response: object) -> tuple:

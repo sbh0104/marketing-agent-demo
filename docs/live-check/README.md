@@ -17,7 +17,7 @@
    - 키나 SDK 가 없으면 아무것도 부르지 않고 없는 것을 한 줄로 알립니다(종료 코드 2).
    - 다시 돌리면 결과 두 파일을 덮어씁니다.
    - 결과 두 파일은 main 에 커밋하지 않습니다 — main 에 새 결과를 커밋하면 `tests.test_live_check_applied` 가 빨강이 됩니다(계약의 기록이 옛 결과의 숫자). 사람 칸의 다른 값(`ok` · `bad` 밖의 글)은 정답 없음으로 세어 빨강이 되지 않습니다. 결과는 그 다시 반영 페이즈(이번은 Phase 6D, 6E 가 작성기를 고치면 Phase 6F)의 레인 브랜치에만 커밋합니다(9).
-5. 화면 첫 줄이 판정입니다 — `6B: go` 또는 `6B: stop — <경우와 숫자>`. 결과는 `docs/live-check/result.json` 과 `docs/live-check/summary.md` 이고, 요약의 첫 줄도 같은 판정입니다. `재지 못함` 이면 요약의 `오류:` 줄(서비스 · 단계 · 상태)이 원인입니다 — 키 · 크레딧 · API 설정 문제일 수 있습니다. `채점 막힘` 이면 요약의 `채점 답 모양:` 줄과 `result.json` 초안의 `grade_shape` 칸이 원인입니다. `재지 못함` 과 `채점 막힘` 이 함께 나오면 채점 호출 자체가 실패한 것이니 `재지 못함` 의 오류 줄부터 봅니다.
+5. 화면 첫 줄이 판정입니다 — `6B: go` 또는 `6B: stop — <경우와 숫자>`. 결과는 `docs/live-check/result.json` 과 `docs/live-check/summary.md` 이고, 요약의 첫 줄도 같은 판정입니다. `재지 못함` 이면 요약의 `오류:` 줄(서비스 · 단계 · 상태)이 원인입니다 — 키 · 크레딧 · API 설정 문제일 수 있습니다. `채점 막힘` 이면 요약의 `채점 답 모양:` 줄과 `result.json` 초안의 `grade_shape` 칸이 원인입니다. 함께 나오면 `재지 못함` 의 오류 줄부터 봅니다 — 그 줄에 `claude` · `grade` 가 있으면 채점 호출이 실패한 것이고, 없으면 채점 막힘의 원인은 `채점 답 모양:` 줄입니다.
 6. 화면 마지막 줄이 `키 검사: 결과 파일에 키 없음` 인지 봅니다. 다른 줄이면 커밋하지 말고 인터뷰로 옵니다.
 7. 채점을 훑고, 동의하지 않는 것만 사람 칸에 적습니다 — 건너뛰어도 됩니다. 판정 줄은 사람 칸과 무관합니다.
    - 초안: `result.json` 의 `videos[].drafts[]` 마다 `claude_grade`(`ok` / `bad`)를 보고, 동의하지 않으면 그 초안의 `"human": ""` 을 `"human": "ok"` 또는 `"human": "bad"` 로 고칩니다.
@@ -25,11 +25,10 @@
 8. 판정이 `stop` 이면 결과를 9 처럼 레인 브랜치에 커밋하되 그 페이즈를 진행하지 않고 인터뷰로 옵니다. `go` 면 커밋한 뒤 그 페이즈를 시작합니다.
 9. 결과 두 파일을 다시 반영 페이즈의 레인 브랜치에 커밋합니다. 허브가 그 페이즈의 레인을 아직 만들지 않았으면 먼저 만듭니다 — 레인을 만들면 그 페이즈의 사이클이 시작되어 결과 커밋 전에 `unmeasured` 로 한 번 멈출 수 있고, 두 파일을 커밋한 뒤 이어 갑니다. main 체크아웃의 뿌리에서:
 
-       cp docs/live-check/result.json docs/live-check/summary.md ~/adw-lanes/marketing-agent-demo/6d/marketing-agent-demo/docs/live-check/
-       git restore docs/live-check/result.json docs/live-check/summary.md
+       cp docs/live-check/result.json docs/live-check/summary.md ~/adw-lanes/marketing-agent-demo/6d/marketing-agent-demo/docs/live-check/ && git restore docs/live-check/result.json docs/live-check/summary.md
 
    그다음 레인 worktree 의 뿌리에서:
 
        git add docs/live-check/result.json docs/live-check/summary.md && git commit -m "docs(live-check): 실제 호출 결과 — Phase 6C 실행기"
 
-   `git restore` 는 main 체크아웃의 두 파일을 커밋된 옛 결과로 되돌립니다 — main 은 옛 결과 그대로여야 초록입니다. 레인 경로의 `6d` 는 허브가 만든 레인 이름입니다.
+   `git restore` 는 main 체크아웃의 두 파일을 커밋된 옛 결과로 되돌립니다 — main 은 옛 결과 그대로여야 초록입니다. 복사가 실패하면(레인 경로가 없거나 6F 등 다른 이름) `git restore` 를 돌리지 않습니다. 레인 경로의 `6d` 는 허브가 만든 레인 이름입니다.
