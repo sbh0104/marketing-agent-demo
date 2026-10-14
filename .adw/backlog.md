@@ -52,7 +52,7 @@
 - [x] Phase 1A — 파서 허용 쪽 규칙 (plans/interview-marketing-agent.md#phase-1a)
 - [x] Phase 1B — 계약 절 이름 규칙 (plans/interview-marketing-agent.md#phase-1b)
 - [x] Phase 6A — 진짜 호출 준비 · 사람이 돌릴 실행기 (plans/interview-marketing-agent.md#phase-6a)
-- [ ] Phase 1C — 글자 설정값 허용 규칙 (plans/interview-marketing-agent.md#phase-1c)
+- [~] Phase 1C — 글자 설정값 허용 규칙 (plans/interview-marketing-agent.md#phase-1c)
 - [ ] Phase 6B — 진짜 결과 반영 · 정확도 기록 · 기준값 조정 (plans/interview-marketing-agent.md#phase-6b)
 - [ ] Phase 7 — 파이프라인 연결 · 운영 규칙 통합 (plans/interview-marketing-agent.md#phase-7)
 - [ ] Phase 8 — 제출물 (plans/interview-marketing-agent.md#phase-8)
