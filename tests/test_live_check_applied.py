@@ -209,6 +209,23 @@ def normalize(text: str) -> str:
     return " ".join(text.split())
 
 
+def record_heads() -> list[str]:
+    """기록 줄의 머리 — 기록 줄을 만드는 함수들의 앞머리를 `LANGUAGES` · `WINDOW_LABELS` 로 만듭니다."""
+    heads: list[str] = []
+    for language in LANGUAGES:
+        heads += [f"{language}: 지금 기준값 맞음", f"{language}: 기준값 사이"]
+    for label in WINDOW_LABELS.values():
+        heads += [f"기준값 사이 영상 {label}:", f"영상 판별 {label}:", f"초안 {label}:"]
+    heads.append("모델 이름:")
+    return heads
+
+
+def head_counts(text: str) -> dict[str, int]:
+    """머리마다 그 머리로 시작하는 줄 수 — 줄은 공백을 접고 앞의 `- ` 를 뗀 뒤 봅니다."""
+    lines = [normalize(line).removeprefix("- ") for line in text.splitlines()]
+    return {head: sum(1 for line in lines if line.startswith(head)) for head in record_heads()}
+
+
 class ContractCase(unittest.TestCase):
     """계약에 기록 문구가 있는지 — 공백을 하나로 접어 비교합니다."""
 
@@ -243,6 +260,38 @@ class ContractBoundaryTest(ContractCase):
         for text in ("탈락 0 · 끝", "탈락 0"):
             with self.subTest(text=text):
                 self._check(text, "탈락 0")
+
+
+class ContractHeadTest(unittest.TestCase):
+    """기록 머리는 계약에 한 번씩 — 같은 머리에 다른 숫자를 단 모순된 중복 줄을 잡습니다."""
+
+    def test_each_record_head_appears_once(self) -> None:
+        counts = head_counts(CONTRACT_PATH.read_text(encoding="utf-8-sig"))
+        for head, count in counts.items():
+            with self.subTest(head=head):
+                self.assertEqual(count, 1, f"계약에 이 머리의 기록 줄이 {count}개입니다: {head}")
+
+    def test_every_record_line_starts_with_one_head(self) -> None:
+        result = load_result()
+        heads = record_heads()
+        lines = [
+            *accuracy_lines(result),
+            *gap_lines(result),
+            *classification_lines(result),
+            *draft_lines(result),
+            model_line(result),
+        ]
+        for line in lines:
+            with self.subTest(line=line):
+                self.assertEqual(sum(1 for head in heads if line.startswith(head)), 1)
+
+    def test_contradicting_duplicate_line_is_counted(self) -> None:
+        duplicate = (
+            "- en: 지금 기준값 맞음 12/22 · 잘못된 일치 3 · 잘못된 불일치 0 · 보류 7 · 오류 0"
+            " · 올리기만 범위 최다 맞음 12/22 — 미달"
+        )
+        text = CONTRACT_PATH.read_text(encoding="utf-8-sig") + "\n" + duplicate + "\n"
+        self.assertEqual(head_counts(text)["en: 지금 기준값 맞음"], 2)
 
 
 class CommittedResultTest(unittest.TestCase):
