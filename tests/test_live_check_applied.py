@@ -503,6 +503,27 @@ class AccuracyRecordTest(ContractCase):
                 tally = self.result["accuracy_tally"][language]
                 self.assertEqual(counts, {key: tally[key] for key in keys})
 
+    def test_tally_slots_follow_record_lines(self) -> None:
+        result = copy.deepcopy(self.result)
+        result["accuracy_tally"]["ko"] = {
+            "correct": 15, "false_yes": 1, "false_no": 2, "hold": 3, "error": 1
+        }
+        result["accuracy_tally"]["en"] = {
+            "correct": 11, "false_yes": 6, "false_no": 2, "hold": 1, "error": 2
+        }
+        n = result["example_count"]
+        expected = {
+            "ko": f"ko: 지금 기준값 맞음 15/{n} · 잘못된 일치 1 · 잘못된 불일치 2 · 보류 3 · 오류 1"
+            " · 올리기만 범위 최다 맞음",
+            "en": f"en: 지금 기준값 맞음 11/{n} · 잘못된 일치 6 · 잘못된 불일치 2 · 보류 1 · 오류 2"
+            " · 올리기만 범위 최다 맞음",
+        }
+        lines = accuracy_lines(result)
+        self.assertEqual(len(lines), len(LANGUAGES))
+        for language, line in zip(LANGUAGES, lines):
+            with self.subTest(language=language):
+                self.assertTrue(line.startswith(expected[language]), line)
+
     def test_question_language_follows_record(self) -> None:
         passed = {language: passes(reach(self.result, language)) for language in LANGUAGES}
         self.assertTrue(any(passed.values()), "drift — 인터뷰")
