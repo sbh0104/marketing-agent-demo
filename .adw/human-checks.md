@@ -629,3 +629,75 @@
 - source: adw/smoke-sweep-s079-s082
 - tag: plain
 - status: open
+
+### H-076 — H-018 · H-044(H-066 · H-068 과 함께)를 done 으로 바꿀지 Risks R9 의 근거를 보고 정한다
+- project: marketing-agent-demo
+- when: 2026-10-15 · plans/interview-marketing-agent.md#phase-6d
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-6d-live-check-reapply
+- tag: plain
+- status: open
+
+### H-077 — H-063 · H-069 를 done 으로 바꾼다 — 실행과 이 레인 커밋(`6626629`)이 끝났고 판정에 `채점 막힘` 이 없음
+- project: marketing-agent-demo
+- when: 2026-10-15 · plans/interview-marketing-agent.md#phase-6d
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-6d-live-check-reapply
+- tag: plain
+- status: open
+
+### H-078 — `draft_answer` 의 "OK" · " ok" · "ok." · "ｏｋ" · "good" 과 `topic_answer` 의 "연애 " · "연 애" · "아님." · "아니" 를 정답 없음으로 둘지 정한다
+- project: marketing-agent-demo
+- when: 2026-10-15 · plans/interview-marketing-agent.md#phase-6d
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-6d-live-check-reapply
+- tag: plain
+- status: open
+
+### H-079 — 기록 하한 고정의 빈틈(0.77–0.80, 그리고 `noul` 을 비워 피하는 길 N2)을 받아들일지 정한다
+- project: marketing-agent-demo
+- when: 2026-10-15 · plans/interview-marketing-agent.md#phase-6d
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-6d-live-check-reapply
+- tag: plain
+- status: open
+
+### H-080 — 이 보고서 첫 줄 `6E: 할 일 있음 — …` 을 보고 Phase 6E 를 시작한다(6G 와 나란히)
+- project: marketing-agent-demo
+- when: 2026-10-15 · plans/interview-marketing-agent.md#phase-6d
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-6d-live-check-reapply
+- tag: plain
+- status: open
+
+### H-081 — H-074 의 "같은 틀 1쌍 이상" 을 ⓒ(겹치는 6글자 조각이 있는 초안 10/11, 최다 9)로 읽어도 되는지 6F 보고서 전에 정한다
+- project: marketing-agent-demo
+- when: 2026-10-15 · plans/interview-marketing-agent.md#phase-6d
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-6d-live-check-reapply
+- tag: plain
+- status: open
+
+### H-082 — 보류 11 중 채점 '연애' 6 을 보고 `noul_yes_min` 을 내릴지 정한다 — 0.75 면 연애 1 이 더, 0.6 이면 연애 2 · 아님 2 가 더 들어와 깨끗하게 가르는 값이 없음
+- project: marketing-agent-demo
+- when: 2026-10-15 · plans/interview-marketing-agent.md#phase-6d
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-6d-live-check-reapply
+- tag: plain
+- status: open
+
+### H-083 — `6E:` 줄의 "작성기 답을 JSON 으로 못 읽은 초안 2/11"(2 = 못 읽은 시도, 11 = 읽힌 초안)을 6F 보고서에서 다른 분모로 적을지 정한다
+- project: marketing-agent-demo
+- when: 2026-10-15 · plans/interview-marketing-agent.md#phase-6d
+- from: ship-report.md § Human checks — .adw/ship-report.md § Risks
+- source: adw/phase-6d-live-check-reapply
+- tag: plain
+- status: open
+
+### H-084 — README 실행 안내(특히 9단계의 복사 경로와 `lane.py status` 문장)를 직접 읽고, 6F 때 헷갈리지 않을지와 6G 착지 전에는 돌리지 않는다는 순서를 확인한다
+- project: marketing-agent-demo
+- when: 2026-10-15 · plans/interview-marketing-agent.md#phase-6d
+- from: ship-report.md § Human checks — .adw/verify-plan.md § Coverage decisions
+- source: adw/phase-6d-live-check-reapply
+- tag: plain
+- status: open
