@@ -864,6 +864,14 @@ class TextKeyTest(unittest.TestCase):
         data["allowed_videos"] = items
         self.assertEqual(config_from_mapping(data).allowed_videos, tuple(items))
 
+    def test_chrome_debug_url_error_precedes_topic_error(self) -> None:
+        data = valid()
+        data["topic"] = "연애\t"
+        data["chrome_debug_url"] = "http://localhost:9222 "
+        with self.assertRaises(ConfigError) as caught:
+            config_from_mapping(data)
+        self.assertEqual(str(caught.exception), f"{EDGE_SPACE}: chrome_debug_url")
+
 
 class LoadConfigTest(unittest.TestCase):
     def setUp(self) -> None:
