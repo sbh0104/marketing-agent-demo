@@ -611,6 +611,10 @@ run_loop(cycle, reload, initial, *, on_error, sleep=time.sleep,
   python3 -m tests.mutants config-narrow-read-errors
   python3 -m tests.mutants config-no-ceiling
   python3 -m tests.mutants config-no-int-ceiling
+  python3 -m tests.mutants config-text-any-char
+  python3 -m tests.mutants config-text-edge-spaces
+  python3 -m tests.mutants config-debug-url-skips-text
+  python3 -m tests.mutants config-no-topic-ceiling
   python3 -m tests.mutants scheduler-one-sleep
   python3 -m tests.mutants scheduler-unclamped-wait
   python3 -m tests.mutants logbook-raw-line-breaks

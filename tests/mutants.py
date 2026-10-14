@@ -222,6 +222,30 @@ MUTANTS: dict[str, tuple[str, str, str, str]] = {
         "if value > maximum:",
         "if False:",
     ),
+    "config-text-any-char": (
+        "agent.config",
+        "tests.test_config",
+        "if not all(map(_is_raw, value)):",
+        "if False:",
+    ),
+    "config-text-edge-spaces": (
+        "agent.config",
+        "tests.test_config",
+        'if value[0] == " " or value[-1] == " ":',
+        "if False:",
+    ),
+    "config-debug-url-skips-text": (
+        "agent.config",
+        "tests.test_config",
+        'url = _text(data["chrome_debug_url"], "chrome_debug_url")',
+        'url = data["chrome_debug_url"]',
+    ),
+    "config-no-topic-ceiling": (
+        "agent.config",
+        "tests.test_config",
+        "if len(topic) > _MAX_TOPIC_CHARS:",
+        "if False:",
+    ),
     "scheduler-one-sleep": (
         "agent.scheduler",
         "tests.test_scheduler",
