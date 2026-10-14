@@ -5,7 +5,7 @@
 오류가 됩니다. 숫자 자리의 YAML 1.1 숫자 표기(`017` → 15, `1:30` → 90)는 그대로 읽고 범위만
 검사합니다. 숫자는 유한값만 받고, 숫자 · 정수 키는 모두 상한이 있습니다 — 계약 2절.
 글자 키는 범주 L · M · N · P · S 의 글자와 U+0020 만 받고, 스페이스로 시작하거나 끝나는 값은
-잘라 쓰지 않고 오류입니다(허용 목록 항목은 쓴 그대로).
+잘라 쓰지 않고 오류이며(허용 목록 항목은 쓴 그대로), 주제(topic)는 500자까지입니다.
 """
 from __future__ import annotations
 
@@ -158,6 +158,9 @@ _MAX_VIEWS = 1_000_000_000_000
 _MAX_PER_DAY = 86_400
 # 댓글 글자 수 — 유튜브 댓글 한 개의 최대 길이입니다.
 _MAX_COMMENT_CHARS = 10_000
+# 주제 글자 수 상한 — 주제는 판별 질문에 세 번 들어갑니다. 500자면 한 글자가 4바이트여도 그 질문이 보기 상한(50개 × 40자)이
+# 이미 허용하는 가장 긴 질문보다 짧아, state 몫이 2만 2천 바이트 아래로 내려가지 않습니다(계약 '주제 판별' 절).
+_MAX_TOPIC_CHARS = 500
 
 
 def _check_keys(data: Mapping[object, object], allowed: tuple[str, ...], prefix: str) -> None:
@@ -328,8 +331,12 @@ def config_from_mapping(data: Mapping[str, object]) -> Config:
     else:
         raise ConfigError("영상 목록이어야 합니다: allowed_videos")
 
+    topic = _text(data["topic"], "topic")
+    if len(topic) > _MAX_TOPIC_CHARS:
+        raise ConfigError(f"{_MAX_TOPIC_CHARS}자 이하여야 합니다: topic")
+
     return Config(
-        topic=_text(data["topic"], "topic"),
+        topic=topic,
         keywords=keyword_items,
         poll_interval_min=_int(
             data["poll_interval_min"], "poll_interval_min", 1, _MAX_INTERVAL_MIN
