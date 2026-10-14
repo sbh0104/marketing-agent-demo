@@ -16,6 +16,7 @@ from datetime import datetime, timezone
 
 from agent.classifier import LANGUAGES, QUESTION_LANGUAGE
 from agent.config import load_config
+from agent.writer import RECENT_WINDOW, REPEAT_MIN_CHARS
 from tests import live_check
 from tests.classifier_examples import EXAMPLES
 from tests.jev_accuracy import PASS_CORRECT, REPO_CONFIG
@@ -339,6 +340,41 @@ class AccuracyRecordTest(ContractCase):
         self.assertEqual(
             (config.noul_yes_min, config.noul_no_max, config.choice_min_confidence),
             (recorded["noul_yes_min"], recorded["noul_no_max"], recorded["choice_min_confidence"]),
+        )
+
+
+class WriterRecordTest(ContractCase):
+    """'댓글 작성' 절의 잰 값 — 모델 이름 · 초안 수가 계약에 있고 통과선 · 반복 글자 수는 그대로."""
+
+    def setUp(self) -> None:
+        self.result = load_result()
+
+    def test_writer_model_is_the_accepted_configured_name(self) -> None:
+        writer = load_config(REPO_CONFIG).comment.writer_model
+        self.assertEqual(writer, self.result["writer_model"])
+        self.assert_in_contract(model_line(self.result))
+        self.assert_in_contract(f"`comment.writer_model` 은 `{writer}` 그대로입니다")
+
+    def test_draft_record_is_in_contract(self) -> None:
+        for phrase in draft_lines(self.result):
+            self.assert_in_contract(phrase)
+
+    def test_check_floor_stays_without_answers(self) -> None:
+        answered = sum(draft_counts(self.result, window)["answered"] for window in WINDOW_LABELS)
+        self.assertEqual(
+            answered, 0, "정답 있는 초안이 있습니다 — 6B 규칙으로 통과선을 다시 정하세요"
+        )
+        value = load_config(REPO_CONFIG).comment.check_min_probability
+        self.assertEqual(value, self.result["fingerprint"]["check_min_probability"])
+        self.assert_in_contract(
+            f"정답 있는 초안이 0 이라 `check_min_probability` 는 {value} 그대로입니다(표본 없음)"
+        )
+
+    def test_repeat_min_chars_stays_unmeasured(self) -> None:
+        self.assert_in_contract(
+            f"`REPEAT_MIN_CHARS`({REPEAT_MIN_CHARS}) 는 그대로입니다 — 표본 부족: 최근 내 댓글"
+            f" {RECENT_WINDOW}개끼리 비교하는 값이라 초안 약 {live_check.TARGET_DRAFTS}개짜리"
+            " 한 바퀴로는 잴 수 없습니다"
         )
 
 
