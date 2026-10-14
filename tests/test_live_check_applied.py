@@ -1080,6 +1080,29 @@ class RecountTest(unittest.TestCase):
         self.assertIsNone(check_floor(fake))
         self.assertEqual(self.drift(fake), ["check_min_probability"])
 
+    def test_check_floor_exactly_one_is_kept(self) -> None:
+        # "1 을 넘으면" — 가장 낮은 비교 점수 0.95 + MARGIN 은 정확히 1.0 이라 막을 수 있습니다
+        fake = self.fake(drafts=(self.draft((0.95, 0.05, 0.95), claude="bad"),))
+        self.assertEqual(check_floor(fake), 1.0)
+
+    def test_todo_line_counts_both_windows(self) -> None:
+        # 6E 줄은 모든 창의 셈 — 운영 창 초안 하나와 넓힌 창 초안 하나의 분모는 2
+        fake = self.fake(drafts=(self.draft(),))
+        widened = copy.deepcopy(fake["videos"][0])
+        widened["window"] = "widened"
+        fake["videos"].append(widened)
+        both, operation = task_counts(fake, None), task_counts(fake, "operation")
+        self.assertEqual((both["tasks"], both["drafts"]), (2, 2))
+        self.assertEqual((operation["tasks"], operation["drafts"]), (1, 1))
+        line = todo_line(fake)
+        for phrase in (
+            f"ⓐ 고민 한 줄이 연애 고민 {both['love']}/{both['tasks']} ·",
+            f"ⓑ 연애사주 경험이 고민과 이어짐 {both['saju']}/{both['tasks']} ·",
+            f"글자 조각이 있는 초안 {both['framed']}/{both['drafts']} ·",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, line)
+
     def test_draft_answer_samples(self) -> None:
         samples = (
             ({"human": "ok", "claude_grade": "bad"}, "ok"),
