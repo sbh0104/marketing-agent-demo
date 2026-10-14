@@ -86,6 +86,8 @@ REJECTED_SHARE_QUERIES = (
     "?" + chr(0xFF56) + "=BBBBBBBBBBB",
     "?list=PLx", "?SI=x", "?Feature=share", "?=x", "?si=x&utm_source=share",
     f"?si=x;v={REPRO_B}", "?v=", "?%76=BBBBBBBBBBB", "?pp=x",
+    # S-051 — 받는 이름은 셋뿐이고, 이름이 정확히 같을 때만 받습니다
+    "?index=2", "?t=1&index=2", "?start=5", "?+si=x", "?si%20=x", "?%20t=1",
 )
 ACCEPTED_SHARE_QUERIES = ("", "?", "?si=xYz12", "?si=x&t=42", "?feature=share", "?t=1;si=x", "?si=x&&t=1")
 SHARE_VALUES_NOT_EXAMINED = ("?si", "?si=", "?si=a=b", "?t=BBBBBBBBBBB", "?feature=%00")
