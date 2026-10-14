@@ -429,3 +429,51 @@
 - source: adw/phase-6a-live-check-prepare
 - tag: plain
 - status: open
+
+### H-051 — 문자열 설정값(`_text`)을 고칠 주인 페이즈를 정하기 — 짝 없는 서로게이트가 든 `topic` 이 `load_config` 를 통과한 뒤 주기마다 `classify` 의 질문 예산 계산(`try` 밖)에서 `UnicodeEncodeError` 로 터지고, `topic` 길이 상한도 없음(H-014 와 겹침). Phase 1A 결정 밖이라 이 페이즈는 넓히지 않음(헌법 5)
+- project: marketing-agent-demo
+- when: 2026-10-14 · plans/interview-marketing-agent.md#phase-1a
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-1a-parser-allow-rules
+- tag: sensitive: tracker decision · confirmed 2026-10-14
+- status: confirmed
+
+### H-052 — 계약 7절 `docs/contracts.md:444-446` 의 "… 터미널에 가짜 줄이 그려지지 않습니다" 를 잰 만큼("제어 문자로 그리는 가짜 줄은 없습니다 — 긴 값이 화면 폭에서 접혀 줄처럼 보이는 것은 막지 않으며, 증명은 `read_log` 로")으로 좁힐지 정하기(헌법 9, R4)
+- project: marketing-agent-demo
+- when: 2026-10-14 · plans/interview-marketing-agent.md#phase-1a
+- from: ship-report.md § Human checks — .adw/ship-report.md § Risks
+- source: adw/phase-1a-parser-allow-rules
+- tag: sensitive: public contract · confirmed 2026-10-14
+- status: confirmed
+
+### H-053 — H-001 · H-005 · H-006 의 status 를 이 페이즈 증거(가드 받는 이름 목록 · `read_log` · 정수 상한)로 바꾸기. H-002 는 이름 철자 넷을 이제 가드가 막아 필요 없지만, 받는 이름의 값을 유튜브가 한 번 더 푸는지(`?si=x%26v%3DB`, R6)는 재지 않았다는 점을 보고 닫을지 정하기. H-007 은 로그 쪽 절반이 끝났다고 적기
+- project: marketing-agent-demo
+- when: 2026-10-14 · plans/interview-marketing-agent.md#phase-1a
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-1a-parser-allow-rules
+- tag: plain
+- status: open
+
+### H-054 — Phase 8 README 에 "허용 목록 항목은 맨 ID 나 공유 버튼 주소 그대로 — `?list=…` 처럼 `si` · `t` · `feature` 밖 꼬리가 붙으면 그 영상은 오류 없이 테스트 모드로만 돈다" 한 줄 쓰기(R3)
+- project: marketing-agent-demo
+- when: 2026-10-14 · plans/interview-marketing-agent.md#phase-1a
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-1a-parser-allow-rules
+- tag: plain
+- status: open
+
+### H-055 — Phase 7 첫 실제 게시(H-023) 때 shorts 영상도 하나 게시해 크롬 `page.url` 꼬리를 보기 — `/shorts/<ID>?pp=…` 처럼 셋 밖 이름이 붙으면 그 영상의 실제 게시는 오류 없이 테스트 모드로 빠짐(R2)
+- project: marketing-agent-demo
+- when: 2026-10-14 · plans/interview-marketing-agent.md#phase-1a
+- from: ship-report.md § Human checks — .adw/ship-report.md § Risks
+- source: adw/phase-1a-parser-allow-rules
+- tag: plain
+- status: open
+
+### H-056 — Phase 7 이 계획을 세우기 전에, 설정 다시 읽기가 거절되면(1A 의 정수 상한 포함) 옛 `allowed_videos` 로 계속 실제 게시할지, 테스트 모드로 떨어질지, 적어도 그 거절을 크게 알릴지 정하기 — 지금은 허용 목록에서 지운 영상이 같은 저장의 다른 오타 하나로 계속 허용됨(R5)
+- project: marketing-agent-demo
+- when: 2026-10-14 · plans/interview-marketing-agent.md#phase-1a
+- from: ship-report.md § Human checks — .adw/ship-report.md § Risks
+- source: adw/phase-1a-parser-allow-rules
+- tag: plain
+- status: open
