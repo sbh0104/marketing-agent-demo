@@ -477,3 +477,43 @@
 - source: adw/phase-1a-parser-allow-rules
 - tag: plain
 - status: open
+
+### H-057 — H-014 의 status 를 바꾸기 — 이 페이즈가 topic 상한 500자를 넣었고, 가장 나쁜 합법 보기(50개 × 40자, 한 글자 4바이트)에서 state 몫이 23,391 B(en) / 23,397 B(ko)로 2만 2천 바이트 선 위임을 쟀음(StateTest · 감사 1)
+- project: marketing-agent-demo
+- when: 2026-10-14 · plans/interview-marketing-agent.md#phase-1c
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-1c-text-config-allow
+- tag: plain
+- status: open
+
+### H-058 — 미할당 글자(Cn)를 설정 거절 목록에 계속 둘지 정하기 — 14:03 인터뷰가 계속 거절로 정함(트래커 Phase 1C HC1 질문 1 B, 커밋 4e859be; 메시지 고침은 S-NEW-1, README 한 줄은 Phase 8). 확인 도장은 앞 보고서(.adw/gate/history/20261014-140655-prev-ship-report.md)에 human_checks.py confirm 이 찍은 것을 옮김
+- project: marketing-agent-demo
+- when: 2026-10-14 · plans/interview-marketing-agent.md#phase-1c
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-1c-text-config-allow
+- tag: sensitive: tracker decision · confirmed 2026-10-14
+- status: confirmed
+
+### H-059 — 범주 L · M · S 안의 빈칸처럼 보이는 글자가 규칙을 지나는 것에 서명하기 — 14:03 인터뷰가 받아들임으로 정하고 글자 부류와 코드 자리로 적음(트래커 Phase 1C HC1 질문 2 A, 커밋 4e859be; 같은 부류의 다른 글자는 새 위험이 아니라 그 줄의 예). 확인 도장은 앞 보고서에서 옮김
+- project: marketing-agent-demo
+- when: 2026-10-14 · plans/interview-marketing-agent.md#phase-1c
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-1c-text-config-allow
+- tag: sensitive: tracker decision · confirmed 2026-10-14
+- status: confirmed
+
+### H-060 — Phase 8 README 에 "주제 · 검색어에 ZWJ 로 이은 이모지(👩‍💻, 커플 이모지 등)를 넣으면 설정이 거절된다 — 이모지 선택기가 흔히 만드는 꼴" 한 줄을 쓸지, 이대로 받을지 정하기(R1)
+- project: marketing-agent-demo
+- when: 2026-10-14 · plans/interview-marketing-agent.md#phase-1c
+- from: ship-report.md § Human checks — .adw/verify-report.md § Non-gating observations
+- source: adw/phase-1c-text-config-allow
+- tag: plain
+- status: open
+
+### H-061 — Phase 7 계획 전에 chrome_debug_url 을 루프백 주소(localhost · 127.0.0.1 · ::1)로만 받을지 정하기 — http://evil.example\@localhost:9222 는 포트 읽기를 9222 로 지나는데 WHATWG 주소 해석은 호스트를 evil.example 로 읽음(R3, 이 페이즈 전부터)
+- project: marketing-agent-demo
+- when: 2026-10-14 · plans/interview-marketing-agent.md#phase-1c
+- from: ship-report.md § Human checks — .adw/ship-report.md § Risks
+- source: adw/phase-1c-text-config-allow
+- tag: plain
+- status: open
