@@ -265,16 +265,27 @@ def _raised(current: float, values: Sequence[float]) -> list[float]:
     return [current, *sorted(x for x in raised if current < x <= 1.0)]
 
 
-def best_correct(rows: Sequence[Mapping[str, object]], base: ClassifierConfig) -> int | None:
-    """올리기만 범위에서 잘못된 일치 0 인 설정 가운데 가장 많은 맞음 — 그런 설정이 없으면 None."""
+def best_setting(
+    rows: Sequence[Mapping[str, object]], base: ClassifierConfig
+) -> tuple[ClassifierConfig, int] | None:
+    """올리기만 범위에서 잘못된 일치 0 인 설정 가운데 가장 많은 맞음의 설정과 그 맞음 수.
+
+    그런 설정이 없으면 None. 맞음이 같은 설정이 여럿이면 덜 올린 쪽 하나입니다 — `noul_yes_min`
+    이 작은 쪽, 그다음 `choice_min_confidence` 가 작은 쪽, 그다음 `noul_no_max` 가 지금 값에 가까운
+    쪽(거리가 같으면 작은 쪽). 더 많은 맞음만 앞의 설정을 바꾸므로 지금 값이 동점 안에 있으면 지금
+    값입니다. 같은 행이면 늘 같은 설정 하나가 나옵니다.
+    """
     measured = [row for row in rows if not row["error"] and row["noul"] is not None]
     negatives = [row for row in measured if row["label"] != "yes"]
     yes_floors = _raised(base.noul_yes_min, [row["noul"] for row in negatives])
     confidence_floors = _raised(
         base.choice_min_confidence, [row["confidence"] for row in negatives]
     )
-    no_ceilings = sorted({base.noul_no_max, 0.0, *(row["noul"] for row in negatives)})
-    best: int | None = None
+    no_ceilings = sorted(
+        {base.noul_no_max, 0.0, *(row["noul"] for row in negatives)},
+        key=lambda value: (round(abs(value - base.noul_no_max), 6), value),
+    )
+    best: tuple[ClassifierConfig, int] | None = None
     for yes_min in yes_floors:
         for confidence_min in confidence_floors:
             for no_max in no_ceilings:
@@ -295,9 +306,15 @@ def best_correct(rows: Sequence[Mapping[str, object]], base: ClassifierConfig) -
                         correct += 1
                     elif verdict is Verdict.YES:
                         false_yes += 1
-                if false_yes == 0 and (best is None or correct > best):
-                    best = correct
+                if false_yes == 0 and (best is None or correct > best[1]):
+                    best = (config, correct)
     return best
+
+
+def best_correct(rows: Sequence[Mapping[str, object]], base: ClassifierConfig) -> int | None:
+    """올리기만 범위에서 잘못된 일치 0 인 설정 가운데 가장 많은 맞음 — 그런 설정이 없으면 None."""
+    found = best_setting(rows, base)
+    return None if found is None else found[1]
 
 
 def classifier_config(data: Mapping[str, object]) -> ClassifierConfig:

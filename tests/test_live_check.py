@@ -819,6 +819,96 @@ class VerdictTest(unittest.TestCase):
         self.assertEqual(self.line(topic_api_error()), "6B: stop — 재지 못함(호출 오류 1)")
 
 
+def setting_rows(*planted: dict) -> list[dict]:
+    """하한 찾기 시험의 예시 행 22개 — yes 10 · no 12, 심은 행은 뒤쪽 no 행 자리에 들어갑니다."""
+    on, off = CLASSIFIER["on_topic_reasons"][0], CLASSIFIER["off_topic_reasons"][0]
+    yes = [
+        {"label": "yes", "verdict": "yes", "error": False, "noul": 0.95, "choice": on,
+         "probability": 0.9, "confidence": 0.9}
+        for _ in range(10)
+    ]
+    no = [
+        {"label": "no", "verdict": "no", "error": False, "noul": 0.05, "choice": off,
+         "probability": 0.9, "confidence": 0.9}
+        for _ in range(12)
+    ]
+    for row, plant in zip(no[len(no) - len(planted):], planted):
+        row.update(plant)
+    return yes + no
+
+
+ON_TOPIC = CLASSIFIER["on_topic_reasons"][0]
+NOUL_BLOCKED = {"noul": 0.83, "confidence": 0.9, "choice": ON_TOPIC}
+CONFIDENCE_BLOCKED = {"noul": 0.95, "confidence": 0.6, "choice": ON_TOPIC}
+TIE = {"noul": 0.85, "confidence": 0.6, "choice": ON_TOPIC}
+OVER_ONE = {"noul": 0.97, "confidence": 0.97, "choice": ON_TOPIC}
+
+
+class BestSettingTest(unittest.TestCase):
+    """`best_setting` — 올리기만 범위 최다 맞음 설정 하나, 맞음이 같으면 덜 올린 쪽."""
+
+    def setUp(self) -> None:
+        self.base = replace(
+            live_check.classifier_config(healthy_result()["fingerprint"]["classifier"]),
+            noul_yes_min=0.8,
+            noul_no_max=0.2,
+            choice_min_confidence=0.5,
+        )
+
+    def found(self, rows: list[dict]) -> tuple[tuple[float, float, float], int] | None:
+        setting = live_check.best_setting(rows, self.base)
+        if setting is None:
+            return None
+        config, correct = setting
+        return (config.noul_yes_min, config.noul_no_max, config.choice_min_confidence), correct
+
+    def cases(self) -> dict[str, list[dict]]:
+        return {
+            "healthy": setting_rows(),
+            "noul": setting_rows(NOUL_BLOCKED),
+            "confidence": setting_rows(CONFIDENCE_BLOCKED),
+            "tie": setting_rows(TIE),
+            "over one": setting_rows(OVER_ONE),
+            "no max": setting_rows(*[{"noul": 0.25}] * 12),
+            "tie reversed": setting_rows(TIE)[::-1],
+        }
+
+    def test_healthy_rows_keep_the_current_setting(self) -> None:
+        # noul_no_max 0.2 와 0.05 가 둘 다 22 — 지금 값이 이깁니다
+        self.assertEqual(self.found(setting_rows()), ((0.8, 0.2, 0.5), 22))
+
+    def test_noul_floor_blocks_false_yes(self) -> None:
+        self.assertEqual(self.found(setting_rows(NOUL_BLOCKED)), ((0.88, 0.2, 0.5), 21))
+
+    def test_confidence_floor_blocks_false_yes(self) -> None:
+        self.assertEqual(self.found(setting_rows(CONFIDENCE_BLOCKED)), ((0.8, 0.2, 0.65), 21))
+
+    def test_tie_takes_the_least_raised(self) -> None:
+        # (0.9, 0.5) 와 (0.8, 0.65) 가 둘 다 21 — noul_yes_min 이 작은 쪽
+        self.assertEqual(self.found(setting_rows(TIE)), ((0.8, 0.2, 0.65), 21))
+
+    def test_floor_over_one_fails_the_language(self) -> None:
+        rows = setting_rows(OVER_ONE)
+        self.assertIsNone(self.found(rows))
+        self.assertIsNone(live_check.best_correct(rows, self.base))
+
+    def test_no_max_moves_to_most_correct(self) -> None:
+        self.assertEqual(self.found(setting_rows(*[{"noul": 0.25}] * 12)), ((0.8, 0.25, 0.5), 22))
+
+    def test_same_rows_give_one_setting(self) -> None:
+        rows = setting_rows(TIE)[::-1]
+        first = self.found(rows)
+        self.assertEqual(self.found(rows), first)
+        self.assertEqual(first, ((0.8, 0.2, 0.65), 21))
+
+    def test_best_correct_is_the_setting_count(self) -> None:
+        for name, rows in self.cases().items():
+            with self.subTest(case=name):
+                setting = live_check.best_setting(rows, self.base)
+                expected = None if setting is None else setting[1]
+                self.assertEqual(live_check.best_correct(rows, self.base), expected)
+
+
 class SummaryTest(unittest.TestCase):
     def summary(self, result: dict) -> list[str]:
         result["verdict"] = live_check.verdict_line(result)
