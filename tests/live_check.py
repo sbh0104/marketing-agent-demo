@@ -5,7 +5,7 @@
 
 모델 이름 확인 → 예시 정확도(tests/jev_accuracy.py 의 judge_examples · tally) → 영상 한 바퀴(운영과 같은
 검색 → 조회수 범위 → 판별 → 인기 댓글 → 댓글 작성 → Claude 채점) 순서입니다. 크롬 · 게시는 하지 않습니다.
-서비스마다 실행기 호출 천장이 있고, 키는 결과 파일 · 화면 · 오류 어디에도 쓰지 않습니다. 채점은 이
+인기 댓글의 항목 수는 클라이언트의 호출 한 번의 답에서 셉니다. 서비스마다 실행기 호출 천장이 있고, 키는 결과 파일 · 화면 · 오류 어디에도 쓰지 않습니다. 채점은 이
 실행기 안의 측정 도구이고 운영 모듈(src/agent)은 채점을 모릅니다. 운영 코드와 똑같이 재려고 비공개
 도우미(_decide · _material · _new_record 등)를 그대로 가져옵니다 — 이름이 바뀌면 이 실행기의 테스트가
 깨져 알립니다. 이 파일은 test*.py 가 아니라서 discover 가 줍지 않습니다. 계약 '실제 호출 실행기' 절.
@@ -91,6 +91,7 @@ TARGET_DRAFTS = 10
 CLASSIFY_MAX = 40
 WRITE_MAX = 15
 WIDE_WINDOW_HOURS = 72
+POPULAR_DRAFTS_MIN = 3  # 인기 댓글을 재료로 쓴 초안이 이보다 적으면 넓힌 창에서 더 찾습니다
 MARGIN = 0.05
 KEY_FRAGMENT_MIN = 8
 PROBE_MAX_TOKENS = 1
@@ -195,16 +196,19 @@ class Services:
 
 @dataclass(frozen=True)
 class RunLimits:
-    """실행 한 번의 한도 — 서비스별 호출 천장 · 목표 초안 수 · 판별 · 작성 영상 수 · 넓힌 창."""
+    """실행 한 번의 한도 — 호출 천장 · 목표 초안 수 · 판별 · 작성 영상 수 · 넓힌 창 · 인기 댓글 초안."""
 
     ceilings: Mapping[str, int]
     target_drafts: int
     classify_max: int
     write_max: int
     wide_window_hours: int
+    popular_drafts_min: int
 
 
-DEFAULT_LIMITS = RunLimits(CEILINGS, TARGET_DRAFTS, CLASSIFY_MAX, WRITE_MAX, WIDE_WINDOW_HOURS)
+DEFAULT_LIMITS = RunLimits(
+    CEILINGS, TARGET_DRAFTS, CLASSIFY_MAX, WRITE_MAX, WIDE_WINDOW_HOURS, POPULAR_DRAFTS_MIN
+)
 
 
 class Redactor:
@@ -457,7 +461,26 @@ def render_summary(result: dict) -> str:
         f" · 채점 오류 {grade_errors} · 사람 칸 {humans}/{len(drafts)}"
     )
     lines.append(_shape_line(drafts))
-    commit = "결과 두 파일을 다시 반영 페이즈의 레인 브랜치에 커밋하고"
+    popular = Counter(
+        video["window"]
+        for video in result["videos"]
+        if video["material"] == "top_comments"
+        for draft in video["drafts"]
+        if draft["parsed"]
+    )
+    empty = sum(
+        1
+        for video in result["videos"]
+        if isinstance(video["comment_items"], int)
+        and video["comment_items"] > 0
+        and video["top_comment_count"] == 0
+    )
+    disabled = sum(1 for video in result["videos"] if video["comments_disabled"])
+    lines.append(
+        f"- 인기 댓글: 재료 초안 운영 창 {popular['operation']} · 넓힌 창 {popular['widened']}"
+        f" · 항목은 왔는데 글 0개인 영상 {empty} · 댓글 막힘 영상 {disabled}"
+    )
+    commit ="결과 두 파일을 다시 반영 페이즈의 레인 브랜치에 커밋하고"
     if verdict == "6B: go":
         step = f"{commit} 그 페이즈를 시작합니다"
     else:
@@ -624,12 +647,29 @@ class _CountedClaude:
 
 
 class _CountedYouTube:
-    """YouTubeClient 를 세는 감싸개 — 같은 모양의 search · videos · top_comments, 단계도 적습니다."""
+    """YouTubeClient 를 세는 감싸개 — 같은 모양의 search · videos · top_comments, 단계도 적습니다.
+
+    commentThreads.list 의 답은 클라이언트의 호출 한 번(_call)에서 항목 수만 보고 그대로 돌려주므로,
+    top_comments 가 돌려주는 글은 운영과 같습니다.
+    """
 
     def __init__(self, youtube: YouTubeClient, calls: Calls, track: _Track) -> None:
         self._youtube = youtube
         self._calls = calls
         self._track = track
+        self.comment_items: int | None = None
+        original = youtube._call
+
+        def observed(
+            name: str, params: dict[str, str], now: datetime, limits: LimitsConfig
+        ) -> dict[str, object]:
+            data = original(name, params, now, limits)
+            if name == "commentThreads.list":
+                items = data.get("items")
+                self.comment_items = len(items) if isinstance(items, list) else None
+            return data
+
+        youtube._call = observed
 
     def search(
         self,
@@ -655,6 +695,7 @@ class _CountedYouTube:
     def top_comments(
         self, video_id: str, now: datetime, limits: LimitsConfig, max_results: int
     ) -> tuple[str, ...] | None:
+        self.comment_items = None  # 댓글이 막혔거나 호출이 실패하면 None 그대로
         return self._send(
             "comments", lambda: self._youtube.top_comments(video_id, now, limits, max_results)
         )
@@ -1086,10 +1127,11 @@ def _search_ids(data: Mapping[str, object]) -> list[str]:
 
 
 class _VideoRound:
-    """영상 한 바퀴 — 운영 창, 초안이 모자라면 넓힌 창.
+    """영상 한 바퀴 — 운영 창, 초안이나 인기 댓글 재료 초안이 모자라면 넓힌 창.
 
     창마다 키워드 검색 → videos.list 조회수 → 범위 안 영상만 판별 → 인기 댓글 → 댓글 작성 →
-    초안마다 채점. 초안 · 판별 · 작성 수가 한도에 닿으면 새 키워드도 새 영상도 고르지 않습니다.
+    초안마다 채점. 초안 수(넓힌 창은 인기 댓글 재료 초안 수도) · 판별 · 작성 수가 한도에 닿으면
+    새 키워드도 새 영상도 고르지 않습니다.
     """
 
     def __init__(
@@ -1116,6 +1158,8 @@ class _VideoRound:
         self.classified = 0
         self.written = 0
         self.previous: list[str] = []  # 이번 실행에서 앞서 통과한 초안 — 운영의 store.comments() 자리
+        self.popular = 0  # 인기 댓글을 재료로 쓴(material = top_comments) 영상의 읽은 초안 수
+        self.current = "operation"
 
     def run(self) -> None:
         writer_model = self.result["writer_model"]
@@ -1127,18 +1171,27 @@ class _VideoRound:
         operation_after = self.now - timedelta(hours=max_age)
         self._window("operation", operation_after, None)
         wide = self.limits.wide_window_hours
-        if wide > max_age and self.drafts < self.limits.target_drafts:
+        if wide > max_age and (
+            self.drafts < self.limits.target_drafts or self.popular < self.limits.popular_drafts_min
+        ):
             self._window("widened", self.now - timedelta(hours=wide), operation_after)
 
     def _done(self) -> bool:
         limits = self.limits
         return (
-            self.drafts >= limits.target_drafts
+            self._enough()
             or self.classified >= limits.classify_max
             or self.written >= limits.write_max
         )
 
+    def _enough(self) -> bool:
+        """운영 창은 초안 수만, 넓힌 창은 초안 수와 인기 댓글 재료 초안 수가 모두 닿아야 그만 고릅니다."""
+        if self.drafts < self.limits.target_drafts:
+            return False
+        return self.current == "operation" or self.popular >= self.limits.popular_drafts_min
+
     def _window(self, name: str, after: datetime, before: datetime | None) -> None:
+        self.current = name
         window = {
             "published_after": after.isoformat(),
             "published_before": None if before is None else before.isoformat(),
@@ -1199,6 +1252,7 @@ class _VideoRound:
             "classification": None,
             "material": None,
             "top_comment_count": 0,
+            "comment_items": None,
             "comments_disabled": False,
             "result": "not_written",
             "error_cause": None,
@@ -1237,6 +1291,7 @@ class _VideoRound:
             video["result"] = "error"
             video["error_cause"] = "comments"
             return
+        video["comment_items"] = self.youtube.comment_items
         comments = [] if fetched is None else [text for text in fetched if text.strip()]
         video["comments_disabled"] = fetched is None
         video["material"] = "top_comments" if comments else "title_description"
@@ -1334,6 +1389,8 @@ class _VideoRound:
                 }
             )
             self.drafts += 1
+            if video["material"] == "top_comments":
+                self.popular += 1
 
 
 def main(

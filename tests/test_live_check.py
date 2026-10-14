@@ -182,6 +182,7 @@ def video(
         },
         "material": "top_comments" if written else None,
         "top_comment_count": 10 if written else 0,
+        "comment_items": 10 if written else None,
         "comments_disabled": False,
         "result": result,
         "error_cause": error_cause,
@@ -769,6 +770,16 @@ class SummaryTest(unittest.TestCase):
         result["videos"][1]["drafts"][0].update(
             grade=None, claude_grade=None, grade_error="응답 모양", grade_shape=SHAPE_TRUNCATED
         )
+        # 항목은 왔는데 글 0개인 영상 하나 · 댓글 막힌 영상 하나 — 둘 다 제목 · 설명 재료
+        result["videos"][2].update(
+            material="title_description", top_comment_count=0, comment_items=3
+        )
+        result["videos"][3].update(
+            material="title_description",
+            top_comment_count=0,
+            comment_items=None,
+            comments_disabled=True,
+        )
         result["videos"] += [
             video(7, "skip", window="widened"),
             video(8, "error", window="widened", error_cause="comments"),
@@ -793,6 +804,8 @@ class SummaryTest(unittest.TestCase):
                 "- 초안: 7 · 채점 ok 2 · bad 4 · 채점 오류 1 · 사람 칸 1/7",
                 "- 채점 답 모양: 모양 칸 1/7 · 도구 블록 없음 1 · JSON 못 읽음 1 · 키 다름 0"
                 " · 참거짓 아님 0 · stop_reason max_tokens 1",
+                "- 인기 댓글: 재료 초안 운영 창 2 · 넓힌 창 2 · 항목은 왔는데 글 0개인 영상 1"
+                " · 댓글 막힘 영상 1",
                 NEXT_STOP + UNMEASURED_HINT,
             ],
         )
@@ -1131,6 +1144,7 @@ SUMMARY_PREFIXES = (
     "- 창 widened: ",
     "- 초안: ",
     "- 채점 답 모양: ",
+    "- 인기 댓글: ",
     "- 다음: ",
 )
 
@@ -1891,8 +1905,10 @@ class CeilingTest(LiveCheckCase):
                 live_check.CLASSIFY_MAX,
                 live_check.WRITE_MAX,
                 live_check.WIDE_WINDOW_HOURS,
+                live_check.POPULAR_DRAFTS_MIN,
             ),
         )
+        self.assertEqual(limits.popular_drafts_min, 3)
         keywords = len(dict.fromkeys(self.config.keywords))
         windows = 2
         probes = 1 + len(live_check.MODEL_NAMES)  # 작성 모델이 두 이름과 다를 때
@@ -1985,7 +2001,8 @@ class VideoRoundTest(LiveCheckCase):
         for field in ("target_drafts", "write_max", "classify_max"):
             with self.subTest(field):
                 self.build()
-                limits = replace(live_check.DEFAULT_LIMITS, **{field: 2})
+                # 인기 댓글 초안 최소 수는 0 — 이 시험은 초안 수 · 한도로만 멈추는지 봅니다
+                limits = replace(live_check.DEFAULT_LIMITS, popular_drafts_min=0, **{field: 2})
                 code, out, err, result = self.run_main(limits=limits)
                 self.assertEqual(
                     [video["video_id"] for video in result["videos"]], [vid(1), vid(2)]
@@ -2223,6 +2240,86 @@ class VideoRoundTest(LiveCheckCase):
             result["verdict"], "6B: stop — 재지 못함(호출 오류 3); 채점 막힘(오류 3/3)"
         )
         self.assertEqual(code, 1)
+
+    def test_comment_items_counted_apart_from_texts(self) -> None:
+        textless = {"kind": "youtube#commentThread", "snippet": {"topLevelComment": {}}}
+        self.world.comments[vid(1)] = ok({"items": [textless] * 3})
+        self.world.comments[vid(5)] = (403, google_error("commentsDisabled"))
+        code, out, err, result = self.run_main()
+        videos = self.by_id(result)
+        self.assertEqual(
+            [
+                (
+                    videos[vid(number)]["comment_items"],
+                    videos[vid(number)]["top_comment_count"],
+                    videos[vid(number)]["material"],
+                )
+                for number in (1, 2, 4, 5)
+            ],
+            [
+                (3, 0, "title_description"),
+                (2, 2, "top_comments"),
+                (None, 0, None),
+                (None, 0, "title_description"),
+            ],
+        )
+        # 실행기 감싸개를 거친 글은 운영 YouTubeClient 가 같은 전송에서 돌려주는 글 그대로입니다
+        ledger = QuotaLedger(self.tmp / "plain" / "quota.json")
+        plain = YouTubeClient(KEYS["YOUTUBE_API_KEY"], ledger, self.world.fetch)
+        for number in (1, 2, 5):
+            with self.subTest(video=number):
+                texts = plain.top_comments(vid(number), NOW, self.config.limits, TOP_COMMENTS_MAX)
+                video = videos[vid(number)]
+                self.assertEqual(video["untrusted"]["top_comments"], list(texts or ()))
+                self.assertEqual(video["comments_disabled"], texts is None)
+        summary = (self.out / live_check.SUMMARY_NAME).read_text(encoding="utf-8")
+        self.assertIn(
+            "- 인기 댓글: 재료 초안 운영 창 1 · 넓힌 창 0 · 항목은 왔는데 글 0개인 영상 1"
+            " · 댓글 막힘 영상 1\n",
+            summary,
+        )
+
+    def test_popular_shortfall_opens_widened_until_both_counts(self) -> None:
+        for number in (1, 2):
+            self.world.comments[vid(number)] = (403, google_error("commentsDisabled"))
+        for number in (6, 7, 8):
+            self.add_video("연애", "widened", number, 2000)
+        limits = replace(live_check.DEFAULT_LIMITS, target_drafts=2)
+        code, out, err, result = self.run_main(limits=limits)
+        self.assertEqual(
+            [(video["video_id"], video["window"]) for video in result["videos"]],
+            [
+                (vid(1), "operation"),
+                (vid(2), "operation"),
+                (vid(5), "widened"),
+                (vid(6), "widened"),
+                (vid(7), "widened"),
+            ],
+        )
+        classified = [title_of(state) for _, _, state, _ in self.jev_kinds("video")]
+        self.assertEqual(classified, [title(number) for number in (1, 2, 5, 6, 7)])
+        popular = [
+            video["video_id"] for video in result["videos"] if video["material"] == "top_comments"
+        ]
+        self.assertEqual(popular, [vid(5), vid(6), vid(7)])
+        self.assertIsNone(result["stopped"])
+        self.assertEqual(result["verdict"], "6B: go")
+
+    def test_popular_shortfall_stops_within_ceilings(self) -> None:
+        self.world.pages[("연애", "widened")] = []
+        for number in range(10, 30):
+            self.add_video("연애", "widened", number, 2000)
+            self.world.comments[vid(number)] = (403, google_error("commentsDisabled"))
+        limits = replace(live_check.DEFAULT_LIMITS, target_drafts=2)
+        code, out, err, result = self.run_main(limits=limits)
+        written = [video for video in result["videos"] if video["result"] != "not_written"]
+        self.assertEqual(len(written), live_check.WRITE_MAX)
+        self.assertEqual(len(result["videos"]), live_check.WRITE_MAX)
+        self.assertEqual(result["windows"]["widened"]["classified"], live_check.WRITE_MAX - 2)
+        self.assertIsNone(result["stopped"])
+        for service, count in result["calls"].items():
+            with self.subTest(service=service):
+                self.assertLessEqual(count, live_check.CEILINGS[service])
 
     def test_default_write_replies_do_not_repeat(self) -> None:
         texts = (*DRAFT_POOL, COMMENT)
