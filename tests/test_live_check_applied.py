@@ -309,6 +309,80 @@ class MeasuredDriftTest(unittest.TestCase):
                 )
 
 
+class DraftBoundaryTest(unittest.TestCase):
+    """심은 초안 · 행의 경계 — 사람 칸이 Claude 채점보다 먼저, 기준값과 같은 `noul` 은 사이가 아님."""
+
+    @staticmethod
+    def _draft(human: str, claude: str | None, self_check: bool) -> dict:
+        return {
+            "parsed": True,
+            "human": human,
+            "claude_grade": claude,
+            "grade_error": None if claude is not None else "응답 모양",
+            "self_check_pass": self_check,
+        }
+
+    @staticmethod
+    def _video(noul: float, outcome: str, drafts: list[dict]) -> dict:
+        return {
+            "window": "operation",
+            "result": outcome,
+            "classification": {"noul": noul},
+            "drafts": drafts,
+        }
+
+    def setUp(self) -> None:
+        self.result = copy.deepcopy(load_result())
+        classifier = self.result["fingerprint"]["classifier"]
+        self.lo, self.hi = classifier["noul_no_max"], classifier["noul_yes_min"]
+        self.result["videos"] = [
+            self._video(
+                self.lo,
+                "comment",
+                [self._draft("ok", "bad", True), self._draft("bad", "ok", True)],
+            ),
+            self._video(
+                self.hi,
+                "skip",
+                [self._draft("", "bad", True), self._draft("Bad", None, False)],
+            ),
+        ]
+        for language in LANGUAGES:
+            rows = self.result["accuracy"][language]
+            rows += [dict(rows[0], noul=self.lo), dict(rows[0], noul=self.hi)]
+
+    def test_human_answer_beats_claude_grade(self) -> None:
+        self.assertEqual(
+            draft_counts(self.result, "operation"),
+            {
+                "written": 2,
+                "skip": 1,
+                "drafts": 4,
+                "human": 2,
+                "claude": 3,
+                "answered": 3,
+                "grade_errors": 1,
+                "differ": 2,
+                "bad_passed": 2,
+                "ok_failed": 0,
+            },
+        )
+
+    def test_threshold_equal_noul_is_not_between(self) -> None:
+        before = gap_lines(load_result())
+        after = gap_lines(self.result)
+        for index, language in enumerate(LANGUAGES):
+            with self.subTest(language=language):
+                head = before[index].split(" · 가장 가까운 예시")[0]
+                self.assertEqual(
+                    after[index], f"{head} · 가장 가까운 예시 {self.lo:.2f} · {self.hi:.2f}"
+                )
+        self.assertEqual(
+            after[len(LANGUAGES)],
+            f"기준값 사이 영상 {WINDOW_LABELS['operation']}: 0/{len(self.result['videos'])}",
+        )
+
+
 class AccuracyRecordTest(ContractCase):
     """'주제 판별' 절의 정확도 기록 — 결과 파일에서 다시 센 숫자가 계약에 있고 기준값은 그대로."""
 
