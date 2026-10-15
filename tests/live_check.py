@@ -309,13 +309,14 @@ def mask_contacts(text: str) -> str:
         text = "".join(pieces) + text[last:]
 
 
-def _kept(text: str, limit: int) -> str:
-    """결과 파일에 남길 바깥 글 사본 — `<` `>` 를 전각으로 바꾸고 연락처 모양을 가린 뒤 `limit` 자로 자르고,
-    자른 끝에 새로 생긴 모양도 가립니다.
+def _kept(text: str, limit: int, redactor: Callable[[str], str]) -> str:
+    """결과 파일에 남길 바깥 글 사본 — `<` `>` 를 전각으로 바꾸고 키를 가린 다음 연락처 모양을 가린 뒤 `limit` 자로
+    자르고, 자른 끝에 새로 생긴 모양도 가립니다.
 
-    자르기가 먼저면 반쯤 잘린 모양이 목록을 빠져나갑니다. 연락처가 없으면 `_clean(text, limit)` 과 같습니다.
+    키가 먼저라야 키 안의 연락처 모양이 키 꼬리를 남기지 않고, 자르기가 먼저면 반쯤 잘린 모양이 목록을 빠져나갑니다.
+    키 가림은 `_clean` 뒤라 `<키 이름>` 이 전각이 되지 않습니다. 키와 연락처가 없으면 `_clean(text, limit)` 과 같습니다.
     """
-    return mask_contacts(mask_contacts(_clean(text, len(text)))[:limit])
+    return mask_contacts(mask_contacts(redactor(_clean(text, len(text))))[:limit])
 
 
 def file_texts(path: Path) -> list[str]:
@@ -1265,11 +1266,18 @@ def connect_real(keys: Keys) -> Services:
     )
 
 
-def run_live_check(services: Services, config: Config, now: datetime, limits: RunLimits) -> dict:
+def run_live_check(
+    services: Services,
+    config: Config,
+    now: datetime,
+    limits: RunLimits,
+    redactor: Callable[[str], str],
+) -> dict:
     """모델 이름 확인 → 예시 정확도 → 영상 한 바퀴를 돌고 결과를 돌려줍니다.
 
     천장 · 쿼터 · 그 밖의 예외(Ctrl-C 포함)는 그 자리에서 멈추고 stopped 에 적습니다. 결과는
     부르는 동안 채워 가므로 멈춘 데까지가 남고, 끝에 accuracy_tally 와 판정 줄을 셉니다.
+    redactor 는 main 이 만든 키 가림이고, 결과에 남길 바깥 글 사본에서 키를 연락처보다 먼저 가립니다.
     """
     calls = Calls(limits.ceilings)
     result = new_result(config, now, limits, calls)
@@ -1286,7 +1294,7 @@ def run_live_check(services: Services, config: Config, now: datetime, limits: Ru
             result["models"], config.comment.writer_model
         )
         _accuracy(ask, config, now, track, result, judged)
-        _VideoRound(ask, claude, youtube, config, now, limits, track, result).run()
+        _VideoRound(ask, claude, youtube, config, now, limits, track, result, redactor).run()
     except CeilingReached as exc:
         result["stopped"] = {"kind": "ceiling", "service": exc.service, "limit": exc.limit}
     except QuotaExhausted as exc:
@@ -1358,6 +1366,7 @@ class _VideoRound:
         limits: RunLimits,
         track: _Track,
         result: dict,
+        redactor: Callable[[str], str],
     ) -> None:
         self.ask = ask
         self.claude = claude
@@ -1367,6 +1376,7 @@ class _VideoRound:
         self.limits = limits
         self.track = track
         self.result = result
+        self.redactor = redactor  # 결과에 남길 사본의 키 가림(main 의 Redactor)
         self.seen: set[str] = set()
         self.drafts = 0
         self.classified = 0
@@ -1476,8 +1486,8 @@ class _VideoRound:
             "error_cause": None,
             "drafts": [],
             "untrusted": {
-                "title": _kept(record.title, TITLE_LIMIT),
-                "description": _kept(record.description, DESCRIPTION_LIMIT),
+                "title": _kept(record.title, TITLE_LIMIT, self.redactor),
+                "description": _kept(record.description, DESCRIPTION_LIMIT, self.redactor),
                 "classification_reason": None,
                 "top_comments": [],
                 "skip_reason": None,
@@ -1521,7 +1531,9 @@ class _VideoRound:
         video["comments_disabled"] = fetched is None
         video["material"] = "top_comments" if comments else "title_description"
         video["top_comment_count"] = len(comments)
-        video["untrusted"]["top_comments"] = [_kept(text, ITEM_LIMIT) for text in comments]
+        video["untrusted"]["top_comments"] = [
+            _kept(text, ITEM_LIMIT, self.redactor) for text in comments
+        ]
         self.written += 1
         recording = _Recording(self.claude, self.check)
         track.stage["claude"] = "write"
@@ -1611,10 +1623,11 @@ class _VideoRound:
                     ),
                     "frame_overlap": 0,  # 실행 끝에 mark_frame_overlaps 가 셉니다
                     "human": "",
-                    # 결과에 남길 사본만 가립니다 — frame_overlap 이 결과 파일의 글로 다시 세어지게(검사 · 채점은 위에서 원문으로)
+                    # 결과에 남길 사본만 키 → 연락처 차례로 가립니다 — frame_overlap 이 결과 파일의 글로
+                    # 다시 세어지게(검사 · 채점은 위에서 원문으로)
                     "untrusted": {
-                        "concern": mask_contacts(concern),
-                        "comment": mask_contacts(text),
+                        "concern": mask_contacts(self.redactor(concern)),
+                        "comment": mask_contacts(self.redactor(text)),
                         "code_failures": failures,
                     },
                 }
@@ -1667,7 +1680,7 @@ def main(
     except ValueError as exc:
         print(redactor(f"실행하지 않습니다 — {exc}"), file=stderr)
         return 2
-    result = run_live_check(services, config, clock(), limits)
+    result = run_live_check(services, config, clock(), limits, redactor)
     try:
         paths = write_outputs(result, out_dir, redactor)
     except KeyLeak as exc:

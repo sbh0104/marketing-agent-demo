@@ -689,7 +689,7 @@ class ContactMaskTest(unittest.TestCase):
             for shape in (FAKE_EMAIL, FAKE_PHONE):
                 with self.subTest(limit=limit, shape=shape):
                     text = "가" * (limit - 3) + shape + " 뒤"
-                    kept = live_check._kept(text, limit)
+                    kept = live_check._kept(text, limit, NO_KEYS)
                     self.assertEqual(kept, "가" * (limit - 3) + "<연락")
                     self.assertNotIn(shape[:3], kept)
                     # 자르기가 먼저면 반쯤 잘린 조각이 남고, 그 조각은 목록을 빠져나갑니다
@@ -700,7 +700,9 @@ class ContactMaskTest(unittest.TestCase):
                 made = "가" * (limit - 13) + "010-0000-1234abc"
                 self.assertEqual(live_check.count_contacts(made), 0)
                 self.assertEqual(live_check.count_contacts(live_check._clean(made, limit)), 1)
-                self.assertEqual(live_check._kept(made, limit), "가" * (limit - 13) + "<연락처>")
+                self.assertEqual(
+                    live_check._kept(made, limit, NO_KEYS), "가" * (limit - 13) + "<연락처>"
+                )
 
     def test_kept_equals_clean_without_contacts(self) -> None:
         cases = (
@@ -710,7 +712,9 @@ class ContactMaskTest(unittest.TestCase):
         )
         for text, limit in cases:
             with self.subTest(text=text[:12], limit=limit):
-                self.assertEqual(live_check._kept(text, limit), live_check._clean(text, limit))
+                self.assertEqual(
+                    live_check._kept(text, limit, NO_KEYS), live_check._clean(text, limit)
+                )
 
     def test_scrub_masks_every_untrusted_field(self) -> None:
         result = healthy_result()
@@ -1486,6 +1490,7 @@ FAKE_ACCOUNT = "000-000-123456"
 FAKE_HOLDER = "예금주: 가나다"
 FAKE_ID = "01000001234"  # 영상 ID 허용 모양(11자)이면서 전화번호 모양
 SHA_LIKE = "ab12345678901cd" + "e" * 49  # examples_sha256 꼴 — 16진 글자 사이의 숫자 11개
+NO_KEYS = live_check.Redactor({})  # 키가 없는 가림 — _kept 를 키 없이 부를 때
 KEY_WITH_PHONE = "tsFAKEKEY-010-0000-1234-TAILMARK"  # 안에 전화번호 덩이가 든 지어낸 키(트래커 6G 질문 4 A ②)
 # 예금주 첫 덩이 대가 줄의 examples(트래커 6G 질문 2 D) — 이름이 첫 덩이가 아니면 남고 끝 줄도 세지 않습니다
 HOLDER_FIRST_CHUNK = (

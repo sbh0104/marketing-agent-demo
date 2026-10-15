@@ -737,8 +737,8 @@ MUTANTS: dict[str, tuple[str, str, str, str]] = {
     "live-check-clip-before-mask": (
         "tests.live_check",
         "tests.test_live_check",
-        "return mask_contacts(mask_contacts(_clean(text, len(text)))[:limit])",
-        "return mask_contacts(_clean(text, limit))",
+        "return mask_contacts(mask_contacts(redactor(_clean(text, len(text))))[:limit])",
+        "return mask_contacts(redactor(_clean(text, limit)))",
     ),
     "live-check-untrusted-unmasked-at-write": (
         "tests.live_check",
@@ -755,8 +755,20 @@ MUTANTS: dict[str, tuple[str, str, str, str]] = {
     "live-check-draft-masked-at-write-only": (
         "tests.live_check",
         "tests.test_live_check",
-        '"comment": mask_contacts(text),',
-        '"comment": text,',
+        '"comment": mask_contacts(self.redactor(text)),',
+        '"comment": self.redactor(text),',
+    ),
+    "live-check-kept-contacts-before-keys": (
+        "tests.live_check",
+        "tests.test_live_check",
+        "mask_contacts(redactor(_clean(text, len(text))))",
+        "redactor(mask_contacts(_clean(text, len(text))))",
+    ),
+    "live-check-draft-contacts-before-keys": (
+        "tests.live_check",
+        "tests.test_live_check",
+        '"comment": mask_contacts(self.redactor(text)),',
+        '"comment": self.redactor(mask_contacts(text)),',
     ),
     "live-check-applied-yes-floor-lowered": (
         "agent.config",
