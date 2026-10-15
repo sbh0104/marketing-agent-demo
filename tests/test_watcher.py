@@ -372,6 +372,26 @@ class FailingStore(Store):
         raise self.error
 
 
+class RawVideosApi(FakeApi):
+    """videos.list 에는 정해 둔 날 본문을 그대로 답하는 가짜 YouTube — 검색은 FakeApi 그대로."""
+
+    def __init__(self, body: bytes) -> None:
+        super().__init__()
+        self.body = body
+
+    def __call__(self, url: str, timeout: float) -> tuple[int, bytes]:
+        answer = super().__call__(url, timeout)
+        if urllib.parse.urlsplit(url).path.endswith("/videos"):
+            return 200, self.body
+        return answer
+
+
+def nested_body(item: dict[str, object], depth: int = 47_500) -> bytes:
+    """item 의 "@@" 값을 depth 단 중첩 빈 목록으로 바꾼 videos.list 본문 (Phase 2 ship-report R2)."""
+    text = json.dumps({"items": [item]})
+    return text.replace('"@@"', "[" * depth + "]" * depth).encode("ascii")
+
+
 class PaginationTest(WatcherCase):
     def test_next_page_follows_an_all_new_page_with_a_token(self) -> None:
         self.api.pages[("연애", None)] = search_page([A], "P1")
@@ -959,6 +979,63 @@ class IntakeTest(WatcherCase):
                 ],
             )
             self.assertEqual(report, CycleReport(1, (), 0, 0, False, False))
+
+    def test_deeply_nested_values_end_the_cycle_without_an_exception(self) -> None:
+        # Phase 2 ship-report R2 — 47,500단 중첩 목록의 repr 이 RecursionError 로 주기를 깨뜨렸습니다.
+        # json.loads 가 그 깊이를 읽으면 SKIP, 못 읽으면(3.10) invalid JSON 의 ERROR 한 줄입니다.
+        published = video_item(A, 1200, published="@@")
+        counted = video_item(K, 1100)
+        counted["statistics"] = {"viewCount": "@@"}
+        rows = (
+            (
+                "publishedAt",
+                A,
+                published,
+                "snippet.publishedAt: UTC 'YYYY-MM-DDTHH:MM:SSZ' 모양이 아닙니다: list",
+            ),
+            ("viewCount", K, counted, "statistics.viewCount: 0 이상의 10진수 글자가 아닙니다: list"),
+        )
+        for label, video_id, item, detail in rows:
+            with self.subTest(label):
+                self.reset(label)
+                body = nested_body(item)
+                self.api = RawVideosApi(body)
+                if video_id == K:
+                    self.seed(K)
+                else:
+                    self.api.pages[("연애", None)] = search_page([A])
+                report = self.run_cycle()
+                try:
+                    json.loads(body)
+                except RecursionError:
+                    invalid = {"where": "videos.list", "reason": "HTTP 200 invalid JSON"}
+                    self.assertEqual(self.events(), [(Event.ERROR, invalid)])
+                    self.assertEqual(report, CycleReport(1, (), 0, 0, False, True))
+                else:
+                    self.assertEqual(
+                        self.events(),
+                        [skip(video_id, "invalid_item", "videos.list", detail=detail)],
+                    )
+                    self.assertEqual(report, CycleReport(1, (), 0, 0, False, False))
+                if video_id == K:
+                    self.assertEqual(self.counts(K), [1000])
+
+    def test_non_string_value_is_named_by_its_type(self) -> None:
+        # 글자가 아닌 값은 종류 이름만, 글자는 repr 그대로 (계약 '탐지 · 조회수 추적' 절)
+        rows = (
+            ("publishedAt None", bad_item(snippet__publishedAt=None), ": NoneType"),
+            ("viewCount 1200", bad_item(statistics__viewCount=1200), ": int"),
+            ("viewCount ' 12'", bad_item(statistics__viewCount=" 12"), ": ' 12'"),
+        )
+        for n, (label, item, ending) in enumerate(rows):
+            with self.subTest(label):
+                self.reset(f"typed-{n}")
+                self.api.pages[("연애", None)] = search_page([A])
+                self.api.videos[A] = item
+                self.run_cycle()
+                [(event, fields)] = self.events()
+                self.assertEqual(event, Event.SKIP)
+                self.assertTrue(fields["detail"].endswith(ending), fields["detail"])
 
 
 class ClockTest(WatcherCase):
