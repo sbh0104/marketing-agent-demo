@@ -921,6 +921,9 @@ class LoopbackUrlTest(unittest.TestCase):
         "http://ｌｏｃａｌｈｏｓｔ:9222",  # 전각 호스트 — 두 해석기가 다르게 읽음(7G HC1 질문 1 A)
         "http://localhost:123456",  # 여섯 자리 포트 — 계약 2절 숫자 1–5자리(7G HC1 질문 1 A)
         "http://localhost:9222//",  # 끝 '/' 둘 — 계약 2절 끝의 '/' 하나까지(7G HC1 질문 1 A)
+        # 포트 숫자만 전각 — urlsplit · WHATWG 모두 포트로 읽지 못함(7G HC1 질문 1 A 의 https 줄
+        # "받아도 게시 때 chrome_unreachable" · :123456 줄 "계약 2절 숫자 1–5자리")
+        "http://localhost:９２２２",
     )
 
     def test_this_computer_addresses_load_as_written(self) -> None:
