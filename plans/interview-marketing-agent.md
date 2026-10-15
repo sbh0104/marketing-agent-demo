@@ -915,7 +915,7 @@ Open questions
 ---
 
 ## Phase 7D — 결과 화면 (`data/report.html`)
-- Status: Not started
+- Status: Done
 - Slug: run-report-html
 - After: Phase 7
 - Goal: 주기가 끝날 때마다 사람이 읽는 결과 한 장(`data/report.html`)을 다시 써, 판단한 영상 목록 · 판별 · 타이밍 · 고민 한 줄 · 달 댓글 · 게시 결과(게시됨 / 리허설 — 버튼 앞에서 멈춤 / 허용 목록 밖이라 저장만 / 채널 대기 · 건너뛴 이유 등)를 한 화면에 보인다.

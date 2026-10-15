@@ -85,7 +85,7 @@
 - [~] Phase 7A — 탐지기 · 네트워크 오류 고침 (plans/interview-marketing-agent.md#phase-7a)
 - [x] Phase 7G — 크롬 주소 · 표본 간격 다지기 (이 컴퓨터 주소만 · 최소 표본 간격) (plans/interview-marketing-agent.md#phase-7g)
 - [ ] Phase 7B — jev 키가 없을 때 Claude 판단 (plans/interview-marketing-agent.md#phase-7b)
-- [~] Phase 7D — 결과 화면 data/report.html (plans/interview-marketing-agent.md#phase-7d)
+- [x] Phase 7D — 결과 화면 data/report.html (plans/interview-marketing-agent.md#phase-7d)
 - [ ] Phase 7C — 댓글 수 · 여는 방식 (건너뛴 영상 다시 쓰기 · 문장 짜임 고르기) (plans/interview-marketing-agent.md#phase-7c)
 - [ ] Phase 7H — 결과 화면 다지기 (낡은 이유 배지 · 이름표 둘) (plans/interview-marketing-agent.md#phase-7h)
 - [ ] (example) Add social login buttons to the login screen
