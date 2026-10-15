@@ -8,11 +8,7 @@
 
 ### E-009 · reviewer — ship-check 가 두 페이즈 연속 계약 문서의 설명 문장이 코드보다 넓게 약속한 것(보장 · "바뀌지 않음" · "~에만" 꼴)을 찾아 사람 확인으로 올렸다 — 코드와 표는 맞고 그 아래 문장이 틀린 꼴이며, 고치는 길이 공개 계약을 건드려 스모크 통에 못 들어간다
 - evidence: Phase 1 — 계약 2절 "비교와 셈에만"(R4) · 7절 문단(R5) (journal 20261013-062542-adw-phase-1-foundation-contracts summary flagged ②③); Phase 4 — '트리거 판정' 절 세 문장 R1/Q2 → Human checks 1 (E-007) (cycle 20261013-161358-adw/phase-4-trigger-timing)
-- first confirmed: 2026-10-13 · last confirmed: 2026-10-15
-
-### E-013 · codebase — `docs/contracts.md:5-6` 머리 문단은 `src/agent/` 모듈을 하나씩 열거하는데, 모듈을 더한 페이즈가 그 목록을 고치지 않는다 — main 에는 `trigger.py`(Phase 4)가 빠졌고 이 브랜치는 `classifier.py` 도 빠뜨렸다
-- evidence: `git show main:docs/contracts.md` 5-6행 = `config.py` · `models.py` · `store.py` · `guard.py` · `logbook.py` · `scheduler.py` 뿐인데 `git ls-tree --name-only main src/agent/` 에 `trigger.py` 가 있음; 이 브랜치 ship-report R5 → S-017 (`classifier.py`) (cycle 20261013-161343-adw/phase-3-classifier-topic; 첫 목격 20261013-161358-adw/phase-4-trigger-timing)
-- first confirmed: 2026-10-13 · last confirmed: 2026-10-14
+- first confirmed: 2026-10-13 · last confirmed: 2026-10-16
 
 ### E-015 · tooling — `smoke_file.py` 의 `verdict()` 는 verify-report **전체**에서 줄머리 `FAIL` 을 찾고 그것을 `PASS` 보다 먼저 본다 — `## Verdict` 가 PASS 여도 본문에 검사 출력 줄(`  FAIL labels: …`)이 있으면 "verify FAIL" 로 읽고, ship-report 의 스모크 후보를 one-pass 로 한 번 더 올린다
 - evidence: `.claude/skills/plan/scripts/smoke_file.py:73-76` (`V_FAIL.search(text)` 를 리포트 전체에), 패턴 `.claude/skills/plan/scripts/retro_collect.py:109` `^[^\w]*\**\s*FAIL\b` (re.M). `python3 -I` 로 이 사이클 verify-report 를 읽으면 `verdict(전체)` = FAIL · `verdict(section_body(…, "Verdict"))` = PASS · 첫 일치 62행 `  FAIL labels: check_probability_above_o…`(V4 음성 대조 출력). 결과: 스텝 note "ship READY · verify FAIL · 5 candidate(s)", 홈 `.adw/smoke-log.md` 에 같은 다섯 고침이 두 번 열림 — S-019~S-023(`deferred by ship-check`) = S-024~S-028(`filed by smoke-file (one-pass)`) (cycle 20261013-161439-adw/phase-5-writer-comment)
@@ -44,7 +40,7 @@
 
 ### E-027 · gotcha — 가드의 youtu.be · shorts 거절 행이 한 검사(`;` 나누기 등)를 재려면 쿼리의 다른 이름이 모두 받는 이름(`si` · `t` · `feature`)이어야 한다 — 셋 밖 이름은 먼저 막혀 행이 다른 이유로 초록이 된다. Phase 1 의 S-003 잠금 행 `?x=1;y=2;v=B` 가 1A 뒤 그렇게 풀려, `guard.py:65` 의 `replace(";", "&")` 를 첫 구분자만 바꾸게 한 변이 g1 이 스위트 461개 초록으로 산다
 - evidence: `tests/test_guard.py:47` (S-003 행) · `src/agent/guard.py:23,65`; `.adw/ship-report.md:405` (가드 표 G1 의 `;` 행은 하나짜리 꼴만) · `:418-421` (R1) → S-056 이 받는 이름만 든 행으로 다시 잠금 (cycle 20261014-035715-adw/phase-1a-parser-allow-rules)
-- first confirmed: 2026-10-14 · last confirmed: 2026-10-15
+- first confirmed: 2026-10-14 · last confirmed: 2026-10-16
 
 ### E-028 · tooling — `tests/mutants.py` 의 변이는 소스에서 바꿀 글자가 **정확히 한 번** 나와야 돈다(아니면 종료 코드 2) — 가드 · 로그 · 설정의 한 줄을 고치는 페이즈는 그 줄을 겨눈 변이 문자열도 함께 고쳐야 하고, 같은 글자를 한 번 더 쓰는 줄을 더하기만 해도 기존 변이가 깨진다
 - evidence: `tests/mutants.py:9-10` 머리말("2 는 이름을 모르거나 바꿀 글자가 정확히 한 번 나오지 않았다는 뜻"); 1A 가 고친 가드 줄을 겨눈 `guard-youtu-be-ignores-query-v` · `guard-shorts-ignores-query-v` · `guard-query-ampersand-only`(`tests/mutants.py:139,145,151`); 등록부 82 → 90 (cycle 20261014-035715-adw/phase-1a-parser-allow-rules)
@@ -56,7 +52,7 @@
 
 ### E-030 · tooling — 민감 확인 줄로 머지 앞에서 멈춘 사이클은 인터뷰가 트래커만 고치고 코드를 한 바이트도 바꾸지 않아도 허브가 verify-run 부터 다시 돌린다 — 같은 코드 트리에서 verify-run 과 ship-check 전체(감사 포함)가 한 번 더 돈다
 - evidence: 이번 사이클 `.adw/gate/history/20261014-140655-cycle-control.json` `{"action": "retry", "issued_by": "hub:move", "step": "verify-run"}`; ship-report § Verdict "코드는 첫 판정 때와 한 바이트도 다르지 않고(그 뒤 바뀐 것은 트래커 10줄)" — 인터뷰 커밋 `4e859be` 는 `plans/` 만(+10줄); retro-bundle Steps verify-run 시도 2 · ship-check 시도 2 $15.4151 · 감사 부름 8(시도 2권 합) (cycle 20261014-112313-adw/phase-1c-text-config-allow). 앞 목격: Phase 1A — 인터뷰가 문서만 두 커밋(`3a4a6e7` · `681acc5`), `git diff 2e58209 HEAD -- src tests` 0바이트인데 verify-run · ship-check 시도 2 (journal 20261014-035715-adw-phase-1a-parser-allow-rules summary.md:17)
-- first confirmed: 2026-10-14 · last confirmed: 2026-10-15
+- first confirmed: 2026-10-14 · last confirmed: 2026-10-16
 
 ### E-031 · codebase — 설정 읽기 `_construct_mapping` 은 중복 키 검사보다 먼저 `loader.flatten_mapping(node)` 를 부른다 — YAML 병합 키(`<<`)로 앵커를 겹겹이 이은 작은 파일이 항목을 기하급수로 복사해, "키가 두 번 나옵니다" 오류나 "이전 설정 유지"에 닿기 전에 메모리를 다 쓸 수 있다
 - evidence: `src/agent/config.py:84-85` (`def _construct_mapping` 첫 줄이 `loader.flatten_mapping(node)`, 중복 검사 `seen` 은 그 뒤 `:86-92`); ship-report R7 — 2,144바이트 파일 n=25 에서 2.97초 · 최대 RSS 1,081,456 KB 뒤 `키가 두 번 나옵니다`, n=30 은 약 32 GB 추정, base 와 HEAD 같음(n=22 0.36초 대 0.35초). 막으려면 설정 파일 형식(병합 키 · 별칭 금지) 결정이 필요해 주인 없음 (cycle 20261014-112313-adw/phase-1c-text-config-allow)
@@ -68,7 +64,7 @@
 
 ### E-034 · reviewer — 트래커만 고친 확인 인터뷰 뒤의 두 번째 ship-check 는 코드가 같은 트리에서도 새 결함을 찾는다 — 6B 에서는 인터뷰가 막 쓴 트래커 줄 자체(Phase 6C 결정 문장, R12)가 6B 테스트보다 넓었다. E-030 상류 고침이 받아들인 "새 트래커 줄은 기계가 다시 대조하지 않음"이 이런 결함을 잃는다
 - evidence: 이번 ship-report R12 — `plans/interview-marketing-agent.md:477` "이 페이즈가 채점을 고쳐도 main 은 초록 그대로다"를 감사 3 이 재현했다: 6C 후보 ① → `test_verdict_recount_is_go_with_one_line` · `test_summary_first_line_is_the_recount` FAIL, 새 지문 칸 → `test_every_fingerprint_key_is_sorted` FAIL. 같은 두 번째 실행이 R5 의 중복 줄 꼴(S-075)도 새로 찾았다. 인터뷰 커밋 `7bdb488` 은 `plans/` 만; retro-bundle Steps ship-check 시도 2 $26.0421 (cycle 20261014-112322-adw/phase-6b-live-check-apply). 앞 목격: 1C — 홈 `.adw/backlog.md` E-030 이관 줄 "1C 에서 R7 · R8 을 건진 우연한 두 번째 감사도 사라짐" (journal 20261014-112313-adw-phase-1c-text-config-allow)
-- first confirmed: 2026-10-14 · last confirmed: 2026-10-15
+- first confirmed: 2026-10-14 · last confirmed: 2026-10-16
 
 ### E-033 · tooling — 이 기계에는 여전히 `typesafe_sdk` 도 `anthropic` 도 없어 진짜 jev · Claude 호출은 사람 환경에서만 돈다 — 진짜 호출의 기록은 사람이 커밋한 `docs/live-check/result.json` 하나뿐이고(6A 실행기 `tests/live_check.py`), 스위트는 가짜 SDK(`tests/test_classifier.py`) · 가짜 Claude(`tests/test_writer.py`)로만 돈다. 다시 재려면 사람 재실행이 필요하다(트래커 6C → 6D 길)
 - evidence: `python3 -I -c "import typesafe_sdk"` · `python3 -I -c "import anthropic"` → 둘 다 `ModuleNotFoundError` (이 retro 실측, 2026-10-14); `docs/live-check/result.json` `run_at 2026-10-14T04:28:16.180435+00:00` · `calls {'claude': 23, 'jev': 72, 'youtube': 17}` · `models` 두 이름 `accepted`; `tests/live_check.py:72` `from tests.jev_accuracy import PASS_CORRECT, REPO_CONFIG, judge_examples, tally`. E-012 · E-016 을 잇는다 (cycle 20261014-112322-adw/phase-6b-live-check-apply)
@@ -92,7 +88,7 @@
 
 ### E-041 · reviewer — plan 이 등록한 변이(`tests/mutants.py`)는 새 판정의 경계(비교 연산 `<` ↔ `<=` · 범위 끝 한 글자)를 비틀지 않고, ship-check 의 변이 점검이 거기서 살아남은 변이를 찾아 테스트만 고치는 스모크 항목으로 보낸다 — 두 페이즈 연속. 착지와 스윕 사이에 다른 페이즈가 그 경계를 잘못 고치면 그 사이클의 스위트는 초록이다
 - evidence: 6C — Guard B 첫 행 `target 2, min 0` 으로 `<=` 변이 M8a 생존 → R3 · S-077, 분모 변이 M23 생존 → R4 · S-078(6C summary.md Coverage decisions). 6E — verify-run V5 `mutants new: 8 run · caught 8` · V6 `47/47` 인데 ship-check 가 `_frame_pieces` 의 '연애사주' 빼기 앞 끝 · 뒤 끝과 `skip_human` 값 변이 생존을 재현 → S-093 · S-094(ship-report.md:173-176). 가드 매트릭스 행 규칙은 `.claude/skills/plan/SKILL.md:128`(변이 행만 `unmeasured` 허용) (cycle 20261014-172227-adw/phase-6c-live-check-grader-fix · 20261015-091934-adw/phase-6e-comment-quality-fix)
-- first confirmed: 2026-10-15 · last confirmed: 2026-10-15
+- first confirmed: 2026-10-15 · last confirmed: 2026-10-16
 
 ### E-043 · reviewer — 받아들인 위험 줄이 코드 자리를 적어도 입력 종류를 재현 입력의 조건으로 좁히면, 다음 ship-check 는 같은 자리에서 더 넓은 입력을 찾아 사람 확인으로 다시 올린다 — 헌법 11조의 ship-check 규칙("same site … different input class is a new risk")대로다. 멈춤이 끝나려면 그 자리가 받는 입력 전체를 입력 종류로 적어야 한다
 - evidence: Phase 2 — 입력으로 적은 줄을 ship-check 가 같은 `except`(`src/agent/youtube.py:245`)에서 새 예외 꼴로 세 번 뚫었고, 자리로 다시 적은 뒤 다섯째 ship-check 는 새 멈춤이 없었다(옛 E-021, cycle 20261013-161159-adw/phase-2-watcher-detect). 6G — 🤖 브리핑(gate `20261015-153916-cycle-control.unconsumed.json`)이 적은 `skip_reason` 대가 줄(`fa66b56`)은 자리 `tests/live_check.py:1621` 를 이름 붙였지만 입력 종류가 "두 번 모두 코드 검사에서 떨어진" 경우뿐이었다. 같은 코드 트리의 다음 ship-check 가 "한 번만 반복 검사에서 떨어져도" 꼴을 찾아 `[sensitive: …]` 로 올렸고(journal 20261015-130935 ship-report.md:12 · :217), HC1 인터뷰가 "어느 한 번이라도 … 다른 시도가 무엇으로 떨어졌든" 으로 넓혀 다시 썼다(`92bf38f`) (cycle 20261015-130935-adw/phase-6g-live-check-redact)
@@ -112,17 +108,22 @@
 
 ### E-047 · codebase — `decide_post` 는 허용 목록 검사를 지난 영상에만 `dry_run` 이유를 준다(목록 밖은 그보다 먼저 `not_in_allowlist`) — 그래서 `live=False` · `dry_run` 이 곧 "테스트 실행의 명단 영상" 이고 7F 리허설 갈래가 이것으로 나뉜다. 한편 테스트 쪽 중복 판정 `_is_duplicate(live=False)` 는 모드와 결과를 가리지 않고 시도가 하나라도 있으면 참이다(`COUNTED_RESULTS` 는 `posted` · `reserved` 만 센다) — 리허설이 시도를 하나라도 저장하면 같은 영상의 다음 리허설은 `SKIP duplicate_video` 가 된다
 - evidence: `src/agent/guard.py:94-98` · `src/agent/store.py:27` · `:42-45`(트리 `bd90bf0`). ship-report R5 — 7F 전 테스트 실행의 `("test","saved","dry_run")` 시도나 `config_rejected` 시도가 있는 영상은 리허설되지 않음. verify-run V10 — 리허설은 저장소 파일을 한 바이트도 바꾸지 않아 같은 영상을 다시 리허설하고 보통 실행도 게시함 (cycle 20261015-182947-adw/phase-7f-chrome-rehearsal)
-- first confirmed: 2026-10-15 · last confirmed: 2026-10-15
+- first confirmed: 2026-10-15 · last confirmed: 2026-10-16
 
 ### E-048 · hazard — 리허설의 글 지우기 `_clear` 는 `Exception` 을 모두 잡아 `rehearsed` 줄의 `detail="clear_failed …"` 로만 남긴다 — `CommentPage` 포트에 메서드를 더한 뒤, 그 메서드가 없는 가짜로 도는 테스트는 `AttributeError` 를 detail 에 삼키고 초록이다. `submits == []` 와 시도 `[]` 만 단언하는 테스트는 이 꼴을 잡지 못한다
 - evidence: `src/agent/poster.py:331-336`. main 의 `tests/test_run.py:181` `FakeTab` 에 `clear_comment` 가 없다(`git show main:tests/test_run.py`). ship-check 감사 3 재현 `POST mode=test result=rehearsed reason=dry_run detail="clear_failed page_error: AttributeError: 'FakeTab' object has no attribute 'clear_comment'"`(journal ship-report.md R2 :144 · verify-report.md N1 :125). run 단위 잠금은 Phase 7G 로 넘김(ship-report Human checks 1) (cycle 20261015-182947-adw/phase-7f-chrome-rehearsal)
-- first confirmed: 2026-10-15 · last confirmed: 2026-10-15
+- first confirmed: 2026-10-15 · last confirmed: 2026-10-16
 
 ### E-049 · hazard — 6G 의 연락처 모양 목록(`tests/live_check.py:317-333` `CONTACT_SHAPES`)은 이메일 · 예금주 · 전화 · 계좌 넷만 본다 — 메신저 연락처(카카오톡 아이디 · 텔레그램 링크 · 디스코드 초대 · `@` 아이디)는 쓰는 순간의 가림도 레인 커밋마다의 검사도 지나 결과 파일 `videos[].untrusted.description` 에 남고, 검사는 "연락처 모양 0" 으로 초록이다. 같은 목록을 부르는 공개용 사본(Phase 8)도 그 값을 그대로 낸다
 - evidence: 6F 결과(`d2d8942`, `run_at` 2026-10-15T08:42:22Z)의 영상 6 · 14 · 15 · 18 · 21 · 29 에 7곳 — 커밋 때 6G 검사 0, ship-check 보안 감사가 찾아 민감 줄로 올림(journal ship-report.md:210-216 · :243). 6D 결과(`a2b2f2f`)에는 이 꼴이 없었다. 사람이 그대로 두고 착지하기로 정함(트래커 6F 결정 2026-10-16 · Trade-offs "6G 목록은 넷 그대로라 다음 실행에서도 메신저 아이디는 결과 파일에 들어간다") (cycle 20261015-175919-adw/phase-6f-live-check-reapply-after-fix)
 - first confirmed: 2026-10-16 · last confirmed: 2026-10-16
 
+### E-050 · codebase — `_measured_pair`(`src/agent/trigger.py:58`)가 판정(`judge_trigger`, :76)과 `views_per_hour`(:98)가 함께 쓰는 유일한 두 기록 고르기 자리다 — 간격 · 짝 규칙을 바꾸는 페이즈는 이 함수만 고치면 판정과 로그의 `TRIGGER per_hour`(`src/agent/run.py:338`)가 어긋나지 않는다. 같은 사이클 로그의 `VIEWS … delta` 는 이 짝이 아니라 목록의 바로 앞 기록(`src/agent/watcher.py:290-291`)을 쓰므로 10분 안 재시작에서 두 줄의 숫자가 갈린다
+- evidence: `trigger.py:58-60` `return _latest_pair(record.view_history) or _first_pair(record)` · `:76` `pair = _measured_pair(record)`(judge_trigger) · `:98` 같은 줄(views_per_hour) · `run.py:337-338` `rule = judge_trigger(…)` 다음 `per_hour = views_per_hour(record)`; `watcher.py:290-291` `views = record.view_history[-1].count` · `prev = record.view_history[-2].count`; ship-report Risks 7(`VIEWS … delta=1` 옆 `TRIGGER … per_hour=576`) · V7 무작위 기록 2,008개에서 판정 · 속도 어긋남 0 (cycle 20261015-211343-adw/phase-7g-chrome-url-sample-gap)
+- first confirmed: 2026-10-16 · last confirmed: 2026-10-16
+
 ## Retired (history — one line each, never deleted)
+- E-013 · codebase — `docs/contracts.md:5-6` 머리 문단은 `src/agent/` 모듈을 하나씩 열거하는데, 모듈을 더한 페이즈가 그 목록을 고치지 않는다 — main 에는 `trigger.py`(Phase 4)가 빠졌고 이 브랜치는 `classifier.py` 도 빠뜨렸다 — retired 2026-10-16 (over cap; unconfirmed since 2026-10-14)
 - E-010 · reviewer — 페이즈가 하류 페이즈에 넘긴 일과 주인 없이 받아들인 위험이 `plan.md` · 계약에만 남고 트래커의 하류 페이즈 절에는 오르지 않는다 — ship-check 가 두 페이즈 연속 "트래커 Phase 2 · 7 절에 주인 줄 적기"를 사람 확인으로 올렸고, Phase 1 에서는 주인 없이 받아들인 위험이 다음 ship-check 에 돌아왔다 — retired 2026-10-16 (over cap; unconfirmed since 2026-10-14)
 - E-006 · tooling — [stop:unknown · 1] 정지 부류 표에 "ship-check sensitive human checks — confirm in the interview before merge" 행이 없다 — 민감 확인 줄로 머지 전에 멈춘 ship-check 는 부류 `unknown` 으로 남는다 — retired 2026-10-15 (over cap; unconfirmed since 2026-10-14)
 - E-007 · codebase — `judge_trigger` 는 기록 한 번(`too_few_samples`) · 조회수 미달/초과(`views_below_min` · `views_above_max`) 검사를 나이 검사(`too_old`)보다 먼저 한다 — 나이 창이 닫힌 영상도 그 셋 중 하나면 영원히 `too_old` 를 받지 못하고, 계약 '트리거 판정' 절의 설명 문장("바뀌지 않는 것은 `too_old` 뿐 … `views_below_min` 과 모든 `hold` 는 `yes` 가 될 수 있다", "조회수가 줄면 … `hold` … 나이 창이 닫히면 `too_old` 로 끝남")은 이 영상들에 대해 틀린다 — retired 2026-10-15 (over cap; unconfirmed since 2026-10-14)

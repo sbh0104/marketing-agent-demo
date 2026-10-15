@@ -988,7 +988,7 @@ Open questions
 ---
 
 ## Phase 7G — 크롬 주소 · 표본 간격 다지기 (이 컴퓨터 주소만 · 최소 표본 간격)
-- Status: Not started
+- Status: Done
 - Slug: chrome-url-sample-gap
 - After: Phase 7
 - Goal: 크롬 연결 주소(`chrome_debug_url`)를 이 컴퓨터 주소만 받게 하고(H-061 · H-111), 재시작 직후 몇 초 사이의 조회수 표본이 큰 속도가 되지 않게 최소 표본 간격(10분)을 둔다(H-009 · H-112). Phase 7F 가 넘긴 run 테스트 하나(H-117)도 더한다. 녹화 · Phase 8 · 8A 는 이 페이즈를 기다리지 않는다 (2026-10-15 Phase 7 인터뷰 질문 6 A 로 Phase 7 에서 나눔).
