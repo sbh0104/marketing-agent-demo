@@ -360,6 +360,12 @@ MUTANTS: dict[str, tuple[str, str, str, str]] = {
         "[entry for entry in self._calls if entry.at > start]",
         "list(self._calls)",
     ),
+    "youtube-narrow-network-catch": (
+        "agent.youtube",
+        "tests.test_youtube",
+        "except Exception as exc:",
+        "except (OSError, http.client.HTTPException) as exc:",
+    ),
     "watcher-silent-hold": (
         "agent.watcher",
         "tests.test_watcher",

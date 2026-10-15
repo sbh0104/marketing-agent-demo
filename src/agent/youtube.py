@@ -286,7 +286,8 @@ class YouTubeClient:
         self._ledger.reserve(call, now, limits)
         try:
             status, body = self._fetch(url, _TIMEOUT_S)
-        except (OSError, http.client.HTTPException) as exc:
+        # _fetch 의 예외는 무엇이든 — 깨진 리다이렉트 · 덩어리 틀 · 시간 상한도 ERROR 한 줄입니다. Ctrl+C 는 BaseException 이라 빠집니다 (계약 '탐지 · 조회수 추적' 절)
+        except Exception as exc:
             raise YouTubeError(call, self._redact(f"network {type(exc).__name__}: {exc}")) from None
         try:
             data = json.loads(body)
