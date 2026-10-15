@@ -5,6 +5,11 @@ decision.video_id 로 만든 watch 주소만 열고, 댓글을 입력한 뒤 클
 주소(page.url)로 decide_post 를 한 번 더 부릅니다. live 가 아니거나 다른 영상이면 누르지 않고
 테스트 모드로 저장합니다.
 
+테스트 실행의 허용 목록 영상(decide_post 의 이유 dry_run)은 리허설합니다 — 같은 watch 주소를 열고
+입력해 게시 버튼까지 본 뒤, 누르지 않고 화면을 남기고 입력한 글을 지웁니다. 다시 확인이 실제 게시라면
+누르지 않았을 화면이면 ERROR 한 줄과 함께 멈춥니다. 리허설은 저장소를 받지 않으므로 시도를 남기지
+않습니다. 허용 목록 밖 영상은 언제나 크롬 없이 테스트 모드로 저장합니다.
+
 예약 전에 멈추면(크롬 연결 · 영상 열기 · 댓글 칸 준비 · 입력 · 버튼 확인) 아무것도 누르지 않았으므로
 저장소는 그대로 두고 ERROR 줄 하나와 화면 캡처만 남깁니다 — 다음 주기에 다시 시도합니다.
 예약 뒤 결과를 모르면(클릭 중 오류 · 확인 오류 · 댓글이 안 보임 · Ctrl-C) 예약을 그대로
@@ -34,6 +39,9 @@ DETAIL_MAX = 200
 BEFORE_CLICK = "before_click"
 AFTER_CLICK = "after_click"
 
+# 리허설 갈래의 신호 — src/agent/guard.py (decide_post) 가 테스트 실행의 허용 목록 영상에만 주는 이유
+DRY_RUN = "dry_run"
+
 # 원인 이름 — 로그에 따옴표 없이 쓰이도록 소문자 ASCII
 NO_COMMENT = "no_comment"
 PAGE_MISMATCH = "page_mismatch"
@@ -47,6 +55,7 @@ PAGE_ERROR = "page_error"
 CLICK_UNKNOWN = "click_unknown"
 CONFIRM_ERROR = "confirm_error"
 NOT_CONFIRMED = "not_confirmed"
+CLEAR_FAILED = "clear_failed"  # 리허설의 글 지우기 실패 — 원인이 아니라 rehearsed 줄 detail 의 머리
 
 
 class PageError(Exception):
@@ -77,6 +86,13 @@ class CommentPage(Protocol):
         """
         ...
 
+    def clear_comment(self) -> None:
+        """prepare_comment 가 입력한 글을 지웁니다 — 아무것도 누르지 않습니다.
+
+        입력 칸을 찾지 못하는 등 멈추면 PageError 를 냅니다.
+        """
+        ...
+
     def submit(self) -> None:
         """게시 버튼을 누릅니다 — 이동도 기다림도 없이.
 
@@ -99,9 +115,12 @@ class CommentPage(Protocol):
 
 @dataclass(frozen=True)
 class PostOutcome:
-    """게시 단계 결과. result 는 skipped · saved · stopped · reserved · posted · failed 중 하나.
+    """게시 단계 결과. result 는 skipped · saved · rehearsed · stopped · reserved · posted · failed
+    중 하나.
 
-    stopped 는 실제 게시가 예약 전에 멈춰 저장소가 그대로라는 뜻입니다.
+    rehearsed 는 테스트 실행의 리허설이 게시 버튼 앞에서 멈췄다는 뜻입니다(글 지우기 실패는 줄의 detail).
+    stopped 는 크롬 길이 예약 전에(리허설이면 끝나기 전에, 또는 다시 확인이 맞지 않아) 멈춰 저장소가
+    그대로라는 뜻입니다.
     """
 
     video_id: str
@@ -127,7 +146,7 @@ def post_video(
     clock: Callable[[], datetime],
     repo_root: Path,
 ) -> PostOutcome:
-    """영상 하나를 계약 6절 순서대로 게시합니다 — 판단 · 한도 · 테스트 모드 · 실제 게시."""
+    """영상 하나를 계약 6절 순서대로 게시합니다 — 판단 · 한도 · 테스트 모드(허용 목록 영상은 리허설) · 실제 게시."""
     if record.comment is None:
         logbook.write(Event.SKIP, video=record.video_id, reason=NO_COMMENT)
         return PostOutcome(record.video_id, "test", "skipped", NO_COMMENT)
@@ -142,6 +161,17 @@ def post_video(
         logbook.write(Event.SKIP, video=decision.video_id, reason=check.reason)
         return PostOutcome(decision.video_id, decision.mode, "skipped", check.reason)
     if not decision.live:
+        if decision.reason == DRY_RUN:
+            return _rehearse(
+                record.comment.text,
+                decision,
+                config=config,
+                dry_run=dry_run,
+                logbook=logbook,
+                open_page=open_page,
+                clock=clock,
+                repo_root=repo_root,
+            )
         return _save_test(
             decision.video_id, decision.reason, now=clock(), store=store, logbook=logbook
         )
@@ -236,6 +266,75 @@ def _post_live(
         return PostOutcome(video_id, "live", "reserved", NOT_CONFIRMED, shot)
     finally:
         _close_quietly(page)
+
+
+def _rehearse(
+    text: str,
+    decision: PostDecision,
+    *,
+    config: Config,
+    dry_run: bool,
+    logbook: Logbook,
+    open_page: Callable[[], CommentPage],
+    clock: Callable[[], datetime],
+    repo_root: Path,
+) -> PostOutcome:
+    """리허설 — 열기 · 입력 · 버튼 확인 → 다시 확인 → 캡처 → 글 지우기. 갈래마다 시계는 한 번.
+
+    게시 버튼은 누르지 않습니다. 저장소를 받지 않으므로 시도도 남기지 않습니다 — 같은 영상을 몇 번이고
+    다시 리허설하고, 그 뒤 실제 게시는 그대로 할 수 있습니다. 이름(shown_url 등)이 _post_live 와 다른
+    것은 음성 대조 표 tests/mutants.py (MUTANTS) 의 글자가 이 파일에 한 번씩만 나오게 하려는 것입니다.
+    """
+    video_id = decision.video_id
+    page = None
+    try:
+        try:
+            page = open_page()
+            page.open(WATCH_URL.format(video_id=video_id))
+            page.prepare_comment(text)
+            shown_url = page.url
+        except Exception as exc:  # 클릭 전 — 누른 것도 저장한 것도 없습니다
+            shot = _log_error(
+                page, video_id, BEFORE_CLICK, _cause(exc), _detail(exc),
+                now=clock(), logbook=logbook, repo_root=repo_root,
+            )
+            return PostOutcome(video_id, "test", "stopped", _cause(exc), shot)
+        recheck = decide_post(shown_url, config.allowed_videos, dry_run)
+        if recheck.reason != DRY_RUN:  # 실제 게시였다면 3.2 에서 테스트 저장으로 빠졌을 화면
+            missed = recheck.reason
+        elif recheck.video_id != video_id:
+            missed = PAGE_MISMATCH
+        else:
+            missed = None
+        if missed is not None:  # 리허설 실패 — 저장 없이 ERROR 한 줄, 입력한 글은 지웁니다
+            shot = _log_error(
+                page, video_id, BEFORE_CLICK, missed, shown_url[:DETAIL_MAX],
+                now=clock(), logbook=logbook, repo_root=repo_root,
+            )
+            _clear(page)
+            return PostOutcome(video_id, "test", "stopped", missed, shot)
+        shot = _capture(page, video_id, clock(), repo_root)
+        failed = _clear(page)
+        detail = (
+            "" if failed is None
+            else f"{CLEAR_FAILED} {_cause(failed)}: {_detail(failed)}"[:DETAIL_MAX]
+        )
+        _write_post(
+            logbook, video_id, "test", "rehearsed", DRY_RUN,
+            screenshot=shot, detail=detail, page_url=shown_url,
+        )
+        return PostOutcome(video_id, "test", "rehearsed", DRY_RUN, shot)
+    finally:
+        _close_quietly(page)
+
+
+def _clear(page: CommentPage) -> BaseException | None:
+    """입력한 글을 지웁니다 — 못 지우면 그 예외를 돌려줍니다(누른 것은 없으므로 멈추지 않음)."""
+    try:
+        page.clear_comment()
+    except Exception as exc:
+        return exc
+    return None
 
 
 def _save_test(
