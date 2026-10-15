@@ -957,3 +957,35 @@
 - source: adw/phase-7-pipeline-rules
 - tag: plain
 - status: open
+
+### H-117 — Phase 7G: main 의 `tests/test_run.py` `FakeTab` 에 `clear_comment` 를 주고, `--once --dry-run` 주기에서 명단 영상이 `detail` 없는 `POST … result=rehearsed reason=dry_run` 을 남기며 `ERROR where=poster` 줄이 없고 `submits == []` 임을 잠그는 run 단위 테스트를 하나 더한다
+- project: marketing-agent-demo
+- when: 2026-10-15 · plans/interview-marketing-agent.md#phase-7f
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-7f-chrome-rehearsal
+- tag: plain
+- status: open
+
+### H-118 — 착지 뒤 lander 가 합친 트리에서 `python3 -m unittest discover -s tests -t .` 가 `OK` 인지 확인한다(오늘 main `10c2de7` 과 미리 합친 트리는 870개 `OK (skipped=3)`, 건너뜀은 `.git` 없는 임시 폴더 탓)
+- project: marketing-agent-demo
+- when: 2026-10-15 · plans/interview-marketing-agent.md#phase-7f
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-7f-chrome-rehearsal
+- tag: plain
+- status: open
+
+### H-119 — Phase 8A 녹화의 첫 실행(로그인된 진짜 크롬, 테스트 실행)에서 V 의 댓글이 입력되고 게시 버튼이 켜졌지만 눌리지 않는지, `fill("")` 이 YouTube 의 `#contenteditable-root` 를 실제로 비우는지, 로그가 `detail` 없는 `POST … result=rehearsed reason=dry_run` 인지 본다
+- project: marketing-agent-demo
+- when: 2026-10-15 · plans/interview-marketing-agent.md#phase-7f
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-7f-chrome-rehearsal
+- tag: plain
+- status: open
+
+### H-120 — 착지 뒤 `.adw/human-checks.md` 의 H-026 `status:` 를 고친다(트래커 7F Responsibilities: 마감 축소 인터뷰 질문 9 A 와 이 페이즈가 답함)
+- project: marketing-agent-demo
+- when: 2026-10-15 · plans/interview-marketing-agent.md#phase-7f
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-7f-chrome-rehearsal
+- tag: plain
+- status: open
