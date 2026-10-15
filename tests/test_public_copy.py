@@ -319,6 +319,18 @@ class ContactTest(GitCase):
         self.assertIn(json.dumps(PHONE_NEAR), joined(check))
         self.assertIn(json.dumps(EMAIL_CASE), joined(check))
 
+    def test_appended_and_cut_known_are_red(self) -> None:
+        """한 글자를 덧붙인 꼴 · 끝 글자를 자른 꼴 — 부분 일치라면 알려진 글자로 넘어갈 둘입니다."""
+        forms = (EMAIL_KNOWN + "x", EMAIL_KNOWN[:-1])
+        src = self.fake()
+        for i, form in enumerate(forms):
+            src.write(f"m{i}.txt", f"메일 {form}\n")
+        src.commit()
+        text = joined(self.contacts(src, {EMAIL_KNOWN}))
+        for i, form in enumerate(forms):
+            with self.subTest(form=form):
+                self.assertIn(f"{json.dumps(form)} ← m{i}.txt @ ", text)
+
     def test_author_email_is_not_scanned(self) -> None:
         src = self.fake()
         src.write("a.txt", "깨끗\n")
@@ -378,6 +390,18 @@ class KeyTest(GitCase):
         src.write("a.txt", f"가짜 {KEY_NEAR}\n")
         src.commit()
         self.assertIn(json.dumps(KEY_NEAR), joined(self.keys(src, {KEY_KNOWN})))
+
+    def test_appended_and_cut_known_are_red(self) -> None:
+        """한 글자를 덧붙인 꼴 · 끝 글자를 자른 꼴 — 부분 일치라면 알려진 글자로 넘어갈 둘입니다."""
+        forms = (KEY_KNOWN + "Q", KEY_KNOWN[:-1])
+        src = self.fake()
+        for i, form in enumerate(forms):
+            src.write(f"k{i}.txt", f"가짜 {form}\n")
+        src.commit()
+        text = joined(self.keys(src, {KEY_KNOWN}))
+        for i, form in enumerate(forms):
+            with self.subTest(form=form):
+                self.assertIn(f"{json.dumps(form)} ← k{i}.txt @ ", text)
 
     def test_key_in_older_commit_and_message_are_red(self) -> None:
         src = self.fake()
@@ -455,6 +479,32 @@ class SecretValueTest(GitCase):
         self.assertTrue(skipped.skipped)
         self.assertFalse(skipped.failed)
 
+    def test_malformed_env_line_fails_not_skips(self) -> None:
+        src = self.fake()
+        src.write("a.txt", "깨끗\n")
+        src.commit()
+        bad = write_env(self.tmp / "bad.env", MARKS)
+        with bad.open("a", encoding="utf-8") as stream:
+            stream.write("등호 없는 줄\n")
+        code, out = self.scan_only(src, "--env", bad)
+        self.assertEqual(code, pc.EXIT_FAILED, out)
+        self.assertIn("✗ 비밀 값 — 1곳", out)
+        self.assertIn("이름=값 형식이 아닙니다", out)
+        self.assertNotIn("건너뜀", out)
+
+    def test_default_env_is_the_source_env(self) -> None:
+        src = self.fake()
+        src.gitignore()
+        write_env(src.root / ".env", MARKS)
+        src.write("a.txt", f"{MARKS['TYPESAFE_API_KEY']}\n")
+        src.commit()
+        self.assertNotIn(".env", src.git("ls-files").split())
+        code, out = self.scan_only(src)
+        self.assertEqual(code, pc.EXIT_FAILED, out)
+        self.assertIn("✗ 비밀 값 — 1곳", out)
+        self.assertIn("TYPESAFE_API_KEY 값 ← a.txt @ ", out)
+        self.assertNotIn("건너뜀", out)
+
     def test_value_is_never_printed(self) -> None:
         src = self.fake()
         src.suite()
@@ -520,6 +570,19 @@ class HomeTest(GitCase):
         src.write("b.txt", f'local = "{HOME_NEAR}AppData/Local"\n')
         src.commit()
         self.assertIn(f"{json.dumps(HOME_NEAR)} ← b.txt @ ", joined(self.homes(src, {HOME_KNOWN})))
+
+    def test_appended_and_cut_name_are_red(self) -> None:
+        """홈 모양은 이름 뒤 가름 글자에서 끝나므로 이름 칸에 한 글자를 덧붙이고 끝 글자를 자릅니다."""
+        name = HOME_KNOWN[:-1]
+        forms = (f"{name}x/", f"{name[:-1]}/")
+        src = self.fake()
+        for i, form in enumerate(forms):
+            src.write(f"h{i}.txt", f'local = "{form}AppData/Local"\n')
+        src.commit()
+        text = joined(self.homes(src, {HOME_KNOWN}))
+        for i, form in enumerate(forms):
+            with self.subTest(form=form):
+                self.assertIn(f"{json.dumps(form)} ← h{i}.txt @ ", text)
 
     def test_home_path_in_message_is_red_in_copy_scope_only(self) -> None:
         src = self.fake()
