@@ -1557,6 +1557,32 @@ class RecountTest(unittest.TestCase):
         ]
         self.assertEqual([_gated(fake, window) for window in WINDOW_LABELS], ["1", "1"])
 
+    def test_bad_questions_samples(self) -> None:
+        # 알려진 한계 줄의 '나쁨' — Claude 채점 다섯 칸을 참거짓 그대로만 읽습니다(결과 파일은 믿을 수 없는 입력)
+        ok_grade = {"scene_in_material": True, "reads_like_ad": False, "follows_concern": True}
+        ok_task = {"concern_is_love_worry": True, "saju_story_fits": True}
+
+        def draft(grade: object, **task: object) -> dict[str, object]:
+            return {"grade": grade, "task_quality": ok_task | task}
+
+        case_key = {"scene_in_material": True, "reads_like_ad": False, "Follows_concern": False}
+        samples = (
+            (draft(ok_grade | {"follows_concern": False}), ["follows_concern"]),
+            (draft(ok_grade | {"reads_like_ad": True}), ["reads_like_ad"]),
+            (draft(ok_grade | {"scene_in_material": False}), ["mentions_scene"]),
+            (draft(ok_grade, concern_is_love_worry=False), ["concern_is_love_worry"]),
+            (draft(None, saju_story_fits=False), ["saju_story_fits"]),
+            (draft(ok_grade), []),
+            (draft(ok_grade | {"follows_concern": "false"}), []),
+            (draft(ok_grade | {"follows_concern": 0}), []),
+            (draft(ok_grade | {"reads_like_ad": 1}), []),
+            (draft(ok_grade, saju_story_fits="False"), []),
+            (draft(case_key), []),
+        )
+        for sample, expected in samples:
+            with self.subTest(draft=sample):
+                self.assertEqual(bad_questions(sample), expected)
+
 
 FIVE_SCORE_NAMES = (*SCORE_NAMES, "concern_is_love_worry", "saju_story_fits")
 
@@ -1598,6 +1624,18 @@ class LowestScoreTest(unittest.TestCase):
             check_floor(result), load_config(REPO_CONFIG).comment.check_min_probability
         )
         self.assertEqual(stored_verdict_mismatches(result), [])
+
+    def test_lowest_question_samples(self) -> None:
+        # 알려진 한계 줄의 '가장 낮은 비교 점수의 질문' — 광고는 1 − P(예), 같은 값이면 CHECK_QUESTIONS 차례가 앞선 것
+        self.assertEqual(lowest_question(self.five(saju_story_fits=0.6)), "saju_story_fits")
+        self.assertEqual(lowest_question(self.five(reads_like_ad=0.4)), "reads_like_ad")
+        self.assertEqual(
+            lowest_question(self.five(mentions_scene=0.7, saju_story_fits=0.7)), "mentions_scene"
+        )
+        self.assertEqual(comparison_label("reads_like_ad"), "광고처럼 읽힘 아님")
+        self.assertEqual(comparison_label("mentions_scene"), "영상 속 장면·말 언급")
+        with self.assertRaises(ValueError):
+            lowest_question({"mentions_scene": 0.9, "Mentions_scene": 0.1})
 
     def test_five_question_fake_result_recounts(self) -> None:
         draft = RecountTest.draft(claude="bad")
@@ -1957,6 +1995,35 @@ class WriterRecordTest(ContractCase):
             *before_after_notes(self.result),
             f"6E 전(Phase 6D 의 실행 `{BEFORE_FIX_RUN_AT}`, 6D 가 이 절에 적은 기록)"
             f" → 6E 뒤(이번 실행 `{self.result['run_at']}`)",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assert_in_contract(phrase)
+
+    def test_human_cells_decide_the_check_floor(self) -> None:
+        # 트래커 Phase 6F 보류 문 인터뷰 질문 1 A · 2 A — 이 실행의 통과선은 사람 칸 둘이 정합니다:
+        # 그대로면 0.7, 둘을 비우면 다시 셈 0.87. 다음 다시 반영이 새 결과를 커밋하면 이 잠금을 걷고
+        # 알려진 한계의 6F 사례를 옮겨 적습니다
+        self.assertEqual(self.result["run_at"], AFTER_FIX_RUN_AT)
+        self.assertEqual(
+            [
+                (video["video_id"], draft["attempt"], draft["human"])
+                for video in self.result["videos"]
+                for draft in video["drafts"]
+                if draft["parsed"] is True and draft["human"] in ANSWERS
+            ],
+            [("om-TAoBO0Rc", 1, "ok"), ("nPMEi5NDSnU", 2, "ok")],
+        )
+        self.assertEqual(check_floor(self.result), 0.7)
+        self.assertEqual(load_config(REPO_CONFIG).comment.check_min_probability, 0.7)
+        self.assertEqual(check_floor(without_human_cells(self.result)), 0.87)
+
+    def test_limit_record_is_in_contract(self) -> None:
+        for phrase in (
+            *limit_lines(self.result),
+            f"올림은 막을 초안의 가장 낮은 비교 점수 + {live_check.MARGIN} 이고 그 초안이 나쁨을 받은"
+            " 질문과 상관없습니다",
+            "6D 에서 한 번(나쁨은 '고민 이음' · 그 질문의 jev 점수 0.90 · 올림은 '장면' 0.71 → 0.76)",
+            "실행 뒤 사람이 두 초안을 원문 · 재료와 함께 읽고 `ok` 로 적은 값입니다(커밋 `36ded73`)",
         ):
             with self.subTest(phrase=phrase):
                 self.assert_in_contract(phrase)
