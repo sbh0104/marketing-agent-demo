@@ -1460,6 +1460,21 @@ class RecountTest(unittest.TestCase):
                 changed["videos"][index]["skip_human"] = value
                 self.assertEqual(skip_lines(changed) != skip_lines(result), moves)
 
+    def test_no_concern_gate_counts_videos_without_drafts(self) -> None:
+        # 전후 줄의 거름 수 — 재료에 연애 고민 없음으로 초안 없이 건너뛴 영상만(정해진 칸 skip_kind · parsed)
+        fake = self.fake()
+        fake["videos"] = [
+            {"window": window, "result": "skip", "skip_kind": kind, "drafts": drafts}
+            for window, kind, drafts in (
+                ("operation", "no_concern", []),
+                ("operation", "no_concern", [{"parsed": True}]),
+                ("operation", "No_concern", []),
+                ("operation", "no_scene", []),
+                ("widened", "no_concern", [{"parsed": False}]),
+            )
+        ]
+        self.assertEqual([_gated(fake, window) for window in WINDOW_LABELS], ["1", "1"])
+
 
 FIVE_SCORE_NAMES = (*SCORE_NAMES, "concern_is_love_worry", "saju_story_fits")
 
@@ -1850,6 +1865,16 @@ class WriterRecordTest(ContractCase):
             *skip_lines(self.result),
             "빈 사람 칸은 동의가 아닙니다",
             "이 숫자는 기록이고, 판정 줄과 통과선은 이 숫자로 움직이지 않습니다",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assert_in_contract(phrase)
+
+    def test_before_after_record_is_in_contract(self) -> None:
+        for phrase in (
+            *before_after_lines(self.result),
+            *before_after_notes(self.result),
+            f"6E 전(Phase 6D 의 실행 `{BEFORE_FIX_RUN_AT}`, 6D 가 이 절에 적은 기록)"
+            f" → 6E 뒤(이번 실행 `{self.result['run_at']}`)",
         ):
             with self.subTest(phrase=phrase):
                 self.assert_in_contract(phrase)
