@@ -895,3 +895,48 @@ other line is required on every item.
 - status: resolved
 - attempts: 0 · last failure: —
 - first seen: 2026-10-15 · last seen: 2026-10-15
+
+### S-NEW-1 — 문장 틀 검사의 '연애사주' 빼기 경계(앞 끝 · 뒤 끝)를 테스트로 고정
+- source: cycle 20261015-091934-adw/phase-6e-comment-quality-fix · tracker plans/interview-marketing-agent.md#phase-6e · deferred by ship-check
+- evidence: src/agent/writer.py:212 — `covered.update(range(found, found + len(word)))` 의 뒤 끝을 한 글자 당긴 변이(`found + len(word) - 1`)와 앞 끝을 한 글자 미룬 변이(`found + 1`)가 둘 다 스위트 744 개 초록(ship-check 변이 점검, git archive 스크래치 사본 · 감사 5 F1). 뒤 끝 변이에서 "저도 예전에 연애사주를 봤을 때 서로 맞는다고 했어요" / "그때 친구랑 연애사주를 봤을 때 서운했던 마음이 풀렸어요" 가 `주를봤을때서` 로 걸리고, 앞 끝 변이에서 "오늘 정말 설레는연애사주 이야기" / "어제 정말 설레는연애사주 덕분" 이 `정말설레는연` 으로 걸림 — 지금 코드는 두 쌍 모두 None. 계약 L964 "'연애사주'에 걸친 조각은 문장 틀로 세지 않습니다" 의 짝 test_required_word_pieces_are_not_frames 가 두 끝을 재지 않음
+- direction: tests/test_writer.py 의 CheckTest.test_required_word_pieces_are_not_frames 에 위 두 쌍(낱말 + 뒤 다섯 글자 공유 · 앞 다섯 글자 + 낱말 공유)이 양쪽 방향 모두 shared_frame None 인 행을 더한다 — 코드 변경 없음
+- touches: tests/test_writer.py
+- status: open
+- attempts: 0 · last failure: —
+- first seen: 2026-10-15 · last seen: 2026-10-15
+
+### S-NEW-2 — 실행기 결과의 빈 사람 칸 `skip_human` 을 테스트로 고정
+- source: cycle 20261015-091934-adw/phase-6e-comment-quality-fix · tracker plans/interview-marketing-agent.md#phase-6e · deferred by ship-check
+- evidence: tests/live_check.py:1426 — `"skip_human": ""` 를 `"skip_human": "정당"` 으로 바꾼 변이가 스위트 744 개 초록(ship-check 변이 점검 · 감사 1 B1). 형제 칸 `topic_human` 의 같은 변이는 test_every_classified_video_is_topic_graded_once 가 잡음. test_new_video_cells_hold_no_outside_text 는 SKIP_CELLS[:4] 만 봄. 트래커 6E 질문 3 A "빈 사람 칸을 함께 둔다(사람 칸이 있으면 그것이 정답)"
+- direction: tests/test_live_check.py 의 SelfSkipRecordTest(예: test_skip_grade_records_true_false_error)에서 결과 파일의 모든 영상이 `skip_human == ""` 인지 단언한다 — 코드 변경 없음
+- touches: tests/test_live_check.py
+- status: open
+- attempts: 0 · last failure: —
+- first seen: 2026-10-15 · last seen: 2026-10-15
+
+### S-NEW-3 — 대조표 짝 테스트 칸이 `tests/test_*.py::test_*` 모양만 받게
+- source: cycle 20261015-091934-adw/phase-6e-comment-quality-fix · tracker plans/interview-marketing-agent.md#phase-6e · deferred by ship-check
+- evidence: tests/test_task_table.py:102-117 `_test_exists` — 그 파일 안의 아무 함수면 받음: ④-4 짝 테스트를 `src/agent/writer.py::write_comment` · `tests/test_writer.py::reply`(도우미) · `tests/test_task_table.py::table_problems` 로 바꿔도 table_problems 가 [](ship-check 재현 · 감사 3 B2). 트래커 6E 질문 1 A "짝 테스트가 테스트 파일에 실제로 있는지 본다" → 빨강 표본(헌법 12조), 계획 결정 7 "pair tests `tests/<file>.py::<test>`", 계약 docs/contracts.md:1025-1026. 지금 표의 짝 테스트 이름 19 개는 모두 `tests/test_[a-z0-9_]+\.py::test_[A-Za-z0-9_]+` 모양(ship-check 확인)
+- direction: `_test_exists` 가 경로 `tests/test_*.py` 와 `test_` 로 시작하는 함수 이름을 요구하게 하고, TaskTableTest 에 위 세 모양이 빨강인 표본을 더한다 — 지금 표는 그대로 초록
+- touches: tests/test_task_table.py
+- status: open
+- attempts: 0 · last failure: —
+- first seen: 2026-10-15 · last seen: 2026-10-15
+
+### S-NEW-4 — 계약 L1021(프롬프트 원문은 writer.py 맨 위에만)의 짝을 스위트 테스트로 옮기기
+- source: cycle 20261015-091934-adw/phase-6e-comment-quality-fix · tracker plans/interview-marketing-agent.md#phase-6e · deferred by ship-check
+- evidence: docs/contracts.md:1021 — 이 diff 가 고친 '에만' 약속 줄인데 계획 `## Test plan` 에 짝이 없고(.adw/plan.md:796-813), verify-plan 이 `.adw/verify.sh` V16 으로만 잼(.adw/verify-plan.md:214 `Promise: L1021 — V16`). 헌법 9조 plan 줄 "The test lives in the suite, never only in `.adw/verify.sh`" (감사 1 B2). V16 은 지금 초록: `prompt originals: 6 names before the first def/class (line 124) · … copies elsewhere 0 · copies inside writer bodies 0 · problems 0`
+- direction: tests/test_writer.py 에 V16 과 같은 판정 — `SYSTEM_PROMPT` · `USER_INSTRUCTION` · `REWRITE_PROMPT` · `WRITE_TOOL` · `CHECK_QUESTIONS` · `CHECK_LABELS` 가 첫 def/class 앞에서 한 번씩 정해지고, 다른 `src/` 모듈과 writer 함수 본문에 그 15글자 이상 줄 · 질문의 복사본이 없음 — 을 하는 스위트 테스트를 더한다 — 코드 변경 없음
+- touches: tests/test_writer.py
+- status: open
+- attempts: 0 · last failure: —
+- first seen: 2026-10-15 · last seen: 2026-10-15
+
+### S-NEW-5 — 낡은 docstring 두 곳: 작성 테스트 머리말의 코드 검사 목록 · `_VideoRound` 의 영상 한 바퀴 단계
+- source: cycle 20261015-091934-adw/phase-6e-comment-quality-fix · tracker plans/interview-marketing-agent.md#phase-6e · deferred by ship-check
+- evidence: tests/test_writer.py:1 "코드 검사(글자 수 · 링크 · 반복)" — 6E 가 넷째 검사 문장 틀(`shared_frame`)을 더함(.adw/verify-plan.md § Out of scope RISK · 감사 3 N9); tests/live_check.py:1288 `_VideoRound` docstring 의 단계 목록("… 댓글 작성 → 초안마다 채점")에 스스로 건너뛴 영상의 재료 채점(`_grade_skip`) 이 없음(감사 3 N12)
+- direction: 두 docstring 에 '문장 틀' 과 '스스로 건너뛴 영상은 재료 채점 한 번' 을 더한다 — 동작 변경 없음
+- touches: tests/test_writer.py, tests/live_check.py
+- status: open
+- attempts: 0 · last failure: —
+- first seen: 2026-10-15 · last seen: 2026-10-15
