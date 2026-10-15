@@ -1681,8 +1681,8 @@ PYTHONPATH=src python3 -m agent.run [--dry-run] [--once]
 - **실패.** 로그를 읽지 못하면(`OSError` · `ValueError`) `ERROR where=report reason=<예외 종류>: <메시지>` 한 줄을 쓰고, 이유 배지를 모두
   "로그를 읽지 못함" 으로, 리허설 · 판단한 쪽을 비운 채 저장소 칸으로 화면을 씁니다. 화면을 만들거나 쓰다 난 그 밖의 `Exception` 도
   `ERROR where=report` 한 줄로 남기고 사이클은 그대로 끝납니다. `KeyboardInterrupt` 같은 `BaseException` 은 그대로 올라갑니다.
-- **음성 대조.** `python3 -m tests.mutants <이름>` — `report-late-filter-off` · `report-raw-reason` · `report-unescaped` ·
-  `report-prefix-anywhere` · `run-report-fence-narrow` · `run-report-log-degrade-silent`.
+- **음성 대조.** `python3 -m tests.mutants <이름>` — `report-late-filter-off` · `report-floor-trigger-off` · `report-floor-hold-counts-trigger` ·
+  `report-raw-reason` · `report-unescaped` · `report-prefix-anywhere` · `run-report-fence-narrow` · `run-report-log-degrade-silent`.
 
 ## 공개용 사본 — `tests/public_copy.py` (Phase 8)
 
