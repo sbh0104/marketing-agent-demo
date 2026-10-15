@@ -97,12 +97,13 @@ def _rule_exists(number: str) -> bool:
 
 
 _FUNCTIONS: dict[Path, set[str]] = {}
+TEST_PATH_RE = re.compile(r"tests/test_[a-z0-9_]+\.py")
 
 
 def _test_exists(pair: str) -> bool:
-    """`<경로>::<함수>` — 저장소 뿌리에서 그 파일이 있고 그 이름의 함수 정의가 있는지."""
+    """`tests/test_*.py::test_*` — 저장소 뿌리에서 그 파일이 있고 그 이름의 함수 정의가 있는지."""
     path_text, sep, name = pair.partition("::")
-    if not sep or not path_text or not name:
+    if not sep or not TEST_PATH_RE.fullmatch(path_text) or not name.startswith("test_"):
         return False
     path = ROOT / path_text
     if not path.is_file():
@@ -208,6 +209,16 @@ class TaskTableTest(unittest.TestCase):
         for odd in (
             "tests/test_writer.py::test_Length_bounds_come_from_config",
             "test_writer.py::test_length_bounds_come_from_config",
+        ):
+            with self.subTest(pair=odd):
+                self.assert_red(self.edited("④-4", "짝 테스트", f"`{odd}`"), "④-4 짝 테스트")
+
+    def test_pair_outside_test_shape_is_red(self) -> None:
+        # 있는 함수라도 `tests/test_*.py::test_*` 모양이 아니면 짝 테스트가 아닙니다
+        for odd in (
+            "src/agent/writer.py::write_comment",
+            "tests/test_writer.py::reply",
+            "tests/test_task_table.py::table_problems",
         ):
             with self.subTest(pair=odd):
                 self.assert_red(self.edited("④-4", "짝 테스트", f"`{odd}`"), "④-4 짝 테스트")
