@@ -1000,6 +1000,6 @@ other line is required on every item.
 - evidence: docs/contracts.md:140 "그동안 게시는 명단 영상까지 모두 크롬 없이 테스트 저장(`reason=config_rejected`)" — 명단 밖 영상은 `not_in_allowlist` 로 저장됨(src/agent/run.py:461, tests/test_run.py::TestConfigRejected::test_rejected_out_of_list_keeps_guard_reason). 같은 계약 '실행 진입점 — run.py (Phase 7)' 절의 '설정 거절' 줄은 정확함
 - direction: 괄호를 "(명단 영상은 `reason=config_rejected`, 명단 밖 영상은 가드의 이유)" 처럼 좁힌다 — Promise 짝 줄의 머리 "하지 않습니다 — 그동안 게시는 명단 영상까지" 와 짝 테스트는 그대로, 코드 변경 없음
 - touches: docs/contracts.md
-- status: open
+- status: resolved
 - attempts: 0 · last failure: —
 - first seen: 2026-10-15 · last seen: 2026-10-15
