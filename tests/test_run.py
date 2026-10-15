@@ -222,12 +222,15 @@ class FakeSession:
 
     def close(self) -> None:
         self.closes += 1
+        if self._chrome.close_error is not None:
+            raise self._chrome.close_error
 
 
 class FakeChrome:
     """Services.chrome 자리 — 받은 debug_url 과 만든 세션, 눌린 submit 을 적습니다.
 
     unreachable 이 n 이면 처음 n 번의 new_page 가 chrome_unreachable 로 멈춥니다.
+    close_error 가 있으면 세션의 close 가 (센 뒤) 그 예외를 냅니다.
     """
 
     def __init__(self) -> None:
@@ -235,6 +238,7 @@ class FakeChrome:
         self.submits: list[str] = []
         self.typed: list[str] = []
         self.unreachable = 0
+        self.close_error: BaseException | None = None
 
     def __call__(self, debug_url: str) -> FakeSession:
         session = FakeSession(self, debug_url)
@@ -736,6 +740,24 @@ class TestChrome(TwoListedCase):
         self.assertEqual([session.closes for session in self.chrome.sessions], [1, 1])
         self.assertEqual([fields["where"] for fields in self.fenced()], ["run.post"])
         self.assertEqual(self.posted_live(), [B])
+
+    def test_close_failure_keeps_successful_post(self) -> None:
+        self.chrome.close_error = RuntimeError("playwright 가 이미 멈췄습니다")
+        self.cycle(self.pipeline())
+        self.assertEqual(self.posted_live(), [A, B])
+        self.assertEqual([session.closes for session in self.chrome.sessions], [1, 1])
+        self.assertEqual(self.lines(Event.ERROR), [])
+        self.assertEqual(self.cycle_errors(), ["0"])
+
+    def test_close_failure_never_replaces_keyboard_interrupt(self) -> None:
+        self.chrome.close_error = RuntimeError("playwright 가 이미 멈췄습니다")
+        pipeline = self.pipeline()
+        with self.patch_stage("post_video", KeyboardInterrupt()):
+            with self.assertRaises(KeyboardInterrupt):
+                pipeline.cycle(self.load())
+        self.assertEqual([session.closes for session in self.chrome.sessions], [1])
+        self.assertEqual(self.lines(Event.ERROR), [])
+        self.assertEqual(self.lines(Event.CYCLE), [])
 
     def test_chrome_unreachable_stops_only_that_post(self) -> None:
         self.chrome.unreachable = 1

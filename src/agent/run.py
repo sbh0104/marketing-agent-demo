@@ -446,7 +446,10 @@ class Pipeline:
                 repo_root=self._repo_root,
             )
         finally:
-            session.close()
+            try:
+                session.close()
+            except Exception:  # 연결 끊기가 터져도 게시 자신의 결과 · Ctrl-C 가 이깁니다
+                pass
 
     def _save_rejected(self, record: VideoRecord, config: Config, allowed: frozenset[str]) -> None:
         """설정이 거절된 동안의 게시 — post_video 없이 계약 6절 1 · 2 · 4 를 크롬 없이 따라 테스트 저장.
