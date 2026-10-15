@@ -853,3 +853,11 @@
 - source: adw/phase-6g-live-check-redact
 - tag: sensitive: tracker decision · confirmed 2026-10-15
 - status: confirmed
+
+### H-104 — 다음 진짜 `tests.live_check` 실행에서 Sonnet 5.5 가 `auto` 에서도 `submit_comment` 도구로 답하는지, 되돌려 붙인 생각 블록을 받는지 확인(작성 오류 400 없음 · 초안 > 0 · 글로만 답해 다시 쓰기로 간 횟수)
+- project: marketing-agent-demo
+- when: 2026-10-15 · adw/smoke-sweep-s093
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/smoke-sweep-s093
+- tag: plain
+- status: open
