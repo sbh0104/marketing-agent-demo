@@ -888,9 +888,12 @@ watcher = Watcher(Store(Path("data/videos.json")), logbook, client, clock)
 **API 오류**
 
 - HTTP 200 이 아니면 `ERROR where=<호출> reason="HTTP <상태> <Google reason>"` 입니다(예:
-  `ERROR where=search.list reason="HTTP 403 quotaExceeded"`). 네트워크 오류는
-  `reason="network <종류>: …"`, 본문이 JSON 객체가 아니면 `reason="HTTP 200 invalid JSON"`.
-  검색 오류에는 `keyword` 가 붙습니다.
+  `ERROR where=search.list reason="HTTP 403 quotaExceeded"`). 리다이렉트(301 · 302 · 303 · 307 ·
+  308)도 따라가지 않고 그 상태로 같은 모양이며(본문에 Google reason 이 없으면 `reason="HTTP 302"`),
+  오류 상태의 본문을 읽다 실패하면 Google reason 없이 `reason="HTTP <상태>"` 입니다. 요청이 예외로
+  끝나면 — 연결 · 읽기 실패, 깨진 응답 틀, 요청 전체 30초 상한(`TimeoutError`) 등 무엇이든 —
+  `reason="network <종류>: …"`, 본문이 JSON 객체가 아니면 `reason="HTTP 200 invalid JSON"`. 검색
+  오류에는 `keyword` 가 붙습니다.
 - 오류가 난 단계는 멈춥니다 — 검색 오류면 남은 검색을 그만두고 추적으로 넘어가고, 조회수 오류면
   추적을 그만둡니다.
 - 오류 글 속 API 키는 `<YOUTUBE_API_KEY>` 로 가리고, 원래 예외(키가 든 URL)는 덧붙이지 않습니다.

@@ -366,6 +366,48 @@ MUTANTS: dict[str, tuple[str, str, str, str]] = {
         "except Exception as exc:",
         "except (OSError, http.client.HTTPException) as exc:",
     ),
+    "youtube-follows-redirects": (
+        "agent.youtube",
+        "tests.test_youtube",
+        "urllib.request.HTTPErrorProcessor(),",
+        "urllib.request.HTTPErrorProcessor(),\n        urllib.request.HTTPRedirectHandler(),",
+    ),
+    "youtube-no-request-cap": (
+        "agent.youtube",
+        "tests.test_youtube",
+        "if not done.wait(timeout):",
+        "if not done.wait():",
+    ),
+    "youtube-open-without-read-timeout": (
+        "agent.youtube",
+        "tests.test_youtube",
+        "open(request, timeout=timeout)",
+        "open(request)",
+    ),
+    "youtube-error-body-failure-raises": (
+        "agent.youtube",
+        "tests.test_youtube",
+        'return exc.code, b""',
+        "raise",
+    ),
+    "youtube-error-left-open": (
+        "agent.youtube",
+        "tests.test_youtube",
+        "exc.close()",
+        "pass",
+    ),
+    "youtube-opener-without-https": (
+        "agent.youtube",
+        "tests.test_youtube",
+        "urllib.request.HTTPSHandler(context=_TLS_CONTEXT),",
+        "",
+    ),
+    "youtube-opener-without-proxy": (
+        "agent.youtube",
+        "tests.test_youtube",
+        "urllib.request.ProxyHandler(),",
+        "",
+    ),
     "watcher-silent-hold": (
         "agent.watcher",
         "tests.test_watcher",
