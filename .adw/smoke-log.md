@@ -940,3 +940,57 @@ other line is required on every item.
 - status: resolved
 - attempts: 0 · last failure: —
 - first seen: 2026-10-15 · last seen: 2026-10-15
+
+### S-NEW-1 — 게시 단계의 크롬 연결 끊기(`session.close()`)가 터져도 게시 자신의 결과 · Ctrl-C 가 이기게
+- source: cycle 20261015-154340-adw/phase-7-pipeline-rules · tracker plans/interview-marketing-agent.md#phase-7 · deferred by ship-check
+- evidence: src/agent/run.py:436-449 (Pipeline › _post) — `finally: session.close()` 를 감싸지 않음, 실제 `ChromeSession.close()` 는 `playwright.stop()` 을 그대로 부름(src/agent/chrome.py:290-296). ship-check 재현: post_video 가 KeyboardInterrupt 를 내고 close() 가 RuntimeError 를 내면 `C2 KeyboardInterrupt REPLACED by RuntimeError` — 울타리(`except Exception`)가 받아 `ERROR where=run.post` 로 남기고 에이전트가 계속 돎(계약 docs/contracts.md:1501 "BaseException 은 그대로 올라가 STOP reason=interrupted(종료 코드 130)" 와 어긋남). 성공한 게시도 close() 가 터지면 ERROR 한 줄 · CYCLE errors 1. poster.py 의 `_close_quietly`(poster.py:329-335)는 같은 경우를 이미 삼킴. 진입 기준: 정리 호출만 감쌈 — 가드 · `decide_post` · `live` · 탭 함수 고르기(`if record.video_id not in allowed:`)는 건드리지 않음
+- direction: `finally:` 안의 `session.close()` 를 poster `_close_quietly` 와 같은 꼴(`try: … except Exception: pass`)로 감싸고, tests/test_run.py 에 두 테스트 — close() 가 터져도 성공한 게시는 ERROR 없이 posted · `CYCLE errors=0`, post_video 의 KeyboardInterrupt 는 close() 가 터져도 그대로 올라감 — 를 더한다
+- touches: src/agent/run.py, tests/test_run.py
+- status: open
+- attempts: 0 · last failure: —
+- first seen: 2026-10-15 · last seen: 2026-10-15
+
+### S-NEW-2 — 시작 때 저장소 · 쿼터 장부 파일을 못 읽으면(OSError) 계약대로 종료 코드 2 와 `ERROR where=store`
+- source: cycle 20261015-154340-adw/phase-7-pipeline-rules · tracker plans/interview-marketing-agent.md#phase-7 · deferred by ship-check
+- evidence: src/agent/run.py:492-496 `except StoreError` · :551 `except (EnvError, QuotaError, ImportError, ValueError)` — `Store._load`(store.py:57)와 `QuotaLedger._load`(youtube.py:153)는 디코드 오류만 감싸, 권한 거부 · 폴더 같은 OSError 가 빠져나감. ship-check 재현(`data/videos.json` 이 폴더): `C1 run_agent ESCAPED IsADirectoryError | log exists: False` — traceback · 종료 코드 1 · 로그 없음. 계약 docs/contracts.md:1464 "SDK · 비밀 값 · 쿼터 장부 · 설정 · 저장소를 쓸 수 없으면 종료 코드 2 … 저장소는 ERROR where=store 도 남김". 짝 테스트가 test_missing_sdk_exits_2 하나뿐이라 감사 변이(`except StoreError` → `except ZeroDivisionError`, main 튜플에서 QuotaError · ValueError 빼기)가 모두 스위트를 통과함
+- direction: run_agent 의 저장소 열기를 `except (StoreError, OSError)` 로, main 의 connect_real 감싸기 튜플에 `OSError` 를 더하고, tests/test_run.py 에 깨진 저장소(StoreError) · 못 읽는 저장소(OSError) · 믿을 수 없는 쿼터 장부(QuotaError) · 못 읽는 쿼터 장부(OSError) → 종료 코드 2, traceback 없음(저장소는 `ERROR where=store` 한 줄) 테스트를 더한다
+- touches: src/agent/run.py, tests/test_run.py
+- status: open
+- attempts: 0 · last failure: —
+- first seen: 2026-10-15 · last seen: 2026-10-15
+
+### S-NEW-3 — 표본 하나 · 보류가 `too_old` 보다 먼저라는 차례를 다시 지키기(test_single_sample_holds_even_when_other_conditions_fail)
+- source: cycle 20261015-154340-adw/phase-7-pipeline-rules · tracker plans/interview-marketing-agent.md#phase-7 · deferred by ship-check
+- evidence: tests/test_trigger.py:58-60 — 2단계가 `published_at=T0 + 20 * H` 로 고쳐, 판정 시각 `20 * H` 에서 나이 0 이 되어 too_old 가 더는 함께 걸리지 않음. ship-check 재현: judge_trigger 의 `if pair is None:` 앞에 `if pair is None and <나이> > max_age_hours: return too_old` 를 심으면 HEAD 스위트 `Ran 821 tests … OK (skipped=3)`, 기준 eb65fc2 의 같은 테스트는 FAILED. 트래커 Phase 7 질문 5 A "판정 차례는 그대로"
+- direction: 나이 0 표본은 두고 판정 시각만 12시간 넘게 뒤로 — 예: `video((2 * H, 6000), published_at=T0 + 2 * H)` 를 `20 * H` 에 판정해 `("hold", "too_few_samples")`(감사가 HEAD 초록 · 위 변이 빨강을 확인) — 코드 변경 없음
+- touches: tests/test_trigger.py
+- status: open
+- attempts: 0 · last failure: —
+- first seen: 2026-10-15 · last seen: 2026-10-15
+
+### S-NEW-4 — 운영의 자체 검사 연결(`jev_self_check(services.ask, …)`)을 스위트 테스트로 잠그기
+- source: cycle 20261015-154340-adw/phase-7-pipeline-rules · tracker plans/interview-marketing-agent.md#phase-7 · deferred by ship-check
+- evidence: src/agent/run.py:266 `check = jev_self_check(self._services.ask, config.classifier.model)` — 트래커 Phase 7 진입점 ⑤ "자체 검사 jev 어댑터를 src/ 로 옮겨 운영이 부름". ship-check 재현: 이 줄을 늘 통과하는 람다(`{n: 0.1 if n == "reads_like_ad" else 0.9}`)로 바꿔도 `Ran 821 tests … OK (skipped=3)` — 게시 전 품질 검사가 운영에서 빠져도 스위트가 모름. tests/test_run.py 의 FakeJevAsk 는 `("check", id)` 호출을 적지만 어떤 테스트도 보지 않음
+- direction: tests/test_run.py 에 — 가짜 jev 가 자체 검사에서 reads_like_ad 를 높게 답하면 그 영상은 작성기의 `SKIP` 으로 끝나 `record.comment` 가 생기지 않고 게시가 없음 · 쓴 영상마다 jev 에 `("check", <ID>)` 호출이 감 — 을 보는 테스트를 더한다 — 코드 변경 없음
+- touches: tests/test_run.py
+- status: open
+- attempts: 0 · last failure: —
+- first seen: 2026-10-15 · last seen: 2026-10-15
+
+### S-NEW-5 — run.py 의 덜 잠긴 줄 셋을 테스트로: 울타리 뒤 판별 저장 · 이유 200자와 공백 접기 · main 의 echo 연결
+- source: cycle 20261015-154340-adw/phase-7-pipeline-rules · tracker plans/interview-marketing-agent.md#phase-7 · deferred by ship-check
+- evidence: (a) src/agent/run.py:331 `_classify` 의 `self._store.put(record)` 를 지워도 스위트 OK — 타이밍 단계가 터지면 판별이 저장되지 않아 다음 주기에 jev 를 다시 부름(계약 "yes · no · 판정 보류는 저장하고 다시 묻지 않습니다"); (b) :137 `[:REASON_MAX]` 와 공백 접기를 지워도 스위트 OK(계약 docs/contracts.md:1500 "메시지 200자까지"); (c) :559 `echo=echo_stream(sys.stdout)` 을 `sys.stdout` 이나 `None` 으로 바꿔도 스위트 OK — 실제 프로세스 검사 `.adw/verify.sh` V9 (d) 만 잡음(헌법 9: 시험은 스위트에)
+- direction: tests/test_run.py 에 — 타이밍 단계가 영상 A 에서 터진 뒤 다음 주기에 A 의 판별을 다시 묻지 않음(jev 분류 호출 1번, 저장된 classification 있음) · 250자 · 줄바꿈 섞인 메시지의 울타리 이유가 `<종류>: ` + 200자 한 줄 · main 이 run_agent 에 넘기는 echo 가 `errors="backslashreplace"` 스트림 — 세 테스트를 더한다 — 코드 변경 없음
+- touches: tests/test_run.py
+- status: open
+- attempts: 0 · last failure: —
+- first seen: 2026-10-15 · last seen: 2026-10-15
+
+### S-NEW-6 — 계약 2절의 설정 거절 문장을 코드대로 좁히기(명단 밖 영상은 가드의 이유 그대로)
+- source: cycle 20261015-154340-adw/phase-7-pipeline-rules · tracker plans/interview-marketing-agent.md#phase-7 · deferred by ship-check
+- evidence: docs/contracts.md:140 "그동안 게시는 명단 영상까지 모두 크롬 없이 테스트 저장(`reason=config_rejected`)" — 명단 밖 영상은 `not_in_allowlist` 로 저장됨(src/agent/run.py:461, tests/test_run.py::TestConfigRejected::test_rejected_out_of_list_keeps_guard_reason). 같은 계약 '실행 진입점 — run.py (Phase 7)' 절의 '설정 거절' 줄은 정확함
+- direction: 괄호를 "(명단 영상은 `reason=config_rejected`, 명단 밖 영상은 가드의 이유)" 처럼 좁힌다 — Promise 짝 줄의 머리 "하지 않습니다 — 그동안 게시는 명단 영상까지" 와 짝 테스트는 그대로, 코드 변경 없음
+- touches: docs/contracts.md
+- status: open
+- attempts: 0 · last failure: —
+- first seen: 2026-10-15 · last seen: 2026-10-15
