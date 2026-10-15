@@ -92,10 +92,12 @@ def line(at: datetime, event: Event, **fields: object) -> LogLine:
     return parse_line(format_line(at, event, fields))
 
 
-def rehearsal(at: datetime, video_id: str = A, **extra: object) -> LogLine:
+def rehearsal(
+    at: datetime, video_id: str = A, *, reason: str = DRY_RUN, **extra: object
+) -> LogLine:
     """poster 의 리허설 줄 모양 — POST mode=test result=rehearsed."""
     return line(
-        at, Event.POST, video=video_id, mode="test", result="rehearsed", reason=DRY_RUN, **extra
+        at, Event.POST, video=video_id, mode="test", result="rehearsed", reason=reason, **extra
     )
 
 
@@ -165,6 +167,24 @@ class TestLabels(unittest.TestCase):
                 self.assertEqual(reason_label(code), label)
         # 트래커 결정 1 의 문장 그대로
         self.assertEqual(reason_label("not_in_allowlist"), "허용 목록 밖이라 게시하지 않음")
+
+    def test_display_texts_are_literal(self) -> None:
+        # 계약의 글자 그대로 — 상수끼리 견주면 상수가 바뀌어도 초록이라 글자를 적어 둡니다
+        cases = (
+            (NO_POST, "게시 기록 없음"),
+            (NO_DRAFT, "댓글 안 씀"),
+            (OTHER, "기타 — 로그 참고"),
+            (RESERVED, "게시 결과 모름 — 로그 참고"),
+            (FAILED, "게시 실패 — 로그 참고"),
+            (NOT_JUDGED, "아직 판별 안 함"),
+            (NOT_TIMED, "아직 안 봄"),
+            (REHEARSED, "리허설 — 게시 버튼 앞에서 멈춤"),
+            (POSTED, "게시됨"),
+            (LOG_UNREADABLE, "로그를 읽지 못함"),
+        )
+        for text, letters in cases:
+            with self.subTest(letters=letters):
+                self.assertEqual(text, letters)
 
     def test_producer_constants_are_listed(self) -> None:
         prefixes = [prefix for prefix, _ in REASON_PREFIXES]
@@ -514,14 +534,14 @@ class TestRender(unittest.TestCase):
         )
 
     def test_one_physical_line_per_row(self) -> None:
-        text = "첫 줄\n둘째 줄 셋째 줄"
+        text = "첫 줄\n둘째 줄\u2028셋째 줄"
         commented = record(A, comment=CommentDraft("고민", text, T))
         page = render_report([commented], [], generated_at=T)
         lines = page.split("\n")
         (shown,) = [text for text in lines if text.startswith('<tr id="v-')]
         self.assertTrue(shown.endswith("</tr>"))
         self.assertEqual(cells(shown)[5], "첫 줄<br>둘째 줄<br>셋째 줄")
-        self.assertNotIn(" ", page)
+        self.assertNotIn("\u2028", page)
         self.assertEqual(page.splitlines(), lines[:-1])
 
 
@@ -590,6 +610,7 @@ def marked_scene() -> tuple[list[VideoRecord], list[LogLine], list[str], list[st
         rehearsal(
             at + S,
             third,
+            reason=m("rehearsal-reason"),
             screenshot=m("rehearsal-shot"),
             detail=m("rehearsal-detail"),
             page_url=m("rehearsal-page-url"),
