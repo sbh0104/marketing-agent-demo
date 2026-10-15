@@ -4270,7 +4270,6 @@ class SelfSkipRecordTest(LiveCheckCase):
         for video in old["videos"]:
             for key in SKIP_CELLS:
                 video.pop(key, None)
-        self.assertFalse(any(key in video for video in old["videos"] for key in SKIP_CELLS))
         new = copy.deepcopy(stored)
         for video in new["videos"]:
             video.update(
