@@ -1237,3 +1237,11 @@
 - source: adw/phase-7a-watcher-network-fixes
 - tag: plain
 - status: open
+
+### H-152 — S-114–S-117 이 이번 스윕이 닫는 S-110–S-113 과 같은 일인지(이미 착지한 Phase 7A 브랜치를 base 로 한 중복) 확인하고, 맞으면 `.adw/smoke-log.md` 에서 닫기
+- project: marketing-agent-demo
+- when: 2026-10-16 · adw/smoke-sweep-s110-s113
+- from: ship-report.md § Human checks — .adw/ship-report.md § Risks
+- source: adw/smoke-sweep-s110-s113
+- tag: plain
+- status: open
