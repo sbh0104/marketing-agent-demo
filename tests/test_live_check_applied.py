@@ -60,6 +60,7 @@ BEFORE_FIX_RUN_AT = "2026-10-14T14:09:02.882902+00:00"
 BEFORE_FIX_LINE = "6B: stop — 작성 막힘(SKIP 5/7)"
 WINDOW_LABELS = {"operation": "운영 창", "widened": "넓힌 창"}
 ANSWERS = ("ok", "bad")
+TASK_CELLS = ("concern_is_love_worry", "saju_story_fits")
 _NOW = datetime(2026, 1, 1, tzinfo=timezone.utc)
 
 
@@ -973,6 +974,7 @@ class RecountTest(unittest.TestCase):
         human: str = "",
         claude: str | None = "ok",
         passed: bool = True,
+        tasks: tuple[bool, bool] = (True, True),
     ) -> dict:
         result = load_result()
         found = next(
@@ -988,6 +990,8 @@ class RecountTest(unittest.TestCase):
             claude_grade=claude,
             grade_error=None if claude is not None else "응답 모양",
             self_check_pass=passed,
+            task_quality=dict(zip(TASK_CELLS, tasks)),
+            task_error=None,
         )
         return draft
 
@@ -1136,14 +1140,52 @@ class RecountTest(unittest.TestCase):
                 self.assertIn(phrase, line)
 
     def test_draft_answer_samples(self) -> None:
+        # 트래커 Phase 6F — 6D 드리프트 인터뷰 질문 3 A: 정답은 채점 다섯 칸(사람 칸이 있으면 그것)이고,
+        # 과제 칸은 참거짓 그대로만 읽습니다(결과 파일은 믿을 수 없는 입력 — 정해진 칸만)
+        def five(human: str, grade: object, **task: object) -> dict[str, object]:
+            cells = {"concern_is_love_worry": True, "saju_story_fits": True} | task
+            return {"human": human, "claude_grade": grade, "task_quality": cells}
+
         samples = (
             ({"human": "ok", "claude_grade": "bad"}, "ok"),
             ({"human": "bad", "claude_grade": "ok"}, "bad"),
             ({"human": "", "claude_grade": "bad"}, "bad"),
+            (five("", "ok"), "ok"),
+            (five("", "ok", concern_is_love_worry=False), "bad"),
+            (five("", "ok", saju_story_fits=False), "bad"),
+            ({"human": "", "claude_grade": "bad", "task_quality": None}, "bad"),
+            (five("ok", "bad", concern_is_love_worry=False, saju_story_fits=False), "ok"),
+            (five("", "OK"), None),
+            (five("", " ok"), None),
+            (five("", "ok", concern_is_love_worry="false"), None),
+            (five("", "ok", concern_is_love_worry=0), None),
+            (five("", "ok", saju_story_fits=1), None),
+            (
+                {
+                    "human": "",
+                    "claude_grade": "ok",
+                    "task_quality": {"concern_is_love_worry": True},
+                },
+                None,
+            ),
         )
         for draft, expected in samples:
             with self.subTest(draft=draft):
                 self.assertEqual(draft_answer(draft), expected)
+
+    def test_task_quality_moves_check_floor(self) -> None:
+        # 약속 "과제 품질 ⓐ · ⓑ 는 위 정답 다섯 칸에 들어 통과선을 움직입니다" — Claude 채점 ok 로 통과한
+        # 초안도 ⓐ 나 ⓑ 가 거짓이면 정답 bad 라 통과선을 올리고, 사람 칸이 있으면 그것이 이깁니다
+        cases = (
+            ((True, True), "", 0.7),
+            ((False, True), "", 0.85),
+            ((True, False), "", 0.85),
+            ((False, False), "ok", 0.7),
+        )
+        for tasks, human, expected in cases:
+            with self.subTest(tasks=tasks, human=human):
+                draft = self.draft((0.80, 0.1, 0.9), human=human, claude="ok", tasks=tasks)
+                self.assertEqual(check_floor(self.fake(drafts=(draft,))), expected)
 
     def test_lowered_recorded_floors_are_caught(self) -> None:
         on_topic = load_result()["fingerprint"]["classifier"]["on_topic_reasons"][0]
@@ -1361,6 +1403,7 @@ class DraftBoundaryTest(unittest.TestCase):
             "claude_grade": claude,
             "grade_error": None if claude is not None else "응답 모양",
             "self_check_pass": self_check,
+            "task_quality": {"concern_is_love_worry": True, "saju_story_fits": True},
         }
 
     @staticmethod
@@ -1402,6 +1445,8 @@ class DraftBoundaryTest(unittest.TestCase):
                 "human": 2,
                 "claude": 3,
                 "answered": 3,
+                "ok": 1,
+                "bad": 2,
                 "grade_errors": 1,
                 "differ": 2,
                 "bad_passed": 2,
@@ -1602,6 +1647,14 @@ class WriterRecordTest(ContractCase):
             "6B 규칙으로 다시 셈한 통과선과 config.yaml 이 다릅니다",
         )
         self.assert_in_contract(check_floor_line(self.result))
+
+    def test_answer_definition_is_in_contract(self) -> None:
+        for phrase in (
+            "정답은 사람 칸(`ok` · `bad`)이 있으면 그것, 없으면 Claude 채점 다섯 칸입니다",
+            "6D 의 기록은 세 칸(`claude_grade` 만) 정답이라 `ok` · `bad` 수의 정의가 이 기록과 다릅니다",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assert_in_contract(phrase)
 
     def test_todo_line_counts_come_from_the_result(self) -> None:
         line = todo_line(self.result)
