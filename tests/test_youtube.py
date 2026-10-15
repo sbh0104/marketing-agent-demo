@@ -839,13 +839,13 @@ class HttpGetTest(unittest.TestCase):
         self.assert_request(server)
 
     def assert_overrun(self, url: str) -> None:
-        """상한 1초 안에 TimeoutError("요청 전체가 1초 상한을 넘었습니다") 로 끝나는지 — 2.5초 안쪽."""
+        """상한 1초 안에 TimeoutError("요청 전체가 1초 상한을 넘었습니다") 로 끝나는지 — 1.8초 안쪽."""
         started = time.monotonic()
         with self.assertRaises(TimeoutError) as caught:
             http_get(url, 1.0)
         elapsed = time.monotonic() - started
         self.assertEqual(str(caught.exception), "요청 전체가 1초 상한을 넘었습니다")
-        self.assertLess(elapsed, 2.5)
+        self.assertLess(elapsed, 1.8)
 
     def test_redirect_is_returned_not_followed(self) -> None:
         # 트래커 7A ③(나) — 다섯 코드 모두 따라가지 않고 3xx 를 그대로 돌려줍니다

@@ -148,7 +148,7 @@ class WatcherNetworkTest(WatcherCase):
         started = time.monotonic()
         self.watcher().run(CONFIG, NOW)
         elapsed = time.monotonic() - started
-        self.assertLess(elapsed, 2.5)
+        self.assertLess(elapsed, 1.8)
         error = {
             "where": "search.list",
             "reason": "network TimeoutError: 요청 전체가 1초 상한을 넘었습니다",
