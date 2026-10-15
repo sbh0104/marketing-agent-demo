@@ -915,6 +915,29 @@ class MeasuredDriftTest(unittest.TestCase):
                 self.assertEqual(render(tampered), render(result))
         self.assertEqual(recount(tampered), recount(result))
 
+    def test_untrusted_cells_are_not_read(self) -> None:
+        # E-045 — 결과의 untrusted 글은 기록 셈에 들어가지 않습니다: 표식을 심고, 건너뜀 이유에는 반대 이유 이름을 심습니다
+        names = {kind: name for name, kind in live_check.SKIP_KIND_OF.items()}
+        swap = {"no_scene": "no_concern", "no_concern": "no_scene"}
+        tampered = copy.deepcopy(self.result)
+        for i, video in enumerate(tampered["videos"]):
+            if isinstance(video.get("untrusted"), Mapping):
+                video["untrusted"] = mark_text(video["untrusted"], f"videos[{i}].untrusted")
+            for n, draft in enumerate(video["drafts"]):
+                if isinstance(draft.get("untrusted"), Mapping):
+                    draft["untrusted"] = mark_text(
+                        draft["untrusted"], f"videos[{i}].drafts[{n}].untrusted"
+                    )
+        for video in tampered["videos"]:
+            if video["result"] == "skip" and isinstance(video.get("untrusted"), Mapping):
+                video["untrusted"]["skip_reason"] = (
+                    names[swap.get(video["skip_kind"], "no_scene")] + " — 1차: 표식"
+                )
+        for render in (skip_lines, draft_lines, task_lines, check_floor_line):
+            with self.subTest(render=render.__name__):
+                self.assertEqual(render(tampered), render(self.result))
+        self.assertEqual(recount(tampered), recount(self.result))
+
     def test_every_fingerprint_key_is_sorted(self) -> None:
         keys = (*GUARDED, *RECOUNTED, *WRITE_SIDE)
         top = {key.split(".")[0] for key in keys} | {"jev_models"}
@@ -1291,6 +1314,90 @@ class RecountTest(unittest.TestCase):
                 self.assertNotEqual(task_lines(changed), task_lines(result))
                 self.assertEqual(check_floor(changed), expected)
                 self.assertEqual(check_floor_line(changed), check_floor_line(result))
+
+    def test_skip_justified_samples(self) -> None:
+        # 트래커 Phase 6E 질문 2 A · 3 A — 정답은 사람 칸이 있으면 그것, 없으면 건너뜀 채점의 그 이유 칸이고,
+        # 정해진 칸(skip_kind · skip_human · skip_grade)을 글자 · 참거짓 그대로만 읽습니다
+        self.assertEqual(set(SKIP_GRADE_CELL), set(live_check.SELF_SKIP_KINDS))
+
+        def video(kind: str, human: str, grade: object) -> dict[str, object]:
+            return {"skip_kind": kind, "skip_human": human, "skip_grade": grade}
+
+        def grade(scene: object, love: object) -> dict[str, object]:
+            return {"material_has_scene": scene, "material_has_love_worry": love}
+
+        samples = (
+            (video("no_scene", "정당", grade(True, False)), True),
+            (video("no_scene", "부당", grade(False, True)), False),
+            (video("no_scene", "", grade(False, True)), True),
+            (video("no_concern", "", grade(False, True)), False),
+            (video("no_scene", "", None), None),
+            (video("no_scene", "정당 ", grade(True, False)), False),
+            (video("no_scene", " 정당", grade(True, False)), False),
+            (video("no_scene", "정당함", grade(True, False)), False),
+            (video("no_scene", "부당 ", grade(False, True)), True),
+            (video("no_scene", "", grade("false", False)), None),
+            (video("no_scene", "", grade(0, False)), None),
+            (video("no_scene", "", {"material_has_love_worry": False}), None),
+            (video("checks_failed", "정당", grade(False, False)), None),
+        )
+        for sample, expected in samples:
+            with self.subTest(video=sample):
+                self.assertEqual(skip_justified(sample), expected)
+        fake = self.fake()
+        both = {"material_has_scene": False, "material_has_love_worry": False}
+        fake["videos"] = [
+            {
+                "window": "operation",
+                "result": "skip",
+                "skip_human": "",
+                "skip_kind": kind,
+                "skip_grade": dict(both),
+            }
+            for kind in ("no_scene", "No_scene", "no-scene", "checks_failed")
+        ]
+        fake["videos"].append(
+            {"window": "operation", "result": "skip", "skip_human": "", "skip_grade": None}
+        )
+        self.assertEqual(
+            skip_lines(fake)[0],
+            "정당한 건너뜀 운영 창: 재료에 장면 없음 1/1 · 재료에 연애 고민 없음 0/0 · 정답 없음 0"
+            " · 검사 두 번 탈락 1",
+        )
+
+    def test_skip_cells_do_not_move_floor_or_verdict(self) -> None:
+        # 약속 "이 숫자는 기록이고, 판정 줄과 통과선은 이 숫자로 움직이지 않습니다"
+        result = load_result()
+        changed = copy.deepcopy(result)
+        swap = {"no_scene": "no_concern", "no_concern": "no_scene"}
+        for video in changed["videos"]:
+            if video["result"] != "skip":
+                continue
+            video.update(
+                skip_human="부당",
+                skip_grade={"material_has_love_worry": True, "material_has_scene": True},
+                skip_kind=swap.get(video["skip_kind"], video["skip_kind"]),
+            )
+        self.assertNotEqual(skip_lines(changed), skip_lines(result))
+        self.assertEqual(recount(changed), recount(result))
+        self.assertEqual(check_floor_line(changed), check_floor_line(result))
+        self.assertEqual(live_check.verdict_line(changed), live_check.verdict_line(result))
+
+    def test_skip_human_value_moves_the_record_but_other_text_does_not(self) -> None:
+        # 약속 "사람 칸의 다른 값(… skip_human 의 정당 · 부당 밖의 글)은 … 빨강으로 만들지 않습니다"
+        result = load_result()
+        index = next(
+            i
+            for i, video in enumerate(result["videos"])
+            if video["window"] == "operation"
+            and video["result"] == "skip"
+            and skip_justified(video) is True
+        )
+        for value, moves in (("부당", True), ("정당", False), ("엉뚱한 글", False), ("부당 ", False)):
+            with self.subTest(skip_human=value):
+                changed = copy.deepcopy(result)
+                changed["videos"][index]["skip_human"] = value
+                self.assertEqual(skip_lines(changed) != skip_lines(result), moves)
 
 
 FIVE_SCORE_NAMES = (*SCORE_NAMES, "concern_is_love_worry", "saju_story_fits")
@@ -1676,6 +1783,15 @@ class WriterRecordTest(ContractCase):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, task_line)
         self.assertIn(f"SKIP {c['skip']}/{c['written']}", live_check.verdict_line(self.result))
+
+    def test_skip_record_is_in_contract(self) -> None:
+        for phrase in (
+            *skip_lines(self.result),
+            "빈 사람 칸은 동의가 아닙니다",
+            "이 숫자는 기록이고, 판정 줄과 통과선은 이 숫자로 움직이지 않습니다",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assert_in_contract(phrase)
 
     def test_repeat_min_chars_stays_unmeasured(self) -> None:
         self.assert_in_contract(
