@@ -1601,3 +1601,33 @@ PYTHONPATH=src python3 -m agent.run [--dry-run] [--once]
   `run-fence-catches-base` · `run-errors-uncounted` · `run-reason-follows-context` · `run-reloader-forgets-rejection` ·
   `run-lock-ignored` · `watcher-allowlist-untracked` · `trigger-first-sample-ignored` · `trigger-first-sample-age-zero` ·
   `config-test-run-any-value` · `writer-status-ignored` · `run-sdk-check-skipped` · `run-echo-strict` · `run-reason-str-unguarded`.
+
+## 공개용 사본 — `tests/public_copy.py` (Phase 8)
+
+공개는 이 저장소가 아니라, 비공개 개발 하네스의 경로를 모든 커밋에서 지운 사본으로 합니다(트래커 Phase 8). 사본을 만들고 push 하는 일은 사람이 합니다.
+
+```
+python3 -m tests.public_copy [--source <저장소>] [--branch main] [--dest <빈 새 폴더>] [--known <목록 파일>] [--env <.env> | --no-env]
+python3 -m tests.public_copy --scan-only [--branch <리비전>] [--env <.env> | --no-env]
+python3 -m tests.public_copy --print-known [--branch <리비전>]
+```
+
+- **복제.** `--source`(기본: 이 파일이 든 저장소)의 가지 `--branch`(기본 `main`) 하나를 `git clone --no-local --no-tags --single-branch` 로 `--dest`(주지 않으면 새 임시 폴더)에 복제합니다. `--dest` 가 비어 있지 않은 폴더이거나 원본 안이면 아무것도 만들지 않고 종료 코드 2 입니다. 원본에는 아무것도 쓰지 않습니다. 사본의 가지는 `main` 하나이고 원격은 지웁니다. 이 스크립트는 push 하지 않습니다.
+- **다시 쓰기.** `HARNESS_PATHS` 여덟 경로(원본에 추적되지 않는 `.adw/harness-paths` 가 있으면 그 줄도 더함)와 그 아래를 `git filter-branch --index-filter` 로 사본의 모든 커밋에서 지우고, 같은 다시 쓰기에서 커밋 메시지 안의 홈 경로(`HOME_PATH_RE` 꼴)를 `~/` 로 바꿉니다. 빈 커밋도 지우지 않아 커밋 수와 작성자 · 커미터의 이름 · 메일 · 날짜는 원본 가지와 같습니다. 메시지는 홈 경로만 다르고, 커밋 번호(해시)는 모두 바뀝니다. 지난 커밋의 파일 내용은 하네스 경로를 지울 뿐 고치지 않습니다.
+- **검사.** 아래 아홉 가지 중 하나라도 걸리면 종료 코드 1 이고 사본은 지우지 않고 남깁니다 — 그 사본은 push 하지 않습니다. 모두 통과하면 0 입니다.
+
+  | 검사 | 보는 곳 | 걸리는 것 |
+  |---|---|---|
+  | 하네스 경로 | 모든 커밋의 파일 경로 | 여덟 경로나 그 아래 |
+  | 무시 규칙 경로 | 모든 커밋의 파일 경로 | 사본 끝 판의 `.gitignore` 가 무시하는 경로 — `.env`(`.env.example` 밖), `docs/marketing-agent.pdf`, 8절의 크롬 프로필 이름, `chrome-profile/` |
+  | 연락처 모양 | 모든 커밋의 파일 내용과 커밋 메시지 | `tests/live_check.py` 의 연락처 모양(Phase 6G)으로 찾은 글 중 알려진 목록 밖 |
+  | 키 모양 | 모든 커밋의 파일 내용과 커밋 메시지 | `KEY_SHAPES` 로 찾은 글 중 알려진 목록 밖 |
+  | 비밀 값 | 모든 커밋의 파일 내용과 커밋 메시지 | `--env`(기본: 원본의 `.env`)에 든 세 키 값과 그 앞 8글자 이상 조각(`tests/live_check.py` 의 `Redactor`) — 파일이 없거나 세 값이 모두 비면 이 검사가 걸리고, `--no-env` 를 주면 건너뜁니다 |
+  | 홈 경로 | 끝 판의 파일 내용과 모든 커밋 메시지 | `/home/<이름>/` · `/Users/<이름>/` · `C:\Users\<이름>\` 꼴 중 알려진 목록 밖 |
+  | 스위트 | 끝 판 | 1절의 테스트 명령이 종료 코드 0 과 `OK` 로 끝나지 않음 |
+  | 커밋 수 · 이름표 | 모든 커밋 | 원본 가지와 커밋 수, 또는 차례대로 본 작성자 · 커미터의 이름 · 메일 · 날짜가 다름 |
+  | 원격 | 사본 | 원격이 하나라도 있음 |
+
+  작성자 · 커미터의 메일은 내용 검사에 넣지 않습니다(트래커 Phase 8 질문 2 B — 이름표는 그대로 둠). 걸린 비밀 값은 화면에 쓰지 않고 키 이름과 자리만 보입니다.
+- **알려진 목록.** `tests/public_copy_known.json` 의 `contacts` · `keys` · `homes` 는 사람이 가짜나 공개된 글로 확인한 글자 그대로입니다. 한 글자라도 다르면 목록 밖입니다. 이 파일 자신은 내용 검사에서 뺍니다. 걸린 글은 목록에 붙여 넣을 수 있는 꼴(JSON 글자)과 자리(경로 · 커밋)로 보입니다. 진짜 연락처나 키는 목록에 넣는 대신 그 사본을 push 하지 않고, 사본에서 지울 규칙을 사람이 정합니다 — 이 저장소의 기록은 다시 쓰지 않습니다(트래커 Phase 8 질문 1 A).
+- **원본 훑기.** `--scan-only` 는 복제와 다시 쓰기 없이 원본의 `--branch`(아무 리비전)를 읽기만 하며, 하네스 경로를 뺀 채 무시 규칙 경로 · 연락처 모양 · 키 모양 · 비밀 값 · 홈 경로 다섯 검사를 봅니다(무시 규칙은 원본 작업 폴더의 `.gitignore`, 홈 경로는 끝 판 파일만 — 메시지의 홈 경로는 사본이 바꿉니다). `--print-known` 은 같은 범위에서 모양 검사 셋이 찾은 글을 목록 파일 꼴로 보이기만 하고 판정하지 않습니다(종료 코드 0).
