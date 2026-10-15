@@ -913,6 +913,17 @@ class LoopbackUrlTest(unittest.TestCase):
         "http://evil.example:9222",  # 다른 호스트
         "http://localhost9222",  # ':' 빠짐 — 호스트가 localhost9222
         "localhost:9222",  # 스킴 빠짐
+        "http://127-0-0-1:9222",  # '.' 대신 '-' — 다른 호스트 이름(7G 질문 2 A)
+        "https://localhost:9222",  # https — 받아도 게시 때 chrome_unreachable(7G HC1 질문 1 A)
+        "http://LOCALHOST:9222",  # 대문자 — 받을 꼴만 적음(7G HC1 질문 1 A · 헌법 12조)
+        "http://127.0.0.2:9222",  # 127.0.0.1 밖 루프백 — 크롬이 문을 열지 않음(7G HC1 질문 1 A)
+        "http://localhost",  # 포트 없음 — 준비 도구도 "포트가 없습니다"(7G HC1 질문 1 A)
+        "http://ｌｏｃａｌｈｏｓｔ:9222",  # 전각 호스트 — 두 해석기가 다르게 읽음(7G HC1 질문 1 A)
+        "http://localhost:123456",  # 여섯 자리 포트 — 계약 2절 숫자 1–5자리(7G HC1 질문 1 A)
+        "http://localhost:9222//",  # 끝 '/' 둘 — 계약 2절 끝의 '/' 하나까지(7G HC1 질문 1 A)
+        # 포트 숫자만 전각 — urlsplit · WHATWG 모두 포트로 읽지 못함(7G HC1 질문 1 A 의 https 줄
+        # "받아도 게시 때 chrome_unreachable" · :123456 줄 "계약 2절 숫자 1–5자리")
+        "http://localhost:９２２２",
     )
 
     def test_this_computer_addresses_load_as_written(self) -> None:
