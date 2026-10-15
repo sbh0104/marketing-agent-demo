@@ -373,7 +373,7 @@ class DetectTest(WatcherCase):
         self.assertEqual(report, CycleReport(1, (), 1, 0, False, False))
 
     def test_store_write_error_propagates_s046(self) -> None:
-        # 계약 9절 — 저장소 쓰기 오류는 잡지 않고 run_loop 까지 올라갑니다
+        # 계약 9절 — 저장소 쓰기 오류는 잡지 않고 run_loop 까지 올라갑니다. 줄이 먼저라 이미 남아 있습니다
         error = OSError("디스크가 찼습니다")
         self.store = FailingStore(self.store_path, error)
         self.api.pages[("연애", None)] = search_page([A])
@@ -381,8 +381,92 @@ class DetectTest(WatcherCase):
         with self.assertRaises(OSError) as caught:
             self.run_cycle()
         self.assertIs(caught.exception, error)
-        self.assertEqual(self.events(), [])
+        self.assertEqual(self.events(), [detect(A), views(A, 1200)])
         self.assertIsNone(Store(self.store_path).get(A))
+
+    def cycle_with_logbook(self, logbook: Logbook) -> CycleReport:
+        client = YouTubeClient("test-key", QuotaLedger(self.quota_path), self.api)
+        return Watcher(self.store, logbook, client, lambda: NOW).run(CONFIG, NOW)
+
+    def file_counts(self, video_id: str) -> list[int]:
+        record = Store(self.store_path).get(video_id)
+        assert record is not None
+        return [sample.count for sample in record.view_history]
+
+    def test_failed_save_keeps_the_lines_and_the_next_cycle_stores_the_video(self) -> None:
+        # 줄이 먼저, 저장은 그다음 — 저장이 한 번 실패해도 DETECT · VIEWS 는 남고, 다음 주기는
+        # DETECT 없이 표본만 더해 저장합니다 (트래커 7A 질문 1 A · R9)
+        error = OSError("디스크가 찼습니다")
+        self.store = SaveFailsOnceStore(self.store_path, error)
+        self.api.pages[("연애", None)] = search_page([A])
+        self.api.videos[A] = video_item(A, 1200)
+        with self.assertRaises(OSError) as caught:
+            self.run_cycle()
+        self.assertIs(caught.exception, error)
+        self.assertEqual(self.events(), [detect(A), views(A, 1200)])
+        self.assertIsNone(Store(self.store_path).get(A))
+        later = NOW + HOUR
+        self.api.videos[A] = video_item(A, 1500)
+        report = self.watcher(lambda: later).cycle(CONFIG)
+        self.assertEqual(
+            self.events(), [detect(A), views(A, 1200), views(A, 1500, prev=1200)]
+        )
+        record = Store(self.store_path).get(A)
+        assert record is not None
+        self.assertEqual(record.view_history, [ViewSample(NOW, 1200), ViewSample(later, 1500)])
+        self.assertEqual(record.keyword, "연애")
+        self.assertEqual(record.detected_at, NOW)
+        self.assertEqual(report, CycleReport(1, (), 1, 0, False, False))
+
+    def test_restart_after_a_failed_save_detects_the_video_again(self) -> None:
+        # 그 사이 에이전트를 다시 켜면 메모리가 비어 새 영상으로 한 번 더 DETECT 를 남깁니다
+        self.store = SaveFailsOnceStore(self.store_path, OSError("디스크가 찼습니다"))
+        self.api.pages[("연애", None)] = search_page([A])
+        self.api.videos[A] = video_item(A, 1200)
+        with self.assertRaises(OSError):
+            self.run_cycle()
+        self.store = Store(self.store_path)
+        self.run_cycle()
+        self.assertEqual(
+            self.events(), [detect(A), views(A, 1200), detect(A), views(A, 1200)]
+        )
+
+    def test_known_video_failed_save_keeps_its_views_line_and_one_sample_each(self) -> None:
+        self.seed(K, views=1000)
+        self.store = SaveFailsOnceStore(self.store_path, OSError("디스크가 찼습니다"))
+        self.api.videos[K] = video_item(K, 1100)
+        with self.assertRaises(OSError):
+            self.run_cycle()
+        self.assertEqual(self.events(), [views(K, 1100, prev=1000)])
+        self.assertEqual(self.file_counts(K), [1000])
+        self.api.videos[K] = video_item(K, 1150)
+        self.watcher(lambda: NOW + HOUR).cycle(CONFIG)
+        self.assertEqual(self.file_counts(K), [1000, 1100, 1150])
+
+    def test_log_write_failure_at_detect_stores_nothing(self) -> None:
+        # 로그 쓰기가 실패하면 저장 전에 멈춥니다 — 다음에 찾을 때 새 영상으로 DETECT 를 남깁니다
+        error = OSError("로그를 쓸 수 없습니다")
+        self.api.pages[("연애", None)] = search_page([A])
+        self.api.videos[A] = video_item(A, 1200)
+        logbook = FailingLogbook(self.log_path, lambda: NOW, Event.DETECT, error)
+        with self.assertRaises(OSError) as caught:
+            self.cycle_with_logbook(logbook)
+        self.assertIs(caught.exception, error)
+        self.assertIsNone(self.store.get(A))
+        self.assertIsNone(Store(self.store_path).get(A))
+        self.assertEqual(self.raw_lines(), [])
+        self.run_cycle()
+        self.assertEqual(self.events(), [detect(A), views(A, 1200)])
+
+    def test_log_write_failure_at_views_keeps_the_known_video_unchanged(self) -> None:
+        error = OSError("로그를 쓸 수 없습니다")
+        self.seed(K, views=1000)
+        self.api.videos[K] = video_item(K, 1100)
+        logbook = FailingLogbook(self.log_path, lambda: NOW, Event.VIEWS, error)
+        with self.assertRaises(OSError) as caught:
+            self.cycle_with_logbook(logbook)
+        self.assertIs(caught.exception, error)
+        self.assertEqual(self.counts(K), [1000])
 
 
 class FailingStore(Store):
@@ -394,6 +478,37 @@ class FailingStore(Store):
 
     def put(self, record: VideoRecord) -> None:
         raise self.error
+
+
+class SaveFailsOnceStore(Store):
+    """파일 쓰기(save)가 처음 한 번만 쓰기 오류를 내는 저장소 — put 은 메모리에 먼저 넣습니다."""
+
+    def __init__(self, path: Path, error: OSError) -> None:
+        super().__init__(path)
+        self.error = error
+        self.failures = 1
+
+    def save(self) -> None:
+        if self.failures > 0:
+            self.failures -= 1
+            raise self.error
+        super().save()
+
+
+class FailingLogbook(Logbook):
+    """정한 사건 하나의 줄 쓰기만 쓰기 오류를 내는 로그."""
+
+    def __init__(
+        self, path: Path, clock: Callable[[], datetime], event: Event, error: OSError
+    ) -> None:
+        super().__init__(path, clock)
+        self.event = event
+        self.error = error
+
+    def write(self, event: Event, **fields: object) -> str:
+        if event is self.event:
+            raise self.error
+        return super().write(event, **fields)
 
 
 class RawVideosApi(FakeApi):
