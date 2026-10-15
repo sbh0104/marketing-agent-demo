@@ -410,7 +410,7 @@ def _error_detail(exc: BaseException) -> str:
     status = getattr(exc, "status_code", None)
     if status is None:
         status = getattr(exc, "status", None)
-    head =type(exc).__name__ if status is None else f"{type(exc).__name__} {status}"
+    head = type(exc).__name__ if status is None else f"{type(exc).__name__} {status}"
     message = " ".join(str(exc).split())[:200]
     return f"{head}: {message}" if message else head
 
