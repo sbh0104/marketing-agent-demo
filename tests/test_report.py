@@ -18,7 +18,7 @@ import agent.run as run
 from agent.guard import decide_post
 from agent.logbook import REQUIRED_FIELDS, Event, format_line, parse_line
 from agent.models import CommentDraft, Judgement, PostAttempt, Verdict, VideoRecord, ViewSample
-from agent.poster import DRY_RUN, NO_COMMENT, WATCH_URL
+from agent.poster import DRY_RUN, NO_COMMENT, PAGE_MISMATCH, WATCH_URL
 from agent.report import (
     FAILED,
     LOG_UNREADABLE,
@@ -157,9 +157,11 @@ class TestLabels(unittest.TestCase):
             "duplicate_video": "이미 처리한 영상",
             "not_in_allowlist": "허용 목록 밖이라 게시하지 않음",
             "invalid_video": "영상 주소를 읽을 수 없음",
+            "invalid_item": "영상 정보를 읽을 수 없음",
             "dry_run": "테스트 실행 — 저장만",
             "no_comment": "댓글 없음",
             "config_rejected": "설정 거절로 저장만",
+            "page_mismatch": "열린 화면이 다른 영상이라 저장만",
             "unavailable": "영상을 볼 수 없음",
         }
         self.assertEqual(REASON_LABELS, expected)
@@ -194,6 +196,7 @@ class TestLabels(unittest.TestCase):
         codes = (
             NO_COMMENT,
             DRY_RUN,
+            PAGE_MISMATCH,
             run.CONFIG_REJECTED,
             decide_post("not a url", (), True).reason,
             decide_post("abcdefghijk", (), True).reason,
@@ -236,6 +239,19 @@ class TestLabels(unittest.TestCase):
             "검사 두 번 통과 못함",
             "jev 검사 실패",
             "Claude 호출 실패: X",
+            "Invalid_item",
+            " invalid_item",
+            "invalid_item ",
+            "invalid-item",
+            "invaliditem",
+            "ｉnvalid_item",  # 전각 i (U+FF49)
+            "invalid_items",
+            "Page_mismatch",
+            " page_mismatch",
+            "page-mismatch",
+            "pagemismatch",
+            "ｐage_mismatch",  # 전각 p (U+FF50)
+            "page_error",  # poster 의 다른 원인 — 목록 밖
         )
         for reason in samples:
             with self.subTest(reason=reason):
@@ -249,6 +265,8 @@ class TestLabels(unittest.TestCase):
             ("재료에 장면 없음 — 1차: 답을 읽을 수 없습니다", "작성 건너뜀 — 짚을 장면 없음"),
             ("claude 호출 실패: RuntimeError: " + mark("server"), "AI 호출 오류 (Claude)"),
             ("재료에 장면 없음표", "작성 건너뜀 — 짚을 장면 없음"),
+            ("invalid_item", "영상 정보를 읽을 수 없음"),
+            ("page_mismatch", "열린 화면이 다른 영상이라 저장만"),
         )
         for reason, label in samples:
             with self.subTest(reason=reason):
@@ -280,6 +298,7 @@ class TestLabels(unittest.TestCase):
             "ｒun.post",  # 전각 r (U+FF52)
             mark("where"),
             "videos.list",  # 감시기 _fail 의 ERROR 에는 video= 가 없습니다
+            "search.list",  # 감시기 검색 오류의 ERROR 에도 video= 가 없습니다 — 목록 밖 (트래커 Phase 7H 결정 2)
         )
         for where in samples:
             with self.subTest(where=where):
@@ -371,6 +390,7 @@ class TestLateLines(unittest.TestCase):
             ("not_in_allowlist", "허용 목록 밖이라 게시하지 않음"),
             ("config_rejected", "설정 거절로 저장만"),
             ("dry_run", "테스트 실행 — 저장만"),
+            ("page_mismatch", "열린 화면이 다른 영상이라 저장만"),
         )
         for reason, label in cases:
             with self.subTest(reason=reason):
@@ -493,6 +513,26 @@ class TestJudgedFloor(unittest.TestCase):
         self.assertEqual(
             badges(again, [first, rerecorded]), (NO_DRAFT, None, "검사 두 번 탈락")
         )
+
+    def test_invalid_item_shown_until_sampled_again(self) -> None:
+        # 저장된 영상의 videos.list 응답을 읽지 못한 감시기 줄 — 그 영상의 ID 를 답니다
+        broken = line(
+            T + HOUR,
+            Event.SKIP,
+            video=A,
+            reason="invalid_item",
+            call="videos.list",
+            detail=mark("detail"),
+        )
+        waiting = record(
+            A, classification=JUDGED, trigger=Judgement(Verdict.NO, "규칙 미달", T)
+        )
+        self.assertEqual(badges(waiting, [broken]), (NO_DRAFT, None, "영상 정보를 읽을 수 없음"))
+        again = record(
+            A, classification=JUDGED, trigger=Judgement(Verdict.NO, "규칙 미달", T + 2 * HOUR)
+        )
+        self.assertEqual(late_lines(again, [broken]), [])
+        self.assertEqual(badges(again, [broken]), (NO_DRAFT, None, None))
 
 
 class TestRender(unittest.TestCase):
@@ -639,6 +679,38 @@ class TestRender(unittest.TestCase):
         self.assertEqual(cells(shown)[5], "첫 줄<br>둘째 줄<br>셋째 줄")
         self.assertNotIn("\u2028", page)
         self.assertEqual(page.splitlines(), lines[:-1])
+
+    def test_new_labels_reach_their_cells(self) -> None:
+        saved = record(
+            A,
+            classification=JUDGED,
+            comment=drafted(T),
+            attempts=[attempt(T + 5 * S, "test", "saved", "page_mismatch")],
+        )
+        skipped = record(B, classification=JUDGED)
+        events = [
+            # 저장된 영상의 videos.list 응답을 읽지 못한 감시기 줄 — 그 영상의 ID 를 답니다
+            line(
+                T + 6 * S,
+                Event.SKIP,
+                video=B,
+                reason="invalid_item",
+                call="videos.list",
+                detail=mark("detail"),
+            )
+        ]
+        page = render_report([saved, skipped], events, generated_at=T)
+        self.assertEqual(
+            cells(row(page, A))[6],
+            '<span class="badge">열린 화면이 다른 영상이라 저장만</span>'
+            "<br><small>2026-10-12T21:00:05+09:00</small>",
+        )
+        self.assertEqual(
+            cells(row(page, B))[6],
+            '<span class="badge">댓글 안 씀</span>'
+            '<br><span class="badge reason">영상 정보를 읽을 수 없음</span>',
+        )
+        self.assertNotIn("MRK", page)
 
 
 MARKED_IDS = ("MRKvideo001", "MRKvideo002", "MRKvideo003")
