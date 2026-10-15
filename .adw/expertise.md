@@ -6,14 +6,6 @@
 - evidence: 이번 ⑷ 13개(`.env.example` · `.gitignore` · `config.yaml` · `src/agent/store.py` · `src/agent/scheduler.py` · `tests/test_gitignore.py` …)는 모두 `1baaf13` 앞 커밋(첫 implement `63fab05`…`bce162f`, 07:08 복구 plan 의 `9a4b6c5` · `2262eca` · `56eec24`)의 파일이고, 11:09 에 다시 쓴 plan.md:402-473 의 `Files:` 줄은 HC1 고침 10개만 이름 붙인다 — verify-run V18 이 `git diff --name-only 1baaf13 7e39c3a` = 정확히 그 10개로 초록 (cycle 20261013-062542-adw/phase-1-foundation-contracts)
 - first confirmed: 2026-10-13 · last confirmed: 2026-10-15
 
-### E-006 · tooling — [stop:unknown · 1] 정지 부류 표에 "ship-check sensitive human checks — confirm in the interview before merge" 행이 없다 — 민감 확인 줄로 머지 전에 멈춘 ship-check 는 부류 `unknown` 으로 남는다
-- evidence: `.adw/journal/20261013-122544-stop-1/stop.md:1,5-6`(홈 트리) — "stop: ship-check · unknown · 1 · seen 2", "lesson: 표에 없는 정지 — 사유를 읽고 부류를 정한다"; 같은 꼴 첫 목격 20261013-075734-stop-1. 같은 stop.md 에 `stale harness: yes` — 현 하네스 표에 행이 이미 생겼는지는 이 retro 가 확인하지 못함
-- first confirmed: 2026-10-13 · last confirmed: 2026-10-14
-
-### E-007 · codebase — `judge_trigger` 는 기록 한 번(`too_few_samples`) · 조회수 미달/초과(`views_below_min` · `views_above_max`) 검사를 나이 검사(`too_old`)보다 먼저 한다 — 나이 창이 닫힌 영상도 그 셋 중 하나면 영원히 `too_old` 를 받지 못하고, 계약 '트리거 판정' 절의 설명 문장("바뀌지 않는 것은 `too_old` 뿐 … `views_below_min` 과 모든 `hold` 는 `yes` 가 될 수 있다", "조회수가 줄면 … `hold` … 나이 창이 닫히면 `too_old` 로 끝남")은 이 영상들에 대해 틀린다
-- evidence: `src/agent/trigger.py:48,51,53` 이 `:57`(`too_old`)보다 앞; `docs/contracts.md:485-492`; ship-report Q2 재현 — 72h 500→600 `('no', 'views_below_min')` · 72h 기록 한 번 `('hold', 'too_few_samples')` · 1450→0 삭제 `('no', 'views_below_min')`. 표(차례)는 결정대로, 틀린 것은 문장 — 고칠 방향은 Human checks 1 (cycle 20261013-161358-adw/phase-4-trigger-timing)
-- first confirmed: 2026-10-13 · last confirmed: 2026-10-14
-
 ### E-009 · reviewer — ship-check 가 두 페이즈 연속 계약 문서의 설명 문장이 코드보다 넓게 약속한 것(보장 · "바뀌지 않음" · "~에만" 꼴)을 찾아 사람 확인으로 올렸다 — 코드와 표는 맞고 그 아래 문장이 틀린 꼴이며, 고치는 길이 공개 계약을 건드려 스모크 통에 못 들어간다
 - evidence: Phase 1 — 계약 2절 "비교와 셈에만"(R4) · 7절 문단(R5) (journal 20261013-062542-adw-phase-1-foundation-contracts summary flagged ②③); Phase 4 — '트리거 판정' 절 세 문장 R1/Q2 → Human checks 1 (E-007) (cycle 20261013-161358-adw/phase-4-trigger-timing)
 - first confirmed: 2026-10-13 · last confirmed: 2026-10-15
@@ -122,7 +114,17 @@
 - evidence: 계획의 음성 대조 16개(`e27e7e3`)는 모두 빨강이다. 그런데 ship-check 가 `src/agent/run.py:266`(자체 검사 연결 `jev_self_check(self._services.ask, …)`) · `:331`(울타리 뒤 판별 `self._store.put`) · `:137`(이유 200자 · 공백 접기) · `:559`(main 의 `echo_stream` 연결) · `:492-496` · `:551`(시작 거절 묶음)에서 변이가 사는 것을 재현했다 → S-100 · S-101 · S-102(ship-report.md:187-190). 같은 자리들은 가드 매트릭스에도 행이 없었다(ship-report.md:220-224) (cycle 20261015-154340-adw/phase-7-pipeline-rules)
 - first confirmed: 2026-10-15 · last confirmed: 2026-10-15
 
+### E-047 · codebase — `decide_post` 는 허용 목록 검사를 지난 영상에만 `dry_run` 이유를 준다(목록 밖은 그보다 먼저 `not_in_allowlist`) — 그래서 `live=False` · `dry_run` 이 곧 "테스트 실행의 명단 영상" 이고 7F 리허설 갈래가 이것으로 나뉜다. 한편 테스트 쪽 중복 판정 `_is_duplicate(live=False)` 는 모드와 결과를 가리지 않고 시도가 하나라도 있으면 참이다(`COUNTED_RESULTS` 는 `posted` · `reserved` 만 센다) — 리허설이 시도를 하나라도 저장하면 같은 영상의 다음 리허설은 `SKIP duplicate_video` 가 된다
+- evidence: `src/agent/guard.py:94-98` · `src/agent/store.py:27` · `:42-45`(트리 `bd90bf0`). ship-report R5 — 7F 전 테스트 실행의 `("test","saved","dry_run")` 시도나 `config_rejected` 시도가 있는 영상은 리허설되지 않음. verify-run V10 — 리허설은 저장소 파일을 한 바이트도 바꾸지 않아 같은 영상을 다시 리허설하고 보통 실행도 게시함 (cycle 20261015-182947-adw/phase-7f-chrome-rehearsal)
+- first confirmed: 2026-10-15 · last confirmed: 2026-10-15
+
+### E-048 · hazard — 리허설의 글 지우기 `_clear` 는 `Exception` 을 모두 잡아 `rehearsed` 줄의 `detail="clear_failed …"` 로만 남긴다 — `CommentPage` 포트에 메서드를 더한 뒤, 그 메서드가 없는 가짜로 도는 테스트는 `AttributeError` 를 detail 에 삼키고 초록이다. `submits == []` 와 시도 `[]` 만 단언하는 테스트는 이 꼴을 잡지 못한다
+- evidence: `src/agent/poster.py:331-336`. main 의 `tests/test_run.py:181` `FakeTab` 에 `clear_comment` 가 없다(`git show main:tests/test_run.py`). ship-check 감사 3 재현 `POST mode=test result=rehearsed reason=dry_run detail="clear_failed page_error: AttributeError: 'FakeTab' object has no attribute 'clear_comment'"`(journal ship-report.md R2 :144 · verify-report.md N1 :125). run 단위 잠금은 Phase 7G 로 넘김(ship-report Human checks 1) (cycle 20261015-182947-adw/phase-7f-chrome-rehearsal)
+- first confirmed: 2026-10-15 · last confirmed: 2026-10-15
+
 ## Retired (history — one line each, never deleted)
+- E-006 · tooling — [stop:unknown · 1] 정지 부류 표에 "ship-check sensitive human checks — confirm in the interview before merge" 행이 없다 — 민감 확인 줄로 머지 전에 멈춘 ship-check 는 부류 `unknown` 으로 남는다 — retired 2026-10-15 (over cap; unconfirmed since 2026-10-14)
+- E-007 · codebase — `judge_trigger` 는 기록 한 번(`too_few_samples`) · 조회수 미달/초과(`views_below_min` · `views_above_max`) 검사를 나이 검사(`too_old`)보다 먼저 한다 — 나이 창이 닫힌 영상도 그 셋 중 하나면 영원히 `too_old` 를 받지 못하고, 계약 '트리거 판정' 절의 설명 문장("바뀌지 않는 것은 `too_old` 뿐 … `views_below_min` 과 모든 `hold` 는 `yes` 가 될 수 있다", "조회수가 줄면 … `hold` … 나이 창이 닫히면 `too_old` 로 끝남")은 이 영상들에 대해 틀린다 — retired 2026-10-15 (over cap; unconfirmed since 2026-10-14)
 - E-004 · tooling — 이 기계의 셸 `grep` 은 GNU grep 이 아니라 ugrep 7.8.4 를 부르는 셸 함수다 — GNU grep 의 동작(NUL 이 든 파일의 `binary file matches` 등)을 재는 시험은 `/usr/bin/grep` 을 경로로 불러야 같은 것을 잰다 — retired 2026-10-15 (over cap; unconfirmed since 2026-10-14)
 - E-021 · reviewer — 받아들인 위험을 재현한 **입력**으로 적으면 다음 ship-check 가 같은 코드 자리에서 다음 입력을 찾아 다시 멈춘다 — 자리(함수 · `except` 줄)로 적자 멈춤이 끝났다 — retired 2026-10-15 (꼬리 "자리로 적자 멈춤이 끝났다" 가 6G 에서 틀림: 자리(`tests/live_check.py:1621`)를 적은 `skip_reason` 대가 줄이 좁은 입력 종류 때문에 다음 ship-check 에서 다시 올라옴(journal 20261015-130935 ship-report.md:217) — 고친 사실을 E-043 에 다시 씀)
 - E-036 · gotcha — 레인 착지는 squash 없는 `merge --no-ff` 라(`.claude/skills/plan/scripts/finalize_step.py:1054`), 레인 끝 판에서만 지운 내용은 앞 레인 커밋마다 남아 main 기록에 붙는다(제출 때 공개) — 실행기는 영상마다 `untrusted.description` 을 `_clean` · 길이 자르기만 하고 결과 파일에 쓰므로(`tests/live_check.py:1380`), 사람이 커밋한 `docs/live-check/result.json` 에 채널 주인 연락처가 그대로 들어갈 수 있다 — retired 2026-10-15 (뒤 절 "실행기는 … `_clean` · 길이 자르기만 하고 결과 파일에 쓰므로" 가 6G 에서 틀림: `_kept`(`tests/live_check.py:353-360`)가 키 가림 → 연락처 가림 → 자르기 순서로 씀 — 앞 절(착지가 레인 역사를 main 에 붙임)은 E-044 에 다시 씀)
