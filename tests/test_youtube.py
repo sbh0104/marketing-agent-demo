@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import http.client
-import io
 import json
 import os
 import tempfile
@@ -13,6 +12,7 @@ import urllib.request
 from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import Any
 from unittest import mock
 
 from agent.config import LimitsConfig
@@ -27,6 +27,7 @@ from agent.youtube import (
     YouTubeError,
     http_get,
 )
+from tests.loopback import RawServer, no_proxies, response
 
 NOW = datetime(2026, 10, 12, 12, 0, tzinfo=timezone.utc)
 DAY = timedelta(hours=24)
@@ -762,65 +763,46 @@ class CommentsTest(YouTubeCase):
         self.assertEqual(QuotaLedger(self.path).usage(NOW), Usage(1, 101))
 
 
-GET_URL = "https://www.googleapis.com/youtube/v3/videos?id=abcdefghijk&key=test-key"
-
-
-class FakeResponse:
-    """urlopen 이 돌려주는 응답 자리 — with 문 · status · read 만."""
-
-    def __init__(self, status: int, body: bytes) -> None:
-        self.status = status
-        self._body = body
-
-    def __enter__(self) -> FakeResponse:
-        return self
-
-    def __exit__(self, *exc: object) -> None:
-        return None
-
-    def read(self) -> bytes:
-        return self._body
+GET_PATH = "/youtube/v3/videos?id=abcdefghijk&key=test-key"
 
 
 class HttpGetTest(unittest.TestCase):
-    """http_get — urllib.request.urlopen 을 patch 해 네트워크 없이."""
+    """http_get — 날 바이트로 답하는 루프백 서버(tests/loopback.py)에 실제로 요청합니다."""
 
-    def assert_request(self, urlopen: mock.MagicMock, timeout: float) -> None:
-        urlopen.assert_called_once()
-        args, kwargs = urlopen.call_args
-        [request] = args
-        self.assertIsInstance(request, urllib.request.Request)
-        self.assertEqual(request.full_url, GET_URL)
-        self.assertEqual(request.get_method(), "GET")
-        self.assertEqual(request.get_header("Accept"), "application/json")
-        self.assertEqual(kwargs, {"timeout": timeout})
+    def setUp(self) -> None:
+        no_proxies(self)
+
+    def serve(self, route: Callable[[str], bytes | None], **kw: Any) -> RawServer:
+        server = RawServer(route, **kw)
+        self.addCleanup(server.close)
+        return server
+
+    def assert_request(self, server: RawServer) -> None:
+        self.assertEqual(len(server.heads), 1, server.heads)
+        [head] = server.heads
+        self.assertTrue(head.startswith(b"GET " + GET_PATH.encode() + b" HTTP/1.1\r\n"), head)
+        self.assertIn(b"\r\nAccept: application/json\r\n", head)
 
     def test_http_error_becomes_its_code_and_body_s037(self) -> None:
         body = b'{"error": {"code": 403, "errors": [{"reason": "quotaExceeded"}]}}'
-        error = urllib.error.HTTPError(
-            GET_URL, 403, "Forbidden", http.client.HTTPMessage(), io.BytesIO(body)
-        )
-        self.addCleanup(error.close)
-        with mock.patch("urllib.request.urlopen", side_effect=error) as urlopen:
-            result = http_get(GET_URL, 12.5)
+        server = self.serve(lambda target: response(403, body, reason="Forbidden"))
+        result = http_get(server.url + GET_PATH, 12.5)
         self.assertEqual(result, (403, body))
-        self.assert_request(urlopen, 12.5)
+        self.assert_request(server)
 
     def test_ok_response_becomes_its_status_and_body_s037(self) -> None:
         body = b'{"items": []}'
-        response = FakeResponse(200, body)
-        with mock.patch("urllib.request.urlopen", return_value=response) as urlopen:
-            result = http_get(GET_URL, 12.5)
+        server = self.serve(lambda target: response(200, body))
+        result = http_get(server.url + GET_PATH, 12.5)
         self.assertEqual(result, (200, body))
-        self.assert_request(urlopen, 12.5)
+        self.assert_request(server)
 
     def test_no_content_response_keeps_its_status_s047(self) -> None:
         # 200 이 아닌 2xx — 상태를 200 으로 바꾸지 않고 응답의 것 그대로 돌려줍니다
-        response = FakeResponse(204, b"")
-        with mock.patch("urllib.request.urlopen", return_value=response) as urlopen:
-            result = http_get(GET_URL, 12.5)
+        server = self.serve(lambda target: response(204))
+        result = http_get(server.url + GET_PATH, 12.5)
         self.assertEqual(result, (204, b""))
-        self.assert_request(urlopen, 12.5)
+        self.assert_request(server)
 
 
 if __name__ == "__main__":
