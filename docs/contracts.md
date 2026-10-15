@@ -23,8 +23,9 @@ Phase 2–7 의 모든 단계가 기대는 계약입니다. 설정 읽기, 영�
   `tests/__init__.py` 가 `src/` 를 `sys.path` 맨 앞에 넣으므로 패키지를 설치하지 않아도
   됩니다. `-W error::EncodingWarning` 때문에 `encoding=` 없이 파일을 여는 코드는 리눅스에서도
   실패합니다 — 윈도우 인코딩 사고를 미리 막는 장치입니다.
-- 실행 진입점(`run.py`, `--dry-run`, `--once`)은 Phase 7 이 더합니다. `--dry-run` 은
-  `decide_post(..., dry_run=True)` 로 그대로 넘어가야 합니다(5절).
+- 실행 진입점은 저장소 뿌리에서 `PYTHONPATH=src python3 -m agent.run [--dry-run] [--once]` 입니다(윈도우
+  PowerShell 은 먼저 `$env:PYTHONPATH = "src"`). `--dry-run` 이나 설정 `test_run: true` 가 테스트 실행을 켜고,
+  테스트 실행은 `decide_post(..., dry_run=True)` 로 넘어갑니다(5절) — '실행 진입점 — run.py' 절.
 
 ## 2. 설정 — `config.yaml`
 
@@ -124,6 +125,9 @@ Phase 2–7 의 모든 단계가 기대는 계약입니다. 설정 읽기, 영�
   두 오류 모두 메시지에 값을 쓰지 않으며, 실행 중이면 이전 설정을 유지합니다.
   YAML 은 따옴표 없는 값의 앞뒤 공백을 스스로 떼므로, 스페이스 규칙은 따옴표 안의 값에서 걸립니다.
   `allowed_videos` 항목은 이 규칙을 받지 않고 쓴 그대로 보관합니다 — 항목은 가드가 읽습니다.
+- `test_run` 은 참 · 거짓 값만 받습니다 — `"false"` · `0` · 빈 값은
+  `참 · 거짓(true 또는 false)이어야 합니다: test_run` 오류입니다. 참이면 테스트 실행입니다.
+  거짓이어도 `--dry-run` 을 끄지 않습니다 — 둘 중 하나면 테스트 실행입니다('실행 진입점 — run.py' 절).
 - 같은 키가 두 번 나오면 두 번째 줄 번호와 함께 오류입니다. 윈도우 메모장이 붙이는 BOM 은
   떼어 내고 읽습니다. UTF-8 이 아닌 저장(메모장의 ANSI·Unicode)은 `ConfigError` 입니다.
 - 읽는 중 나는 그 밖의 모든 오류도 `ConfigError` 입니다 — 날짜 모양의 틀린 값
@@ -132,7 +136,9 @@ Phase 2–7 의 모든 단계가 기대는 계약입니다. 설정 읽기, 영�
   `설정 값을 읽을 수 없습니다 (<원인 종류>: <원인>): <경로>` 이고 원인은 `__cause__` 에
   남습니다. `KeyboardInterrupt` 는 바꾸지 않고 그대로 올라갑니다.
 - 주기 루프는 사이클마다 `config.yaml` 을 다시 읽습니다(9절). 실행 중에 값을 고치면 다음
-  대기부터 적용되고, 잘못 고친 파일은 이전 설정을 유지합니다.
+  대기부터 적용됩니다. 잘못 고친 파일은 이전 설정을 유지하되, 다시 읽기가 받을 때까지 진입점이 실제 게시를
+  하지 않습니다 — 그동안 게시는 명단 영상까지 모두 크롬 없이 테스트 저장(`reason=config_rejected`)이고, 거절마다
+  `ERROR where=config` 한 줄이 남습니다('실행 진입점 — run.py' 절).
 
 ## 3. 영상 기록 — `models.py`
 
@@ -562,7 +568,7 @@ run_loop(cycle, reload, initial, *, on_error, sleep=time.sleep,
    `KeyboardInterrupt` 는 위로 올라갑니다.
 3. 돈 횟수를 더하고, `max_cycles` 에 닿으면 다시 읽기나 대기 없이 횟수를 돌려줍니다.
 4. `config = reload()` — `ConfigError` 는 `on_error("config", exc)` 로 알리고 이전 설정을
-   유지합니다.
+   유지합니다. 진입점(`run.py`)이 넘기는 `reload` 는 거절을 기억해, 거절이 이어지는 동안 실제 게시를 멈춥니다(2절 끝).
 5. `wait = min(poll_interval_min × 60, 약 100년) − (monotonic() − started)` 만큼, 하루 이하
    조각으로 나눠 `sleep` 합니다. `wait` 가 0 이하이면 `sleep(0.0)` 을 한 번 부릅니다.
 
@@ -752,6 +758,13 @@ watcher = Watcher(Store(Path("data/videos.json")), logbook, client, clock)
 
 `held` 와 `truncated` 가 "새 영상이 없었음" 과 "한도에 막혀 다 보지 못했음" 을 가릅니다.
 
+- **명단 영상(Phase 7).** 사이클마다 `allowed_videos` 의 영상 ID(`allowed_video_ids`, 5절 — 읽을 수 없는 항목은 버림)를
+  검색 · 나이 창과 상관없이 추적 대기열에 한 번씩 더합니다.
+  저장소에 없는 명단 영상은 처음 본 사이클에 기록을 만들고, `keyword` 는 그 사이클 검색이 찾았으면 그 검색어, 아니면 `allowed_videos` 입니다.
+  명단 영상의 `DETECT` 줄에는 `allowlisted=true` 가 붙습니다.
+- **한 벌 · 한 스레드.** 진입점(`run.py`)은 저장소와 쿼터 장부를 데이터 폴더마다 한 벌만 만들어 탐지 · 작성 · 게시가
+  함께 쓰고, 다섯 단계를 한 스레드에서 차례로 돌립니다.
+
 **비밀 값** — `require_secret(name, env_path, environ)`
 
 - 비어 있지 않은 환경 변수가 먼저이고, 없으면 `.env` 의 값입니다. 둘 다 비었으면
@@ -874,7 +887,7 @@ Phase 7 이 영상마다 부르는 모양:
 
 ```python
 result = write_comment(record, config=config.comment, claude=anthropic_client(),
-                       check=<Phase 3 의 jev 검사>, previous=store.comments(),
+                       check=jev_self_check(sdk_ask, config.classifier.model), previous=store.comments(),
                        logbook=logbook, now=now, transcript="", top_comments=<top_comments 또는 ()>)
 if result.draft is not None:
     record.comment = result.draft
@@ -900,7 +913,10 @@ if result.draft is not None:
 - **`check` 포트** — `check(state, questions) -> {질문 이름: P(예)}`. 초안 한 개에 `noul` 질문
   다섯 개(`CHECK_QUESTIONS`: `mentions_scene` · `reads_like_ad` · `follows_concern` ·
   `concern_is_love_worry` · `saju_story_fits`)를 **한 요청**으로 묻습니다. 접속(키 `TYPESAFE_API_KEY` · jev 모델 · `typesafe-sdk`)은 Phase 3 의
-  것이고, Phase 7 이 Phase 3 의 클라이언트를 이 자리에 이어 붙입니다.
+  것이고, 운영은 `jev_self_check(sdk_ask, config.classifier.model)`(이 모듈)을 이 자리에 넘깁니다.
+- **오류 이유의 상태 코드.** `claude 호출 실패: …` · `jev 검사 호출 실패: …` 의 머리는 `<예외 종류> <상태 코드>: <메시지>` 입니다 —
+  상태 코드는 예외의 `status_code`, 없으면 `status` 이고, 둘 다 없으면 `<예외 종류>: <메시지>` 입니다. 운영의 jev 검사는
+  `sdk_ask` 를 거치므로 SDK 실패가 `JevError: TypeSafeError 401` 처럼 상태 코드를 머리 가까이 싣습니다.
 - **자료의 출처** — 자막은 공식 API 로 남의 영상에서 받을 수 없어 비어 있습니다.
   `captions.download` 는 OAuth 와 그 영상의 편집 권한(200단위)을 요구하고, 비공식 긁기는 약관 · 차단
   위험이라 이 저장소의 방법이 아닙니다. 그래서 `transcript` 는 늘 `""` 이고, 인기 댓글은 탐지 절의
@@ -1046,6 +1062,7 @@ if result.draft is not None:
 
 ```python
 judge_trigger(record, config, now) -> Judgement     # config 는 Config.trigger
+views_per_hour(record) -> float | None             # TRIGGER per_hour — 판정과 같은 두 기록 사이, 잴 수 없으면 None
 ```
 
 `judge_trigger` 는 영상 기록 하나를 지금(`now`) 댓글 대상으로 볼지 정해 `Judgement(verdict, reason, at=now)` 를
@@ -1055,7 +1072,7 @@ judge_trigger(record, config, now) -> Judgement     # config 는 Config.trigger
 
 - **최신과 직전:** 조회수 기록을 시각(`at`) 순으로 놓습니다 — 목록 순서는 보지 않고, 시간대가 달라도 같은
   순간이면 같은 시각이며, 같은 시각끼리는 조회수가 큰 쪽이 뒤입니다. 맨 뒤가 *최신*, 최신보다 시각이 이른
-  기록 중 맨 뒤가 *직전*입니다. 같은 시각의 기록 여럿은 한 번으로 셉니다.
+  기록 중 맨 뒤가 *직전*입니다. 같은 시각의 기록 여럿은 한 번으로 셉니다. 시각이 다른 기록이 하나이면 직전은 업로드 시각(`published_at`)의 조회수 0 입니다(2026-10-15 질문 3 B).
 - **시간당 조회수** = (최신 조회수 − 직전 조회수) ÷ 두 시각 사이의 시간. 조회수가 그대로면 0 입니다.
   조회수가 줄었으면(삭제 · 비공개 · 조회수 정정) 재지 않습니다 — 음수 속도는 없습니다.
 
@@ -1063,7 +1080,7 @@ judge_trigger(record, config, now) -> Judgement     # config 는 Config.trigger
 
 | 차례 | 조건 | verdict | reason |
 |---|---|---|---|
-| 1 | 시각이 다른 기록이 둘 미만(기록 없음 포함) | `hold` | `too_few_samples` |
+| 1 | 기록이 없음, 또는 시각이 다른 기록이 하나이고 업로드 시각이 그 기록보다 앞이 아님(나이 0 · 미래 업로드) | `hold` | `too_few_samples` |
 | 2 | 최신 조회수 < `min_views` | `no` | `views_below_min` |
 | 3 | 최신 조회수 > `max_views` | `no` | `views_above_max` |
 | 4 | `published_at` 이 `now` 보다 뒤 | `hold` | `published_in_future` |
@@ -1075,14 +1092,18 @@ judge_trigger(record, config, now) -> Judgement     # config 는 Config.trigger
 - 경계는 모두 통과입니다 — 조회수 정확히 `min_views` · `max_views`, 나이 정확히 `max_age_hours`(그리고
   `published_at` 이 `now` 와 같은 나이 0), 시간당 정확히 `min_views_per_hour` 는 대상입니다(과제의
   "1,000–5,000 · 12시간 이내 · 150 이상").
-- **판정은 모두 `at` 시각의 판정입니다.** 다시 부르면 바뀌지 않는 것은 `too_old` 뿐입니다(나이는 줄지 않음).
-  `views_above_max` 는 조회수가 정정되어 줄 때만 바뀌고, `views_below_min` · `too_slow` 와 모든 `hold` 는
-  기록이 더 쌓이면 `yes` 가 될 수 있습니다. 그래서 부르는 쪽은 `too_old` 가 아닌 기록을 새 조회수 기록이 생길
-  때마다 다시 판정합니다. `hold` 는 잴 수 없어 미룬 판정(기록 부족 · 미래 업로드 시각 · 줄어든 조회수)이고,
-  `no` 는 재어 보니 지금은 아닌 판정입니다.
-- 기록이 한 번뿐인 영상은 다른 조건과 상관없이 `hold` 입니다(트래커 Phase 4 의 절충). 조회수가 줄면
-  `min_views_per_hour` 가 0 이어도 `hold` 입니다 — 지워졌거나 비공개가 된 영상을 대상으로 올리지 않고, 나이
-  창이 닫히면 `too_old` 로 끝납니다.
+- **판정은 모두 `at` 시각의 판정입니다.** 나이 창이 닫힌 영상(`now − published_at` > `max_age_hours`)은 이유와 상관없이
+  다시 `yes` 가 되지 못합니다 — 조회수 검사가 나이 검사보다 앞이라 `views_below_min` · `views_above_max` 로 남기도 합니다.
+  줄어든 조회수가 `min_views` 아래면 `hold views_decreased` 가 아니라 `no views_below_min` 입니다.
+  설정의 `max_age_hours` 를 늘리면 `too_old` 도 바뀝니다.
+  탐지기는 나이 창 밖 영상의 조회수를 더 재지 않으므로(명단 영상 제외 — 탐지 절) 그런 영상은 다시 판정되지 않습니다.
+  `hold` 는 잴 수 없어 미룬 판정(기록 부족 · 미래 업로드 시각 · 줄어든 조회수)이고, `no` 는 재어 보니 지금은 아닌 판정입니다.
+- 시각이 다른 기록이 하나인 영상은 업로드 시각의 조회수 0 을 직전 기록으로 쳐 처음 본 사이클에 판정합니다(2026-10-15
+  질문 3 B — 트래커 Phase 4 의 절충을 바꿈). 업로드 시각이 그 기록보다 앞이 아니면(나이 0 · 미래 업로드) 잴 시간이 없어
+  `hold too_few_samples` 입니다.
+  조회수가 범위(`min_views`–`max_views`) 안에서 줄고 나이 창 안이면 `min_views_per_hour` 가 0 이어도 `hold views_decreased` 입니다 —
+  지워졌거나 비공개가 된 영상을 대상으로 올리지 않습니다. 줄어든 조회수가 범위 밖이면 `no views_below_min` · `no views_above_max`,
+  나이 창이 닫혔으면 `no too_old` 입니다(표의 차례).
 - 나이는 업로드 시각(`published_at`)부터 잽니다(탐지 시각이 아님). `published_at` 이 `now` 보다 뒤이면 이
   컴퓨터의 시계가 유튜브보다 늦다는 뜻이라 `hold published_in_future` 로 둡니다 — 시계가 따라잡으면 저절로
   풀리고, 로그에서 찾을 수 있습니다. 시계가 늦으면 다른 영상의 나이도 그만큼 적게 재지만, 이 판정이 그것까지
@@ -1095,10 +1116,11 @@ judge_trigger(record, config, now) -> Judgement     # config 는 Config.trigger
 - reason 은 모두 로그에 따옴표 없이 쓰이는 글자입니다. 3절 · 7절 예시의 `views_per_hour` 는 `yes` 의
   reason 입니다.
 - **기준 제안:** 세 기준 값은 과제 값 그대로 둡니다(트래커 Phase 4 결정) — 실제 조회수 기록(Phase 2)이 아직
-  없어 다른 숫자를 뒷받침할 근거가 없습니다. 대신 과제가 정하지 않은 재는 방법을 정했습니다: 시간당 조회수를
-  업로드 뒤 평균(조회수 ÷ 나이)이나 첫 기록부터의 평균이 아니라 *가장 늦은 두 기록* 사이로 잽니다. "뜨기
-  직전"은 지금 빨라지는 영상인데, 업로드 뒤 평균은 이미 끝난 반짝 증가를 대상으로 올리고, 첫 기록부터의
-  평균은 지금의 가속을 느린 시작과 섞어 묽힙니다.
+  없어 다른 숫자를 뒷받침할 근거가 없습니다. 대신 과제가 정하지 않은 재는 방법을 정했습니다: 시간당 조회수는 *가장 늦은
+  두 기록* 사이로 잽니다. 기록이 한 시각인 첫 판정만 업로드 뒤 평균(조회수 ÷ 나이)입니다 — 120분 주기에서는 둘째 기록이
+  2시간 뒤라 빨리 뜨는 영상이 둘째 판정 전에 5,000 을 넘어 대부분 놓쳤습니다(2026-10-15 질문 3 B).
+  첫 판정의 업로드 뒤 평균은 이미 끝난 반짝 증가를 대상으로 올리기도 하지만, 12시간 안 영상이라 지금 속도와 크게 다르지 않다는 쪽에 겁니다.
+  둘째 판정부터는 첫 기록부터의 평균을 쓰지 않습니다 — 지금의 가속을 느린 시작과 섞어 묽히기 때문입니다.
 - 음성 대조 — 각 명령은 판정 한 줄을 메모리에서만 망가뜨리고 `tests.test_trigger` 를 돌리며, **종료 코드
   1(테스트가 잡음)** 이어야 합니다. `judge_trigger` 의 본문을 고칠 때 함께 확인합니다:
 
@@ -1127,11 +1149,12 @@ judge_trigger(record, config, now) -> Judgement     # config 는 Config.trigger
   자막은 공식 API 로 남의 영상에서 받을 수 없어 비어 있습니다 — 운영과 실제 호출 실행기는 `transcript=None` 으로 부릅니다.
 - **부르는 쪽의 할 일.** 판정마다 `CLASSIFY video=… verdict=… reason=…` 를 씁니다. 오류
   보류(`is_error_hold(j)` 가 참)이면 `ERROR where=classify reason=<j.reason>` 도 함께 씁니다.
-  오류 보류를 `record.classification` 에 저장할지, 나중에 다시 판정할지는 Phase 7 이 정합니다
-  (트래커 Phase 7: 실패 후 재시도 없이 다음 영상).
+  운영(`run.py`)은 오류 보류를 `record.classification` 에 저장하지 않고, 그 영상에 새 조회수 기록이 붙는 다음 사이클에
+  다시 판정합니다(트래커 Phase 7: 실패 후 재시도 없이 다음 영상 — '실행 진입점 — run.py' 절).
 - **보류가 되는 실패.** SDK 가 알린 실패만 보류입니다 — 모든 `TypeSafeError`, 곧 401 · 422 ·
-  429 · 529 · 연결 · 응답 검증. 429/529 의 다시 시도는 SDK 기본 정책을 따릅니다. SDK 가 없거나
-  우리 코드가 잘못된 경우는 예외가 그대로 올라갑니다(9절의 `on_error("cycle")`).
+  429 · 529 · 연결 · 응답 검증. 429/529 의 다시 시도는 SDK 기본 정책을 따릅니다. 우리 코드가 잘못된 경우는
+  예외가 그대로 올라갑니다 — 운영(`run.py`)에서는 영상마다 울타리가 `ERROR where=run.classify` 로 받습니다.
+  SDK 가 없으면 운영은 켜지지 않습니다(종료 코드 2, '실행 진입점 — run.py' 절).
 - **한 요청, 두 질문.** `matches_topic`(noul)과 `reason`(choice). choice 가 첫 보기 쪽으로
   기우는 경향 때문에 보기는 `off_topic_reasons` 를 먼저, 그다음 `on_topic_reasons` 를 보입니다.
 - **믿지 않는 입력.** 영상 글은 `state` 에만 들어가고 질문에는 들어가지 않습니다. 두 답이 같은
@@ -1244,7 +1267,7 @@ python3 -m tests.live_check --verdict <결과 파일>     # 호출 없이 판정
   자막은 공식 API 로 남의 영상에서 받을 수 없어 비어 있습니다.
 - **jev 자체 검사 어댑터.** `jev_self_check(ask, model)` 이 '댓글 작성' 절의 `check` 포트를 채웁니다 —
   질문마다 `noul`(`criteria = {"true": "Yes, it does", "false": "No, it does not"}`)을 한 요청으로 묻고
-  `answers[이름].noul` 을 돌려줍니다. 운영(Phase 7)이 이어 붙일 때 이 모양을 옮겨 씁니다.
+  `answers[이름].noul` 을 돌려줍니다. 이 함수는 `agent.writer` 에 있고(Phase 7 이 옮김) 실행기와 운영이 같은 함수를 씁니다.
 - **영상의 끝.** `result` 는 `comment`(통과) · `skip`(검사 두 번 탈락 또는 스스로 건너뜀 — `skip_kind` 가
   `checks_failed` · `no_scene` · `no_concern`; 실행기가 Claude 답을 `read_reply` 로 다시 읽어 정합니다) ·
   `error`(인기 댓글을 못 받음,
@@ -1428,3 +1451,58 @@ python3 -m tests.live_check --verdict <결과 파일>     # 호출 없이 판정
     채점)을 바꾸어 이 모듈이 빨강입니다. 사람 칸의 다른 값(`human` 의 `ok` · `bad` 밖의 글, `topic_human` 의
     `연애` · `아님` 밖의 글)은 사람 칸으로 세지 않아 이 모듈을 빨강으로 만들지 않습니다.
 - **음성 대조.** 10절 목록의 `youtube-comments-*` · `live-check-*` 명령.
+
+## 실행 진입점 — `run.py` (Phase 7)
+
+```
+PYTHONPATH=src python3 -m agent.run [--dry-run] [--once]
+```
+
+- **켜기.** 단일 실행 잠금(`data/agent.lock`) → SDK 둘(`typesafe-sdk` · `anthropic`, `find_spec`) → 비밀 값 셋(`YOUTUBE_API_KEY` ·
+  `TYPESAFE_API_KEY` · `ANTHROPIC_API_KEY`, 탐지 절의 `require_secret`) → `config.yaml` → 저장소 → `START` → `run_loop`(9절) 차례입니다.
+  잠금을 다른 에이전트(`agent.run`)가 쥐고 있으면 로그를 한 줄도 쓰지 않고 종료 코드 3 으로 끝납니다.
+  SDK · 비밀 값 · 쿼터 장부 · 설정 · 저장소를 쓸 수 없으면 종료 코드 2 입니다(설정은 `ERROR where=config`, 저장소는
+  `ERROR where=store` 도 남김). 잠금은 운영체제가 쥐므로 프로세스가 죽으면 저절로 풀립니다.
+  이 잠금은 에이전트끼리만 막습니다 — 실제 호출 실행기(`tests/live_check.py`)도 같은 쿼터 장부를 쓰지만 이 잠금을 쥐지 않으므로,
+  에이전트가 도는 동안에는 실행기를 돌리지 않습니다(두 프로세스의 장부가 서로의 기록을 덮어씁니다).
+- **로그 줄.** `START mode=live|test allowed=<명단 영상 수> interval_min=… dry_run=… once=… test_run=…`, 사이클마다
+  `CYCLE n=… errors=… mode=live|test`, 끝에 `STOP reason=once|interrupted|error` 입니다.
+  `errors` 는 울타리가 잡은 영상 수이고, 단계가 스스로 남긴 `ERROR`(판별 오류 보류 · 작성기 API 오류 · 유튜브 오류)는 세지 않습니다.
+  화면 출력(echo)은 콘솔 인코딩이 못 쓰는 글자를 `\` 이스케이프(`backslashreplace`)로 바꿔 씁니다 — 로그 파일은 그대로 UTF-8 입니다.
+- **한 벌 · 한 스레드.** 저장소(`data/videos.json`) · 쿼터 장부(`data/quota.json`) · 로그(`logs/agent.log`)를 한 벌씩 만들고,
+  다섯 단계(탐지 → 판별 → 타이밍 → 작성 → 게시)를 주기 루프 하나 · 한 스레드에서 차례로 돌립니다.
+- **사이클.** 탐지(`Watcher.cycle`) 뒤, 이 사이클에 새 조회수 기록이 붙은 영상마다 저장소 순서(`detected_at`, `video_id`)로
+  판별 → 타이밍 → 작성 → 게시를 돌립니다.
+- **판별.** `record.classification` 이 없으면 `classify(record, config, ask, now)` 를 부르고 `CLASSIFY` 를 씁니다.
+  `yes` · `no` · 판정 보류는 저장하고 다시 묻지 않습니다.
+  오류 보류(`is_error_hold`)는 `ERROR where=classify` 도 쓰고 저장하지 않아, 다음 새 기록 때 다시 묻습니다.
+- **타이밍.** 새 기록마다 `judge_trigger` 로 다시 판정해 `record.trigger` 에 저장하고 `TRIGGER … per_hour=<views_per_hour>` 를
+  씁니다. 명단 영상(`allowed_video_ids(config.allowed_videos)`)은 규칙 판정을 `rule_verdict=` · `rule_reason=` 에 함께 적고
+  `verdict=yes reason=allowlisted` 로 통과합니다 — 다른 영상의 기준은 그대로입니다.
+- **작성.** 판별 · 타이밍이 모두 `yes` 이고 댓글이 없으면 인기 댓글(`top_comments` 앞 10개, 댓글이 막힌 영상은 `()`) ·
+  `previous=store.comments()` · `transcript=""` 로 `write_comment` 를 부르고, 초안을 `record.comment` 에 넣어 저장합니다.
+  인기 댓글을 못 받은 영상(`QUOTA` 또는 `ERROR where=commentThreads.list`)은 이번 사이클에 쓰지 않습니다.
+  명단 밖 영상의 댓글도 저장소와 `COMMENT` 줄에 남습니다.
+- **게시.** 댓글이 있는 영상마다 `post_video(…, dry_run=<테스트 실행>, …)`(6절)를 부릅니다. 영상당 1개 · 하루 상한 · 채널
+  대기는 명단 영상에도 저장소가 그대로 셉니다(4절). 테스트 실행은 `--dry-run` 또는 `config.test_run` 이고, 설정은
+  `--dry-run` 을 끄지 못합니다. 명단 영상에는 게시마다 `ChromeSession(config.chrome_debug_url)` 을 새로 만들어 그 `new_page` 를
+  `open_page` 로 넘기고, 게시가 끝나면(성공 · 실패 · 예외) `close()` 로 연결만 놓습니다 — 테스트 실행에서도 같습니다(그 탭을
+  쓰는 길은 Phase 7F).
+  명단 밖 영상에는 크롬을 여는 함수를 넘기지 않습니다 — 부르면 `PageError(chrome_withheld)` 를 내는 함수가 그 자리에 갑니다.
+- **설정 거절.** `reload` 가 `ConfigError` 를 내면 진입점이 거절을 기억하고, 다시 읽기가 받으면 잊습니다.
+  거절이 이어지는 동안 탐지 · 판별 · 타이밍 · 작성은 이전 설정으로 돌고, 게시는 `post_video` 를 부르지 않고 6절 1 · 2 · 4 를
+  크롬 없이 따라 테스트 저장합니다 — 명단 영상의 이유는 `config_rejected`, 명단 밖 영상은 가드의 이유 그대로입니다.
+  그래서 사람이 켠 테스트 실행(`dry_run`)과 로그에서 갈리고, Phase 7F 의 리허설 길로 가지 않습니다.
+- **고친 설정이 닿는 때.** 설정은 사이클이 끝난 뒤 다시 읽습니다(9절). 대기 중에 고친 값(`test_run: true` · 명단에서 뺀 영상 포함)은
+  그 대기 뒤 사이클이 옛 값으로 돈 다음, 그 사이클 뒤의 다시 읽기부터 적용됩니다.
+  실제 게시를 바로 멈추려면 Ctrl-C 로 끄고 `--dry-run` 으로 다시 켭니다.
+- **영상마다 울타리.** 판별 · 타이밍 · 작성 · 게시 중 한 영상에서 난 `Exception` 은
+  `ERROR where=run.classify|run.trigger|run.write|run.post reason=<예외 종류>: <메시지 200자까지> video=<ID>` 한 줄로 남기고 다음 영상으로
+  갑니다. `KeyboardInterrupt` 같은 `BaseException` 은 그대로 올라가 `STOP reason=interrupted`(종료 코드 130)로 끝납니다.
+  울타리 줄과 `on_error` 의 `ERROR where=cycle|config` 줄은 예외 자신의 종류와 메시지만 쓰고, `__context__` · `__cause__` ·
+  traceback 을 따라가지 않습니다(Phase 2 ship-report R6).
+  그 영상을 다음 사이클에 다시 하지 않게 하는 기억은 아직 없습니다(Phase 7C).
+- **음성 대조.** `python3 -m tests.mutants <이름>` — `run-rejected-posts-live` · `run-chrome-for-all` · `run-no-timing-exemption` ·
+  `run-fence-catches-base` · `run-errors-uncounted` · `run-reason-follows-context` · `run-reloader-forgets-rejection` ·
+  `run-lock-ignored` · `watcher-allowlist-untracked` · `trigger-first-sample-ignored` · `trigger-first-sample-age-zero` ·
+  `config-test-run-any-value` · `writer-status-ignored` · `run-sdk-check-skipped` · `run-echo-strict` · `run-reason-str-unguarded`.
