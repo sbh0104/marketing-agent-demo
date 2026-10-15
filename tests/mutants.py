@@ -770,6 +770,12 @@ MUTANTS: dict[str, tuple[str, str, str, str]] = {
         '"comment": mask_contacts(self.redactor(text)),',
         '"comment": self.redactor(mask_contacts(text)),',
     ),
+    "live-check-gap-ambiguous": (
+        "tests.live_check",
+        "tests.test_live_check",
+        r'_GAP = rf"[ \t]*(?:[.{_DASH}][ \t]*)?"',
+        r'_GAP = rf"[ \t]*[.{_DASH}]?[ \t]*"',
+    ),
     "live-check-applied-yes-floor-lowered": (
         "agent.config",
         "tests.test_live_check_applied",
