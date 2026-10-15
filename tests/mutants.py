@@ -725,7 +725,7 @@ MUTANTS: dict[str, tuple[str, str, str, str]] = {
     "live-check-contacts-unmasked": (
         "tests.live_check",
         "tests.test_live_check",
-        "for match in CONTACT_RE.finditer(text.translate(HALF_WIDTH)):",
+        "for match in CONTACT_RE.finditer(_match_view(text)):",
         "for match in ():",
     ),
     "live-check-contact-line-blind": (
@@ -775,6 +775,12 @@ MUTANTS: dict[str, tuple[str, str, str, str]] = {
         "tests.test_live_check",
         r'_GAP = rf"[ \t]*(?:[.{_DASH}][ \t]*)?"',
         r'_GAP = rf"[ \t]*[.{_DASH}]?[ \t]*"',
+    ),
+    "live-check-dash-like-unbounded": (
+        "tests.live_check",
+        "tests.test_live_check",
+        r'_DASH_BETWEEN_DIGITS.sub(r"\1-", text.translate(MATCH_VIEW))',
+        r'text.translate({**MATCH_VIEW, **dict.fromkeys(map(ord, _DASH_LIKE), ord("-"))})',
     ),
     "live-check-applied-yes-floor-lowered": (
         "agent.config",

@@ -260,19 +260,26 @@ class Redactor:
         return self._pattern.search(text) is not None
 
 
-# 전각 ASCII(U+FF01–U+FF5E)를 반각으로 — 한 글자가 한 글자라 맞춘 글의 자리가 원문의 자리입니다
+# 전각 ASCII(U+FF01–U+FF5E)를 반각으로
 HALF_WIDTH = {code: code - 0xFEE0 for code in range(0xFF01, 0xFF5F)}
+_SPACE_LIKE = " 　  "  # 보이지 않는 띄어쓰기 — NBSP · 전각 · 얇은 · 좁은 NBSP
+_ZERO_WIDTH = "​‌‍⁠﻿"  # 너비 없는 글자 — 띄어쓰기처럼 끊는 자리로 봅니다
+_DASH_LIKE = "ㅡ─━ーｰ﹘﹣"  # 가로줄 닮은 글자 — ㅡ ─ ━ ー ｰ ﹘ ﹣
+MATCH_VIEW = {**HALF_WIDTH, **dict.fromkeys(map(ord, _SPACE_LIKE + _ZERO_WIDTH), ord(" "))}
+# 숫자와 숫자 사이(띄어쓰기는 받음)의 가로줄 닮은 글자만 하이픈으로 — 글자 뒤에 붙은 것까지 바꾸면 계좌 앞 경계가 막힙니다
+_DASH_BETWEEN_DIGITS = re.compile(rf"(?<=[0-9])([ \t]*)[{_DASH_LIKE}](?=[ \t]*[0-9])")
 _DASH = "\\-\u2010-\u2015\u2212"  # 하이픈 · 유니코드 대시 · 빼기 기호
-_AT = r"(?:@|[(\[][ \t]*at[ \t]*[)\]])"
-_DOT = r"(?:\.|[(\[][ \t]*dot[ \t]*[)\]])"
+_AT = r"(?:@|[(\[{<][ \t]*at[ \t]*[)\]}>])"
+_DOT = r"(?:\.|[(\[{<][ \t]*dot[ \t]*[)\]}>])"
 # 띄어쓰기 · 하이픈이나 점 하나 · 띄어쓰기 — 별표 둘이 맞붙지 않게 묶어, 긴 띄어쓰기에도 되짚기가 늘지 않습니다
 _GAP = rf"[ \t]*(?:[.{_DASH}][ \t]*)?"
+_SEP = rf"[ \t]*[.{_DASH}][ \t]*"  # 하이픈이나 점이 반드시 있는 끊음
 # 숫자 한 덩이의 앞 — 주소 경로 · 쿼리 · 16진 해시 · 소수 · 다른 숫자 묶음 안이면 연락처로 세지 않습니다
 _EDGE = rf"(?<![0-9A-Za-z/=?&#%_.{_DASH}])"
 # 이은 숫자 묶음의 앞 — 위와 같되 '/' 는 받습니다(은행/계좌/이름 꼴)
 _JOINED_EDGE = rf"(?<![0-9A-Za-z=?&#%_.{_DASH}])"
 CONTACT_SHAPES = (
-    # 이메일 — (at) · [dot] 로 쓴 꼴과 @ · 점 둘레의 띄어쓰기까지
+    # 이메일 — (at) · [at] · {at} · <at> 와 같은 꼴의 dot 으로 쓴 것과 @ · 점 둘레의 띄어쓰기까지
     rf"[A-Za-z0-9._%+\-]{{1,64}}[ \t]*{_AT}[ \t]*[A-Za-z0-9\-]{{1,63}}"
     rf"(?:[ \t]*{_DOT}[ \t]*[A-Za-z0-9\-]{{1,63}})*[ \t]*{_DOT}[ \t]*[A-Za-z]{{2,24}}",
     # 예금주 줄 — 예금주명 · 괄호 · 구분 기호(: | ㅣ / = > · -) 뒤의 이름 한 덩이까지
@@ -280,6 +287,8 @@ CONTACT_SHAPES = (
     # 전화번호 — 010 · (02) · 031 꼴과 +82, 하이픈 · 점 · 띄어쓰기로 끊었거나 붙여 쓴 것
     rf"(?<![0-9A-Za-z])(?:\+[ \t]*82{_GAP}(?:\(0\)[ \t]*)?|\(?0)(?:1[016789]|2|[3-6][1-5])\)?"
     rf"{_GAP}[0-9]{{3,4}}{_GAP}[0-9]{{4}}(?![0-9A-Za-z])",
+    # 전화번호 — 하이픈 · 점으로 끊은 꼴은 영문자 바로 뒤에 붙어도(HP010-0000-1234)
+    rf"(?<=[A-Za-z])0(?:1[016789]|2|[3-6][1-5]){_SEP}[0-9]{{3,4}}{_SEP}[0-9]{{4}}(?![0-9A-Za-z])",
     # 계좌번호 — 하이픈 · 점으로 이은 숫자 묶음 셋 이상, 숫자 10~16개
     rf"{_JOINED_EDGE}\+?(?=(?:[.{_DASH}]?[0-9]){{10,16}}(?![.{_DASH}]?[0-9]))"
     rf"[0-9]{{2,6}}(?:[.{_DASH}][0-9]{{1,7}}){{2,5}}(?![0-9A-Za-z])",
@@ -289,20 +298,28 @@ CONTACT_SHAPES = (
 CONTACT_RE = re.compile("|".join(CONTACT_SHAPES), re.IGNORECASE)
 
 
+def _match_view(text: str) -> str:
+    """찾기 전 맞춤 — 한 글자를 한 글자로 바꿔 맞춘 글의 자리가 원문의 자리입니다(너비 없는 글자도 지우지 않습니다).
+
+    전각은 반각, 보이지 않는 띄어쓰기 · 너비 없는 글자는 띄어쓰기, 숫자 사이의 가로줄 닮은 글자는 하이픈입니다.
+    """
+    return _DASH_BETWEEN_DIGITS.sub(r"\1-", text.translate(MATCH_VIEW))
+
+
 def count_contacts(text: str) -> int:
-    """글 안 연락처 모양(CONTACT_RE)의 곳 수 — 전각 글자는 반각으로 맞춰 봅니다."""
-    return sum(1 for _ in CONTACT_RE.finditer(text.translate(HALF_WIDTH)))
+    """글 안 연락처 모양(CONTACT_RE)의 곳 수 — 찾기 전 맞춤(_match_view)으로 맞춘 글에서 셉니다."""
+    return sum(1 for _ in CONTACT_RE.finditer(_match_view(text)))
 
 
 def mask_contacts(text: str) -> str:
     """연락처 모양을 CONTACT_MASK 로 바꿉니다 — 바꾼 자리 옆에 새 모양이 드러나면 없어질 때까지 다시 봅니다.
 
-    자리는 전각을 반각으로 맞춘 글에서 찾고, 바꾸기는 원문에 합니다.
+    자리는 찾기 전 맞춤(_match_view)으로 맞춘 글에서 찾고, 바꾸기는 원문에 합니다.
     """
     while True:
         pieces: list[str] = []
         last = 0
-        for match in CONTACT_RE.finditer(text.translate(HALF_WIDTH)):
+        for match in CONTACT_RE.finditer(_match_view(text)):
             pieces += (text[last : match.start()], CONTACT_MASK)
             last = match.end()
         if not pieces:
