@@ -1138,7 +1138,7 @@ other line is required on every item.
 - touches: tests/test_youtube.py, tests/test_watcher_network.py
 - base: adw/phase-7a-watcher-network-fixes
 - phase: plans/interview-marketing-agent.md#phase-7a
-- status: open
+- status: resolved
 - attempts: 0 · last failure: —
 
 ### S-115 — 쿼터 장부 48시간 보관 경계를 스위트 테스트로 잠그기
@@ -1148,7 +1148,7 @@ other line is required on every item.
 - touches: tests/test_youtube.py
 - base: adw/phase-7a-watcher-network-fixes
 - phase: plans/interview-marketing-agent.md#phase-7a
-- status: open
+- status: resolved
 - attempts: 0 · last failure: —
 
 ### S-116 — 조용한 서버 테스트가 일꾼 스레드를 실제로 봤는지 · 읽기마다의 timeout 값 전달을 단언하기
@@ -1158,7 +1158,7 @@ other line is required on every item.
 - touches: tests/test_youtube.py
 - base: adw/phase-7a-watcher-network-fixes
 - phase: plans/interview-marketing-agent.md#phase-7a
-- status: open
+- status: resolved
 - attempts: 0 · last failure: —
 
 ### S-117 — 테스트 가짜의 '모르는 호출' · '네트워크 금지' 가드가 _call 의 예외 잡기에 삼켜지지 않게
@@ -1168,5 +1168,5 @@ other line is required on every item.
 - touches: tests/test_live_check.py, tests/test_watcher_network.py
 - base: adw/phase-7a-watcher-network-fixes
 - phase: plans/interview-marketing-agent.md#phase-7a
-- status: open
+- status: resolved
 - attempts: 0 · last failure: —
