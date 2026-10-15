@@ -4,15 +4,11 @@
 
 ### E-002 · tooling — 계획 밖 파일 · T4 경보 ⑷ 는 `main..브랜치` 전체 diff 를 **마지막** plan.md 의 `Files:` 줄과만 대조한다 — 앞 사이클이나 understand 부터 다시 돈 사이클이 남긴 커밋의 파일은 모두 "계획 밖"으로 센다
 - evidence: 이번 ⑷ 13개(`.env.example` · `.gitignore` · `config.yaml` · `src/agent/store.py` · `src/agent/scheduler.py` · `tests/test_gitignore.py` …)는 모두 `1baaf13` 앞 커밋(첫 implement `63fab05`…`bce162f`, 07:08 복구 plan 의 `9a4b6c5` · `2262eca` · `56eec24`)의 파일이고, 11:09 에 다시 쓴 plan.md:402-473 의 `Files:` 줄은 HC1 고침 10개만 이름 붙인다 — verify-run V18 이 `git diff --name-only 1baaf13 7e39c3a` = 정확히 그 10개로 초록 (cycle 20261013-062542-adw/phase-1-foundation-contracts)
-- first confirmed: 2026-10-13 · last confirmed: 2026-10-15
+- first confirmed: 2026-10-13 · last confirmed: 2026-10-16
 
 ### E-009 · reviewer — ship-check 가 두 페이즈 연속 계약 문서의 설명 문장이 코드보다 넓게 약속한 것(보장 · "바뀌지 않음" · "~에만" 꼴)을 찾아 사람 확인으로 올렸다 — 코드와 표는 맞고 그 아래 문장이 틀린 꼴이며, 고치는 길이 공개 계약을 건드려 스모크 통에 못 들어간다
 - evidence: Phase 1 — 계약 2절 "비교와 셈에만"(R4) · 7절 문단(R5) (journal 20261013-062542-adw-phase-1-foundation-contracts summary flagged ②③); Phase 4 — '트리거 판정' 절 세 문장 R1/Q2 → Human checks 1 (E-007) (cycle 20261013-161358-adw/phase-4-trigger-timing)
 - first confirmed: 2026-10-13 · last confirmed: 2026-10-15
-
-### E-010 · reviewer — 페이즈가 하류 페이즈에 넘긴 일과 주인 없이 받아들인 위험이 `plan.md` · 계약에만 남고 트래커의 하류 페이즈 절에는 오르지 않는다 — ship-check 가 두 페이즈 연속 "트래커 Phase 2 · 7 절에 주인 줄 적기"를 사람 확인으로 올렸고, Phase 1 에서는 주인 없이 받아들인 위험이 다음 ship-check 에 돌아왔다
-- evidence: Phase 1 summary flagged ②④ · Coverage ①(R3 · R6 가 두 번째 ship-check 에 돌아와 understand 부터 다시); Phase 4 ship-report R4 · R5 → Human checks 2 — 트래커 Phase 2 · 7 절 `간격|spacing` 검색 → 없음, 넘긴 일은 `.adw/plan.md:573-588` 과 계약 '트리거 판정' 절에만 (cycle 20261013-161358-adw/phase-4-trigger-timing)
-- first confirmed: 2026-10-13 · last confirmed: 2026-10-14
 
 ### E-013 · codebase — `docs/contracts.md:5-6` 머리 문단은 `src/agent/` 모듈을 하나씩 열거하는데, 모듈을 더한 페이즈가 그 목록을 고치지 않는다 — main 에는 `trigger.py`(Phase 4)가 빠졌고 이 브랜치는 `classifier.py` 도 빠뜨렸다
 - evidence: `git show main:docs/contracts.md` 5-6행 = `config.py` · `models.py` · `store.py` · `guard.py` · `logbook.py` · `scheduler.py` 뿐인데 `git ls-tree --name-only main src/agent/` 에 `trigger.py` 가 있음; 이 브랜치 ship-report R5 → S-017 (`classifier.py`) (cycle 20261013-161343-adw/phase-3-classifier-topic; 첫 목격 20261013-161358-adw/phase-4-trigger-timing)
@@ -104,11 +100,11 @@
 
 ### E-044 · gotcha — 레인 착지는 squash 없는 `merge --no-ff` 라(`.claude/skills/plan/scripts/finalize_step.py:1054`), 레인 끝 판에서만 지우거나 바꾼 내용도 앞 레인 커밋마다 남아 main 기록에 붙는다. 제출 때 main 이 공개되므로, 공개되면 안 되는 값은 그 값을 처음 더한 커밋에서부터 없어야 한다
 - evidence: 6D — 허브가 결과 파일의 연락처를 끝 판에서만 지웠고(`f5cef6a`), ship-check 06:13 이 BLOCKED 했다(앞 커밋 9개에 그대로 남음). 드리프트 인터뷰가 레인 기록을 다시 썼다(cycle 20261014-225050-adw/phase-6d-live-check-reapply). 6G — 질문 4 A ④ 는 옛 표본(`795989b` · `5ad1374`: 실제 은행 앞자리 꼴 계좌와 `gmail.com`, 더한 줄 9개)을 끝 트리에서만 바꿨다. 세 번째 ship-check 이 역사에서 그 표본을 찾아 사람 확인으로 올렸고(journal 20261015-130935 ship-report.md:257), 다시 쓰지 않고 트래커 6G 대가 줄로 남겼다 (cycle 20261015-130935-adw/phase-6g-live-check-redact)
-- first confirmed: 2026-10-15 · last confirmed: 2026-10-15
+- first confirmed: 2026-10-15 · last confirmed: 2026-10-16
 
 ### E-045 · codebase — 실행기 결과 파일에는 작성기 · 판별기가 가공한 이유 글을 원문 그대로 싣는 칸이 아직 남아 있다. `videos[].untrusted.skip_reason`(`tests/live_check.py:1621` ← `src/agent/writer.py:379` "검사 두 번 탈락 — 1차: … / 2차: …", 반복 이유의 겹친 글자 · 링크 조각을 담음)와 `videos[].untrusted.classification_reason` · `accuracy[].untrusted.reason`(`tests/live_check.py:1569` · `:1393` ← `src/agent/classifier.py:125` `{choice!r}`)이 그렇다. 6G 가 이름과 숫자만 적게 바꾼 칸은 `drafts[].untrusted.code_failures` 하나다. 가공한 조각에서는 연락처 · 키 모양이 목록 밖 꼴이 되어, 쓰는 순간의 가림도 끝 줄도 그 모양을 보지 못한다
 - evidence: 위 줄 번호는 트리 `92bf38f` 에서 grep 으로 확인. 두 번째 ship-check 막힘 1과 세 번째 ship-check 민감 줄 ① ② ③ → 트래커 6G Trade-offs accepted 의 `skip_reason` · 키 소문자 · `repr` 줄 셋. 트래커 6G Responsibilities "그때 고칠 자리는 이유 칸을 이름과 숫자만 적기(`skip_reason` · 판별 이유 칸, 질문 3 A 꼴)" (cycle 20261015-130935-adw/phase-6g-live-check-redact)
-- first confirmed: 2026-10-15 · last confirmed: 2026-10-15
+- first confirmed: 2026-10-15 · last confirmed: 2026-10-16
 
 ### E-046 · reviewer — plan 이 등록한 음성 대조는 새 판정 규칙의 줄은 비틀지만, 모듈을 잇는 진입점의 연결 줄(단계 호출 하나 · 울타리 뒤 저장 · 시작 거절 예외 묶음 · 출력 연결)은 비틀지 않는다. 그래서 그 줄을 망가뜨려도 스위트가 초록이다. ship-check 의 변이 점검이 거기서 살아남은 변이를 찾아, 테스트만 고치는 스모크 항목으로 보낸다. E-041(새 판정의 경계)과 같은 부류를 세 페이즈 연속(6C · 6E · 7) 본 것이다. 다른 점은 줄의 종류뿐이다
 - evidence: 계획의 음성 대조 16개(`e27e7e3`)는 모두 빨강이다. 그런데 ship-check 가 `src/agent/run.py:266`(자체 검사 연결 `jev_self_check(self._services.ask, …)`) · `:331`(울타리 뒤 판별 `self._store.put`) · `:137`(이유 200자 · 공백 접기) · `:559`(main 의 `echo_stream` 연결) · `:492-496` · `:551`(시작 거절 묶음)에서 변이가 사는 것을 재현했다 → S-100 · S-101 · S-102(ship-report.md:187-190). 같은 자리들은 가드 매트릭스에도 행이 없었다(ship-report.md:220-224) (cycle 20261015-154340-adw/phase-7-pipeline-rules)
@@ -122,7 +118,12 @@
 - evidence: `src/agent/poster.py:331-336`. main 의 `tests/test_run.py:181` `FakeTab` 에 `clear_comment` 가 없다(`git show main:tests/test_run.py`). ship-check 감사 3 재현 `POST mode=test result=rehearsed reason=dry_run detail="clear_failed page_error: AttributeError: 'FakeTab' object has no attribute 'clear_comment'"`(journal ship-report.md R2 :144 · verify-report.md N1 :125). run 단위 잠금은 Phase 7G 로 넘김(ship-report Human checks 1) (cycle 20261015-182947-adw/phase-7f-chrome-rehearsal)
 - first confirmed: 2026-10-15 · last confirmed: 2026-10-15
 
+### E-049 · hazard — 6G 의 연락처 모양 목록(`tests/live_check.py:317-333` `CONTACT_SHAPES`)은 이메일 · 예금주 · 전화 · 계좌 넷만 본다 — 메신저 연락처(카카오톡 아이디 · 텔레그램 링크 · 디스코드 초대 · `@` 아이디)는 쓰는 순간의 가림도 레인 커밋마다의 검사도 지나 결과 파일 `videos[].untrusted.description` 에 남고, 검사는 "연락처 모양 0" 으로 초록이다. 같은 목록을 부르는 공개용 사본(Phase 8)도 그 값을 그대로 낸다
+- evidence: 6F 결과(`d2d8942`, `run_at` 2026-10-15T08:42:22Z)의 영상 6 · 14 · 15 · 18 · 21 · 29 에 7곳 — 커밋 때 6G 검사 0, ship-check 보안 감사가 찾아 민감 줄로 올림(journal ship-report.md:210-216 · :243). 6D 결과(`a2b2f2f`)에는 이 꼴이 없었다. 사람이 그대로 두고 착지하기로 정함(트래커 6F 결정 2026-10-16 · Trade-offs "6G 목록은 넷 그대로라 다음 실행에서도 메신저 아이디는 결과 파일에 들어간다") (cycle 20261015-175919-adw/phase-6f-live-check-reapply-after-fix)
+- first confirmed: 2026-10-16 · last confirmed: 2026-10-16
+
 ## Retired (history — one line each, never deleted)
+- E-010 · reviewer — 페이즈가 하류 페이즈에 넘긴 일과 주인 없이 받아들인 위험이 `plan.md` · 계약에만 남고 트래커의 하류 페이즈 절에는 오르지 않는다 — ship-check 가 두 페이즈 연속 "트래커 Phase 2 · 7 절에 주인 줄 적기"를 사람 확인으로 올렸고, Phase 1 에서는 주인 없이 받아들인 위험이 다음 ship-check 에 돌아왔다 — retired 2026-10-16 (over cap; unconfirmed since 2026-10-14)
 - E-006 · tooling — [stop:unknown · 1] 정지 부류 표에 "ship-check sensitive human checks — confirm in the interview before merge" 행이 없다 — 민감 확인 줄로 머지 전에 멈춘 ship-check 는 부류 `unknown` 으로 남는다 — retired 2026-10-15 (over cap; unconfirmed since 2026-10-14)
 - E-007 · codebase — `judge_trigger` 는 기록 한 번(`too_few_samples`) · 조회수 미달/초과(`views_below_min` · `views_above_max`) 검사를 나이 검사(`too_old`)보다 먼저 한다 — 나이 창이 닫힌 영상도 그 셋 중 하나면 영원히 `too_old` 를 받지 못하고, 계약 '트리거 판정' 절의 설명 문장("바뀌지 않는 것은 `too_old` 뿐 … `views_below_min` 과 모든 `hold` 는 `yes` 가 될 수 있다", "조회수가 줄면 … `hold` … 나이 창이 닫히면 `too_old` 로 끝남")은 이 영상들에 대해 틀린다 — retired 2026-10-15 (over cap; unconfirmed since 2026-10-14)
 - E-004 · tooling — 이 기계의 셸 `grep` 은 GNU grep 이 아니라 ugrep 7.8.4 를 부르는 셸 함수다 — GNU grep 의 동작(NUL 이 든 파일의 `binary file matches` 등)을 재는 시험은 `/usr/bin/grep` 을 경로로 불러야 같은 것을 잰다 — retired 2026-10-15 (over cap; unconfirmed since 2026-10-14)

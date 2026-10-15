@@ -705,7 +705,7 @@ Open questions
 ---
 
 ## Phase 6F — 고친 뒤 다시 반영 (전후 숫자)
-- Status: Not started
+- Status: Done
 - Slug: live-check-reapply-after-fix
 - After: Phase 6E, Phase 6G
 - Goal: 사람이 6E 뒤 6C 의 실행기로 다시 돌려 이 페이즈의 레인 브랜치에 커밋한 결과로, 계약의 기록과 기준값을 6D 와 같은 규칙으로 다시 쓰고, 과제 품질 세 칸의 전후 숫자(6D 의 실행 → 이번 실행)를 나란히 적는다.
