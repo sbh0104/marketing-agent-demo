@@ -80,7 +80,7 @@
 - [~] Phase 8 — 제출 문서 (README · PROCESS.md · 공개 정리) (plans/interview-marketing-agent.md#phase-8)
 - [ ] Phase 8A — 실제 실행 반영 (sample.log · 시연 링크 · 실제 숫자) (plans/interview-marketing-agent.md#phase-8a)
 - [ ] Phase 7A — 탐지기 · 네트워크 오류 고침 (plans/interview-marketing-agent.md#phase-7a)
-- [ ] Phase 7G — 크롬 주소 · 표본 간격 다지기 (이 컴퓨터 주소만 · 최소 표본 간격) (plans/interview-marketing-agent.md#phase-7g)
+- [~] Phase 7G — 크롬 주소 · 표본 간격 다지기 (이 컴퓨터 주소만 · 최소 표본 간격) (plans/interview-marketing-agent.md#phase-7g)
 - [ ] Phase 7B — jev 키가 없을 때 Claude 판단 (plans/interview-marketing-agent.md#phase-7b)
 - [ ] Phase 7D — 결과 화면 data/report.html (plans/interview-marketing-agent.md#phase-7d)
 - [ ] Phase 7C — 댓글 수 · 여는 방식 (건너뛴 영상 다시 쓰기 · 문장 짜임 고르기) (plans/interview-marketing-agent.md#phase-7c)
