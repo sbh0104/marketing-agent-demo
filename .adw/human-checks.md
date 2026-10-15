@@ -773,3 +773,83 @@
 - source: adw/phase-6e-comment-quality-fix
 - tag: plain
 - status: open
+
+### H-094 — 트래커 666 의 입력 종류를 "어느 한 시도라도 반복 · 링크 이유에 연락처가 실림"으로 넓혀 고쳐 쓸지, 아니면 `skip_reason` 도 이유 이름과 숫자만으로 고칠지 정하기 — 섞인 탈락(1차 반복 · 2차 JSON)에서 `요상담hp01000001234` 가 남고 끝 줄 "없음" · 종료 코드 0 으로 재현됨. 같은 줄의 "종료 코드 0" 도 "판정대로 0 또는 1" 로
+- project: marketing-agent-demo
+- when: 2026-10-15 · plans/interview-marketing-agent.md#phase-6g
+- from: ship-report.md § Human checks — .adw/ship-report.md § Risks
+- source: adw/phase-6g-live-check-redact
+- tag: sensitive: tracker decision · confirmed 2026-10-15
+- status: confirmed
+
+### H-095 — `skip_reason` 으로 API 키가 소문자 · 기호 지운 꼴로 나가는 길(키 줄 "키 없음", 종료 코드 3 아님, 6G 전부터 있음)을 대가 줄로 받아들일지 고칠지 정하기
+- project: marketing-agent-demo
+- when: 2026-10-15 · plans/interview-marketing-agent.md#phase-6g
+- from: ship-report.md § Human checks — .adw/ship-report.md § Risks
+- source: adw/phase-6g-live-check-redact
+- tag: sensitive: tracker decision · confirmed 2026-10-15
+- status: confirmed
+
+### H-096 — 판별 이유 칸(`classification_reason` · `accuracy[].untrusted.reason`)에 jev 의 목록 밖 답이 `repr` 꼴로 남는 길(NBSP 가 `\xa0` 글자가 되어 0곳)을 받아들일지, 이 칸에도 이유 이름만 적을지 정하기
+- project: marketing-agent-demo
+- when: 2026-10-15 · plans/interview-marketing-agent.md#phase-6g
+- from: ship-report.md § Human checks — .adw/ship-report.md § Risks
+- source: adw/phase-6g-live-check-redact
+- tag: sensitive: tracker decision · confirmed 2026-10-15
+- status: confirmed
+
+### H-097 — 계약 '개인 정보' 줄과 README 4 · 6단계에, 끝 줄 `없음` 이 받아들인 길(662 · 666 · 667)을 덮지 않는다는 단서를 적을지 정하기
+- project: marketing-agent-demo
+- when: 2026-10-15 · plans/interview-marketing-agent.md#phase-6g
+- from: ship-report.md § Human checks — .adw/ship-report.md § Risks
+- source: adw/phase-6g-live-check-redact
+- tag: sensitive: tracker decision · confirmed 2026-10-15
+- status: confirmed
+
+### H-098 — 레인 역사의 옛 실제 같은 표본(795989b · 5ad1374, 더한 줄 9개)을 착지 전에 가짜로 다시 쓸지, 끝 트리만 바꾼 것을 트래커 줄로 받아들일지 정하기 — `merge --no-ff` 로 main 에 들어가고 제출 때 공개됨
+- project: marketing-agent-demo
+- when: 2026-10-15 · plans/interview-marketing-agent.md#phase-6g
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-6g-live-check-redact
+- tag: sensitive: tracker decision · confirmed 2026-10-15
+- status: confirmed
+
+### H-099 — 다시 보는 고리의 제곱 비용을 고칠지 정하기(한 번에 찾기, 또는 인기 댓글 길이 상한) — `'+822000ㅡ1234'*833` 9.85초, 영상 하나 최악 84초
+- project: marketing-agent-demo
+- when: 2026-10-15 · plans/interview-marketing-agent.md#phase-6g
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-6g-live-check-redact
+- tag: sensitive: tracker decision · confirmed 2026-10-15
+- status: confirmed
+
+### H-100 — `tests/live_check.py::_EDGE`/`_JOINED_EDGE` 표본 색 정하기 — 하이픈 · `_DASH` · 가로줄 닮은 글자 뒤에 붙은 계좌: `후원-000-000-123456`, `카카오뱅크-0000-00-1234567-가나다`, `계좌—000-000-123456`, `1ㅡ000ㅡ000ㅡ123456`, `2024.10.15ㅡ000ㅡ000ㅡ123456` (모두 0곳, 끝 줄 "없음")
+- project: marketing-agent-demo
+- when: 2026-10-15 · plans/interview-marketing-agent.md#phase-6g
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-6g-live-check-redact
+- tag: sensitive: tracker decision · confirmed 2026-10-15
+- status: confirmed
+
+### H-101 — `tests/live_check.py::_match_view` 의 undecided 표본 색 정하기: `010<U+2007>0000<U+2007>1234`, `010ㅡㅡ0000ㅡㅡ1234`, `01<U+200B>0-0000-1234`, `fake.owner@exa<U+200B>mple.com`, `000<U+200B>000<U+200B>123456`, `예금주: 가나<U+200B>다`(첫 판은 통째로 가림, 지금은 `<연락처><U+200B>다`), 계좌 하이픈 옆 NBSP `000-<NBSP>000-<NBSP>123456` · `000<NBSP>-<NBSP>000<NBSP>-<NBSP>123456`, 목록 밖 가로줄 닮은 글자 U+4E00 · U+1173 · U+2F00 · U+FFDA · U+2E3A · U+02D7 · U+2796 · U+23AF · U+2574 · U+2043 (`010X0000X1234` · `000X000X123456` 모두 0곳)
+- project: marketing-agent-demo
+- when: 2026-10-15 · plans/interview-marketing-agent.md#phase-6g
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-6g-live-check-redact
+- tag: sensitive: tracker decision · confirmed 2026-10-15
+- status: confirmed
+
+### H-102 — `tests/live_check.py::CONTACT_SHAPES`(영문자 뒤 전화) undecided 표본 색 정하기: `HP010 0000 1234`, `HP010-00001234`, 숫자 바로 뒤에 붙은 전화 `92024010-0000-1234`
+- project: marketing-agent-demo
+- when: 2026-10-15 · plans/interview-marketing-agent.md#phase-6g
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-6g-live-check-redact
+- tag: sensitive: tracker decision · confirmed 2026-10-15
+- status: confirmed
+
+### H-103 — `tests/live_check.py::_GAP` undecided 표본 색 정하기: `010--0000--1234`
+- project: marketing-agent-demo
+- when: 2026-10-15 · plans/interview-marketing-agent.md#phase-6g
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-6g-live-check-redact
+- tag: sensitive: tracker decision · confirmed 2026-10-15
+- status: confirmed
