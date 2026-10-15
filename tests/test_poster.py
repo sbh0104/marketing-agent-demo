@@ -298,7 +298,10 @@ class PosterRehearsalTest(PosterCase):
 
     def test_live_post_follows_rehearsal(self) -> None:
         record = self.put()
-        self.post(record, dry_run=True)
+        first = self.post(record, dry_run=True)
+        self.assertEqual(
+            first, PostOutcome(VID, "test", "rehearsed", "dry_run", screenshot_path(VID, NOW))
+        )
         self.page = FakePage(self.store, self.log_path)
         outcome = self.post(record, dry_run=False)
         self.assertEqual(outcome, PostOutcome(VID, "live", "posted", "allowlisted"))
@@ -350,6 +353,15 @@ class PosterRehearsalTest(PosterCase):
                 )
                 self.assertEqual(self.reloaded_attempts(), [])
         self.assertNotIn(Event.POST, [event for event, _ in self.log()])
+
+    def test_rehearsal_recheck_miss_detail_capped(self) -> None:
+        url = WATCH.format(OTHER_ALLOWED) + "&pad=" + "x" * 300
+        self.page.url_after_open = url
+        self.post(self.put(), dry_run=True)
+        event, fields = self.log()[-1]
+        self.assertEqual(event, Event.ERROR)
+        self.assertEqual(fields["detail"], url[:200])
+        self.assertEqual(len(fields["detail"]), 200)
 
     def test_rehearsal_chrome_off_logs_error_then_next_video(self) -> None:
         def unreachable() -> FakePage:
@@ -436,6 +448,16 @@ class PosterRehearsalTest(PosterCase):
                 )
             ],
         )
+
+    def test_rehearsal_clear_failure_detail_capped(self) -> None:
+        self.page.clear_error = PageError(COMMENT_BOX_MISSING, "y" * 300)
+        self.post(self.put(), dry_run=True)
+        [fields] = [fields for event, fields in self.log() if event is Event.POST]
+        self.assertEqual(fields["result"], "rehearsed")
+        self.assertEqual(
+            fields["detail"], ("clear_failed comment_box_missing: " + "y" * 300)[:200]
+        )
+        self.assertEqual(len(fields["detail"]), 200)
 
     def test_rehearsal_screenshot_failure_still_clears(self) -> None:
         self.page.screenshot_error = OSError("capture failed")
