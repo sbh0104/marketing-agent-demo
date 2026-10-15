@@ -63,6 +63,16 @@ class ReadmeTest(unittest.TestCase):
         self.assertIn(f"{RUN_COMMAND} --once --dry-run", self.readme)
         self.assertIn(RUN_COMMAND, agent.run.__doc__ or "")
 
+    def test_run_lines_are_locked_line_by_line(self) -> None:
+        """맥 첫 실행 줄과 녹화 3단계 줄이 둘 다, 윈도우 줄은 두 조각이 한 줄에 함께 있어야 합니다."""
+        self.assertGreaterEqual(self.readme.count(f"{RUN_COMMAND} --once --dry-run"), 2)
+        windows = [
+            line
+            for line in self.readme.splitlines()
+            if '$env:PYTHONPATH = "src"' in line and "python -m agent.run --once --dry-run" in line
+        ]
+        self.assertTrue(windows)
+
     def test_suite_command_is_the_contract_one(self) -> None:
         self.assertIn(SUITE_COMMAND, self.readme)
 
