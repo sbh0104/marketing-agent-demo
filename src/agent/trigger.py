@@ -4,8 +4,9 @@
 (min_views_per_hour 이상)를 모두 만족하면 대상(yes)입니다. 기준은 부를 때마다 받은
 TriggerConfig 에서 읽고, 지금 시각도 인자로 받아 같은 입력이면 언제나 같은 판정입니다.
 시각은 벽시계가 아니라 순간으로 비교합니다.
-시간당 조회수는 시각이 다른 가장 늦은 두 기록으로 재며, 기록이 한 시각이면 업로드 시각의
-조회수 0 을 직전 기록으로 칩니다(업로드가 그 기록보다 앞일 때만, 질문 3 B). 조회수가 줄었으면
+시간당 조회수는 최신 기록과, 최신보다 최소 간격(_MIN_GAP, 10분) 이상 앞선 기록 중 가장 늦은 것으로 잽니다.
+그보다 가까운 기록(같은 시각 포함)은 건너뛰고, 그런 앞 기록이 없으면 업로드 시각의 조회수 0 을 직전 기록으로
+칩니다(업로드가 최신 기록보다 앞일 때만 — 이 짝에는 간격을 따지지 않음, 질문 3 B · 7G 질문 1 A). 조회수가 줄었으면
 재지 않습니다 — 음수 속도는 없습니다. 판정만 돌려주고 저장 · 로그는 부르는 쪽이 합니다.
 """
 from __future__ import annotations
@@ -18,6 +19,7 @@ from agent.models import Judgement, Verdict, VideoRecord, ViewSample
 
 _MICROSECOND = timedelta(microseconds=1)
 _US_PER_HOUR = 3_600_000_000
+_MIN_GAP = timedelta(minutes=10)  # 최소 표본 간격 — 재시작 직후 몇 초 사이 1회가 큰 속도가 되지 않게(7G 질문 1 A · 2 A)
 
 
 def _utc(moment: datetime) -> datetime:
@@ -26,19 +28,22 @@ def _utc(moment: datetime) -> datetime:
 
 
 def _latest_pair(history: Sequence[ViewSample]) -> tuple[ViewSample, ViewSample] | None:
-    """(직전, 최신) — 시각이 다른 가장 늦은 두 기록. 목록 순서는 보지 않습니다."""
+    """(직전, 최신) — 최신과, 최신보다 _MIN_GAP 이상 앞선 기록 중 가장 늦은 것. 목록 순서는 보지 않습니다.
+
+    그보다 가까운 기록(같은 시각 포함)은 건너뜁니다 — 정확히 _MIN_GAP 앞선 기록은 씁니다. 간격은 순간(_utc)으로 잽니다.
+    """
     ordered = sorted(history, key=lambda sample: (_utc(sample.at), sample.count))
     if not ordered:
         return None
     latest = ordered[-1]
-    earlier = [sample for sample in ordered if _utc(sample.at) < _utc(latest.at)]
+    earlier = [sample for sample in ordered if _utc(latest.at) - _utc(sample.at) >= _MIN_GAP]
     if not earlier:
         return None
     return earlier[-1], latest
 
 
 def _first_pair(record: VideoRecord) -> tuple[ViewSample, ViewSample] | None:
-    """(업로드 시각의 조회수 0, 최신) — 기록이 한 시각뿐인 첫 판정(질문 3 B).
+    """(업로드 시각의 조회수 0, 최신) — 최신보다 _MIN_GAP 이상 앞선 기록이 없을 때(질문 3 B · 7G 질문 1 A). 업로드 쪽에는 간격을 따지지 않습니다.
 
     기록이 없거나, 업로드 시각이 최신 기록보다 앞이 아니면(나이 0 · 미래 업로드) 잴 시간이 없어 None.
     """
@@ -51,7 +56,7 @@ def _first_pair(record: VideoRecord) -> tuple[ViewSample, ViewSample] | None:
 
 
 def _measured_pair(record: VideoRecord) -> tuple[ViewSample, ViewSample] | None:
-    """판정과 views_per_hour 가 함께 쓰는 두 기록 — 시각이 다른 가장 늦은 둘, 없으면 업로드 0 과 최신."""
+    """판정과 views_per_hour 가 함께 쓰는 두 기록 — 최신과 _MIN_GAP 이상 앞선 가장 늦은 기록, 없으면 업로드 0 과 최신."""
     return _latest_pair(record.view_history) or _first_pair(record)
 
 
