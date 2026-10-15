@@ -597,18 +597,6 @@ def task_lines(result: dict) -> list[str]:
     return lines
 
 
-def todo_line(result: dict) -> str:
-    """보고서 첫머리의 6E 줄 — 이번 결과는 늘 "할 일 있음"(트래커 Phase 6D 드리프트 인터뷰 질문 3 A)."""
-    c = task_counts(result, None)
-    return (
-        f"6E: 할 일 있음 — ⓐ 고민 한 줄이 연애 고민 {c['love']}/{c['tasks']}"
-        f" · ⓑ 연애사주 경험이 고민과 이어짐 {c['saju']}/{c['tasks']}"
-        f" · ⓒ 다른 영상 초안과 겹치는 {live_check.FRAME_CHARS}글자 조각이 있는 초안"
-        f" {c['framed']}/{c['drafts']} · 건너뜀 SKIP {c['skip']}/{c['written']}"
-        f" · 작성기 답을 JSON 으로 못 읽은 초안 {c['unparsed']}/{c['drafts']}"
-    )
-
-
 def mark_text(value: object, path: str = "") -> object:
     """글 칸마다 표식을 심은 복사본 — 모든 글 잎은 `MRK·<경로>` 가 됩니다.
 
@@ -921,7 +909,6 @@ class MeasuredDriftTest(unittest.TestCase):
             topic_grade_lines,
             lowering_lines,
             task_lines,
-            todo_line,
         )
         for render in renders:
             with self.subTest(render=render.__name__):
@@ -1141,8 +1128,8 @@ class RecountTest(unittest.TestCase):
         fake = self.fake(drafts=(self.draft((0.95, 0.05, 0.95), claude="bad"),))
         self.assertEqual(check_floor(fake), 1.0)
 
-    def test_todo_line_counts_both_windows(self) -> None:
-        # 6E 줄은 모든 창의 셈 — 운영 창 초안 하나와 넓힌 창 초안 하나의 분모는 2
+    def test_task_counts_without_window_counts_both_windows(self) -> None:
+        # 창 없이 센 task_counts 는 모든 창의 셈 — 운영 창 초안 하나와 넓힌 창 초안 하나의 분모는 2
         fake = self.fake(drafts=(self.draft(),))
         widened = copy.deepcopy(fake["videos"][0])
         widened["window"] = "widened"
@@ -1150,14 +1137,6 @@ class RecountTest(unittest.TestCase):
         both, operation = task_counts(fake, None), task_counts(fake, "operation")
         self.assertEqual((both["tasks"], both["drafts"]), (2, 2))
         self.assertEqual((operation["tasks"], operation["drafts"]), (1, 1))
-        line = todo_line(fake)
-        for phrase in (
-            f"ⓐ 고민 한 줄이 연애 고민 {both['love']}/{both['tasks']} ·",
-            f"ⓑ 연애사주 경험이 고민과 이어짐 {both['saju']}/{both['tasks']} ·",
-            f"글자 조각이 있는 초안 {both['framed']}/{both['drafts']} ·",
-        ):
-            with self.subTest(phrase=phrase):
-                self.assertIn(phrase, line)
 
     def test_draft_answer_samples(self) -> None:
         # 트래커 Phase 6F — 6D 드리프트 인터뷰 질문 3 A: 정답은 채점 다섯 칸(사람 칸이 있으면 그것)이고,
@@ -1333,22 +1312,26 @@ class LowestScoreTest(unittest.TestCase):
         scores.update(values)
         return scores
 
-    def test_three_question_drafts_recount(self) -> None:
+    def test_committed_drafts_recount(self) -> None:
+        # 6E 뒤 결과의 초안은 질문 다섯 — 통과선 다시 셈과 저장된 판정 다시 판정이 다섯 이름으로 읽습니다
         result = load_result()
         drafts = [draft for draft in _parsed_drafts(result) if draft["scores"] is not None]
         self.assertTrue(drafts)
         for draft in drafts:
             scores = draft["scores"]
             with self.subTest(scores=scores):
-                self.assertEqual(set(scores), set(SCORE_NAMES))
+                self.assertEqual(set(scores), set(FIVE_SCORE_NAMES))
                 expected = min(
                     scores["mentions_scene"],
                     1.0 - scores["reads_like_ad"],
                     scores["follows_concern"],
+                    scores["concern_is_love_worry"],
+                    scores["saju_story_fits"],
                 )
                 self.assertEqual(lowest_score(scores), expected)
-        # 두 자리 모두 질문 셋의 초안을 읽습니다 — 고치기 전에는 KeyError: 'concern_is_love_worry'
-        self.assertEqual(check_floor(result), 0.7)
+        self.assertEqual(
+            check_floor(result), load_config(REPO_CONFIG).comment.check_min_probability
+        )
         self.assertEqual(stored_verdict_mismatches(result), [])
 
     def test_five_question_fake_result_recounts(self) -> None:
@@ -1680,42 +1663,19 @@ class WriterRecordTest(ContractCase):
             with self.subTest(phrase=phrase):
                 self.assert_in_contract(phrase)
 
-    def test_todo_line_counts_come_from_the_result(self) -> None:
-        line = todo_line(self.result)
-        self.assertTrue(line.startswith("6E: 할 일 있음 — "), line)
-        found = re.fullmatch(
-            r"6E: 할 일 있음 — ⓐ 고민 한 줄이 연애 고민 ([0-9]+)/([0-9]+)"
-            r" · ⓑ 연애사주 경험이 고민과 이어짐 ([0-9]+)/([0-9]+)"
-            rf" · ⓒ 다른 영상 초안과 겹치는 {live_check.FRAME_CHARS}글자 조각이 있는 초안"
-            r" ([0-9]+)/([0-9]+) · 건너뜀 SKIP ([0-9]+)/([0-9]+)"
-            r" · 작성기 답을 JSON 으로 못 읽은 초안 ([0-9]+)/([0-9]+)",
-            line,
-        )
-        self.assertIsNotNone(found, line)
-        love, tasks, saju, tasks_b, framed, drafts, skip, written, unparsed, drafts_b = (
-            found.groups()
-        )
-        self.assertEqual((tasks_b, drafts_b), (tasks, drafts))
+    def test_summary_task_line_is_the_result_count(self) -> None:
+        # 요약의 과제 품질 줄과 판정 줄의 SKIP 은 결과 파일의 셈 그대로(창 없이 센 task_counts)
+        c = task_counts(self.result, None)
         summary = live_check.render_summary(self.result).splitlines()
         task_line = next(text for text in summary if text.startswith("- 과제 품질:"))
         for phrase in (
-            f"고민이 연애 고민 {love}/{tasks}",
-            f"연애사주 경험이 고민과 이어짐 {saju}/{tasks}",
-            f"조각이 있는 초안 {framed}/{drafts}",
+            f"고민이 연애 고민 {c['love']}/{c['tasks']}",
+            f"연애사주 경험이 고민과 이어짐 {c['saju']}/{c['tasks']}",
+            f"조각이 있는 초안 {c['framed']}/{c['drafts']}",
         ):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, task_line)
-        self.assertIn(f"SKIP {skip}/{written}", live_check.verdict_line(self.result))
-        attempts = [draft for video in self.result["videos"] for draft in video["drafts"]]
-        self.assertEqual(
-            int(unparsed), sum(1 for draft in attempts if draft["parsed"] is not True)
-        )
-        tampered = copy.deepcopy(self.result)
-        for video in tampered["videos"]:
-            for draft in video["drafts"]:
-                if isinstance(draft.get("task_quality"), Mapping):
-                    draft["task_quality"]["concern_is_love_worry"] = True
-        self.assertIn(f"ⓐ 고민 한 줄이 연애 고민 {tasks}/{tasks} ·", todo_line(tampered))
+        self.assertIn(f"SKIP {c['skip']}/{c['written']}", live_check.verdict_line(self.result))
 
     def test_repeat_min_chars_stays_unmeasured(self) -> None:
         self.assert_in_contract(
