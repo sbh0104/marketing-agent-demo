@@ -61,7 +61,10 @@ BEFORE_FIX_LINE = "6B: stop — 작성 막힘(SKIP 5/7)"
 WINDOW_LABELS = {"operation": "운영 창", "widened": "넓힌 창"}
 ANSWERS = ("ok", "bad")
 TASK_CELLS = ("concern_is_love_worry", "saju_story_fits")
-_NOW = datetime(2026, 1, 1, tzinfo=timezone.utc)
+SKIP_HUMAN = ("정당", "부당")
+SKIP_GRADE_CELL = {"no_scene": "material_has_scene", "no_concern": "material_has_love_worry"}
+CHECKS_FAILED = "checks_failed"  # 실행기가 검사 두 번 탈락 영상의 skip_kind 에 적는 낱말
+_NOW =datetime(2026, 1, 1, tzinfo=timezone.utc)
 
 
 def load_result() -> dict:
@@ -597,6 +600,61 @@ def task_lines(result: dict) -> list[str]:
     return lines
 
 
+def _skip_kind(video: Mapping[str, object]) -> str | None:
+    """건너뛴 이유 낱말 — 정해진 칸 `skip_kind` 만 읽습니다(`untrusted.skip_reason` 은 읽지 않음, E-045)."""
+    kind = video.get("skip_kind")
+    return kind if isinstance(kind, str) else None
+
+
+def skip_justified(video: Mapping[str, object]) -> bool | None:
+    """사람 칸(`정당` · `부당`)이 있으면 그것, 없으면 건너뜀 채점에서 그 이유의 칸 — 거짓이면 정당, 참이면
+    부당, 채점이 없거나(오류) 칸이 참거짓이 아니면 None; 빈 사람 칸은 동의가 아닙니다(트래커 Phase 6E
+    질문 2 A · 3 A)."""
+    cell = SKIP_GRADE_CELL.get(_skip_kind(video))
+    if cell is None:
+        return None
+    human = video.get("skip_human")
+    if human in SKIP_HUMAN:
+        return human == "정당"
+    grade = video.get("skip_grade")
+    value = grade.get(cell) if isinstance(grade, Mapping) else None
+    if value is False:
+        return True
+    if value is True:
+        return False
+    return None
+
+
+def skip_lines(result: dict) -> list[str]:
+    """창마다 스스로 건너뜀의 이유별 정당 n/m — 기록만이고 판정 줄 · 통과선을 움직이지 않습니다."""
+    names = {kind: name for name, kind in live_check.SKIP_KIND_OF.items()}
+    lines: list[str] = []
+    for window, label in WINDOW_LABELS.items():
+        if window not in result["windows"]:
+            lines.append(f"정당한 건너뜀 {label}: 실행 없음")
+            continue
+        skipped = [video for video in _window_videos(result, window) if video["result"] == "skip"]
+        parts: list[str] = []
+        for kind in live_check.SELF_SKIP_KINDS:
+            group = [video for video in skipped if _skip_kind(video) == kind]
+            parts.append(
+                f"{names[kind]}"
+                f" {sum(1 for video in group if skip_justified(video) is True)}/{len(group)}"
+            )
+        unknown = sum(
+            1
+            for video in skipped
+            if _skip_kind(video) in SKIP_GRADE_CELL and skip_justified(video) is None
+        )
+        failed = sum(1 for video in skipped if _skip_kind(video) == CHECKS_FAILED)
+        lines.append(
+            f"정당한 건너뜀 {label}: "
+            + " · ".join(parts)
+            + f" · 정답 없음 {unknown} · 검사 두 번 탈락 {failed}"
+        )
+    return lines
+
+
 def mark_text(value: object, path: str = "") -> object:
     """글 칸마다 표식을 심은 복사본 — 모든 글 잎은 `MRK·<경로>` 가 됩니다.
 
@@ -638,6 +696,7 @@ def record_heads() -> list[str]:
             f"보류 영상 하한 내림 {label}:",
             f"과제 품질 {label}:",
             f"인기 댓글 {label}:",
+            f"정당한 건너뜀 {label}:",
         ]
     heads.append("모델 이름:")
     return heads
@@ -706,6 +765,7 @@ class ContractHeadTest(unittest.TestCase):
             *lowering_lines(result),
             *draft_lines(result),
             *task_lines(result),
+            *skip_lines(result),
             model_line(result),
         ]
         for line in lines:
@@ -909,6 +969,7 @@ class MeasuredDriftTest(unittest.TestCase):
             topic_grade_lines,
             lowering_lines,
             task_lines,
+            skip_lines,
         )
         for render in renders:
             with self.subTest(render=render.__name__):

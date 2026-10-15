@@ -920,6 +920,13 @@ MUTANTS: dict[str, tuple[str, str, str, str]] = {
         "cells = [task.get(name) if isinstance(task, Mapping) else None for name in TASK_CELLS]",
         "cells = [True for name in TASK_CELLS]",
     ),
+    "live-check-applied-skip-reads-reason": (
+        "tests.test_live_check_applied",
+        "tests.test_live_check_applied",
+        'kind = video.get("skip_kind")',
+        'kind = live_check.SKIP_KIND_OF.get(str((video.get("untrusted") or {})'
+        '.get("skip_reason", "")).split(" — ")[0], video.get("skip_kind"))',
+    ),
     "live-check-skip-grade-every-skip": (
         "tests.live_check",
         "tests.test_live_check",

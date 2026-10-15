@@ -732,6 +732,7 @@ run_loop(cycle, reload, initial, *, on_error, sleep=time.sleep,
   python3 -m tests.mutants live-check-applied-unknown-question-ignored
   python3 -m tests.mutants live-check-applied-recheck-no-tolerance
   python3 -m tests.mutants live-check-applied-answer-three-cells
+  python3 -m tests.mutants live-check-applied-skip-reads-reason
   python3 -m tests.mutants live-check-skip-grade-every-skip
   ```
 
@@ -743,7 +744,7 @@ run_loop(cycle, reload, initial, *, on_error, sleep=time.sleep,
   `best_correct` · `best_setting` · `verdict_line` · `cli` · `main` ·
   `write_comment` · `code_failures` · `self_check_failure` · `link_fragment` · `repeated_run` 의
   본문을 고칠 때는 이 명령들이 계속 1 로 끝나는지 함께 확인합니다. `tests/test_live_check_applied.py` 의
-  `measured_drift` · `recount` · `admitted` · `stored_verdict_mismatches` · `claude_answer` 본문을 고칠 때도
+  `measured_drift` · `recount` · `admitted` · `stored_verdict_mismatches` · `claude_answer` · `_skip_kind` 본문을 고칠 때도
   `live-check-applied-*` 명령이 계속 1 로 끝나는지 함께
   확인합니다. 음성 대조 실행기는 `agent.*` 모듈과 `tests.live_check` · `tests.test_live_check_applied`
   를 메모리에서 바꿉니다.
@@ -1018,6 +1019,11 @@ if result.draft is not None:
   - 인기 댓글 운영 창: 재료 초안 2 · 항목은 왔는데 글 0개인 영상 0
   - 인기 댓글 넓힌 창: 재료 초안 5 · 항목은 왔는데 글 0개인 영상 0
   - 과제 품질 ⓒ · 과제 칸 오류 · 인기 댓글 숫자는 기록입니다 — 통과선은 이 숫자로 움직이지 않습니다(트래커 Phase 6C 질문 1 A). 과제 품질 ⓐ · ⓑ 는 위 정답 다섯 칸에 들어 통과선을 움직입니다(트래커 Phase 6F — 6D 드리프트 인터뷰 질문 3 A).
+  - 정당한 건너뜀 운영 창: 재료에 장면 없음 3/3 · 재료에 연애 고민 없음 2/3 · 정답 없음 0 · 검사 두 번 탈락 0
+  - 정당한 건너뜀 넓힌 창: 재료에 장면 없음 0/0 · 재료에 연애 고민 없음 1/1 · 정답 없음 0 · 검사 두 번 탈락 1
+  - '정당한 건너뜀' 은 작성기가 스스로 건너뛴 영상을 이유별로 센 정당 수/그 이유로 건너뛴 수입니다. 정답은 사람 칸(`skip_human` 의 `정당` · `부당`)이 있으면 그것, 없으면 건너뜀 채점(`skip_grade`)에서 그 이유의 칸(장면 없음은 `material_has_scene`, 연애 고민 없음은 `material_has_love_worry`)이 거짓이면 정당 · 참이면 부당이고, 채점이 없으면(오류) 정답 없음입니다 — 빈 사람 칸은 동의가 아닙니다.
+    재료 채점은 제목도 장면 출처로 세어, 제목만 장면 출처인 영상은 부당 쪽으로 기웁니다. 검사 두 번 탈락은 스스로 건너뜀이 아니라 수만 적습니다.
+    이 숫자는 기록이고, 판정 줄과 통과선은 이 숫자로 움직이지 않습니다(트래커 Phase 6E 질문 2 A · 3 A).
 - **자료** — 태그 블록 `<video_title>` · `<video_description>` · `<transcript>`(자막이 비었으면
   대신 `<top_comments>` — 비어 있지 않은 인기 댓글 앞 10개) · `<classification>` ·
   `<my_previous_comments>`(최근 댓글이 있을 때만). 시스템 프롬프트가 태그 안의 글을 지시가 아닌
@@ -1462,6 +1468,7 @@ python3 -m tests.live_check --verdict <결과 파일>     # 호출 없이 판정
     기준값을 새 결과로 다시 쓰는 것입니다. 그 사이클은 다시 반영 페이즈(트래커 — 6D 다음은 6F)가 맡고, 새 결과는 main 이
     아니라 그 페이즈의 레인 브랜치에만 커밋합니다 — 그 뒤의 재실행도 트래커에 다시 반영 페이즈를 열고
     같은 길로 갑니다. 영상의 사람 칸(`topic_human`)에 `연애` · `아님` 을 적은 결과도 기록 줄(영상 판별
-    채점)을 바꾸어 이 모듈이 빨강입니다. 사람 칸의 다른 값(`human` 의 `ok` · `bad` 밖의 글, `topic_human` 의
-    `연애` · `아님` 밖의 글)은 사람 칸으로 세지 않아 이 모듈을 빨강으로 만들지 않습니다.
+    채점)을 바꾸어 이 모듈이 빨강입니다.
+    스스로 건너뛴 영상의 사람 칸(`skip_human`)에 건너뜀 채점과 다른 `정당` · `부당` 을 적은 결과도 기록 줄(정당한 건너뜀)을 바꾸어 이 모듈이 빨강입니다.
+    사람 칸의 다른 값(`human` 의 `ok` · `bad` 밖의 글, `topic_human` 의 `연애` · `아님` 밖의 글, `skip_human` 의 `정당` · `부당` 밖의 글)은 사람 칸으로 세지 않아 이 모듈을 빨강으로 만들지 않습니다.
 - **음성 대조.** 10절 목록의 `youtube-comments-*` · `live-check-*` 명령.
