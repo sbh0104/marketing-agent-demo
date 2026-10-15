@@ -20,6 +20,7 @@ from datetime import datetime
 from difflib import SequenceMatcher
 from typing import Protocol
 
+from agent.classifier import Ask
 from agent.config import CommentConfig
 from agent.logbook import Event, Logbook
 from agent.models import CommentDraft, Judgement, Verdict, VideoRecord
@@ -136,8 +137,34 @@ class ClaudeClient(Protocol):
 
 
 # jev 자체 검사 포트 — 초안 한 개에 `noul` 질문 여러 개를 한 요청으로 묻고, 질문 이름 → P(예) 를
-# 돌려줍니다. 접속(키 · jev 모델 · SDK)은 Phase 3 의 것이고, Phase 7 이 이 자리에 이어 붙입니다.
+# 돌려줍니다. 접속(키 · jev 모델 · SDK)은 Phase 3 의 것이고, 운영은 jev_self_check(sdk_ask, …) 를 넘깁니다.
 SelfCheck = Callable[[str, Mapping[str, str]], Mapping[str, object]]
+SELF_CHECK_CRITERIA = {"true": "Yes, it does", "false": "No, it does not"}
+
+
+def jev_self_check(ask: Ask, model: str) -> SelfCheck:
+    """'댓글 작성' 절의 check 포트 — 질문마다 noul 하나를 한 요청으로 묻고 answers[이름].noul 을 돌려줍니다.
+
+    실제 호출 실행기와 운영(run.py)이 이 함수를 함께 씁니다(계약 '댓글 작성' 절).
+    답의 모양이 다르면 예외가 그대로 올라가고, write_comment 가 jev 검사 실패로 받습니다.
+    """
+
+    def check(state: str, questions: Mapping[str, str]) -> Mapping[str, object]:
+        response = ask(
+            model,
+            state,
+            {
+                name: {
+                    "type": "noul",
+                    "instructions": text,
+                    "criteria": dict(SELF_CHECK_CRITERIA),
+                }
+                for name, text in questions.items()
+            },
+        )
+        return {name: response.answers[name].noul for name in questions}
+
+    return check
 
 
 @dataclass(frozen=True)
@@ -379,9 +406,11 @@ def _rewrite_turns(response: object, reason: str) -> list[dict[str, object]]:
 
 
 def _error_detail(exc: BaseException) -> str:
-    """오류 종류 · 상태 코드 · 메시지(200자까지)를 한 줄로."""
+    """오류 종류 · 상태 코드 · 메시지(200자까지)를 한 줄로. 상태 코드는 status_code, 없으면 status."""
     status = getattr(exc, "status_code", None)
-    head = type(exc).__name__ if status is None else f"{type(exc).__name__} {status}"
+    if status is None:
+        status = getattr(exc, "status", None)
+    head =type(exc).__name__ if status is None else f"{type(exc).__name__} {status}"
     message = " ".join(str(exc).split())[:200]
     return f"{head}: {message}" if message else head
 
