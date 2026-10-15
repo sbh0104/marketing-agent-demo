@@ -35,7 +35,7 @@ class PublishedResultTest(unittest.TestCase):
                 "fingerprint": {"jev_models": ["jev 010-0000-1234"]},
             }
             result_path.write_text(json.dumps(planted, ensure_ascii=False), encoding="utf-8")
-            summary_path.write_text("요약\n후원 110-000-123456\n", encoding="utf-8")
+            summary_path.write_text("요약\n후원 000-000-123456\n", encoding="utf-8")
             self.assertEqual(committed_places((result_path, summary_path)), 3)
 
     def test_missing_files_count_zero(self) -> None:

@@ -667,13 +667,20 @@ class ContactMaskTest(unittest.TestCase):
                 self.assertEqual(live_check.count_contacts(text), 1)
                 self.assertEqual(live_check.mask_contacts(text), masked)
 
+    def test_holder_masks_first_chunk_only(self) -> None:
+        # 예금주 모양은 구분 기호 다음 첫 덩이까지만 — 남은 이름은 가리지도 세지도 않습니다(대가 줄)
+        for text, masked in HOLDER_FIRST_CHUNK:
+            with self.subTest(text=text):
+                self.assertEqual(live_check.mask_contacts(text), masked)
+                self.assertEqual(live_check.count_contacts(masked), 0)
+
     def test_masked_text_counts_zero(self) -> None:
         samples = (*CONTACT_RED, *(text for text, _ in CONTACT_IN_CONTEXT), *CONTACT_GREEN)
         for sample in samples:
             with self.subTest(sample=sample):
                 self.assertEqual(live_check.count_contacts(live_check.mask_contacts(sample)), 0)
         # 이메일을 가린 뒤에야 글자에 붙어 있던 계좌 모양이 드러납니다 — 다시 보는 가림
-        joined = "x@y.ca110-000-123456"
+        joined = "x@y.ca000-000-123456"
         self.assertEqual(live_check.mask_contacts(joined), "<연락처><연락처>")
         self.assertEqual(live_check.count_contacts(live_check.mask_contacts(joined)), 0)
 
@@ -748,7 +755,7 @@ class ContactMaskTest(unittest.TestCase):
             self.assertEqual(live_check.contact_places(paths), 1)
 
     def test_file_texts_reads_json_strings_not_numbers(self) -> None:
-        raw = "후원\r\n110-000-123456"
+        raw = "후원\r\n000-000-123456"
         data = {
             "videos": [
                 {
@@ -1475,27 +1482,36 @@ GRADER_NAMES = ("live_check", "grade_draft", "GRADE_SYSTEM", "grade_topic", "TOP
 # 연락처 모양 표본 — 모두 지어낸 가짜입니다(트래커 Phase 6G: 진짜 개인 정보 금지)
 FAKE_EMAIL = "fake.owner@example.com"
 FAKE_PHONE = "010-0000-1234"
-FAKE_ACCOUNT = "110-000-123456"
+FAKE_ACCOUNT = "000-000-123456"
 FAKE_HOLDER = "예금주: 가나다"
 FAKE_ID = "01000001234"  # 영상 ID 허용 모양(11자)이면서 전화번호 모양
 SHA_LIKE = "ab12345678901cd" + "e" * 49  # examples_sha256 꼴 — 16진 글자 사이의 숫자 11개
+# 예금주 첫 덩이 대가 줄의 examples(트래커 6G 질문 2 D) — 이름이 첫 덩이가 아니면 남고 끝 줄도 세지 않습니다
+HOLDER_FIRST_CHUNK = (
+    ("예금주는 가나다입니다", "<연락처> 가나다입니다"),
+    ("예금주: Hong Gildong", "<연락처> Gildong"),
+    ("예금주 : 홍 길 동", "<연락처> 길 동"),
+    ("예금주, 가나다", "예금주, 가나다"),
+    ("가나다(예금주)", "가나다(예금주)"),
+)
 CONTACT_RED = (
-    "fake.owner@example.com", "abc (at) gmail.com", "abc [at] gmail [dot] com", "abc@gmail . com",
-    "abc @ gmail.com", "ABC@GMAIL.COM", "abc＠gmail.com", "ａｂｃ＠ｇｍａｉｌ．ｃｏｍ",
+    "fake.owner@example.com", "abc (at) example.com", "abc [at] example [dot] com",
+    "abc@example . com", "abc @ example.com", "ABC@EXAMPLE.COM", "abc＠example.com",
+    "ａｂｃ＠ｅｘａｍｐｌｅ．ｃｏｍ",
     "youtube.com@evil.example",
     "010-0000-1234", "010.0000.1234", "010 0000 1234", "010 - 0000 - 1234", "01000001234",
     "+82 10-0000-1234", "+821000001234", "02-000-1234", "(02)000-1234", "02)000-1234",
     "(010)0000-1234",
     "０１０－００００－１２３４", "010‐0000‐1234",
-    "110-000-123456", "3333-00-1234567", "352-0000-1234-56", "110000123456", "110–000–123456",
+    "000-000-123456", "0000-00-1234567", "000-0000-1234-56", "000000123456", "000–000–123456",
     "예금주: 가나다", "예금주 가나다", "예금주：가나다", "예금주\n가나다", "예금주명: 가나다", "예금주 - 가나다",
     "예금주 ㅣ 가나다", "예금주 | 가나다",
 )
 # 앞뒤 글과 함께 볼 표본 — (원문, 가린 뒤)
 CONTACT_IN_CONTEXT = (
-    ("후원\r\n110-000-123456", "후원\r\n<연락처>"),
+    ("후원\r\n000-000-123456", "후원\r\n<연락처>"),
     ("문의\n01000001234", "문의\n<연락처>"),
-    ("카카오뱅크/3333-00-1234567/가나다", "카카오뱅크/<연락처>/가나다"),
+    ("카카오뱅크/0000-00-1234567/가나다", "카카오뱅크/<연락처>/가나다"),
     ("[예금주] 가나다", "[<연락처>"),
     ("예금주 (가나다)", "<연락처>)"),
 )
