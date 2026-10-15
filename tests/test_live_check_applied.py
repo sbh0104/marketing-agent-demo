@@ -1221,6 +1221,108 @@ class RecountTest(unittest.TestCase):
                 self.assertEqual(check_floor(changed), expected)
 
 
+FIVE_SCORE_NAMES = (*SCORE_NAMES, "concern_is_love_worry", "saju_story_fits")
+
+
+class LowestScoreTest(unittest.TestCase):
+    """`lowest_score` · `self_check_passes` — 초안마다 그 초안 `scores` 의 질문 이름으로 셉니다.
+
+    결과의 질문 이름은 실행 때의 `CHECK_QUESTIONS` 라 판마다 다릅니다(6D 셋 · 6E 뒤 다섯). 모르는
+    이름 · 빈 점수는 거절합니다 — 헌법 12조 닮은 꼴 표본(트래커 Phase 6E 'The plan decides' 6D
+    ship-check R2).
+    """
+
+    @staticmethod
+    def five(**values: float) -> dict[str, float]:
+        """다섯 이름 점수 — 비교 점수가 모두 1.0(광고는 P(예) 0.0)인 것에서 values 만 바꿉니다."""
+        scores = {name: 1.0 for name in FIVE_SCORE_NAMES}
+        scores["reads_like_ad"] = 0.0
+        scores.update(values)
+        return scores
+
+    def test_three_question_drafts_recount(self) -> None:
+        result = load_result()
+        drafts = [draft for draft in _parsed_drafts(result) if draft["scores"] is not None]
+        self.assertTrue(drafts)
+        for draft in drafts:
+            scores = draft["scores"]
+            with self.subTest(scores=scores):
+                self.assertEqual(set(scores), set(SCORE_NAMES))
+                expected = min(
+                    scores["mentions_scene"],
+                    1.0 - scores["reads_like_ad"],
+                    scores["follows_concern"],
+                )
+                self.assertEqual(lowest_score(scores), expected)
+        # 두 자리 모두 질문 셋의 초안을 읽습니다 — 고치기 전에는 KeyError: 'concern_is_love_worry'
+        self.assertEqual(check_floor(result), 0.7)
+        self.assertEqual(stored_verdict_mismatches(result), [])
+
+    def test_five_question_fake_result_recounts(self) -> None:
+        draft = RecountTest.draft(claude="bad")
+        draft["scores"] = self.five(
+            mentions_scene=0.9,
+            reads_like_ad=0.1,
+            follows_concern=0.9,
+            concern_is_love_worry=0.85,
+            saju_story_fits=0.72,
+        )
+        fake = RecountTest.fake(drafts=(draft,))
+        self.assertEqual(lowest_score(draft["scores"]), 0.72)
+        self.assertEqual(check_floor(fake), round(0.72 + live_check.MARGIN, 6))
+        self.assertEqual(check_floor(fake), 0.77)
+        self.assertEqual(stored_verdict_mismatches(fake), [])
+        flipped = copy.deepcopy(fake)
+        flipped["videos"][0]["drafts"][0]["self_check_pass"] = False
+        self.assertEqual(
+            stored_verdict_mismatches(flipped),
+            ["videos[0].drafts[0] self_check_pass False -> True"],
+        )
+
+    def test_self_check_passes_matches_writer(self) -> None:
+        self.assertEqual(set(FIVE_SCORE_NAMES), set(CHECK_QUESTIONS))
+        for i in range(1, 100):
+            floor = float(f"0.{i:02d}")
+            below = round(floor - 0.01, 2)
+            for name in FIVE_SCORE_NAMES:
+                inverted = name in INVERTED_QUESTIONS
+                at = round(1 - floor, 2) if inverted else floor  # 1 − 0.9 경계 갈래
+                under = round(1 - below, 2) if inverted else below
+                for label, value, passing in (("at", at, True), ("below", under, False)):
+                    scores = self.five(**{name: value})
+                    with self.subTest(floor=floor, name=name, case=label):
+                        writer_pass = self_check_failure(scores, floor) is None
+                        self.assertEqual(self_check_passes(scores, floor), writer_pass)
+                        self.assertEqual(writer_pass, passing)
+
+    def test_unknown_question_name_is_refused(self) -> None:
+        three = dict(zip(SCORE_NAMES, PASSING_SCORES))
+        self.assertEqual(lowest_score(three), 0.9)
+        self.assertEqual(lowest_score(self.five(saju_story_fits=0.72)), 0.72)
+        near_misses = (
+            "Reads_like_ad",
+            " reads_like_ad",
+            "reads-like-ad",
+            "ｒeads_like_ad",
+            "reads_like_promo",
+        )
+        for odd in near_misses:
+            scores = {
+                (odd if key == "reads_like_ad" else key): value for key, value in three.items()
+            }
+            with self.subTest(name=odd):
+                with self.assertRaises(ValueError):
+                    lowest_score(scores)
+                with self.assertRaises(ValueError):
+                    self_check_passes(scores, 0.7)
+
+    def test_empty_scores_is_refused(self) -> None:
+        with self.assertRaises(ValueError):
+            lowest_score({})
+        with self.assertRaises(ValueError):
+            self_check_passes({}, 0.7)
+
+
 class DraftBoundaryTest(unittest.TestCase):
     """심은 초안 · 행의 경계 — 사람 칸이 Claude 채점보다 먼저, 기준값과 같은 `noul` 은 사이가 아님."""
 

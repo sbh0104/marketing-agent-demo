@@ -23,6 +23,7 @@ from agent.config import CommentConfig, load_config
 from agent.logbook import Event, Logbook, parse_line
 from agent.models import CommentDraft, Judgement, Verdict, VideoRecord
 from agent.writer import (
+    CHECK_LABELS,
     CHECK_QUESTIONS,
     CLAUDE_TIMEOUT_S,
     MAX_TOKENS,
@@ -305,6 +306,8 @@ class CheckTest(unittest.TestCase):
             "mentions_scene": (0.25, "자체 검사 미달 — 영상 속 장면·말 언급 0.25"),
             "reads_like_ad": (0.75, "자체 검사 미달 — 광고처럼 읽힘 0.75"),
             "follows_concern": (0.25, "자체 검사 미달 — 영상 고민과 이어짐 0.25"),
+            "concern_is_love_worry": (0.25, "자체 검사 미달 — 고민 한 줄이 연애 고민 0.25"),
+            "saju_story_fits": (0.25, "자체 검사 미달 — 연애사주 경험이 고민과 이어짐 0.25"),
         }
         self.assertEqual(set(cases), set(CHECK_QUESTIONS))
         self.assertIsNone(self_check_failure(PASSING, 0.5))
@@ -450,7 +453,10 @@ class WriteCommentTest(unittest.TestCase):
         result = self.write(claude, jev, previous=[PREV])
         self.assertEqual((len(claude.calls), len(jev.calls)), (1, 1))
         check = Judgement(
-            Verdict.YES, "mentions_scene=0.90 reads_like_ad=0.10 follows_concern=0.80", NOW
+            Verdict.YES,
+            "mentions_scene=0.90 reads_like_ad=0.10 follows_concern=0.80"
+            " concern_is_love_worry=0.85 saju_story_fits=0.75",
+            NOW,
         )
         self.assertEqual(result, WriteResult(CommentDraft(CONCERN, GOOD, NOW, check), None))
         self.assertEqual(
@@ -591,7 +597,64 @@ class WriteCommentTest(unittest.TestCase):
                     "Does the text inside <draft_comment> respond to the concern written"
                     " inside <video_concern>?"
                 ),
+                "concern_is_love_worry": (
+                    "Does the text inside <video_concern> describe a romantic-relationship worry"
+                    " that a person in the material (someone in the video, the person whose story"
+                    " it is, or a viewer commenting on that situation) is going through, rather"
+                    " than a summary of the plot or topic or a wish to get a fortune reading? For"
+                    " a tarot or saju reading video, the situation the reading answers (whether"
+                    " they will get in touch, getting back together, a new relationship) counts"
+                    " as that worry."
+                ),
+                "saju_story_fits": (
+                    "Does the text inside <draft_comment> share the writer's own experience of"
+                    " getting a '연애사주' (love saju) reading when they had a similar worry, and"
+                    " does that experience connect naturally to the concern written inside"
+                    " <video_concern>?"
+                ),
             },
+        )
+        self.assertEqual(
+            list(CHECK_QUESTIONS),
+            [
+                "mentions_scene",
+                "reads_like_ad",
+                "follows_concern",
+                "concern_is_love_worry",
+                "saju_story_fits",
+            ],
+        )
+        self.assertEqual(
+            {name: CHECK_LABELS[name] for name in ("concern_is_love_worry", "saju_story_fits")},
+            {
+                "concern_is_love_worry": "고민 한 줄이 연애 고민",
+                "saju_story_fits": "연애사주 경험이 고민과 이어짐",
+            },
+        )
+
+    def test_new_questions_below_threshold_rewrite(self) -> None:
+        labels = {
+            "concern_is_love_worry": "고민 한 줄이 연애 고민",
+            "saju_story_fits": "연애사주 경험이 고민과 이어짐",
+        }
+        for name, label in labels.items():
+            with self.subTest(name):
+                claude = FakeClaude([reply(CONCERN, GOOD), reply(CONCERN, GOOD2)])
+                jev = FakeJev([{**PASSING, name: 0.25}, PASSING])
+                result = self.write(claude, jev, log_path=self.dir / f"{name}.log")
+                self.assertEqual((len(claude.calls), len(jev.calls)), (2, 2))
+                self.assertEqual(result.draft.text, GOOD2)
+                self.assertEqual(self.rewrite_reason(claude), f"자체 검사 미달 — {label} 0.25")
+        both = {**PASSING, "concern_is_love_worry": 0.25, "saju_story_fits": 0.25}
+        claude = FakeClaude([reply(CONCERN, GOOD), reply(CONCERN, GOOD2)])
+        result = self.write(claude, FakeJev([both, both]), log_path=self.dir / "both.log")
+        failure = "자체 검사 미달 — 고민 한 줄이 연애 고민 0.25, 연애사주 경험이 고민과 이어짐 0.25"
+        reason = f"검사 두 번 탈락 — 1차: {failure} / 2차: {failure}"
+        self.assertEqual(result, WriteResult(None, reason))
+        self.assertEqual(len(claude.calls), 2)
+        self.assertEqual(
+            self.events(self.dir / "both.log"),
+            [(Event.SKIP, {"video": VIDEO_ID, "reason": reason})],
         )
 
     def test_self_check_below_threshold_rewrites_once(self) -> None:
@@ -1106,19 +1169,25 @@ class WriteCommentTest(unittest.TestCase):
             self.user_message(claude),
         )
 
-    def test_check_request_holds_three_questions_concern_and_draft(self) -> None:
+    def test_check_request_holds_five_questions_concern_and_draft(self) -> None:
         claude = FakeClaude([reply(CONCERN, GOOD), reply("답장 텀 걱정", GOOD2)])
         jev = FakeJev([{**PASSING, "follows_concern": 0.25}, PASSING])
         self.write(claude, jev)
-        self.assertEqual(len(jev.calls), 2)
+        self.assertEqual(len(jev.calls), 2)  # 초안마다 한 요청
         for (state, questions), (concern, text) in zip(
             jev.calls, ((CONCERN, GOOD), ("답장 텀 걱정", GOOD2))
         ):
             with self.subTest(concern=concern):
                 self.assertEqual(questions, CHECK_QUESTIONS)
+                self.assertEqual(len(questions), 5)
                 self.assertIn(f"<video_concern>\n{concern}\n</video_concern>", state)
                 self.assertIn(f"<draft_comment>\n{text}\n</draft_comment>", state)
                 self.assertIn("<video_title>\n연락 텀 때문에 불안한 썸\n</video_title>", state)
+                self.assertIn(
+                    "<video_description>\n썸 타는 사람의 답장이 세 시간씩 늦을 때 어떻게 해야"
+                    " 할까요?\n</video_description>",
+                    state,
+                )
 
     def test_write_result_holds_exactly_one_outcome(self) -> None:
         draft = CommentDraft(CONCERN, GOOD, NOW)
