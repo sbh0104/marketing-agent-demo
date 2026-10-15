@@ -6,10 +6,6 @@
 - evidence: 이번 ⑷ 13개(`.env.example` · `.gitignore` · `config.yaml` · `src/agent/store.py` · `src/agent/scheduler.py` · `tests/test_gitignore.py` …)는 모두 `1baaf13` 앞 커밋(첫 implement `63fab05`…`bce162f`, 07:08 복구 plan 의 `9a4b6c5` · `2262eca` · `56eec24`)의 파일이고, 11:09 에 다시 쓴 plan.md:402-473 의 `Files:` 줄은 HC1 고침 10개만 이름 붙인다 — verify-run V18 이 `git diff --name-only 1baaf13 7e39c3a` = 정확히 그 10개로 초록 (cycle 20261013-062542-adw/phase-1-foundation-contracts)
 - first confirmed: 2026-10-13 · last confirmed: 2026-10-15
 
-### E-003 · gotcha — `verify-run` 부터 다시(control retry)는 옛 verify-plan 을 그대로 쓴다 — 그 사이 인터뷰가 트래커만 커밋해도 범위 끝을 `HEAD` 로 둔 검사는 빨개진다
-- evidence: 14:28 retry 본 패스에서 V18(`git diff --name-only 1baaf13 HEAD` = 10개)이 HC1-2 트래커 커밋 `a35981b` 때문에 11줄로 빨강; 범위를 verify-plan 이 잰 `7e39c3a` 로 고정하고 "그 뒤는 트래커 하나만"을 단언하자 초록, 음성 대조 3개는 그대로 빨강 (verify-report.md Fixes applied 1). `.adw/verify.sh` 는 git 이 무시해(`.adw/.gitignore:23`) 이 고침엔 커밋 SHA 가 없다 (cycle 20261013-062542-adw/phase-1-foundation-contracts)
-- first confirmed: 2026-10-13 · last confirmed: 2026-10-14
-
 ### E-004 · tooling — 이 기계의 셸 `grep` 은 GNU grep 이 아니라 ugrep 7.8.4 를 부르는 셸 함수다 — GNU grep 의 동작(NUL 이 든 파일의 `binary file matches` 등)을 재는 시험은 `/usr/bin/grep` 을 경로로 불러야 같은 것을 잰다
 - evidence: ship-report.md:320 (R5); `type grep` → "grep is a function", `/usr/bin/grep` 따로 있음 (cycle 20261013-062542-adw/phase-1-foundation-contracts)
 - first confirmed: 2026-10-13 · last confirmed: 2026-10-14
@@ -122,7 +118,15 @@
 - evidence: 6C — Guard B 첫 행 `target 2, min 0` 으로 `<=` 변이 M8a 생존 → R3 · S-077, 분모 변이 M23 생존 → R4 · S-078(6C summary.md Coverage decisions). 6E — verify-run V5 `mutants new: 8 run · caught 8` · V6 `47/47` 인데 ship-check 가 `_frame_pieces` 의 '연애사주' 빼기 앞 끝 · 뒤 끝과 `skip_human` 값 변이 생존을 재현 → S-093 · S-094(ship-report.md:173-176). 가드 매트릭스 행 규칙은 `.claude/skills/plan/SKILL.md:128`(변이 행만 `unmeasured` 허용) (cycle 20261014-172227-adw/phase-6c-live-check-grader-fix · 20261015-091934-adw/phase-6e-comment-quality-fix)
 - first confirmed: 2026-10-15 · last confirmed: 2026-10-15
 
+### E-042 · gotcha — [stop:red-unbucketable · 6g] ship-check BLOCKED 이고 통이 그 고침을 못 받는다 — 이 페이즈는 제 브랜치에서 아래 Blockers 를 범위로 다시 돈다
+- blocker: **`예금주` 줄의 이름이 남는데, 끝 줄은 "없음"이라고 찍습니다.** 후원 안내 속 예금주 실명이 공개 저장소에 들어갈 수 있습니다.
+- blocker: 6F 실제 실행: 어떤 영상 설명에 `후원 3333-00-1234567 예금주는 가나다입니다` 가 있습니다.
+- blocker: 실행기가 결과 사본을 만듦(`_kept`): 계좌번호는 `<연락처>` 가 됩니다. `예금주` 줄은 `예금주는` 까지만 이름 자리로 읽혀 가려지고, 결과는 `<연락처> 가나다입니다` 입니다.
+- evidence: .adw/journal/20261015-123731-stop-6g · 6g · end|6g|2026-10-15T12:37:30+0900
+- first confirmed: 2026-10-15 · last confirmed: 2026-10-15
+
 ## Retired (history — one line each, never deleted)
+- E-003 · gotcha — `verify-run` 부터 다시(control retry)는 옛 verify-plan 을 그대로 쓴다 — 그 사이 인터뷰가 트래커만 커밋해도 범위 끝을 `HEAD` 로 둔 검사는 빨개진다 — retired 2026-10-15 (over cap; unconfirmed since 2026-10-14)
 - E-035 · codebase — 실행기 테스트의 가짜 Claude(`tests/test_live_check.py` `FakeClaude.create`)는 `system` 글이 `GRADE_SYSTEM` · `TOPIC_SYSTEM` 과 같은지로 호출 종류를 가리고, 둘 다 아니면 오류 없이 `write`(작성)로 센다 — 실행기에 새 system 글로 Claude 를 부르는 호출을 더하는 페이즈가 가짜에 갈래를 더하지 않으면 그 호출은 작성 큐의 답을 받는다. 최악 호출 수를 글자로 잠근 `test_default_limits_fit_under_ceilings` 도 함께 고쳐야 한다 — retired 2026-10-15 (6E 가 세 번째 갈래(`SKIP_GRADE_SYSTEM` → `skip_grade`, `tests/test_live_check.py:1591`)를 더해 "둘 다 아니면" 과 인용 줄(:1417-1426)이 코드와 어긋남 — 같은 사실을 고친 줄로 E-037 에 다시 씀)
 - E-011 · tooling — `retro_collect.py` 의 `_tokens` 는 `Files:` 줄 경로의 양끝에서 `.` 를 벗긴다 — 점으로 시작하는 파일은 plan 이 `Files:` 에 적어도 "계획 밖 파일" · T4 경보 ⑷ 에 늘 들어간다(`.env.example` → `env.example`, `.gitignore` → 점이 없어져 경로로 안 보고 버림) — retired 2026-10-15 (over cap; unconfirmed since 2026-10-13)
 - E-018 · tooling — 이 기계에는 `playwright` 도 `pip-audit` 도 설치돼 있지 않다 — 브라우저 층 시험은 가짜 객체로만 돌고, `requirements.txt` 를 바꾼 사이클의 의존성 감사는 미측정이라 ship 판정이 ⚠️ READY WITH RISKS 위로 올라가지 못한다 — retired 2026-10-15 (over cap; unconfirmed since 2026-10-13)
