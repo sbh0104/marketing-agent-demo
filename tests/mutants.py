@@ -482,6 +482,36 @@ MUTANTS: dict[str, tuple[str, str, str, str]] = {
         "logbook.write(Event.ERROR, where=where, reason=reason, video=record.video_id)",
         "None",
     ),
+    "writer-self-skip-checked": (
+        "agent.writer",
+        "tests.test_writer",
+        "if isinstance(reply, str):",
+        "if False:",
+    ),
+    "writer-no-concern-ignored": (
+        "agent.writer",
+        "tests.test_writer",
+        "if not has_concern:",
+        "if False:",
+    ),
+    "writer-no-frame": (
+        "agent.writer",
+        "tests.test_writer",
+        "if piece in others:",
+        "if False:",
+    ),
+    "writer-frame-counts-required-word": (
+        "agent.writer",
+        "tests.test_writer",
+        "if not covered.intersection(range(start, start + FRAME_MIN_CHARS))",
+        "if True",
+    ),
+    "task-table-missing-sentence-ignored": (
+        "tests.test_task_table",
+        "tests.test_task_table",
+        'problems.append(f"없는 문장: {sentence}")',
+        "None",
+    ),
     "classifier-error-yes": (
         "agent.classifier",
         "tests.test_classifier",
@@ -757,6 +787,24 @@ MUTANTS: dict[str, tuple[str, str, str, str]] = {
         "tests.test_live_check_applied",
         "return mismatches",
         "return []",
+    ),
+    "live-check-applied-unknown-question-ignored": (
+        "tests.test_live_check_applied",
+        "tests.test_live_check_applied",
+        "if unknown or not scores:",
+        "if not scores:",
+    ),
+    "live-check-applied-recheck-no-tolerance": (
+        "tests.test_live_check_applied",
+        "tests.test_live_check_applied",
+        "return lowest_score(scores) + _TOLERANCE >= threshold",
+        "return lowest_score(scores) >= threshold",
+    ),
+    "live-check-skip-grade-every-skip": (
+        "tests.live_check",
+        "tests.test_live_check",
+        'if video["skip_kind"] in SELF_SKIP_KINDS:',
+        'if video["result"] == "skip":',
     ),
 }
 

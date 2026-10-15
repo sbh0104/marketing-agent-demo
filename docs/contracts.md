@@ -669,6 +669,11 @@ run_loop(cycle, reload, initial, *, on_error, sleep=time.sleep,
   python3 -m tests.mutants writer-repeat-all-history
   python3 -m tests.mutants writer-unescaped-material
   python3 -m tests.mutants writer-api-error-unlogged
+  python3 -m tests.mutants writer-self-skip-checked
+  python3 -m tests.mutants writer-no-concern-ignored
+  python3 -m tests.mutants writer-no-frame
+  python3 -m tests.mutants writer-frame-counts-required-word
+  python3 -m tests.mutants task-table-missing-sentence-ignored
   python3 -m tests.mutants classifier-error-yes
   python3 -m tests.mutants classifier-malformed-yes
   python3 -m tests.mutants classifier-unchecked-probability
@@ -705,6 +710,9 @@ run_loop(cycle, reload, initial, *, on_error, sleep=time.sleep,
   python3 -m tests.mutants live-check-applied-recount-ignored
   python3 -m tests.mutants live-check-applied-exception-any-run
   python3 -m tests.mutants live-check-applied-stored-verdicts-unchecked
+  python3 -m tests.mutants live-check-applied-unknown-question-ignored
+  python3 -m tests.mutants live-check-applied-recheck-no-tolerance
+  python3 -m tests.mutants live-check-skip-grade-every-skip
   ```
 
   `classify` · `read_answers` · `build_state` · `is_error_hold` · `sdk_ask` ·
@@ -880,14 +888,17 @@ if result.draft is not None:
   `ValueError("주제 판별이 yes 인 영상에만 댓글을 씁니다: <영상 ID>")` 이고 Claude 를 부르지
   않습니다.
 - **`claude` 포트** — `anthropic.Anthropic` 과 같은 모양
-  (`messages.create(model=, max_tokens=, system=, messages=)`). `anthropic_client(api_key=None)`
+  (`messages.create(model=, max_tokens=, system=, tools=, tool_choice=, messages=)`).
+  `anthropic_client(api_key=None)`
   가 실제 클라이언트를 만듭니다. `anthropic` 패키지는 이 함수 안에서만 가져오므로 테스트는 설치
   없이 돕니다. 제한 시간은 60초(`CLAUDE_TIMEOUT_S` — SDK 기본값 10분이면 한 줄로 도는 루프가
   멈춥니다)이고, 429/529 재시도는 SDK 기본값 그대로입니다. 모델 이름은 `comment.writer_model`
-  (2절)에서 읽습니다.
+  (2절)에서 읽습니다. 작성 답은 도구 `submit_comment` 의 입력으로 받습니다(`tool_choice` 로 그
+  도구를 정함). 모델이 그 도구로 답하는지와 `tool_result` 다시 쓰기 차례를 받는지는 다음 진짜
+  실행이 처음 확인합니다.
 - **`check` 포트** — `check(state, questions) -> {질문 이름: P(예)}`. 초안 한 개에 `noul` 질문
-  세 개(`CHECK_QUESTIONS`: `mentions_scene` · `reads_like_ad` · `follows_concern`)를 **한
-  요청**으로 묻습니다. 접속(키 `TYPESAFE_API_KEY` · jev 모델 · `typesafe-sdk`)은 Phase 3 의
+  다섯 개(`CHECK_QUESTIONS`: `mentions_scene` · `reads_like_ad` · `follows_concern` ·
+  `concern_is_love_worry` · `saju_story_fits`)를 **한 요청**으로 묻습니다. 접속(키 `TYPESAFE_API_KEY` · jev 모델 · `typesafe-sdk`)은 Phase 3 의
   것이고, Phase 7 이 Phase 3 의 클라이언트를 이 자리에 이어 붙입니다.
 - **자료의 출처** — 자막은 공식 API 로 남의 영상에서 받을 수 없어 비어 있습니다.
   `captions.download` 는 OAuth 와 그 영상의 편집 권한(200단위)을 요구하고, 비공식 긁기는 약관 · 차단
@@ -897,33 +908,42 @@ if result.draft is not None:
 
 **흐름** — 시도마다(최대 두 번):
 
-1. Claude 가 JSON `{"concern": "고민 한 줄", "comment": "댓글"}` 으로 답합니다. 읽을 수 없으면
-   jev 를 부르지 않고 그 시도는 `JSON 으로 읽을 수 없습니다` 로 떨어집니다.
-2. jev 자체 검사.
-3. 코드 검사 — 글자 수 · 링크 · 반복을 **모두** 돌립니다(코드가 마지막).
+1. Claude 가 도구 `submit_comment` 로 답합니다 — `has_love_concern` · `has_scene`(JSON 참거짓)과,
+   둘 다 참이면 `concern`(고민 한 줄) · `comment`(댓글). 도구 블록이 없거나 모양이 다르면 jev 를
+   부르지 않고 그 시도는 `답을 읽을 수 없습니다` 로 떨어집니다. 글 블록이 함께 와도 도구 블록이
+   답이고, 네 칸 밖의 키가 있어도 네 칸으로 읽습니다.
+2. **스스로 건너뜀** — `has_love_concern` 이 거짓이면 `재료에 연애 고민 없음`, 고민은 참이고
+   `has_scene` 이 거짓이면 `재료에 장면 없음` 입니다. jev 를 부르지 않고 다시 쓰지 않으며 바로
+   `SKIP reason="<그 이유>"` 입니다(두 번째 시도의 답이면 `"<그 이유> — 1차: <1차 이유>"`).
+   건너뜀 답에서 읽는 것은 두 참거짓뿐입니다.
+3. jev 자체 검사.
+4. 코드 검사 — 글자 수 · 링크 · 반복 · 문장 틀을 **모두** 돌립니다(코드가 마지막).
 
 떨어진 이유(jev 이유가 먼저, 코드 이유는 위 순서)를 모두 `; ` 로 이어 다시 쓰기 이유 하나로
-만들고, 같은 대화에 Claude 의 원래 답(assistant)과 `REWRITE_PROMPT`(user)를 붙여 한 번 다시
+만들고, 원래 답에 도구 호출이 있으면 그 호출(assistant)과 그 호출의 `tool_result` 로 붙인
+`REWRITE_PROMPT`(user)를, 없으면 원래 글과 `REWRITE_PROMPT` 를 같은 대화에 붙여 한 번 다시
 씁니다. 두 번째도 떨어지면 `SKIP reason="검사 두 번 탈락 — 1차: … / 2차: …"` 입니다. 통과하면
 `COMMENT` 를 남기고 초안을 돌려줍니다.
 
 | 검사 | 통과 규칙 | 떨어질 때 이유 |
 |---|---|---|
-| 답 읽기 | JSON 객체, `concern` · `comment` 가 비어 있지 않은 글자 | `JSON 으로 읽을 수 없습니다` |
+| 답 읽기 | 도구 `submit_comment` 입력 — 두 참거짓, 둘 다 참이면 `concern` · `comment` 가 비어 있지 않은 글자 | `답을 읽을 수 없습니다` |
 | jev 자체 검사 | 질문마다 점수 + `_TOLERANCE` ≥ `check_min_probability` | `자체 검사 미달 — <이름표> <P(예)>, …` |
 | 글자 수 | `min_chars` ≤ 글자 수 ≤ `max_chars` | `글자 수 <n>자 — <min>–<max>자여야 합니다` |
 | 링크 | 링크 보기에 `_LINK_RE` 조각이 없음 | `링크·주소 모양이 들어 있습니다: <조각>` |
 | 반복 | 최근 댓글과 같지 않고, 겹친 연속 글자 < 12 | `이전 댓글과 겹칩니다: <겹친 글자>` |
+| 문장 틀 | 최근 댓글과 같은 6글자 조각이 없음('연애사주' 에 걸친 조각은 빼고) | `이전 댓글과 문장 틀이 같습니다: <조각>` |
 
-- 이름표(`CHECK_LABELS`)는 `영상 속 장면·말 언급` · `광고처럼 읽힘` · `영상 고민과 이어짐`
-  이고, 확률은 소수 둘째 자리입니다(`자체 검사 미달 — 영상 속 장면·말 언급 0.25`).
-- **하한 비교** — 점수는 `mentions_scene` · `follows_concern` 이 P(예), `reads_like_ad` 는
-  1 − P(예)입니다. jev 는 부정을 글자 그대로 읽으므로 광고 질문은 긍정으로 묻고 뒤집습니다.
+- 이름표(`CHECK_LABELS`)는 `영상 속 장면·말 언급` · `광고처럼 읽힘` · `영상 고민과 이어짐` ·
+  `고민 한 줄이 연애 고민` · `연애사주 경험이 고민과 이어짐` 이고, 확률은 소수 둘째
+  자리입니다(`자체 검사 미달 — 영상 속 장면·말 언급 0.25`).
+- **하한 비교** — 점수는 `mentions_scene` · `follows_concern` · `concern_is_love_worry` ·
+  `saju_story_fits` 가 P(예), `reads_like_ad` 는 1 − P(예)입니다. jev 는 부정을 글자 그대로 읽으므로 광고 질문은 긍정으로 묻고 뒤집습니다.
   `score + _TOLERANCE < check_min_probability` 이면 떨어집니다(`_TOLERANCE = 1e-9`). 그냥 `<`
   로 비교하면 1 − P 의 부동소수 오차(`1 - 0.9 = 0.0999…98`) 때문에 두 자리 하한 99개 중 20개에서
   "하한과 같으면 통과" 가 깨집니다.
 - **글자 수** — NFC 로 맞춘 댓글의 `len()`, 곧 코드 포인트 수이지 바이트가 아닙니다.
-  `parse_output` 이 댓글을 NFC 로 맞추고 앞뒤 공백을 떼며, 고민은 한 줄로 모읍니다.
+  `read_reply` 가 댓글을 NFC 로 맞추고 앞뒤 공백을 떼며, 고민은 한 줄로 모읍니다.
   서로게이트(U+D800–U+DFFF)가 든 고민 · 댓글은 읽을 수 없는 답으로 보아 다시 씁니다.
 - **링크** — 링크 보기는 NFKC + casefold 한 글에서 글자 · 숫자(`isalnum`, 한글 포함)와 `@` 는
   그대로, 유니코드 이름에 `FULL STOP`/`DOT` 이 든 글자는 `.`, `SOLIDUS`/`SLASH` 는 `/`,
@@ -939,6 +959,17 @@ if result.draft is not None:
   같거나, `difflib.SequenceMatcher(autojunk=False)` 로 찾은 가장 긴 연속 공통 글자가
   `REPEAT_MIN_CHARS`(12, 코드 상수) 이상이면 반복입니다. 비교 대상은 `previous` 의 마지막
   `RECENT_WINDOW`(20)개 — Claude 가 `<my_previous_comments>` 에서 보는 바로 그 댓글들입니다.
+- **문장 틀** — 두 글을 반복과 같이 맞춘 뒤(NFKC + casefold, `isalnum` 글자만) 최근 댓글 하나와
+  `FRAME_MIN_CHARS`(6, 코드 상수) 글자 조각이 하나라도 같으면 같은 문장 틀입니다. '연애사주'
+  (`REQUIRED_WORD`, 과제가 반드시 넣으라는 낱말)에 걸친 조각은 문장 틀로 세지 않습니다 — 그래서
+  `연애 사주` · `연애사주를 봤을 때` 만 겹치면 지나가고, `뜨끔했어요. 저도` 처럼 문장을 잇는 6글자
+  조각이 겹치면 걸립니다. 이 검사가 잡는 것은 6글자 이상 같은 이음 조각입니다 — 6D 초안 11개 가운데
+  이 검사가 잡는 것은 2개(`뜨끔했어요. 저도` 한 쌍)이고, 나머지가 나눈 두 문장 뼈대('[반응]어요. 저도
+  … 연애사주를 봤을 때 … 말을 듣고 …')처럼 '연애사주' 에 걸친 조각과 6글자보다 짧은 이음으로 겹치는
+  꼴은 지나갑니다. 그 몫은 프롬프트 규칙 6 입니다. 비교 대상은 반복과 같은 `RECENT_WINDOW`(20)
+  개입니다. `FRAME_MIN_CHARS` 는 잰 값이 아닙니다 — 실행기는 한 실행에서 앞서 통과한 초안(몇 개)과만
+  비교해 20개 창에서 얼마나 막는지 잴 수 없고, 운영(Phase 7)의 기록이 처음 잽니다. 실행기의 과제
+  품질 ⓒ(`frame_overlap`)는 공백만 빼고 '연애사주' 조각도 세는 기록이라 이 검사와 다른 셈입니다.
 - **잰 값 (Phase 6D).** `docs/live-check/result.json` 에서 읽은 숫자입니다('주제 판별' 절의 기록과 같은
   실행). 6E 가 고칠 작성기의 숫자라 '고치기 전' 기록입니다(트래커 Phase 6D 드리프트 인터뷰 질문 1 A).
   - 모델 이름: claude-sonnet-5-5 accepted · claude-haiku-5-5 accepted — 작성 claude-sonnet-5-5 · 채점 claude-haiku-5-5
@@ -982,12 +1013,33 @@ if result.draft is not None:
   몫입니다. `try` 안에는 `messages.create` 와 `check` 호출만 있으므로, 모양이 틀린 Claude
   응답(작성기 버그)은 건너뛰기로 숨지 않고 그대로 오류가 됩니다.
 - **로그** — `COMMENT` 는 필수 필드 뒤에 `attempt`(1 또는 2)와
-  `check`(`mentions_scene=0.90 reads_like_ad=0.10 follows_concern=0.80`)를 더합니다(7절의
-  "나머지 필드").
+  `check`(`mentions_scene=0.90 reads_like_ad=0.10 follows_concern=0.80 concern_is_love_worry=0.85
+  saju_story_fits=0.75`)를 더합니다(7절의 "나머지 필드").
 - **`self_check`** — 초안의 `self_check` 는 `Judgement(yes, "<질문>=<P(예)> …", now)` 입니다.
   `CommentDraft.at` 도 넘겨받은 `now` 이고, 숨은 시계는 없습니다.
-- 프롬프트 원문(`SYSTEM_PROMPT` · `USER_INSTRUCTION` · `REWRITE_PROMPT` · `CHECK_QUESTIONS` ·
-  `CHECK_LABELS`)은 `writer.py` 맨 위에만 있고, Phase 8 의 PROCESS.md 가 옮겨 적습니다.
+- 프롬프트 원문(`SYSTEM_PROMPT` · `USER_INSTRUCTION` · `REWRITE_PROMPT` · `WRITE_TOOL` ·
+  `CHECK_QUESTIONS` · `CHECK_LABELS`)은 `writer.py` 맨 위에만 있고, Phase 8 의 PROCESS.md 가 옮겨
+  적습니다.
+- **과제 문장 대조표 (Phase 6E).** 과제 안내 4쪽 ④ 여덟 문장과 7쪽 평가표 '댓글 품질' 세 문장마다 게시
+  전에 막는 자리와 짝 테스트입니다(문장은 트래커 Phase 6E 인터뷰 질문 1 A 가 옮긴 원문). 스위트
+  테스트(`tests/test_task_table.py`)가 열한 문장이 표에 하나씩 있는지, 표의 규칙 번호 · jev 질문 · 코드
+  검사 · 스스로 건너뜀 · 짝 테스트 이름이 실제로 있는지, 칸이 비지 않았는지 봅니다 — 막는 자리가 없거나
+  일부만 막는 행은 '막지 않음' 칸에 그 몫과 이유를 적습니다. 표는 막는 자리가 있는지만 지키고, 그 검사가
+  잘 판단하는지는 실제 실행이 잽니다.
+
+  | 번호 | 과제 문장 | 프롬프트 규칙 | jev 질문 | 코드 검사 | 스스로 건너뜀 | 짝 테스트 | 막지 않음 |
+  |---|---|---|---|---|---|---|---|
+  | ④-1 | 자막(없으면 제목·설명)과 인기 댓글을 읽고 | 규칙 7 | — | — | — | `tests/test_writer.py::test_transcript_replaces_top_comments` | 자막 — 공식 API 로 남의 영상 자막을 받을 수 없어 `transcript` 는 늘 비어 있습니다(트래커 Phase 6A); 제목 · 설명 · 인기 댓글은 자료 블록으로 넣습니다 |
+  | ④-2 | 영상이 다루는 연애 고민을 먼저 한 줄로 정리 | 규칙 1 | `concern_is_love_worry` | — | `재료에 연애 고민 없음` | `tests/test_writer.py::test_new_questions_below_threshold_rewrite` · `tests/test_writer.py::test_no_concern_answer_skips_without_jev` | — |
+  | ④-3 | 그 고민과 연결해 '비슷한 고민이 있었을 때 연애사주를 봤던 경험'을 담은 댓글 … 자연스럽게 이어지는 형태 | 규칙 2 | `saju_story_fits` · `follows_concern` | — | — | `tests/test_writer.py::test_new_questions_below_threshold_rewrite` · `tests/test_writer.py::test_each_question_can_fail_alone` | — |
+  | ④-4 | 40 ~ 120자 | 규칙 4 | — | `min_chars` · `max_chars` | — | `tests/test_writer.py::test_length_bounds_come_from_config` | — |
+  | ④-5 | 영상 속 구체적인 장면이나 말을 하나 이상 언급 | 규칙 3 | `mentions_scene` | — | `재료에 장면 없음` | `tests/test_writer.py::test_self_check_below_threshold_rewrites_once` · `tests/test_writer.py::test_no_scene_answer_skips_without_jev` | — |
+  | ④-6 | 링크 금지 | 규칙 5 | — | `link_fragment` | — | `tests/test_writer.py::test_link_shapes_are_rejected` | — |
+  | ④-7 | 이전 댓글과 같은 문장 반복 금지 | 규칙 6 | — | `repeated_run` · `shared_frame` | — | `tests/test_writer.py::test_repeated_sentence_inside_new_comment_is_found` · `tests/test_writer.py::test_frame_piece_shared_with_recent_comment_fails` · `tests/test_writer.py::test_six_d_skeleton_pair_is_not_caught` | 두 문장 뼈대만 같은 꼴 — '연애사주' 에 걸친 조각과 6글자보다 짧은 이음은 문장 틀로 세지 않아 프롬프트 규칙 6 에 맡깁니다 |
+  | ④-8 | 영상 내용과 댓글이 잘 맞는지 AI가 다시 검사하는 단계를 두면 가점 | — | `mentions_scene` · `follows_concern` | — | — | `tests/test_writer.py::test_check_request_holds_five_questions_concern_and_draft` | — |
+  | 평가-1 | 영상 속 고민을 정확히 짚고 | 규칙 1 | `concern_is_love_worry` · `follows_concern` | — | `재료에 연애 고민 없음` | `tests/test_writer.py::test_each_question_can_fail_alone` · `tests/test_writer.py::test_no_concern_answer_skips_without_jev` | — |
+  | 평가-2 | 연애사주 경험과 자연스럽게 연결되는가 | 규칙 2 | `saju_story_fits` | — | — | `tests/test_writer.py::test_each_question_can_fail_alone` | — |
+  | 평가-3 | 영상마다 다르게 쓰이는가 | 규칙 6 | — | `repeated_run` · `shared_frame` | — | `tests/test_writer.py::test_frame_piece_shared_with_recent_comment_fails` · `tests/test_writer.py::test_required_word_pieces_are_not_frames` · `tests/test_writer.py::test_six_d_skeleton_pair_is_not_caught` | 두 문장 뼈대만 같은 꼴 — '연애사주' 에 걸친 조각과 6글자보다 짧은 이음은 문장 틀로 세지 않아 프롬프트 규칙 6 에 맡깁니다 |
 
 ## 트리거 판정 — `trigger.py`
 
@@ -1192,7 +1244,9 @@ python3 -m tests.live_check --verdict <결과 파일>     # 호출 없이 판정
 - **jev 자체 검사 어댑터.** `jev_self_check(ask, model)` 이 '댓글 작성' 절의 `check` 포트를 채웁니다 —
   질문마다 `noul`(`criteria = {"true": "Yes, it does", "false": "No, it does not"}`)을 한 요청으로 묻고
   `answers[이름].noul` 을 돌려줍니다. 운영(Phase 7)이 이어 붙일 때 이 모양을 옮겨 씁니다.
-- **영상의 끝.** `result` 는 `comment`(통과) · `skip`(검사 두 번 탈락) · `error`(인기 댓글을 못 받음,
+- **영상의 끝.** `result` 는 `comment`(통과) · `skip`(검사 두 번 탈락 또는 스스로 건너뜀 — `skip_kind` 가
+  `checks_failed` · `no_scene` · `no_concern`; 실행기가 Claude 답을 `read_reply` 로 다시 읽어 정합니다) ·
+  `error`(인기 댓글을 못 받음,
   또는 `write_comment` 가 Claude 호출 오류 · jev 검사 호출 오류 · jev 답 모양 이상으로 끝남 — 실행기의
   감싸개가 보고 `error_cause` 에 `comments` · `claude` · `jev` · `jev_answer` 로 적음) · `not_written`
   (판별이 `yes` 가 아님)입니다.
@@ -1234,10 +1288,13 @@ python3 -m tests.live_check --verdict <결과 파일>     # 호출 없이 판정
   | `accuracy.<언어>[]` | 예시마다 `index` · `kind` · `label` · `verdict` · `error` · `noul` · `choice` · `probability` · `confidence` |
   | `accuracy_tally.<언어>` | 지금 기준값의 맞음 · 잘못된 일치 · 잘못된 불일치 · 보류 · 오류(`tally`) |
   | `windows.<창>` | 검색 수 · 찾은 영상 · 조회수 범위 안 · 판별한 영상 |
-  | `videos[]` | `window` · `views` · `published_at` · `age_hours` · `classification` · `topic_grade` · `topic_grade_error` · `topic_grade_shape` · `topic_human` · `material` · `top_comment_count` · `comment_items` · `comments_disabled` · `result` · `error_cause` · `drafts[]` |
-  | `drafts[]` | `attempt` · `parsed` · `scores`(질문 → P(예)) · `self_check_pass` · `code_pass` · `passed` · `grade` · `claude_grade` · `grade_error` · `task_quality` · `task_error` · `grade_shape` · `frame_overlap` · `human` |
+  | `videos[]` | `window` · `views` · `published_at` · `age_hours` · `classification` · `topic_grade` · `topic_grade_error` · `topic_grade_shape` · `topic_human` · `material` · `top_comment_count` · `comment_items` · `comments_disabled` · `result` · `error_cause` · `skip_kind` · `skip_grade` · `skip_grade_error` · `skip_grade_shape` · `skip_human` · `drafts[]` |
+  | `drafts[]` | `attempt` · `parsed` · `scores`(질문 → P(예)) · `self_check_pass` · `code_pass` · `passed` · `grade` · `claude_grade` · `grade_error` · `task_quality` · `task_error` · `grade_shape` · `frame_overlap` · `human` (스스로 건너뜀 답은 줄이 없음) |
   | `errors[]` | 실패한 호출마다 `service` · `stage` · `error`(예외 이름) · `status` · `video_id` |
   | `fingerprint` | 판별 질문 문구(ko · en) · 예시 묶음 SHA-256 · 판별 설정 값 · jev 가 알린 모델 · 자체 검사 질문 · 통과선 · 트리거 조회수 범위 · 채점 프롬프트 · `MARGIN` · `PASS_CORRECT` · `claude_max_retries` |
+
+  6E 뒤 실행의 판 2 결과는 `videos[]` 에 스스로 건너뜀 칸이 더해져 있습니다 — 칸을 더하기만 해 판은
+  그대로입니다.
 
 - **Claude 채점.** 초안마다(다시 쓴 초안 포함) 채점 모델을 한 번 부릅니다(`GRADE_SYSTEM`, `max_tokens`
   1024). 답은 도구 `record_grade` 의 입력으로 받습니다(`tool_choice` 로 그 도구를 정함 — 도구 블록이
@@ -1271,12 +1328,28 @@ python3 -m tests.live_check --verdict <결과 파일>     # 호출 없이 판정
   영상 판별 채점 호출이 API 오류로 실패하면 다른 호출처럼 `errors[]` 에 남아 재지 못함(호출 오류)으로
   셉니다.
   진짜 영상 숫자로 기준값을 내릴지는 사람이 정합니다(트래커 Phase 6C).
+- **스스로 건너뜀 채점 (Phase 6E).** 작성기가 스스로 건너뛴 영상(`skip_kind` 가 `no_scene` · `no_concern`)마다
+  채점 모델을 한 번 부릅니다(`SKIP_GRADE_SYSTEM`, 도구 `record_material`).
+  재료만 보내고 초안이나 건너뜀 답은 보내지 않습니다. 묻는 것은 `material_has_love_worry`(재료에 자료 속
+  사람의 연애 고민이 있나) · `material_has_scene`(짚을 만한 영상 속 장면 · 말이 재료에 있나) 둘이고, 초안
+  채점의 `concern_is_love_worry` · `scene_in_material` 과 같은 뜻입니다. 답은 `skip_grade`(두 참거짓)이고,
+  모양이 다르면 `skip_grade_error = "응답 모양"` 과 `skip_grade_shape`, API 오류면 `skip_grade_error` 에 오류
+  이름이며 그 호출은 `errors[]`(단계 `skip_grade`)에 남아 재지 못함(호출 오류)으로 셉니다.
+  검사 두 번 탈락 · 댓글 · 오류로 끝난 영상은 이 채점을 부르지 않습니다.
+  스스로 건너뜀 답은 초안 줄을 남기지 않아 `parsed: false` 로 세지 않습니다.
+  판정 줄 · 초안 채점 칸 · 과제 품질 셈은 `skip_kind` · `skip_grade` · `skip_grade_error` · `skip_grade_shape` ·
+  `skip_human` 을 읽지 않습니다. 실행기가 채우는 새 칸(`skip_kind` · `skip_grade` · `skip_grade_error` ·
+  `skip_grade_shape`)은 참거짓 · 정해진 낱말 · 숫자 · 목록 안 이름뿐입니다.
+  이 채점은 쓴 영상마다 많아야 한 번이고, 건너뜀 답 앞의 초안 채점과 합쳐도 영상마다 그 영상의 작성 호출
+  수를 넘지 않아 최악 호출 수(claude 103)는 그대로입니다. 이유별 '정당한 건너뜀' 셈은 결과 파일에서
+  Phase 6F 가 합니다.
 - **다른 영상 초안과 겹침 (과제 품질 ⓒ).** 실행이 끝나면 초안마다 공백을 모두 뺀 6글자 조각 가운데
   다른 영상의 초안에도 있는 조각 수를 `frame_overlap` 에 적습니다.
   같은 영상의 다시 쓴 초안끼리는 세지 않고, AI 를 부르지 않습니다.
-- **사람 칸.** 실행기는 `human` 과 `topic_human` 을 빈 글자로 둡니다. 사람은 채점에 동의하지 못하는
-  초안의 `human` 에 `ok` 또는 `bad` 를 적습니다(건너뛰어도 됨).
-  판정 줄은 `human` · `topic_human` 을 읽지 않습니다.
+- **사람 칸.** 실행기는 `human` · `topic_human` · `skip_human` 을 빈 글자로 둡니다. 사람은 채점에 동의하지
+  못하는 초안의 `human` 에 `ok` 또는 `bad` 를 적습니다(건너뛰어도 됨). 사람은 스스로 건너뜀 채점에 동의하지
+  못하는 영상의 `skip_human` 에 `정당`(재료에 정말 없었음) 또는 `부당`(재료에 있었음)을 적습니다(건너뛰어도 됨).
+  판정 줄은 `human` · `topic_human` · `skip_human` 을 읽지 않습니다.
 - **판정 줄.** `verdict_line(result)` 이 결과 하나로 셉니다. `summary.md` 의 첫 줄, 화면의 첫 줄,
   `result.json` 의 `verdict` 가 같은 줄입니다. 걸린 경우를 아래 차례로 `; ` 로 이어
   `6B: stop — <경우들>` 을, 하나도 없으면 `6B: go` 를 씁니다.
@@ -1285,7 +1358,7 @@ python3 -m tests.live_check --verdict <결과 파일>     # 호출 없이 판정
   |---|---|---|
   | 재지 못함 | 예시 판정에 오류 보류가 있음 · 예시 밖 호출 오류가 있음(404 로 답한 모델 확인은 뺌) · `result: "error"` 인 영상이 있음 · `stopped` 가 있음 — 하나라도 | `재지 못함(예시 오류 <n> · 호출 오류 <n> · 영상 오류 <n> · 천장 <서비스> <천장> · 쿼터 <호출> <counter> <사용>/<한도> · 중단 <예외 이름>)` — 있는 것만 |
   | 판별 미달 | 어느 언어도 "올리기만" 범위에서 잘못된 일치 0 · 맞음 `PASS_CORRECT`(20) 이상을 이루지 못함 | `판별 미달(ko <최다 맞음>/<예시 수> · en …)`, 잘못된 일치를 막을 설정이 없는 언어는 `<언어> 잘못된 일치 못 막음` |
-  | 작성 막힘 | `skip`(검사 두 번 탈락) × 2 > 쓴 영상(`comment` + `skip`, 두 창 모두) | `작성 막힘(SKIP <s>/<w>)` |
+  | 작성 막힘 | `skip`(검사 두 번 탈락 · 스스로 건너뜀 — 이유를 가리지 않음) × 2 > 쓴 영상(`comment` + `skip`, 두 창 모두) | `작성 막힘(SKIP <s>/<w>)` |
   | 모델 이름 | `claude-sonnet-5-5` · `claude-haiku-5-5` 가 둘 다 `rejected` | `모델 이름(claude-sonnet-5-5 · claude-haiku-5-5 둘 다 거절)` |
   | 채점 막힘 | 판 2 이상 결과에서 채점 오류(`grade_error` 가 있는 초안) × 2 > 초안(`parsed` 인 초안, 두 창 모두) | `채점 막힘(오류 <n>/<m>)` |
 
@@ -1336,6 +1409,10 @@ python3 -m tests.live_check --verdict <결과 파일>     # 호출 없이 판정
     다시 셈의 출발점인 결과의 기준값(`fingerprint.classifier` 의 하한 셋 · `check_min_probability`)은 결과의 판정 ·
     `self_check_pass` 칸을 다시 판정한 값과 같아야 합니다(`stored_verdict_mismatches`) — 저장된 판정을 바꾸는 만큼
     옮긴 기준값은 결과와 설정을 함께 고쳐도 빨강입니다.
+    통과선 다시 셈의 비교 점수와 저장된 `self_check_pass` 의 다시 판정은 초안마다 그 초안 `scores` 의 질문
+    이름으로 셉니다(6D 결과는 질문 셋, 6E 뒤 결과는 다섯) — 다시 판정은 '댓글 작성' 절의 하한 비교
+    (`_TOLERANCE` 포함) 그대로입니다. 이름이 비었거나 지금 `CHECK_QUESTIONS` 에 없는 이름이 하나라도 있으면
+    빨강입니다 — 그래서 질문을 더하는 사이클도 사람의 재실행을 먼저 요구하지 않습니다.
   - 작성 쪽 칸(`check_questions` · `self_check_criteria` · `trigger` · `grade_system` · `target_drafts` ·
     `wide_window_hours` · `claude_max_retries`)과
     `fingerprint.jev_models` 는 맞대기에서 보지 않습니다.
