@@ -671,6 +671,8 @@ run_loop(cycle, reload, initial, *, on_error, sleep=time.sleep,
   python3 -m tests.mutants writer-api-error-unlogged
   python3 -m tests.mutants writer-self-skip-checked
   python3 -m tests.mutants writer-no-concern-ignored
+  python3 -m tests.mutants writer-no-frame
+  python3 -m tests.mutants writer-frame-counts-required-word
   python3 -m tests.mutants classifier-error-yes
   python3 -m tests.mutants classifier-malformed-yes
   python3 -m tests.mutants classifier-unchecked-probability
@@ -913,7 +915,7 @@ if result.draft is not None:
    `SKIP reason="<그 이유>"` 입니다(두 번째 시도의 답이면 `"<그 이유> — 1차: <1차 이유>"`).
    건너뜀 답에서 읽는 것은 두 참거짓뿐입니다.
 3. jev 자체 검사.
-4. 코드 검사 — 글자 수 · 링크 · 반복을 **모두** 돌립니다(코드가 마지막).
+4. 코드 검사 — 글자 수 · 링크 · 반복 · 문장 틀을 **모두** 돌립니다(코드가 마지막).
 
 떨어진 이유(jev 이유가 먼저, 코드 이유는 위 순서)를 모두 `; ` 로 이어 다시 쓰기 이유 하나로
 만들고, 원래 답에 도구 호출이 있으면 그 호출(assistant)과 그 호출의 `tool_result` 로 붙인
@@ -928,6 +930,7 @@ if result.draft is not None:
 | 글자 수 | `min_chars` ≤ 글자 수 ≤ `max_chars` | `글자 수 <n>자 — <min>–<max>자여야 합니다` |
 | 링크 | 링크 보기에 `_LINK_RE` 조각이 없음 | `링크·주소 모양이 들어 있습니다: <조각>` |
 | 반복 | 최근 댓글과 같지 않고, 겹친 연속 글자 < 12 | `이전 댓글과 겹칩니다: <겹친 글자>` |
+| 문장 틀 | 최근 댓글과 같은 6글자 조각이 없음('연애사주' 에 걸친 조각은 빼고) | `이전 댓글과 문장 틀이 같습니다: <조각>` |
 
 - 이름표(`CHECK_LABELS`)는 `영상 속 장면·말 언급` · `광고처럼 읽힘` · `영상 고민과 이어짐` ·
   `고민 한 줄이 연애 고민` · `연애사주 경험이 고민과 이어짐` 이고, 확률은 소수 둘째
@@ -954,6 +957,17 @@ if result.draft is not None:
   같거나, `difflib.SequenceMatcher(autojunk=False)` 로 찾은 가장 긴 연속 공통 글자가
   `REPEAT_MIN_CHARS`(12, 코드 상수) 이상이면 반복입니다. 비교 대상은 `previous` 의 마지막
   `RECENT_WINDOW`(20)개 — Claude 가 `<my_previous_comments>` 에서 보는 바로 그 댓글들입니다.
+- **문장 틀** — 두 글을 반복과 같이 맞춘 뒤(NFKC + casefold, `isalnum` 글자만) 최근 댓글 하나와
+  `FRAME_MIN_CHARS`(6, 코드 상수) 글자 조각이 하나라도 같으면 같은 문장 틀입니다. '연애사주'
+  (`REQUIRED_WORD`, 과제가 반드시 넣으라는 낱말)에 걸친 조각은 문장 틀로 세지 않습니다 — 그래서
+  `연애 사주` · `연애사주를 봤을 때` 만 겹치면 지나가고, `뜨끔했어요. 저도` 처럼 문장을 잇는 6글자
+  조각이 겹치면 걸립니다. 이 검사가 잡는 것은 6글자 이상 같은 이음 조각입니다 — 6D 초안 11개 가운데
+  이 검사가 잡는 것은 2개(`뜨끔했어요. 저도` 한 쌍)이고, 나머지가 나눈 두 문장 뼈대('[반응]어요. 저도
+  … 연애사주를 봤을 때 … 말을 듣고 …')처럼 '연애사주' 에 걸친 조각과 6글자보다 짧은 이음으로 겹치는
+  꼴은 지나갑니다. 그 몫은 프롬프트 규칙 6 입니다. 비교 대상은 반복과 같은 `RECENT_WINDOW`(20)
+  개입니다. `FRAME_MIN_CHARS` 는 잰 값이 아닙니다 — 실행기는 한 실행에서 앞서 통과한 초안(몇 개)과만
+  비교해 20개 창에서 얼마나 막는지 잴 수 없고, 운영(Phase 7)의 기록이 처음 잽니다. 실행기의 과제
+  품질 ⓒ(`frame_overlap`)는 공백만 빼고 '연애사주' 조각도 세는 기록이라 이 검사와 다른 셈입니다.
 - **잰 값 (Phase 6D).** `docs/live-check/result.json` 에서 읽은 숫자입니다('주제 판별' 절의 기록과 같은
   실행). 6E 가 고칠 작성기의 숫자라 '고치기 전' 기록입니다(트래커 Phase 6D 드리프트 인터뷰 질문 1 A).
   - 모델 이름: claude-sonnet-5-5 accepted · claude-haiku-5-5 accepted — 작성 claude-sonnet-5-5 · 채점 claude-haiku-5-5

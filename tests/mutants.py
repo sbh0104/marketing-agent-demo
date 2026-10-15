@@ -494,6 +494,18 @@ MUTANTS: dict[str, tuple[str, str, str, str]] = {
         "if not has_concern:",
         "if False:",
     ),
+    "writer-no-frame": (
+        "agent.writer",
+        "tests.test_writer",
+        "if piece in others:",
+        "if False:",
+    ),
+    "writer-frame-counts-required-word": (
+        "agent.writer",
+        "tests.test_writer",
+        "if not covered.intersection(range(start, start + FRAME_MIN_CHARS))",
+        "if True",
+    ),
     "classifier-error-yes": (
         "agent.classifier",
         "tests.test_classifier",

@@ -4,8 +4,8 @@
 참거짓, 있으면 고민 한 줄과 댓글) → 하나라도 없다고 답하면 jev · 다시 쓰기 없이 그 이유로 건너뜀
 → jev 가 초안 한 개에 `noul` 질문 다섯 개(영상 속 장면·말 언급 · 광고처럼 읽힘 · 영상 고민과
 이어짐 · 고민 한 줄이 연애 고민 · 연애사주 경험이 고민과 이어짐)를 한 요청으로 답합니다 → 코드가
-글자 수 · 링크 · 최근 내 댓글과의 반복을 셉니다. 떨어지면 모든 이유를 붙여 같은 대화에서 한 번
-다시 쓰고, 두 번째도 떨어지면 그 영상을 건너뛰고 이유를 `SKIP` 으로 남깁니다.
+글자 수 · 링크 · 최근 내 댓글과의 반복 · 문장 틀을 셉니다. 떨어지면 모든 이유를 붙여 같은 대화에서
+한 번 다시 쓰고, 두 번째도 떨어지면 그 영상을 건너뛰고 이유를 `SKIP` 으로 남깁니다.
 Claude · jev 호출 오류는 다시 써도 고쳐지지 않으므로 다시 쓰지 않고 `ERROR` 와 `SKIP` 을 남깁니다.
 
 프롬프트 원문은 이 모듈 맨 위에만 둡니다 — Phase 8 PROCESS.md 가 옮겨 적습니다. 계약 '댓글 작성' 절.
@@ -105,6 +105,11 @@ CHECK_LABELS = {
 _TOLERANCE = 1e-9  # 1 − P 의 부동소수 오차(1 − 0.9 = 0.0999…98)가 하한 경계를 넘지 않게 덮습니다
 REPEAT_MIN_CHARS = 12   # 공백·문장부호를 뺀 글자가 연속 이만큼 같으면 반복 — 한국어 한 마디 크기
 RECENT_WINDOW = 20      # 반복 비교와 프롬프트에 함께 쓰는 최근 내 댓글 수 (하루 상한 10 × 이틀)
+# 과제가 반드시 넣으라는 낱말 — 이 낱말에 걸친 조각은 문장 틀로 세지 않습니다
+REQUIRED_WORD = "연애사주"
+# 공백·문장부호를 뺀 글자 조각이 이만큼 최근 댓글과 같으면 같은 문장 틀 — 잰 값이 아님,
+# 계약 '댓글 작성' 절의 문장 틀
+FRAME_MIN_CHARS = 6
 MAX_TOKENS = 1024
 CLAUDE_TIMEOUT_S = 60.0
 TITLE_LIMIT = 300
@@ -197,8 +202,35 @@ def repeated_run(text: str, previous: Sequence[str], min_run: int) -> str | None
     return None
 
 
+def _frame_pieces(text: str) -> list[str]:
+    """`_letters` 로 맞춘 글의 FRAME_MIN_CHARS 글자 조각(앞에서부터) — REQUIRED_WORD 에 걸친 조각은 뺍니다."""
+    letters = _letters(text)
+    word = _letters(REQUIRED_WORD)
+    covered: set[int] = set()
+    found = letters.find(word)
+    while found >= 0:
+        covered.update(range(found, found + len(word)))
+        found = letters.find(word, found + 1)
+    return [
+        letters[start : start + FRAME_MIN_CHARS]
+        for start in range(len(letters) - FRAME_MIN_CHARS + 1)
+        if not covered.intersection(range(start, start + FRAME_MIN_CHARS))
+    ]
+
+
+def shared_frame(text: str, previous: Sequence[str]) -> str | None:
+    """최근 댓글 하나와 같은 문장 틀 조각이 있으면 그 조각(댓글 차례 · 글 앞쪽 첫 조각)을, 없으면 None."""
+    pieces = _frame_pieces(text)
+    for comment in previous:
+        others = set(_frame_pieces(comment))
+        for piece in pieces:
+            if piece in others:
+                return piece
+    return None
+
+
 def code_failures(text: str, recent: Sequence[str], config: CommentConfig) -> list[str]:
-    """코드 검사 세 가지(글자 수 · 링크 · 반복)를 모두 돌리고 걸린 이유를 순서대로 돌려줍니다."""
+    """코드 검사 네 가지(글자 수 · 링크 · 반복 · 문장 틀)를 모두 돌리고 걸린 이유를 순서대로 돌려줍니다."""
     failures: list[str] = []
     length = len(text)
     if not config.min_chars <= length <= config.max_chars:
@@ -209,6 +241,9 @@ def code_failures(text: str, recent: Sequence[str], config: CommentConfig) -> li
     run = repeated_run(text, recent, REPEAT_MIN_CHARS)
     if run is not None:
         failures.append(f"이전 댓글과 겹칩니다: {run}")
+    frame = shared_frame(text, recent)
+    if frame is not None:
+        failures.append(f"이전 댓글과 문장 틀이 같습니다: {frame}")
     return failures
 
 
