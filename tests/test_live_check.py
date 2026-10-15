@@ -688,6 +688,30 @@ class ContactMaskTest(unittest.TestCase):
         kept = live_check._kept("문의 abc<at>example.com", live_check.ITEM_LIMIT, NO_KEYS)
         self.assertEqual(kept, "문의 <연락처>")
 
+    def test_stored_failures_keep_names_and_numbers(self) -> None:
+        # 작성기의 이유 글은 겹친 글자 · 링크 조각을 담습니다 — 결과에는 이름과 숫자만 남깁니다
+        config = load_config(REPO_CONFIG).comment
+        first = f"{DRAFT_POOL[0]} 상담 HP {FAKE_PHONE}"
+        second = f"{DRAFT_POOL[1]} 상담 HP {FAKE_PHONE}"
+        run = repeated_run(second, [first], REPEAT_MIN_CHARS)
+        self.assertGreaterEqual(len(run), REPEAT_MIN_CHARS)
+        length = code_failures("가" * 39, [], config)
+        self.assertEqual(len(length), 1)
+        self.assertTrue(length[0].startswith("글자 수 39자"), length)
+        cases = (
+            (code_failures(second, [first], config), [f"이전 댓글과 겹칩니다 ({len(run)}글자)"]),
+            (
+                code_failures(f"{DRAFT_POOL[2]} {FAKE_EMAIL}", [], config),
+                ["링크·주소 모양이 들어 있습니다"],
+            ),
+            (length, length),
+            ([f"새 이유: {FAKE_PHONE}"], ["그 밖의 코드 검사 이유"]),
+            ([], []),
+        )
+        for failures, stored in cases:
+            with self.subTest(failures=failures):
+                self.assertEqual(live_check._stored_failures(failures), stored)
+
     def test_masked_text_counts_zero(self) -> None:
         samples = (*CONTACT_RED, *(text for text, _ in CONTACT_IN_CONTEXT), *CONTACT_GREEN)
         for sample in samples:
@@ -3818,6 +3842,56 @@ class ContactRunTest(LiveCheckCase):
         self.assertNotEqual(code, 3)
         self.assertEqual(out.split("\n")[-3], "키 검사: 결과 파일에 키 없음")
         self.assertEqual(out.split("\n")[-2], "개인 정보 검사: 결과 파일에 연락처 모양 없음")
+
+    def test_code_failure_reasons_store_names_and_numbers(self) -> None:
+        # 반복 · 링크 이유에 연락처 꼬리 — 결과의 이유 칸은 이름과 숫자만, 판정은 원문 검사 그대로
+        raws = (
+            f"{DRAFT_POOL[0]} 상담 HP {FAKE_PHONE}",
+            f"{DRAFT_POOL[1]} 상담 HP {FAKE_PHONE}",
+            f"{DRAFT_POOL[2]} {FAKE_EMAIL}",
+            f"{DRAFT_POOL[3]} {FAKE_EMAIL}",
+        )
+        self.claude.writes = [writer_reply(comment=text) for text in raws]
+        # Claude 가 돌려주는 글 칸마다 표식 — 이유 칸에 어느 것도 들어가지 않아야 합니다
+        self.claude.probe_text = "네 이유표식"
+        self.claude.grades = [text_response("채점 이유표식")]
+        self.claude.topics = [text_response("주제 이유표식")]
+        code, out, err, result = self.run_main()
+        drafts = [
+            draft for video in result["videos"] for draft in video["drafts"] if draft["parsed"]
+        ]
+        run = repeated_run(raws[1], [raws[0]], REPEAT_MIN_CHARS)
+        self.assertEqual(
+            [(d["code_pass"], d["passed"], d["untrusted"]["code_failures"]) for d in drafts[:4]],
+            [
+                (True, True, []),
+                (False, False, [f"이전 댓글과 겹칩니다 ({len(run)}글자)"]),
+                (False, False, ["링크·주소 모양이 들어 있습니다"]),
+                (False, False, ["링크·주소 모양이 들어 있습니다"]),
+            ],
+        )
+        reason_shape = (
+            r"\A(?:이전 댓글과 겹칩니다 \([0-9]+글자\)|링크·주소 모양이 들어 있습니다"
+            r"|글자 수 [0-9]+자 — [0-9]+–[0-9]+자여야 합니다)\Z"
+        )
+        for draft in drafts:
+            untrusted = draft["untrusted"]
+            for reason in untrusted["code_failures"]:
+                with self.subTest(reason=reason):
+                    self.assertRegex(reason, reason_shape)
+                    for marker in ("이유표식", "초안표식", "고민표식"):
+                        self.assertNotIn(marker, reason)
+            for field in (untrusted["concern"], untrusted["comment"], *untrusted["code_failures"]):
+                for needle in ("01000001234", ".fake", "fake.owner"):
+                    with self.subTest(field=field[:40], needle=needle):
+                        self.assertNotIn(needle, field)
+        paths = [self.out / live_check.RESULT_NAME, self.out / live_check.SUMMARY_NAME]
+        self.assertEqual(live_check.contact_places(paths), 0)
+        self.assertEqual(out.split("\n")[-2], "개인 정보 검사: 결과 파일에 연락처 모양 없음")
+        # 채점은 가리지 않은 원문 초안을 읽습니다
+        grades = [call["messages"][0]["content"] for call in self.calls_of("grade")]
+        self.assertTrue(any(FAKE_EMAIL in content for content in grades))
+        self.assertTrue(any(f"HP {FAKE_PHONE}" in content for content in grades))
 
 
 class GraderBoundaryTest(unittest.TestCase):
