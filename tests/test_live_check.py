@@ -1395,8 +1395,9 @@ def title_of(state: str) -> str:
     return state.split("\n", 1)[0].removeprefix("Title: ")
 
 
-def writer_reply(concern: str = CONCERN, comment: str = COMMENT) -> str:
-    return json.dumps({"concern": concern, "comment": comment}, ensure_ascii=False)
+def writer_reply(concern: str = CONCERN, comment: str = COMMENT) -> dict:
+    """작성 도구(submit_comment) 입력 — 고민과 장면이 모두 있다고 답한 초안."""
+    return {"has_love_concern": True, "has_scene": True, "concern": concern, "comment": comment}
 
 
 def text_response(text: str, stop_reason: str | None = None) -> SimpleNamespace:
@@ -1530,11 +1531,11 @@ class FakeClaude:
 
     이름 확인은 probe_status 에 적은 이름만 그 상태로 거절하고, 작성 · 채점은 준비한 답을
     차례로(다 쓰면 기본 답 — 작성은 DRAFT_POOL 을 돌려 씀) 돌려줍니다. 답 자리의 dict 는 그
-    종류의 도구 답, 글은 글 블록 답, 예외는 그 예외를 내고, 그 밖의 객체는 미리 만든 응답이라
-    그대로 돌려줍니다.
+    종류의 도구 답(작성은 submit_comment), 글은 글 블록 답, 예외는 그 예외를 내고, 그 밖의
+    객체는 미리 만든 응답이라 그대로 돌려줍니다.
     """
 
-    TOOLS = {"grade": "record_grade", "topic": "record_topic"}
+    TOOLS = {"write": "submit_comment", "grade": "record_grade", "topic": "record_topic"}
 
     def __init__(self, log: list[tuple[str, str]]) -> None:
         self.messages = self
