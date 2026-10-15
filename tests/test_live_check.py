@@ -3600,6 +3600,9 @@ class SelfSkipRecordTest(LiveCheckCase):
                 self.assertEqual(video["skip_grade_shape"] is not None, shaped)
                 self.assertNotIn(ANSWER_MARK, json.dumps(video["skip_grade_shape"]))
                 self.assertEqual(result["errors"], errors)
+                # 사람 칸은 실행기가 채우지 않습니다 — 결과 파일의 모든 영상이 빈 칸으로 남습니다
+                self.assertTrue(result["videos"])
+                self.assertEqual({v["skip_human"] for v in result["videos"]}, {""})
 
     def test_skip_grade_does_not_move_verdict_or_tasks(self) -> None:
         self.claude.writes = [NO_SCENE_ANSWER]
