@@ -67,7 +67,7 @@
 - first confirmed: 2026-10-14 · last confirmed: 2026-10-14
 
 ### E-032 · tooling — 글자 규칙(`logbook._is_raw`, 설정 `_text` 가 같은 함수)의 판정은 실행 중인 파이썬의 `unicodedata` 판을 따르는데, 이 기계의 파이썬은 판이 둘이다 — `/usr/bin/python3` · `python3.14` 는 3.14.4(유니코드 16.0.0), `~/.local/bin/python3.12` 는 3.12.13(15.0.0)이고 `python3.10` · `python3.13` 은 PATH 에 없다
-- evidence: 이 retro 실측 — `python3 -I -c "…unicodedata.unidata_version, unicodedata.category(chr(0x1FAE9))"` → `/usr/bin/python3 3.14.4 16.0.0 So` · `/home/sbh/.local/bin/python3.12 3.12.13 15.0.0 Cn` · `/usr/bin/python3.14 3.14.4 16.0.0 So`; 트래커 Phase 1C Trade-offs(HC1 질문 1 B) — `topic: "연애 고민 🫩"` 이 3.14.4 에서 `load OK`, 3.12.13 에서 `ConfigError`(인터뷰가 잰 3.10.20 은 PATH 밖 다른 경로) (cycle 20261014-112313-adw/phase-1c-text-config-allow)
+- evidence: 이 retro 실측 — `python3 -I -c "…unicodedata.unidata_version, unicodedata.category(chr(0x1FAE9))"` → `/usr/bin/python3 3.14.4 16.0.0 So` · `~/.local/bin/python3.12 3.12.13 15.0.0 Cn` · `/usr/bin/python3.14 3.14.4 16.0.0 So`; 트래커 Phase 1C Trade-offs(HC1 질문 1 B) — `topic: "연애 고민 🫩"` 이 3.14.4 에서 `load OK`, 3.12.13 에서 `ConfigError`(인터뷰가 잰 3.10.20 은 PATH 밖 다른 경로) (cycle 20261014-112313-adw/phase-1c-text-config-allow)
 - first confirmed: 2026-10-14 · last confirmed: 2026-10-14
 
 ### E-034 · reviewer — 트래커만 고친 확인 인터뷰 뒤의 두 번째 ship-check 는 코드가 같은 트리에서도 새 결함을 찾는다 — 6B 에서는 인터뷰가 막 쓴 트래커 줄 자체(Phase 6C 결정 문장, R12)가 6B 테스트보다 넓었다. E-030 상류 고침이 받아들인 "새 트래커 줄은 기계가 다시 대조하지 않음"이 이런 결함을 잃는다
@@ -83,7 +83,7 @@
 - first confirmed: 2026-10-14 · last confirmed: 2026-10-15
 
 ### E-038 · tooling — 과제 안내 `docs/marketing-agent.pdf` 는 홈 체크아웃에 추적되지 않은 파일(`??`)로만 있어 레인 worktree 에는 없다 — 레인 안의 사이클(understand · plan · ship-check)은 과제 원문을 다시 읽지 못하고 트래커가 인용한 문장만 쓴다
-- evidence: 레인에서 `ls docs/marketing-agent.pdf` → `No such file or directory`; `git -C /home/sbh/project/marketing-agent-demo status --short --ignored docs/marketing-agent.pdf` → `?? docs/marketing-agent.pdf`(무시 아님 · 추적 아님). 6E notes.md Expertise check 후보 3. 그래서 ship-report Human checks 3번째 줄은 계약 대조표의 ④-3 이 PDF 의 둥근 따옴표 “…” 대신 트래커 인용의 '…' 와 줄임을 따랐는지를 사람에게 넘겼다 (cycle 20261015-091934-adw/phase-6e-comment-quality-fix)
+- evidence: 레인에서 `ls docs/marketing-agent.pdf` → `No such file or directory`; `git -C <홈 체크아웃> status --short --ignored docs/marketing-agent.pdf` → `?? docs/marketing-agent.pdf`(무시 아님 · 추적 아님). 6E notes.md Expertise check 후보 3. 그래서 ship-report Human checks 3번째 줄은 계약 대조표의 ④-3 이 PDF 의 둥근 따옴표 “…” 대신 트래커 인용의 '…' 와 줄임을 따랐는지를 사람에게 넘겼다 (cycle 20261015-091934-adw/phase-6e-comment-quality-fix)
 - first confirmed: 2026-10-15 · last confirmed: 2026-10-15
 
 ### E-039 · codebase — 실행기의 재료 채점(`SKIP_GRADE_SYSTEM`)과 작성 규칙의 '장면' 은 뜻이 다르다 — 재료 채점의 `material_has_scene` 은 `<video_title>` 도 장면 출처로 세지만, 작성 규칙 3 은 제목을 되풀이하는 것을 장면으로 치지 않는다. 제목만 있는 영상의 스스로 건너뜀('재료에 장면 없음')은 재료 채점에서 '부당' 쪽으로 기운다
