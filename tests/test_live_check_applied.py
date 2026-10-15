@@ -24,6 +24,7 @@ from agent.classifier import LANGUAGES, QUESTION_LANGUAGE, _decide
 from agent.config import ClassifierConfig, load_config
 from agent.models import Verdict
 from agent.writer import (
+    CHECK_LABELS,
     CHECK_QUESTIONS,
     INVERTED_QUESTIONS,
     RECENT_WINDOW,
@@ -71,6 +72,12 @@ TASK_PHRASES = (
     ("love", "tasks", "ⓐ 고민 한 줄이 연애 고민"),
     ("saju", "tasks", "ⓑ 연애사주 경험이 고민과 이어짐"),
     ("framed", "drafts", f"ⓒ 다른 영상 초안과 겹치는 {live_check.FRAME_CHARS}글자 조각이 있는 초안"),
+)
+# Claude 채점 세 칸이 나쁨인 값과 그 칸에 맞는 jev 질문 이름 — tests/live_check.py (GRADE_KEYS) 의 셋이 ok 인 쪽의 반대
+GRADE_BAD = (
+    ("scene_in_material", False, "mentions_scene"),
+    ("reads_like_ad", True, "reads_like_ad"),
+    ("follows_concern", False, "follows_concern"),
 )
 SKIP_HUMAN = ("정당", "부당")
 SKIP_GRADE_CELL = {"no_scene": "material_has_scene", "no_concern": "material_has_love_worry"}
@@ -374,6 +381,23 @@ def lowest_score(scores: Mapping[str, float]) -> float:
         raise ValueError(f"초안 점수의 질문 이름을 셀 수 없습니다: {unknown}")
     return min(
         1.0 - value if name in INVERTED_QUESTIONS else value for name, value in scores.items()
+    )
+
+
+def comparison_label(name: str) -> str:
+    """비교 점수의 이름표 — '예' 가 나쁜 질문은 비교 점수가 1 − P(예)라 ' 아님' 을 붙입니다."""
+    return CHECK_LABELS[name] + (" 아님" if name in INVERTED_QUESTIONS else "")
+
+
+def lowest_question(scores: Mapping[str, float]) -> str:
+    """가장 낮은 비교 점수의 질문 이름 — 같은 값이면 CHECK_QUESTIONS 차례가 앞선 것; 이름 검사는
+    `lowest_score` 그대로(모르는 이름은 ValueError)."""
+    floor = lowest_score(scores)
+    return next(
+        name
+        for name in CHECK_QUESTIONS
+        if name in scores
+        and (1.0 - scores[name] if name in INVERTED_QUESTIONS else scores[name]) == floor
     )
 
 
@@ -726,6 +750,63 @@ def before_after_notes(result: dict) -> list[str]:
     ]
 
 
+def bad_questions(draft: Mapping[str, object]) -> list[str]:
+    """Claude 채점 다섯 칸 가운데 나쁨인 칸의 jev 질문 이름 — 참거짓 그대로만 읽고, 채점이 없거나
+    참거짓이 아닌 칸은 빠집니다."""
+    grade = draft.get("grade")
+    task = draft.get("task_quality")
+    names = [
+        question
+        for cell, bad, question in GRADE_BAD
+        if isinstance(grade, Mapping) and grade.get(cell) is bad
+    ]
+    names += [name for name in TASK_CELLS if isinstance(task, Mapping) and task.get(name) is False]
+    return names
+
+
+def without_human_cells(result: dict) -> dict:
+    """초안의 사람 칸(`human`)을 모두 비운 깊은 복사본 — 정답이 Claude 채점 다섯 칸만일 때의 다시 셈을
+    봅니다."""
+    blank = copy.deepcopy(result)
+    for video in blank["videos"]:
+        for draft in video["drafts"]:
+            draft["human"] = ""
+    return blank
+
+
+def limit_lines(result: dict) -> list[str]:
+    """통과선 알려진 한계의 기록 두 줄 — 사람 칸을 비우면 막을 초안(창 · 영상 · 시도, 나쁨 칸 · 가장 낮은
+    비교 점수)과 다시 셈, 초안마다 가장 낮은 비교 점수의 질문 수(트래커 Phase 6F 보류 문 인터뷰 질문
+    3 A). 기록만."""
+    blank = without_human_cells(result)
+    blocking = {id(draft) for draft in blocking_drafts(blank)}
+    cases: list[str] = []
+    for video in blank["videos"]:
+        for draft in video["drafts"]:
+            if id(draft) not in blocking:
+                continue
+            low = lowest_score(draft["scores"])
+            cases.append(
+                f"{WINDOW_LABELS[video['window']]} {video['video_id']} 시도 {draft['attempt']}"
+                f"(나쁨: {', '.join(CHECK_LABELS[name] for name in bad_questions(draft)) or '없음'}"
+                f" / 가장 낮은 비교 점수: {comparison_label(lowest_question(draft['scores']))}"
+                f" {low:.2f} → {round(low + live_check.MARGIN, 6)})"
+            )
+    floor = check_floor(blank)
+    first = (
+        f"사람 칸을 비우면: 정답 bad 인데 자체 검사를 통과한 초안 {len(cases)}"
+        f" · 다시 셈 {'없음(1 을 넘음)' if floor is None else floor}"
+    )
+    if cases:
+        first += " — " + " · ".join(cases)
+    scored = [draft for draft in _parsed_drafts(result) if isinstance(draft["scores"], Mapping)]
+    counts = Counter(lowest_question(draft["scores"]) for draft in scored)
+    second = f"가장 낮은 비교 점수의 질문: 초안 {len(scored)} 가운데 " + " · ".join(
+        f"{comparison_label(name)} {counts[name]}" for name in CHECK_QUESTIONS
+    )
+    return [first, second]
+
+
 def mark_text(value: object, path: str = "") -> object:
     """글 칸마다 표식을 심은 복사본 — 모든 글 잎은 `MRK·<경로>` 가 됩니다.
 
@@ -770,6 +851,7 @@ def record_heads() -> list[str]:
             f"정당한 건너뜀 {label}:",
             f"과제 품질 전후 {label}:",
         ]
+    heads += ["사람 칸을 비우면:", "가장 낮은 비교 점수의 질문:"]
     heads.append("모델 이름:")
     return heads
 
@@ -839,6 +921,7 @@ class ContractHeadTest(unittest.TestCase):
             *task_lines(result),
             *skip_lines(result),
             *before_after_lines(result),
+            *limit_lines(result),
             model_line(result),
         ]
         for line in lines:
@@ -1045,6 +1128,7 @@ class MeasuredDriftTest(unittest.TestCase):
             skip_lines,
             before_after_lines,
             before_after_notes,
+            limit_lines,
         )
         for render in renders:
             with self.subTest(render=render.__name__):
@@ -1076,6 +1160,7 @@ class MeasuredDriftTest(unittest.TestCase):
             check_floor_line,
             before_after_lines,
             before_after_notes,
+            limit_lines,
         ):
             with self.subTest(render=render.__name__):
                 self.assertEqual(render(tampered), render(self.result))
