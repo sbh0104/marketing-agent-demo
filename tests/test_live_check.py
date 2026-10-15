@@ -835,6 +835,16 @@ class ContactMaskTest(unittest.TestCase):
         # 이스케이프를 풀지 않은 JSON 글에서는 `\n` 의 n 이 계좌 모양을 막습니다 — 그래서 풀어 봅니다
         self.assertEqual(live_check.count_contacts(json.dumps(raw)), 0)
 
+    def test_file_texts_counts_json_keys(self) -> None:
+        # 연락처가 JSON 키에만 있어도 셉니다 — 계약 "키와 값"
+        key = f"문의 {FAKE_PHONE}"
+        data = {"videos": [{"untrusted": {key: "값"}}]}
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / live_check.RESULT_NAME
+            path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+            self.assertIn(key, live_check.file_texts(path))
+            self.assertEqual(live_check.contact_places([path]), 1)
+
 
 class VerdictTest(unittest.TestCase):
     def line(self, result: dict) -> str:
@@ -3893,6 +3903,23 @@ class ContactRunTest(LiveCheckCase):
         grades = [call["messages"][0]["content"] for call in self.calls_of("grade")]
         self.assertTrue(any(FAKE_EMAIL in content for content in grades))
         self.assertTrue(any(f"HP {FAKE_PHONE}" in content for content in grades))
+
+    def test_end_line_counts_summary_alone(self) -> None:
+        # summary.md 에만, 꼭 한 곳 — 끝 줄은 두 파일을 다 세고 한 곳이라도 종료 코드 4 입니다
+        render = live_check.render_summary
+        with mock.patch.object(
+            live_check, "render_summary", lambda result: render(result) + f"문의 {FAKE_PHONE}\n"
+        ):
+            code, out, err, result = self.run_main()
+        result_path = self.out / live_check.RESULT_NAME
+        summary_path = self.out / live_check.SUMMARY_NAME
+        self.assertEqual(live_check.contact_places([result_path]), 0)
+        self.assertEqual(live_check.contact_places([summary_path]), 1)
+        self.assertEqual(code, 4)
+        self.assertEqual(out.split("\n")[-3], "키 검사: 결과 파일에 키 없음")
+        self.assertEqual(
+            out.split("\n")[-2], "개인 정보 검사: 결과 파일에 연락처 모양 1곳 — 커밋하지 마세요"
+        )
 
 
 class GraderBoundaryTest(unittest.TestCase):

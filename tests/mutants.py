@@ -800,6 +800,42 @@ MUTANTS: dict[str, tuple[str, str, str, str]] = {
         "len(reason) - len(REPEAT_REASON)",
         "len(reason) - len(REPEAT_REASON) + 1",
     ),
+    "live-check-contact-keys-unread": (
+        "tests.live_check",
+        "tests.test_live_check",
+        "found.append(key)",
+        'found.append("")',
+    ),
+    "live-check-contact-line-summary-blind": (
+        "tests.live_check",
+        "tests.test_live_check",
+        "places = contact_places(paths)",
+        "places = contact_places(paths[:1])",
+    ),
+    "live-check-contact-line-one-place-passes": (
+        "tests.live_check",
+        "tests.test_live_check",
+        "if places:",
+        "if places > 1:",
+    ),
+    "live-check-code-check-reads-masked": (
+        "tests.live_check",
+        "tests.test_live_check",
+        "failures = code_failures(text, recent, self.comment_config)",
+        "failures = code_failures(mask_contacts(text), recent, self.comment_config)",
+    ),
+    "live-check-grade-reads-masked": (
+        "tests.live_check",
+        "tests.test_live_check",
+        'self.claude, self.result["grader_model"], record, comments, concern, text',
+        'self.claude, self.result["grader_model"], record, comments, concern, mask_contacts(text)',
+    ),
+    "live-check-passed-ignores-code-check": (
+        "tests.live_check",
+        "tests.test_live_check",
+        '"passed": self_check_pass is True and not failures,',
+        '"passed": self_check_pass is True,',
+    ),
     "live-check-applied-yes-floor-lowered": (
         "agent.config",
         "tests.test_live_check_applied",
