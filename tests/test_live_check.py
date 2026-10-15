@@ -1486,6 +1486,7 @@ FAKE_ACCOUNT = "000-000-123456"
 FAKE_HOLDER = "예금주: 가나다"
 FAKE_ID = "01000001234"  # 영상 ID 허용 모양(11자)이면서 전화번호 모양
 SHA_LIKE = "ab12345678901cd" + "e" * 49  # examples_sha256 꼴 — 16진 글자 사이의 숫자 11개
+KEY_WITH_PHONE = "tsFAKEKEY-010-0000-1234-TAILMARK"  # 안에 전화번호 덩이가 든 지어낸 키(트래커 6G 질문 4 A ②)
 # 예금주 첫 덩이 대가 줄의 examples(트래커 6G 질문 2 D) — 이름이 첫 덩이가 아니면 남고 끝 줄도 세지 않습니다
 HOLDER_FIRST_CHUNK = (
     ("예금주는 가나다입니다", "<연락처> 가나다입니다"),
@@ -3722,6 +3723,41 @@ class ContactRunTest(LiveCheckCase):
             self.assertTrue((self.out / name).exists(), name)
         for value in (FAKE_PHONE, FAKE_ACCOUNT, FAKE_HOLDER, "가나다"):
             self.assertNotIn(value, out + err, value)
+
+    def test_key_masked_before_contacts(self) -> None:
+        # 키 안의 전화번호 덩이 — 연락처를 먼저 가리면 키가 쪼개져 꼬리가 결과에 남습니다
+        self.add_video(
+            "연애",
+            "operation",
+            6,
+            2500,
+            name=f"연애 고민 제목표식 {KEY_WITH_PHONE}",
+            description=f"설명표식 {KEY_WITH_PHONE}",
+        )
+        self.world.comments[vid(6)] = [f"댓글표식 {KEY_WITH_PHONE}"]
+        self.claude.writes = [
+            writer_reply(
+                concern=f"{CONCERN} {KEY_WITH_PHONE}", comment=f"{DRAFT_POOL[0]} {KEY_WITH_PHONE}"
+            )
+        ]
+        code, out, err, result = self.run_main(
+            environ={**KEYS, "TYPESAFE_API_KEY": KEY_WITH_PHONE}
+        )
+        mask = "<TYPESAFE_API_KEY>"
+        planted = self.by_id(result)[vid(6)]["untrusted"]
+        self.assertEqual(planted["title"], f"연애 고민 제목표식 {mask}")
+        self.assertEqual(planted["description"], f"설명표식 {mask}")
+        self.assertEqual(planted["top_comments"], [f"댓글표식 {mask}"])
+        drafted = self.by_id(result)[vid(1)]["drafts"][0]["untrusted"]
+        self.assertEqual(drafted["concern"], f"{CONCERN} {mask}")
+        self.assertEqual(drafted["comment"], f"{DRAFT_POOL[0]} {mask}")
+        for name in (live_check.RESULT_NAME, live_check.SUMMARY_NAME):
+            saved = (self.out / name).read_text(encoding="utf-8")
+            for tail in ("TAILMARK", "tsFAKEKEY"):
+                self.assertNotIn(tail, saved, f"{name}: {tail}")
+        self.assertNotEqual(code, 3)
+        self.assertEqual(out.split("\n")[-3], "키 검사: 결과 파일에 키 없음")
+        self.assertEqual(out.split("\n")[-2], "개인 정보 검사: 결과 파일에 연락처 모양 없음")
 
 
 class GraderBoundaryTest(unittest.TestCase):
