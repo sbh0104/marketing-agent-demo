@@ -130,12 +130,14 @@ class FakeJevAsk:
     """classifier.Ask 모양 — 판별 질문(matches_topic)과 자체 검사 질문을 가려 답합니다.
 
     classify[id] 는 그 영상의 판별 답(응답 또는 예외), 없으면 확신 있는 일치입니다. 자체 검사는
-    광고처럼 읽힘만 낮고 나머지는 높게 답합니다. 영상은 상태 글의 제목(ID 가 든)으로 알아봅니다.
+    광고처럼 읽힘만 reads_like_ad(처음 0.1, 낮음)로, 나머지는 높게 답합니다. 영상은 상태 글의
+    제목(ID 가 든)으로 알아봅니다.
     """
 
     def __init__(self) -> None:
         self.classify: dict[str, object] = {}
         self.calls: list[tuple[str, str | None]] = []
+        self.reads_like_ad = 0.1
 
     def __call__(self, model: str, state: str, questions: Mapping[str, object]) -> object:
         video_id = next((v for v in (A, B, C, D) if title_of(v) in state), None)
@@ -147,7 +149,7 @@ class FakeJevAsk:
             return answer
         self.calls.append(("check", video_id))
         nouls = {
-            name: SimpleNamespace(noul=0.1 if name == "reads_like_ad" else 0.9)
+            name: SimpleNamespace(noul=self.reads_like_ad if name == "reads_like_ad" else 0.9)
             for name in questions
         }
         return SimpleNamespace(answers=nouls)
@@ -222,12 +224,15 @@ class FakeSession:
 
     def close(self) -> None:
         self.closes += 1
+        if self._chrome.close_error is not None:
+            raise self._chrome.close_error
 
 
 class FakeChrome:
     """Services.chrome 자리 — 받은 debug_url 과 만든 세션, 눌린 submit 을 적습니다.
 
     unreachable 이 n 이면 처음 n 번의 new_page 가 chrome_unreachable 로 멈춥니다.
+    close_error 가 있으면 세션의 close 가 (센 뒤) 그 예외를 냅니다.
     """
 
     def __init__(self) -> None:
@@ -235,6 +240,7 @@ class FakeChrome:
         self.submits: list[str] = []
         self.typed: list[str] = []
         self.unreachable = 0
+        self.close_error: BaseException | None = None
 
     def __call__(self, debug_url: str) -> FakeSession:
         session = FakeSession(self, debug_url)
@@ -280,6 +286,15 @@ def raise_for(video_id: str, error: BaseException | None, real: object) -> objec
 
 def watch(video_id: str) -> str:
     return f"https://www.youtube.com/watch?v={video_id}"
+
+
+def unreadable_reason(path: Path) -> str:
+    """폴더를 파일로 읽을 때 나는 OSError 의 short_reason — 종류는 운영체제마다 다릅니다."""
+    try:
+        path.read_text(encoding="utf-8-sig")
+    except OSError as exc:
+        return run.short_reason(exc)
+    raise AssertionError(f"폴더가 파일로 읽혔습니다: {path}")
 
 
 # 단계 함수 이름(agent.run 의 이름) → 울타리 줄의 where
@@ -569,6 +584,78 @@ class TestEntry(RunCase):
                 self.assertIn(f"MissingSdkError: {package} 가 설치되지 않았습니다", stderr.getvalue())
                 self.assertFalse(self.log_path.exists())
 
+    def main_with_services(self) -> tuple[int, str]:
+        """main 을 가짜 서비스로 돌립니다 — 종료 코드와 stderr(화면 출력은 버림)."""
+        stderr = io.StringIO()
+        with (
+            mock.patch.object(run, "connect_real", return_value=self.services),
+            contextlib.redirect_stdout(io.StringIO()),
+            contextlib.redirect_stderr(stderr),
+        ):
+            code = run.main(["--once"], root=self.root, environ=KEYS)
+        return code, stderr.getvalue()
+
+    def main_with_ledger(self) -> tuple[int, str]:
+        """main 을 진짜 connect_real(SDK 있음 · Claude 가짜)로 돌립니다 — 쿼터 장부를 정말 엽니다."""
+        real = run.connect_real
+        stderr = io.StringIO()
+        with (
+            mock.patch.object(
+                run,
+                "connect_real",
+                side_effect=lambda root, env: real(root, env, lambda name: object()),
+            ),
+            mock.patch.object(run, "anthropic_client", return_value=self.claude),
+            mock.patch.dict(os.environ),
+            contextlib.redirect_stderr(stderr),
+        ):
+            code = run.main(["--once"], root=self.root, environ=KEYS)
+        return code, stderr.getvalue()
+
+    def test_corrupt_store_exits_2_with_store_line(self) -> None:
+        store = self.root / "data" / "videos.json"
+        store.parent.mkdir(parents=True)
+        store.write_text("{깨진 저장소", encoding="utf-8")
+        code, stderr = self.main_with_services()
+        self.assertEqual(code, 2)
+        self.assertEqual([event for event, _ in self.events()], [Event.ERROR])
+        (fields,) = self.lines(Event.ERROR, where="store")
+        self.assertTrue(
+            fields["reason"].startswith("StoreError: 저장소 파일이 올바른 JSON 이 아닙니다"), fields
+        )
+        self.assertNotIn("Traceback", stderr)
+
+    def test_unreadable_store_exits_2_with_store_line(self) -> None:
+        store = self.root / "data" / "videos.json"
+        store.mkdir(parents=True)  # 폴더라 파일로 읽을 수 없음(OSError)
+        expected = unreadable_reason(store)
+        code, stderr = self.main_with_services()
+        self.assertEqual(code, 2)
+        self.assertEqual([event for event, _ in self.events()], [Event.ERROR])
+        self.assertEqual(self.lines(Event.ERROR), [{"where": "store", "reason": expected}])
+        self.assertNotIn("Traceback", stderr)
+
+    def test_untrusted_quota_ledger_exits_2(self) -> None:
+        ledger = self.root / "data" / "quota.json"
+        ledger.parent.mkdir(parents=True)
+        ledger.write_text('{"calls": [], "schema_version": 99}', encoding="utf-8")
+        code, stderr = self.main_with_ledger()
+        self.assertEqual(code, 2)
+        self.assertIn(
+            "에이전트를 시작할 수 없습니다 — QuotaError: 쿼터 기록 파일을 믿을 수 없습니다", stderr
+        )
+        self.assertNotIn("Traceback", stderr)
+        self.assertFalse(self.log_path.exists())
+
+    def test_unreadable_quota_ledger_exits_2(self) -> None:
+        ledger = self.root / "data" / "quota.json"
+        ledger.mkdir(parents=True)  # 폴더라 파일로 읽을 수 없음(OSError)
+        expected = unreadable_reason(ledger)
+        code, stderr = self.main_with_ledger()
+        self.assertEqual(code, 2)
+        self.assertEqual(stderr, f"에이전트를 시작할 수 없습니다 — {expected}\n")
+        self.assertFalse(self.log_path.exists())
+
     def test_echo_never_raises_on_unencodable_text(self) -> None:
         console = io.TextIOWrapper(io.BytesIO(), encoding="cp949")
         logbook = Logbook(self.log_path, self.clock, run.echo_stream(console))
@@ -736,6 +823,24 @@ class TestChrome(TwoListedCase):
         self.assertEqual([session.closes for session in self.chrome.sessions], [1, 1])
         self.assertEqual([fields["where"] for fields in self.fenced()], ["run.post"])
         self.assertEqual(self.posted_live(), [B])
+
+    def test_close_failure_keeps_successful_post(self) -> None:
+        self.chrome.close_error = RuntimeError("playwright 가 이미 멈췄습니다")
+        self.cycle(self.pipeline())
+        self.assertEqual(self.posted_live(), [A, B])
+        self.assertEqual([session.closes for session in self.chrome.sessions], [1, 1])
+        self.assertEqual(self.lines(Event.ERROR), [])
+        self.assertEqual(self.cycle_errors(), ["0"])
+
+    def test_close_failure_never_replaces_keyboard_interrupt(self) -> None:
+        self.chrome.close_error = RuntimeError("playwright 가 이미 멈췄습니다")
+        pipeline = self.pipeline()
+        with self.patch_stage("post_video", KeyboardInterrupt()):
+            with self.assertRaises(KeyboardInterrupt):
+                pipeline.cycle(self.load())
+        self.assertEqual([session.closes for session in self.chrome.sessions], [1])
+        self.assertEqual(self.lines(Event.ERROR), [])
+        self.assertEqual(self.lines(Event.CYCLE), [])
 
     def test_chrome_unreachable_stops_only_that_post(self) -> None:
         self.chrome.unreachable = 1
@@ -1012,6 +1117,25 @@ class TestStages(RunCase):
                 )
                 self.assertEqual(len(self.claude.user_messages(A)), 1)
                 self.assertEqual(len(self.claude.user_messages(C)), 1 if verdict == "yes" else 0)
+
+    def test_self_check_asks_jev_and_its_failure_skips_post(self) -> None:
+        self.jev.reads_like_ad = 0.9  # 광고처럼 읽힌다고 답 — 하한 0.7 아래(1 − 0.9)
+        self.show(A, 2000, channel="UC1")
+        self.show(B, 2000, channel="UC2")
+        self.cycle(self.pipeline())
+        checks = [call for call in self.jev.calls if call[0] == "check"]
+        self.assertEqual(checks, [("check", A), ("check", A), ("check", B), ("check", B)])
+        failed = "자체 검사 미달 — 광고처럼 읽힘 0.90"
+        reason = f"검사 두 번 탈락 — 1차: {failed} / 2차: {failed}"
+        self.assertEqual(
+            self.lines(Event.SKIP),
+            [{"video": A, "reason": reason}, {"video": B, "reason": reason}],
+        )
+        self.assertEqual(self.lines(Event.COMMENT), [])
+        self.assertIsNone(self.record(A).comment)
+        self.assertIsNone(self.record(B).comment)
+        self.assertEqual(self.lines(Event.POST), [])
+        self.assertEqual(self.chrome.sessions, [])
 
     def test_top_comments_passed_to_writer_transcript_empty(self) -> None:
         self.api.comments[A] = ["답장 세 시간 장면 공감해요", "둘째 인기 댓글"]

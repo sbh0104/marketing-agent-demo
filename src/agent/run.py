@@ -446,7 +446,10 @@ class Pipeline:
                 repo_root=self._repo_root,
             )
         finally:
-            session.close()
+            try:
+                session.close()
+            except Exception:  # 연결 끊기가 터져도 게시 자신의 결과 · Ctrl-C 가 이깁니다
+                pass
 
     def _save_rejected(self, record: VideoRecord, config: Config, allowed: frozenset[str]) -> None:
         """설정이 거절된 동안의 게시 — post_video 없이 계약 6절 1 · 2 · 4 를 크롬 없이 따라 테스트 저장.
@@ -491,7 +494,7 @@ def run_agent(
         return EXIT_SETUP
     try:
         store = Store(root / STORE_PATH)
-    except StoreError as exc:
+    except (StoreError, OSError) as exc:
         logbook.write(Event.ERROR, where="store", reason=short_reason(exc))
         return EXIT_SETUP
     watcher = Watcher(store, logbook, services.youtube, clock)
@@ -548,7 +551,7 @@ def main(
         with RunLock(lock_path):
             try:
                 services = connect_real(root, env)
-            except (EnvError, QuotaError, ImportError, ValueError) as exc:
+            except (EnvError, QuotaError, ImportError, ValueError, OSError) as exc:
                 print(f"에이전트를 시작할 수 없습니다 — {short_reason(exc)}", file=sys.stderr)
                 return EXIT_SETUP
             return run_agent(
