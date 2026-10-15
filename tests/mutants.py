@@ -794,6 +794,12 @@ MUTANTS: dict[str, tuple[str, str, str, str]] = {
         "return lowest_score(scores) + _TOLERANCE >= threshold",
         "return lowest_score(scores) >= threshold",
     ),
+    "live-check-skip-grade-every-skip": (
+        "tests.live_check",
+        "tests.test_live_check",
+        'if video["skip_kind"] in SELF_SKIP_KINDS:',
+        'if video["result"] == "skip":',
+    ),
 }
 
 

@@ -711,6 +711,7 @@ run_loop(cycle, reload, initial, *, on_error, sleep=time.sleep,
   python3 -m tests.mutants live-check-applied-stored-verdicts-unchecked
   python3 -m tests.mutants live-check-applied-unknown-question-ignored
   python3 -m tests.mutants live-check-applied-recheck-no-tolerance
+  python3 -m tests.mutants live-check-skip-grade-every-skip
   ```
 
   `classify` · `read_answers` · `build_state` · `is_error_hold` · `sdk_ask` ·
@@ -1222,7 +1223,9 @@ python3 -m tests.live_check --verdict <결과 파일>     # 호출 없이 판정
 - **jev 자체 검사 어댑터.** `jev_self_check(ask, model)` 이 '댓글 작성' 절의 `check` 포트를 채웁니다 —
   질문마다 `noul`(`criteria = {"true": "Yes, it does", "false": "No, it does not"}`)을 한 요청으로 묻고
   `answers[이름].noul` 을 돌려줍니다. 운영(Phase 7)이 이어 붙일 때 이 모양을 옮겨 씁니다.
-- **영상의 끝.** `result` 는 `comment`(통과) · `skip`(검사 두 번 탈락) · `error`(인기 댓글을 못 받음,
+- **영상의 끝.** `result` 는 `comment`(통과) · `skip`(검사 두 번 탈락 또는 스스로 건너뜀 — `skip_kind` 가
+  `checks_failed` · `no_scene` · `no_concern`; 실행기가 Claude 답을 `read_reply` 로 다시 읽어 정합니다) ·
+  `error`(인기 댓글을 못 받음,
   또는 `write_comment` 가 Claude 호출 오류 · jev 검사 호출 오류 · jev 답 모양 이상으로 끝남 — 실행기의
   감싸개가 보고 `error_cause` 에 `comments` · `claude` · `jev` · `jev_answer` 로 적음) · `not_written`
   (판별이 `yes` 가 아님)입니다.
@@ -1264,10 +1267,13 @@ python3 -m tests.live_check --verdict <결과 파일>     # 호출 없이 판정
   | `accuracy.<언어>[]` | 예시마다 `index` · `kind` · `label` · `verdict` · `error` · `noul` · `choice` · `probability` · `confidence` |
   | `accuracy_tally.<언어>` | 지금 기준값의 맞음 · 잘못된 일치 · 잘못된 불일치 · 보류 · 오류(`tally`) |
   | `windows.<창>` | 검색 수 · 찾은 영상 · 조회수 범위 안 · 판별한 영상 |
-  | `videos[]` | `window` · `views` · `published_at` · `age_hours` · `classification` · `topic_grade` · `topic_grade_error` · `topic_grade_shape` · `topic_human` · `material` · `top_comment_count` · `comment_items` · `comments_disabled` · `result` · `error_cause` · `drafts[]` |
-  | `drafts[]` | `attempt` · `parsed` · `scores`(질문 → P(예)) · `self_check_pass` · `code_pass` · `passed` · `grade` · `claude_grade` · `grade_error` · `task_quality` · `task_error` · `grade_shape` · `frame_overlap` · `human` |
+  | `videos[]` | `window` · `views` · `published_at` · `age_hours` · `classification` · `topic_grade` · `topic_grade_error` · `topic_grade_shape` · `topic_human` · `material` · `top_comment_count` · `comment_items` · `comments_disabled` · `result` · `error_cause` · `skip_kind` · `skip_grade` · `skip_grade_error` · `skip_grade_shape` · `skip_human` · `drafts[]` |
+  | `drafts[]` | `attempt` · `parsed` · `scores`(질문 → P(예)) · `self_check_pass` · `code_pass` · `passed` · `grade` · `claude_grade` · `grade_error` · `task_quality` · `task_error` · `grade_shape` · `frame_overlap` · `human` (스스로 건너뜀 답은 줄이 없음) |
   | `errors[]` | 실패한 호출마다 `service` · `stage` · `error`(예외 이름) · `status` · `video_id` |
   | `fingerprint` | 판별 질문 문구(ko · en) · 예시 묶음 SHA-256 · 판별 설정 값 · jev 가 알린 모델 · 자체 검사 질문 · 통과선 · 트리거 조회수 범위 · 채점 프롬프트 · `MARGIN` · `PASS_CORRECT` · `claude_max_retries` |
+
+  6E 뒤 실행의 판 2 결과는 `videos[]` 에 스스로 건너뜀 칸이 더해져 있습니다 — 칸을 더하기만 해 판은
+  그대로입니다.
 
 - **Claude 채점.** 초안마다(다시 쓴 초안 포함) 채점 모델을 한 번 부릅니다(`GRADE_SYSTEM`, `max_tokens`
   1024). 답은 도구 `record_grade` 의 입력으로 받습니다(`tool_choice` 로 그 도구를 정함 — 도구 블록이
@@ -1301,12 +1307,28 @@ python3 -m tests.live_check --verdict <결과 파일>     # 호출 없이 판정
   영상 판별 채점 호출이 API 오류로 실패하면 다른 호출처럼 `errors[]` 에 남아 재지 못함(호출 오류)으로
   셉니다.
   진짜 영상 숫자로 기준값을 내릴지는 사람이 정합니다(트래커 Phase 6C).
+- **스스로 건너뜀 채점 (Phase 6E).** 작성기가 스스로 건너뛴 영상(`skip_kind` 가 `no_scene` · `no_concern`)마다
+  채점 모델을 한 번 부릅니다(`SKIP_GRADE_SYSTEM`, 도구 `record_material`).
+  재료만 보내고 초안이나 건너뜀 답은 보내지 않습니다. 묻는 것은 `material_has_love_worry`(재료에 자료 속
+  사람의 연애 고민이 있나) · `material_has_scene`(짚을 만한 영상 속 장면 · 말이 재료에 있나) 둘이고, 초안
+  채점의 `concern_is_love_worry` · `scene_in_material` 과 같은 뜻입니다. 답은 `skip_grade`(두 참거짓)이고,
+  모양이 다르면 `skip_grade_error = "응답 모양"` 과 `skip_grade_shape`, API 오류면 `skip_grade_error` 에 오류
+  이름이며 그 호출은 `errors[]`(단계 `skip_grade`)에 남아 재지 못함(호출 오류)으로 셉니다.
+  검사 두 번 탈락 · 댓글 · 오류로 끝난 영상은 이 채점을 부르지 않습니다.
+  스스로 건너뜀 답은 초안 줄을 남기지 않아 `parsed: false` 로 세지 않습니다.
+  판정 줄 · 초안 채점 칸 · 과제 품질 셈은 `skip_kind` · `skip_grade` · `skip_grade_error` · `skip_grade_shape` ·
+  `skip_human` 을 읽지 않습니다. 실행기가 채우는 새 칸(`skip_kind` · `skip_grade` · `skip_grade_error` ·
+  `skip_grade_shape`)은 참거짓 · 정해진 낱말 · 숫자 · 목록 안 이름뿐입니다.
+  이 채점은 쓴 영상마다 많아야 한 번이고, 건너뜀 답 앞의 초안 채점과 합쳐도 영상마다 그 영상의 작성 호출
+  수를 넘지 않아 최악 호출 수(claude 103)는 그대로입니다. 이유별 '정당한 건너뜀' 셈은 결과 파일에서
+  Phase 6F 가 합니다.
 - **다른 영상 초안과 겹침 (과제 품질 ⓒ).** 실행이 끝나면 초안마다 공백을 모두 뺀 6글자 조각 가운데
   다른 영상의 초안에도 있는 조각 수를 `frame_overlap` 에 적습니다.
   같은 영상의 다시 쓴 초안끼리는 세지 않고, AI 를 부르지 않습니다.
-- **사람 칸.** 실행기는 `human` 과 `topic_human` 을 빈 글자로 둡니다. 사람은 채점에 동의하지 못하는
-  초안의 `human` 에 `ok` 또는 `bad` 를 적습니다(건너뛰어도 됨).
-  판정 줄은 `human` · `topic_human` 을 읽지 않습니다.
+- **사람 칸.** 실행기는 `human` · `topic_human` · `skip_human` 을 빈 글자로 둡니다. 사람은 채점에 동의하지
+  못하는 초안의 `human` 에 `ok` 또는 `bad` 를 적습니다(건너뛰어도 됨). 사람은 스스로 건너뜀 채점에 동의하지
+  못하는 영상의 `skip_human` 에 `정당`(재료에 정말 없었음) 또는 `부당`(재료에 있었음)을 적습니다(건너뛰어도 됨).
+  판정 줄은 `human` · `topic_human` · `skip_human` 을 읽지 않습니다.
 - **판정 줄.** `verdict_line(result)` 이 결과 하나로 셉니다. `summary.md` 의 첫 줄, 화면의 첫 줄,
   `result.json` 의 `verdict` 가 같은 줄입니다. 걸린 경우를 아래 차례로 `; ` 로 이어
   `6B: stop — <경우들>` 을, 하나도 없으면 `6B: go` 를 씁니다.
@@ -1315,7 +1337,7 @@ python3 -m tests.live_check --verdict <결과 파일>     # 호출 없이 판정
   |---|---|---|
   | 재지 못함 | 예시 판정에 오류 보류가 있음 · 예시 밖 호출 오류가 있음(404 로 답한 모델 확인은 뺌) · `result: "error"` 인 영상이 있음 · `stopped` 가 있음 — 하나라도 | `재지 못함(예시 오류 <n> · 호출 오류 <n> · 영상 오류 <n> · 천장 <서비스> <천장> · 쿼터 <호출> <counter> <사용>/<한도> · 중단 <예외 이름>)` — 있는 것만 |
   | 판별 미달 | 어느 언어도 "올리기만" 범위에서 잘못된 일치 0 · 맞음 `PASS_CORRECT`(20) 이상을 이루지 못함 | `판별 미달(ko <최다 맞음>/<예시 수> · en …)`, 잘못된 일치를 막을 설정이 없는 언어는 `<언어> 잘못된 일치 못 막음` |
-  | 작성 막힘 | `skip`(검사 두 번 탈락) × 2 > 쓴 영상(`comment` + `skip`, 두 창 모두) | `작성 막힘(SKIP <s>/<w>)` |
+  | 작성 막힘 | `skip`(검사 두 번 탈락 · 스스로 건너뜀 — 이유를 가리지 않음) × 2 > 쓴 영상(`comment` + `skip`, 두 창 모두) | `작성 막힘(SKIP <s>/<w>)` |
   | 모델 이름 | `claude-sonnet-5-5` · `claude-haiku-5-5` 가 둘 다 `rejected` | `모델 이름(claude-sonnet-5-5 · claude-haiku-5-5 둘 다 거절)` |
   | 채점 막힘 | 판 2 이상 결과에서 채점 오류(`grade_error` 가 있는 초안) × 2 > 초안(`parsed` 인 초안, 두 창 모두) | `채점 막힘(오류 <n>/<m>)` |
 
