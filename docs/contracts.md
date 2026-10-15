@@ -669,6 +669,8 @@ run_loop(cycle, reload, initial, *, on_error, sleep=time.sleep,
   python3 -m tests.mutants writer-repeat-all-history
   python3 -m tests.mutants writer-unescaped-material
   python3 -m tests.mutants writer-api-error-unlogged
+  python3 -m tests.mutants writer-self-skip-checked
+  python3 -m tests.mutants writer-no-concern-ignored
   python3 -m tests.mutants classifier-error-yes
   python3 -m tests.mutants classifier-malformed-yes
   python3 -m tests.mutants classifier-unchecked-probability
@@ -880,11 +882,14 @@ if result.draft is not None:
   `ValueError("주제 판별이 yes 인 영상에만 댓글을 씁니다: <영상 ID>")` 이고 Claude 를 부르지
   않습니다.
 - **`claude` 포트** — `anthropic.Anthropic` 과 같은 모양
-  (`messages.create(model=, max_tokens=, system=, messages=)`). `anthropic_client(api_key=None)`
+  (`messages.create(model=, max_tokens=, system=, tools=, tool_choice=, messages=)`).
+  `anthropic_client(api_key=None)`
   가 실제 클라이언트를 만듭니다. `anthropic` 패키지는 이 함수 안에서만 가져오므로 테스트는 설치
   없이 돕니다. 제한 시간은 60초(`CLAUDE_TIMEOUT_S` — SDK 기본값 10분이면 한 줄로 도는 루프가
   멈춥니다)이고, 429/529 재시도는 SDK 기본값 그대로입니다. 모델 이름은 `comment.writer_model`
-  (2절)에서 읽습니다.
+  (2절)에서 읽습니다. 작성 답은 도구 `submit_comment` 의 입력으로 받습니다(`tool_choice` 로 그
+  도구를 정함). 모델이 그 도구로 답하는지와 `tool_result` 다시 쓰기 차례를 받는지는 다음 진짜
+  실행이 처음 확인합니다.
 - **`check` 포트** — `check(state, questions) -> {질문 이름: P(예)}`. 초안 한 개에 `noul` 질문
   세 개(`CHECK_QUESTIONS`: `mentions_scene` · `reads_like_ad` · `follows_concern`)를 **한
   요청**으로 묻습니다. 접속(키 `TYPESAFE_API_KEY` · jev 모델 · `typesafe-sdk`)은 Phase 3 의
@@ -897,19 +902,26 @@ if result.draft is not None:
 
 **흐름** — 시도마다(최대 두 번):
 
-1. Claude 가 JSON `{"concern": "고민 한 줄", "comment": "댓글"}` 으로 답합니다. 읽을 수 없으면
-   jev 를 부르지 않고 그 시도는 `JSON 으로 읽을 수 없습니다` 로 떨어집니다.
-2. jev 자체 검사.
-3. 코드 검사 — 글자 수 · 링크 · 반복을 **모두** 돌립니다(코드가 마지막).
+1. Claude 가 도구 `submit_comment` 로 답합니다 — `has_love_concern` · `has_scene`(JSON 참거짓)과,
+   둘 다 참이면 `concern`(고민 한 줄) · `comment`(댓글). 도구 블록이 없거나 모양이 다르면 jev 를
+   부르지 않고 그 시도는 `답을 읽을 수 없습니다` 로 떨어집니다. 글 블록이 함께 와도 도구 블록이
+   답이고, 네 칸 밖의 키가 있어도 네 칸으로 읽습니다.
+2. **스스로 건너뜀** — `has_love_concern` 이 거짓이면 `재료에 연애 고민 없음`, 고민은 참이고
+   `has_scene` 이 거짓이면 `재료에 장면 없음` 입니다. jev 를 부르지 않고 다시 쓰지 않으며 바로
+   `SKIP reason="<그 이유>"` 입니다(두 번째 시도의 답이면 `"<그 이유> — 1차: <1차 이유>"`).
+   건너뜀 답에서 읽는 것은 두 참거짓뿐입니다.
+3. jev 자체 검사.
+4. 코드 검사 — 글자 수 · 링크 · 반복을 **모두** 돌립니다(코드가 마지막).
 
 떨어진 이유(jev 이유가 먼저, 코드 이유는 위 순서)를 모두 `; ` 로 이어 다시 쓰기 이유 하나로
-만들고, 같은 대화에 Claude 의 원래 답(assistant)과 `REWRITE_PROMPT`(user)를 붙여 한 번 다시
+만들고, 원래 답에 도구 호출이 있으면 그 호출(assistant)과 그 호출의 `tool_result` 로 붙인
+`REWRITE_PROMPT`(user)를, 없으면 원래 글과 `REWRITE_PROMPT` 를 같은 대화에 붙여 한 번 다시
 씁니다. 두 번째도 떨어지면 `SKIP reason="검사 두 번 탈락 — 1차: … / 2차: …"` 입니다. 통과하면
 `COMMENT` 를 남기고 초안을 돌려줍니다.
 
 | 검사 | 통과 규칙 | 떨어질 때 이유 |
 |---|---|---|
-| 답 읽기 | JSON 객체, `concern` · `comment` 가 비어 있지 않은 글자 | `JSON 으로 읽을 수 없습니다` |
+| 답 읽기 | 도구 `submit_comment` 입력 — 두 참거짓, 둘 다 참이면 `concern` · `comment` 가 비어 있지 않은 글자 | `답을 읽을 수 없습니다` |
 | jev 자체 검사 | 질문마다 점수 + `_TOLERANCE` ≥ `check_min_probability` | `자체 검사 미달 — <이름표> <P(예)>, …` |
 | 글자 수 | `min_chars` ≤ 글자 수 ≤ `max_chars` | `글자 수 <n>자 — <min>–<max>자여야 합니다` |
 | 링크 | 링크 보기에 `_LINK_RE` 조각이 없음 | `링크·주소 모양이 들어 있습니다: <조각>` |
@@ -923,7 +935,7 @@ if result.draft is not None:
   로 비교하면 1 − P 의 부동소수 오차(`1 - 0.9 = 0.0999…98`) 때문에 두 자리 하한 99개 중 20개에서
   "하한과 같으면 통과" 가 깨집니다.
 - **글자 수** — NFC 로 맞춘 댓글의 `len()`, 곧 코드 포인트 수이지 바이트가 아닙니다.
-  `parse_output` 이 댓글을 NFC 로 맞추고 앞뒤 공백을 떼며, 고민은 한 줄로 모읍니다.
+  `read_reply` 가 댓글을 NFC 로 맞추고 앞뒤 공백을 떼며, 고민은 한 줄로 모읍니다.
   서로게이트(U+D800–U+DFFF)가 든 고민 · 댓글은 읽을 수 없는 답으로 보아 다시 씁니다.
 - **링크** — 링크 보기는 NFKC + casefold 한 글에서 글자 · 숫자(`isalnum`, 한글 포함)와 `@` 는
   그대로, 유니코드 이름에 `FULL STOP`/`DOT` 이 든 글자는 `.`, `SOLIDUS`/`SLASH` 는 `/`,
@@ -986,8 +998,9 @@ if result.draft is not None:
   "나머지 필드").
 - **`self_check`** — 초안의 `self_check` 는 `Judgement(yes, "<질문>=<P(예)> …", now)` 입니다.
   `CommentDraft.at` 도 넘겨받은 `now` 이고, 숨은 시계는 없습니다.
-- 프롬프트 원문(`SYSTEM_PROMPT` · `USER_INSTRUCTION` · `REWRITE_PROMPT` · `CHECK_QUESTIONS` ·
-  `CHECK_LABELS`)은 `writer.py` 맨 위에만 있고, Phase 8 의 PROCESS.md 가 옮겨 적습니다.
+- 프롬프트 원문(`SYSTEM_PROMPT` · `USER_INSTRUCTION` · `REWRITE_PROMPT` · `WRITE_TOOL` ·
+  `CHECK_QUESTIONS` · `CHECK_LABELS`)은 `writer.py` 맨 위에만 있고, Phase 8 의 PROCESS.md 가 옮겨
+  적습니다.
 
 ## 트리거 판정 — `trigger.py`
 

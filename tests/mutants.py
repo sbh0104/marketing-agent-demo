@@ -482,6 +482,18 @@ MUTANTS: dict[str, tuple[str, str, str, str]] = {
         "logbook.write(Event.ERROR, where=where, reason=reason, video=record.video_id)",
         "None",
     ),
+    "writer-self-skip-checked": (
+        "agent.writer",
+        "tests.test_writer",
+        "if isinstance(reply, str):",
+        "if False:",
+    ),
+    "writer-no-concern-ignored": (
+        "agent.writer",
+        "tests.test_writer",
+        "if not has_concern:",
+        "if False:",
+    ),
     "classifier-error-yes": (
         "agent.classifier",
         "tests.test_classifier",

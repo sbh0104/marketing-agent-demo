@@ -57,9 +57,8 @@ from agent.writer import (
     _clean,
     _invalid_answer,
     _material,
-    _reply_text,
     code_failures,
-    parse_output,
+    read_reply,
     self_check_failure,
     write_comment,
 )
@@ -1461,16 +1460,19 @@ class _VideoRound:
         comments: list[str],
         recent: Sequence[str],
     ) -> None:
-        """Claude 답마다 초안 한 줄 — 읽은 초안은 자체 검사 점수 · 코드 검사 · 채점 두 몫 · 빈 사람 칸."""
+        """Claude 작성 답마다 초안 한 줄 — 스스로 건너뜀 답은 줄이 없고, 읽지 못한 답은 `parsed: false`,
+        읽은 초안은 자체 검사 점수 · 코드 검사 · 채점 두 몫 · 빈 사람 칸."""
         self.track.stage["claude"] = "grade"
         checks = iter(recording.checks)
         threshold = self.comment_config.check_min_probability
         for attempt, response in enumerate(recording.replies, 1):
-            parsed = parse_output(_reply_text(response))
-            if parsed is None:
+            reply = read_reply(response)
+            if isinstance(reply, str):
+                continue  # 스스로 건너뜀 답은 초안이 아닙니다
+            if reply is None:
                 video["drafts"].append({"attempt": attempt, "parsed": False})
                 continue
-            concern, text = parsed
+            concern, text = reply
             answer = next(checks, None)
             scores = (
                 None
