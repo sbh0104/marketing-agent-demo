@@ -355,6 +355,7 @@ Phase 3–5 가 정합니다.)
    6. `store.resolve_live(video_id, "posted" | "failed", now, reason, screenshot)`
    7. 로그 `POST … result=posted` 또는 `result=failed`
 4. **테스트 모드:** `store.save_test(decision.video_id, now, reason=<decision.reason, 3.2 에서 왔으면 3.2 의 이유>)` 를 부르고 로그 `POST … mode=test result=saved reason=<그 reason>`.
+   단 `decision.reason` 이 `dry_run` 이면(테스트 실행의 허용 목록 영상) 저장 대신 아래 **리허설** 입니다.
 5. **`reserve_live` 가 오류를 냈으면 절대 클릭하지 않습니다.**
 
 - 3.1 · 3.2 는 가드와 브라우저가 같은 주소를 다르게 읽을 자리를 없애는 두 겹 잠금입니다(가드의
@@ -364,6 +365,7 @@ Phase 3–5 가 정합니다.)
   댓글이 달리기 때문입니다. `page_mismatch` 는 `decide_post` 의 이유가 아니라 게시 단계가 남기는
   테스트 저장 이유입니다. 유튜브가 중간 화면(로그인 · 동의)을 띄우면 정상 게시도 테스트 모드로
   빠질 수 있습니다 — 안전한 쪽 실패로 받아들입니다. Phase 6 이 지킵니다.
+  리허설(아래 '게시 단계 구현')에서는 다시 확인의 이 이유들이 저장 없이 `stopped` 의 원인이 됩니다.
 
 ### 게시 단계 구현 — poster.py · chrome.py (Phase 6)
 
@@ -373,11 +375,29 @@ post_video(record, *, config, dry_run, store, logbook, open_page, clock,
 ```
 
 위 순서를 그대로 따릅니다. `video_ref` 는 `record.video_id` 입니다. `PostOutcome.result` 는
-`skipped` · `saved` · `stopped` · `reserved` · `posted` · `failed` 중 하나입니다.
+`skipped` · `saved` · `rehearsed` · `stopped` · `reserved` · `posted` · `failed` 중 하나입니다.
 
 - **댓글 없음.** 댓글이 없는 기록은 `SKIP reason=no_comment` 입니다.
-- **테스트 모드는 크롬을 열지 않습니다.** `--dry-run` 의 "게시 직전까지"는 탐지 · 분류 ·
-  트리거 · 댓글 작성까지라는 뜻입니다.
+- **리허설 — 테스트 실행의 허용 목록 영상.** `decision.reason` 이 `dry_run` 이면 3.1 처럼 크롬에서
+  `decision.video_id` 의 watch 주소를 열고, 댓글 칸에 입력해 게시 버튼이 켜졌는지까지 봅니다(준비).
+  이어 3.2 처럼 `page.url` 로 `decide_post` 를 다시 부르고, 화면을 캡처한 뒤 입력한 글을 지우고
+  탭을 닫습니다. 기록은 `POST … mode=test result=rehearsed reason=dry_run screenshot=… page_url=…`
+  한 줄입니다. 캡처가 실패하면 `screenshot=` 을 빼고 씁니다. 글 지우기가 실패해도 버튼까지는
+  닿았으므로 결과는 `rehearsed` 이고, 줄에 `detail="clear_failed <원인>: …"` 이 붙습니다.
+- **리허설은 게시 버튼을 누르지 않습니다.**
+  리허설은 저장소에 시도를 남기지 않습니다 — 그래서 채널 대기 · 24시간 상한 · 영상당 한 번을
+  쓰지 않고, 같은 영상으로 다시 돌리면 다시 리허설하며, 그 뒤 보통 실행은 그 영상에 게시합니다.
+  리허설 앞의 `check_post` 는 다른 테스트 모드처럼 `live=False` 로 불려, 그 영상에 시도가 이미
+  있으면 `SKIP reason=duplicate_video`, 24시간 상한이나 채널 대기에 걸리면 그 이유의 `SKIP` 입니다.
+- **리허설이 멈추면** 결과는 `stopped` 이고, '3.2 앞에서 멈춤' 과 같은
+  `ERROR where=poster reason=<원인> … stage=before_click video=<ID>` 줄 하나를 남긴 채 다음
+  영상으로 갑니다. 크롬 연결 · 영상 열기 · 준비에서 멈추면 원인은 원인 표의 이름이고, 글을 지우는
+  단계 없이 탭을 닫습니다. 다시 확인에서 실제 게시였다면 3.2 에서 4(테스트 모드)로 빠졌을 화면이면
+  원인은 그 이유(`not_in_allowlist` · `invalid_video` · `page_mismatch`)이고 `detail=` 은
+  `page.url` 이며, 화면을 캡처한 뒤 입력한 글을 지웁니다.
+- **허용 목록 밖 영상은 테스트 실행이든 아니든 크롬을 열지 않습니다** — 4(테스트 모드)로 저장합니다.
+  `--dry-run` 의 "게시 직전까지"는 허용 목록 영상이면 게시 버튼 앞까지, 그 밖의 영상이면 댓글
+  작성까지라는 뜻입니다.
 - **3.2 앞에서 멈춤** (크롬 연결, 영상 열기, 댓글 칸 준비, 입력, 버튼 확인) — 아무것도 누르지
   않았으므로 저장소는 그대로이고 결과는 `stopped` 입니다. 남는 기록은
   `ERROR where=poster reason=<원인> detail=… screenshot=… stage=before_click video=<ID>` 한
@@ -406,7 +426,7 @@ post_video(record, *, config, dry_run, store, logbook, open_page, clock,
   | `comment_box_missing` | 준비 | 댓글 영역이나 입력 칸을 찾지 못함 |
   | `post_button_missing` | 준비 · 클릭 | 게시 버튼이 없거나 눌리지 않음 — 준비에서는 `stopped`, 클릭 직전이면 `failed` |
   | `page_error` | 연결 · 준비 | 그 밖의 예외 (탭 열기 · 영상 열기 시간 초과 등) |
-  | `page_mismatch` | 다시 확인 | 크롬이 다른 영상에 있음 — 테스트 저장 |
+  | `page_mismatch` | 다시 확인 | 크롬이 다른 영상에 있음 — 테스트 저장(리허설이면 저장 없이 `stopped`) |
   | `click_unknown` | 클릭 | 누르는 중 예외 — 결과를 모름, `reserved` |
   | `confirm_error` | 확인 | 게시 확인 중 예외 — 결과를 모름, `reserved` |
   | `not_confirmed` | 확인 | 기다리는 동안 댓글이 보이지 않음 — 결과를 모름, `reserved` |
@@ -602,8 +622,15 @@ run_loop(cycle, reload, initial, *, on_error, sleep=time.sleep,
   python3 -m tests.mutants poster-unconfirmed-as-posted
   python3 -m tests.mutants poster-ignore-check
   python3 -m tests.mutants poster-test-mode-opens-chrome
+  python3 -m tests.mutants poster-dry-run-skips-rehearsal
+  python3 -m tests.mutants poster-rehearse-not-allowlisted
+  python3 -m tests.mutants poster-rehearsal-clicks
+  python3 -m tests.mutants poster-rehearsal-keeps-text
+  python3 -m tests.mutants poster-rehearsal-no-recheck
+  python3 -m tests.mutants poster-rehearsal-no-page-mismatch
   python3 -m tests.mutants chrome-allow-default-profile
   python3 -m tests.mutants chrome-allow-repo-folder
+  python3 -m tests.mutants chrome-clear-keeps-text
   python3 -m tests.mutants guard-allow-all
   python3 -m tests.mutants guard-ignore-dry-run
   python3 -m tests.mutants guard-dry-run-truthy
