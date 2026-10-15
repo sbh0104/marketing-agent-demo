@@ -551,6 +551,28 @@ class YouTubePageTest(unittest.TestCase):
         )
         self.assertIn(("click", COMMENT_PLACEHOLDER, 10000), page.calls)
 
+    def test_clear_comment_empties_input_without_click(self) -> None:
+        page = full_page()
+        adapter = self.adapter(page)
+        adapter.prepare_comment(TEXT)
+        adapter.clear_comment()
+        self.assertEqual(
+            [call for call in page.calls if call[0] == "fill"],
+            [("fill", COMMENT_INPUT, TEXT), ("fill", COMMENT_INPUT, "")],
+        )
+        self.assertEqual(
+            [call for call in page.calls if call[0] == "click"],
+            [("click", COMMENT_PLACEHOLDER, 10000)],
+        )
+
+    def test_clear_comment_missing_input_is_comment_box_missing(self) -> None:
+        page = full_page(input=None)
+        with self.assertRaises(PageError) as caught:
+            self.adapter(page).clear_comment()
+        self.assertEqual(caught.exception.reason, "comment_box_missing")
+        self.assertEqual(caught.exception.detail, COMMENT_INPUT)
+        self.assertEqual([call for call in page.calls if call[0] == "fill"], [])
+
     def assert_no_waiting(self, page: FakeBrowserPage) -> None:
         waits = [c for c in page.calls if c[0] in ("wait_for", "goto", "wait_for_timeout")]
         self.assertEqual(waits, [])
