@@ -629,6 +629,8 @@ Responsibilities & risks to guard against
 - (질문 1) 대조표는 막는 자리가 사라지는 것만 잡는다 — 새 과제 문장이 생기거나(과제 안내는 고정) 문장의 해석이 바뀌면 표를 사람이 고친다.
 - 스스로 건너뜀은 재료가 얇다는 뜻이지 작성 실패가 아니다 — 결과 파일과 운영 로그에서 두 이유가 가려져야 6F 인터뷰가 나눠 볼 수 있다.
 - (2026-10-15) Phase 6G 가 같은 때 `tests/live_check.py` · `tests/test_live_check.py` · `docs/live-check/README.md` 를 고친다(결과 파일 개인 정보 가림) — 나중에 착지하는 쪽이 충돌을 맞춘다. 6E 가 실행기의 결과 기록 칸을 더할 때 그 칸도 6G 의 가림 · 끝 줄 검사를 지나야 한다.
+- Smoke log 2026-10-15: 6F 사람 실행(`tests.live_check`, 2026-10-15T08:20Z)에서 작성기의 Claude 호출이 15번 모두 400 — `src/agent/writer.py:449` 의 강제 `tool_choice` 를 Claude Sonnet 5.5 가 거절 → E → S-093
+- Smoke log 2026-10-15: 같은 원인이 Phase 7B 의 Claude 판단에도 걸림(계획 결정이 '도구 호출로') → C → Phase 7B
 
 Dependencies
 - Depends on: Phase 6D (계약의 과제 품질 숫자 · 보고서의 `6E:` 줄)
@@ -640,7 +642,7 @@ Open questions
 ---
 
 ## Phase 6G — 결과 파일 개인 정보 가림 (실행기가 쓸 때 연락처 모양 가림 · 끝 줄 검사)
-- Status: Not started
+- Status: Done
 - Slug: live-check-redact
 - After: Phase 6D
 - Goal: 실행기(`tests/live_check.py`)가 결과 두 파일(`docs/live-check/result.json` · `summary.md`)에 쓰는 바깥 글에서 이메일 · 전화번호 · 계좌번호 모양을 가리고, 실행 끝에 "키 검사" 줄 옆에 개인 정보 검사 한 줄을 남겨, 사람이 6F 레인에 커밋하는 결과에 남의 연락처가 들어가지 않게 한다. Claude · jev 에 보내는 재료는 그대로다. 커밋된 결과 두 파일은 스위트 테스트도 같은 목록으로 늘 훑어, 끝 줄을 놓치고 커밋한 결과는 착지 전에 빨강이 된다 (2026-10-15 6G 인터뷰 질문 1 A).
@@ -839,6 +841,7 @@ Decisions
 - 고르는 때는 시작할 때 한 번 — 키가 없으면 Claude, 있으면 jev. **jev 키가 있는데 jev 가 오류를 내면 Claude 로 넘기지 않는다** — 오류는 지금처럼 그 영상의 오류(`ERROR` · `SKIP`)로 남는다. 근거: 넘기면 jev 장애가 로그에서 가려지고 같은 실행 안에서 판단 잣대가 바뀐다 (2026-10-15 인터뷰 진행자가 덧붙인 결정 — 사용자 확인 대기).
 - `START` 줄과 판단 줄(`CLASSIFY` · 자체 검사 결과)에 어느 쪽이 판단했는지 남긴다(예: `judge=jev` · `judge=claude` — 이름은 plan). 결과 화면(Phase 7D)도 같은 표시를 보인다.
 - **The plan decides** — Claude 판단의 답 모양과 기준값 · 후보: Claude 가 예/아니오와 0–1 확신을 도구 호출로 내고 jev 와 같은 하한(`classifier.noul_yes_min` · `comment.check_min_probability` 등)에 댄다 / 예 · 아니오만 받아 하한을 쓰지 않는다 · 조건: 같은 질문 문구(계약 '주제 판별' · '댓글 작성' 절)를 두 판단이 함께 쓰고, 가짜 Claude · 가짜 jev 로 키 없음 · 있음 두 길과 "jev 오류는 넘기지 않음" 을 테스트로 잠근다. 바깥 글이 Claude 판단 프롬프트의 어느 칸에 놓이는지는 헌법 9조의 흐름 약속이다.
+- [from Phase 6E smoke] Claude 판단(판별 · 자체 검사)은 도구를 강제하지 않는다 — Claude Sonnet 5.5 · Opus 5.5 · Fable 5.1 은 `tool_choice` 의 `tool` · `any` 를 400 으로 거절한다(`tool_choice: type "tool" and "any" are not supported for this model.`, 2026-10-15 6F 사람 실행에서 작성기가 15번 모두 400 — S-093). `tool_choice` 는 `auto` + 도구에 `strict: true` + 프롬프트가 도구를 부르라고 말하고, 도구가 불리지 않으면 다시 묻거나 그 영상의 오류로 남긴다. 다시 묻는 차례는 첫 답의 블록(생각 블록 포함)을 고치지 않고 되돌려 붙인다. 가짜 Claude 가 받은 요청의 `tool_choice` 가 강제가 아님을 테스트로 잠근다.
 
 Trade-offs accepted
 - Claude 판단의 정확도는 재지 않고 출하한다 — 6B–6F 의 숫자는 jev 의 것이다. README 와 PROCESS 가 그렇게 적는다.

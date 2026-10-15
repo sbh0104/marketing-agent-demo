@@ -38,10 +38,6 @@
 - evidence: ship-report R1 — `bit‧ly/3xYzAb` 가 `bitly/3xyzab` 로 읽혀 통과(감사 재현); `## Human checks` 3번째 줄 — 어디까지 막을지는 사람 결정(보이지 않는 글자를 다 막으면 U+200D 이모지 잇기도 막힘). 실제 게시는 허용 목록뿐(`src/agent/guard.py:94`) (cycle 20261013-161439-adw/phase-5-writer-comment)
 - first confirmed: 2026-10-13 · last confirmed: 2026-10-15
 
-### E-021 · reviewer — 받아들인 위험을 재현한 **입력**으로 적으면 다음 ship-check 가 같은 코드 자리에서 다음 입력을 찾아 다시 멈춘다 — 자리(함수 · `except` 줄)로 적자 멈춤이 끝났다
-- evidence: Phase 2 ship-check 5회 $69.9469(사이클 $103.6405 중, retro-bundle Steps) — 정지 셋(R11 깨진 리다이렉트 `Location` 의 `ValueError` · `UnicodeError` → R11′ `ftp://%00/` 의 `TypeError` · 3.10 `OverflowError` → B1 음수 chunk 크기 `ValueError`)이 모두 `YouTubeClient._call` 의 좁은 `except (OSError, http.client.HTTPException)`(`src/agent/youtube.py:245`, 트리 `abe85c5` 실측)을 빠져나간 새 예외 꼴이었다. 입력 목록을 고쳐 쓰다 덮개가 빠지기도 했다(`e265dbf` 가 `3d0ae81` 의 "`ValueError` 도 잡는다"를 지워 B1 이 주인 없이 남음). 트래커 `0d50c02` 가 셋째 예외를 "`_call` 에서 `self._fetch` 가 낸 예외는 무엇이든"으로 다시 적은 뒤, 다섯째 ship-check 는 새 정지 없이 READY WITH RISKS 였다(plans/interview-marketing-agent.md Phase 2 Decisions 2026-10-14 줄 · Trade-offs accepted 셋째 줄). 같은 동학의 앞 목격: E-005(Phase 1 — 열거한 꼴 목록을 ship-check 네 번이 매번 뚫음) · E-019(Phase 6) (cycle 20261013-161159-adw/phase-2-watcher-detect)
-- first confirmed: 2026-10-14 · last confirmed: 2026-10-14
-
 ### E-022 · hazard — 계약 절 이름 테스트 `tests/test_contract_sections.py` 는 열거한 꼴만 잡는다 — 제목은 `HEADING_RE = ^## ([0-9]+)\.`(:20), 인용은 `([0-9]+)절`(:21) 뿐이라 `## 11 제목`(마침표 없음) · `## 11) 제목` · `##  11.`(공백 둘) · `### 11.` · 앞 공백 셋 `   ## 11.`(마크다운에서는 여전히 제목) 과 `§11` · `11 절` · ASCII 아닌 숫자는 초록으로 지나간다. E-005 · E-017 · E-019 와 같은 "열거한 꼴" 부류
 - evidence: `tests/test_contract_sections.py:20-21`; 감사관이 다섯 제목 꼴을 `[]` 로 읽음 — journal `20261014-035724-adw-phase-1b-contract-section-names/ship-report.md:177-181`(Risks 2) · 돌연변이 표 `:145-148`; 인용 쪽 사각지대는 트래커 Phase 1B 질문 1 trade-off 가 받아들임, 제목 쪽은 아직 결정 없음(질문 2 A 빨강 꼴 ① 밖). verify-plan.md:127 Property-based N/A "two regexes over a small enumerated shape set" 가 이 꼴들을 ship-check 까지 가렸다 (cycle 20261014-035724-adw/phase-1b-contract-section-names)
 - first confirmed: 2026-10-14 · last confirmed: 2026-10-14
@@ -68,7 +64,7 @@
 
 ### E-028 · tooling — `tests/mutants.py` 의 변이는 소스에서 바꿀 글자가 **정확히 한 번** 나와야 돈다(아니면 종료 코드 2) — 가드 · 로그 · 설정의 한 줄을 고치는 페이즈는 그 줄을 겨눈 변이 문자열도 함께 고쳐야 하고, 같은 글자를 한 번 더 쓰는 줄을 더하기만 해도 기존 변이가 깨진다
 - evidence: `tests/mutants.py:9-10` 머리말("2 는 이름을 모르거나 바꿀 글자가 정확히 한 번 나오지 않았다는 뜻"); 1A 가 고친 가드 줄을 겨눈 `guard-youtu-be-ignores-query-v` · `guard-shorts-ignores-query-v` · `guard-query-ampersand-only`(`tests/mutants.py:139,145,151`); 등록부 82 → 90 (cycle 20261014-035715-adw/phase-1a-parser-allow-rules)
-- first confirmed: 2026-10-14 · last confirmed: 2026-10-14
+- first confirmed: 2026-10-14 · last confirmed: 2026-10-15
 
 ### E-029 · tooling — PyYAML 이 읽은 16진수(`0x…`) 정수는 파이썬의 4,300자리 문자열 변환 한도를 읽기에서 거치지 않는다(2의 거듭제곱 진법은 한도 밖) — 십진 `str()` · `format` 에 닿아서야 `ValueError` 가 나므로, 십진수 행만 있는 시험은 이 꼴을 재지 않는다. 정수 키는 1A 의 필수 상한(`src/agent/config.py:174`)이 막지만, 새 숫자 읽기는 같은 꼴을 다시 만날 수 있다
 - evidence: `python3 -I -c "import yaml; n=yaml.safe_load('k: 0x'+'F'*3700)['k']; str(n)"` → 14,800비트 int 로 읽힌 뒤 `ValueError: Exceeds the limit (4300 digits) for integer string conversion` (이 retro 실측); Phase 1 ship-report R4 · 트래커 Phase 1A 결정 2 (cycle 20261014-035715-adw/phase-1a-parser-allow-rules)
@@ -94,10 +90,6 @@
 - evidence: `python3 -I -c "import typesafe_sdk"` · `python3 -I -c "import anthropic"` → 둘 다 `ModuleNotFoundError` (이 retro 실측, 2026-10-14); `docs/live-check/result.json` `run_at 2026-10-14T04:28:16.180435+00:00` · `calls {'claude': 23, 'jev': 72, 'youtube': 17}` · `models` 두 이름 `accepted`; `tests/live_check.py:72` `from tests.jev_accuracy import PASS_CORRECT, REPO_CONFIG, judge_examples, tally`. E-012 · E-016 을 잇는다 (cycle 20261014-112322-adw/phase-6b-live-check-apply)
 - first confirmed: 2026-10-14 · last confirmed: 2026-10-15
 
-### E-036 · gotcha — 레인 착지는 squash 없는 `merge --no-ff` 라(`.claude/skills/plan/scripts/finalize_step.py:1054`), 레인 끝 판에서만 지운 내용은 앞 레인 커밋마다 남아 main 기록에 붙는다(제출 때 공개) — 실행기는 영상마다 `untrusted.description` 을 `_clean` · 길이 자르기만 하고 결과 파일에 쓰므로(`tests/live_check.py:1380`), 사람이 커밋한 `docs/live-check/result.json` 에 채널 주인 연락처가 그대로 들어갈 수 있다
-- evidence: 6D 결과의 영상 셋(`jO2wSna2Xi8` · `ZC74ENMS1nE` · `N0RyQJG9vdI`) 설명 글에 이메일 3 · 후원 계좌 · 예금주 실명. 허브 🤖 가 끝 판만 지움(`f5cef6a`, gate `20261015-055623-cycle-control.json` "지우고 출하") → ship-check 06:13 BLOCKED(앞 커밋 9개에 그대로) → 드리프트 인터뷰 2 가 레인 기록을 다시 씀(`d9cd05b→6626629` …, 트래커 6D 2026-10-15 질문 1 A) → 세 번째 ship-check 이 레인 커밋 11개 모두 이메일 · 계좌 모양 0. main 의 6B 결과(판 1, 설명 글 17개)는 같은 모양 검사로 0. 실행기 쪽 가림의 주인은 Phase 6G (cycle 20261014-225050-adw/phase-6d-live-check-reapply)
-- first confirmed: 2026-10-15 · last confirmed: 2026-10-15
-
 ### E-037 · codebase — 실행기 테스트의 가짜 Claude(`tests/test_live_check.py` `FakeClaude.create`)는 `system` 글이 `GRADE_SYSTEM` · `TOPIC_SYSTEM` · `SKIP_GRADE_SYSTEM` 중 무엇과 같은지로 호출 종류를 가리고, 셋 다 아니면 오류 없이 `write`(작성)로 센다 — 실행기에 새 system 글로 Claude 를 부르는 호출을 더하는 페이즈가 가짜에 갈래를 더하지 않으면 그 호출은 작성 큐의 답을 받는다. 최악 호출 수를 글자로 잠근 `test_default_limits_fit_under_ceilings` 도 함께 본다
 - evidence: `tests/test_live_check.py:1583-1594`(`system is None` → probe · `GRADE_SYSTEM` → grade · `TOPIC_SYSTEM` → topic · `SKIP_GRADE_SYSTEM` → skip_grade · `else` → write) · `:2229`(`{"jev": 114, "claude": 103, "youtube": 35}`, 6E 에서 그대로). 6C 가 `topic` 갈래를, 6E 가 `skip_grade` 갈래를 더했다 — 6E understand 가 옛 E-035 로 이 자리를 짚었고 plan-repairs R1 의 가짜 로그 `['topic', 'write', 'write', 'grade', 'skip_grade']` 가 새 갈래가 도는 것을 보였다 (cycle 20261014-172227-adw/phase-6c-live-check-grader-fix · 20261015-091934-adw/phase-6e-comment-quality-fix)
 - first confirmed: 2026-10-14 · last confirmed: 2026-10-15
@@ -118,14 +110,22 @@
 - evidence: 6C — Guard B 첫 행 `target 2, min 0` 으로 `<=` 변이 M8a 생존 → R3 · S-077, 분모 변이 M23 생존 → R4 · S-078(6C summary.md Coverage decisions). 6E — verify-run V5 `mutants new: 8 run · caught 8` · V6 `47/47` 인데 ship-check 가 `_frame_pieces` 의 '연애사주' 빼기 앞 끝 · 뒤 끝과 `skip_human` 값 변이 생존을 재현 → S-093 · S-094(ship-report.md:173-176). 가드 매트릭스 행 규칙은 `.claude/skills/plan/SKILL.md:128`(변이 행만 `unmeasured` 허용) (cycle 20261014-172227-adw/phase-6c-live-check-grader-fix · 20261015-091934-adw/phase-6e-comment-quality-fix)
 - first confirmed: 2026-10-15 · last confirmed: 2026-10-15
 
-### E-042 · gotcha — [stop:red-unbucketable · 6g] ship-check BLOCKED 이고 통이 그 고침을 못 받는다 — 이 페이즈는 제 브랜치에서 아래 Blockers 를 범위로 다시 돈다
-- blocker: **`예금주` 줄의 이름이 남는데, 끝 줄은 "없음"이라고 찍습니다.** 후원 안내 속 예금주 실명이 공개 저장소에 들어갈 수 있습니다.
-- blocker: 6F 실제 실행: 어떤 영상 설명에 `후원 3333-00-1234567 예금주는 가나다입니다` 가 있습니다.
-- blocker: 실행기가 결과 사본을 만듦(`_kept`): 계좌번호는 `<연락처>` 가 됩니다. `예금주` 줄은 `예금주는` 까지만 이름 자리로 읽혀 가려지고, 결과는 `<연락처> 가나다입니다` 입니다.
-- evidence: .adw/journal/20261015-123731-stop-6g · 6g · end|6g|2026-10-15T12:37:30+0900
+### E-043 · reviewer — 받아들인 위험 줄이 코드 자리를 적어도 입력 종류를 재현 입력의 조건으로 좁히면, 다음 ship-check 는 같은 자리에서 더 넓은 입력을 찾아 사람 확인으로 다시 올린다 — 헌법 11조의 ship-check 규칙("same site … different input class is a new risk")대로다. 멈춤이 끝나려면 그 자리가 받는 입력 전체를 입력 종류로 적어야 한다
+- evidence: Phase 2 — 입력으로 적은 줄을 ship-check 가 같은 `except`(`src/agent/youtube.py:245`)에서 새 예외 꼴로 세 번 뚫었고, 자리로 다시 적은 뒤 다섯째 ship-check 는 새 멈춤이 없었다(옛 E-021, cycle 20261013-161159-adw/phase-2-watcher-detect). 6G — 🤖 브리핑(gate `20261015-153916-cycle-control.unconsumed.json`)이 적은 `skip_reason` 대가 줄(`fa66b56`)은 자리 `tests/live_check.py:1621` 를 이름 붙였지만 입력 종류가 "두 번 모두 코드 검사에서 떨어진" 경우뿐이었다. 같은 코드 트리의 다음 ship-check 가 "한 번만 반복 검사에서 떨어져도" 꼴을 찾아 `[sensitive: …]` 로 올렸고(journal 20261015-130935 ship-report.md:12 · :217), HC1 인터뷰가 "어느 한 번이라도 … 다른 시도가 무엇으로 떨어졌든" 으로 넓혀 다시 썼다(`92bf38f`) (cycle 20261015-130935-adw/phase-6g-live-check-redact)
+- first confirmed: 2026-10-14 · last confirmed: 2026-10-15
+
+### E-044 · gotcha — 레인 착지는 squash 없는 `merge --no-ff` 라(`.claude/skills/plan/scripts/finalize_step.py:1054`), 레인 끝 판에서만 지우거나 바꾼 내용도 앞 레인 커밋마다 남아 main 기록에 붙는다. 제출 때 main 이 공개되므로, 공개되면 안 되는 값은 그 값을 처음 더한 커밋에서부터 없어야 한다
+- evidence: 6D — 허브가 결과 파일의 연락처를 끝 판에서만 지웠고(`f5cef6a`), ship-check 06:13 이 BLOCKED 했다(앞 커밋 9개에 그대로 남음). 드리프트 인터뷰가 레인 기록을 다시 썼다(cycle 20261014-225050-adw/phase-6d-live-check-reapply). 6G — 질문 4 A ④ 는 옛 표본(`795989b` · `5ad1374`: 실제 은행 앞자리 꼴 계좌와 `gmail.com`, 더한 줄 9개)을 끝 트리에서만 바꿨다. 세 번째 ship-check 이 역사에서 그 표본을 찾아 사람 확인으로 올렸고(journal 20261015-130935 ship-report.md:257), 다시 쓰지 않고 트래커 6G 대가 줄로 남겼다 (cycle 20261015-130935-adw/phase-6g-live-check-redact)
+- first confirmed: 2026-10-15 · last confirmed: 2026-10-15
+
+### E-045 · codebase — 실행기 결과 파일에는 작성기 · 판별기가 가공한 이유 글을 원문 그대로 싣는 칸이 아직 남아 있다. `videos[].untrusted.skip_reason`(`tests/live_check.py:1621` ← `src/agent/writer.py:379` "검사 두 번 탈락 — 1차: … / 2차: …", 반복 이유의 겹친 글자 · 링크 조각을 담음)와 `videos[].untrusted.classification_reason` · `accuracy[].untrusted.reason`(`tests/live_check.py:1569` · `:1393` ← `src/agent/classifier.py:125` `{choice!r}`)이 그렇다. 6G 가 이름과 숫자만 적게 바꾼 칸은 `drafts[].untrusted.code_failures` 하나다. 가공한 조각에서는 연락처 · 키 모양이 목록 밖 꼴이 되어, 쓰는 순간의 가림도 끝 줄도 그 모양을 보지 못한다
+- evidence: 위 줄 번호는 트리 `92bf38f` 에서 grep 으로 확인. 두 번째 ship-check 막힘 1과 세 번째 ship-check 민감 줄 ① ② ③ → 트래커 6G Trade-offs accepted 의 `skip_reason` · 키 소문자 · `repr` 줄 셋. 트래커 6G Responsibilities "그때 고칠 자리는 이유 칸을 이름과 숫자만 적기(`skip_reason` · 판별 이유 칸, 질문 3 A 꼴)" (cycle 20261015-130935-adw/phase-6g-live-check-redact)
 - first confirmed: 2026-10-15 · last confirmed: 2026-10-15
 
 ## Retired (history — one line each, never deleted)
+- E-021 · reviewer — 받아들인 위험을 재현한 **입력**으로 적으면 다음 ship-check 가 같은 코드 자리에서 다음 입력을 찾아 다시 멈춘다 — 자리(함수 · `except` 줄)로 적자 멈춤이 끝났다 — retired 2026-10-15 (꼬리 "자리로 적자 멈춤이 끝났다" 가 6G 에서 틀림: 자리(`tests/live_check.py:1621`)를 적은 `skip_reason` 대가 줄이 좁은 입력 종류 때문에 다음 ship-check 에서 다시 올라옴(journal 20261015-130935 ship-report.md:217) — 고친 사실을 E-043 에 다시 씀)
+- E-036 · gotcha — 레인 착지는 squash 없는 `merge --no-ff` 라(`.claude/skills/plan/scripts/finalize_step.py:1054`), 레인 끝 판에서만 지운 내용은 앞 레인 커밋마다 남아 main 기록에 붙는다(제출 때 공개) — 실행기는 영상마다 `untrusted.description` 을 `_clean` · 길이 자르기만 하고 결과 파일에 쓰므로(`tests/live_check.py:1380`), 사람이 커밋한 `docs/live-check/result.json` 에 채널 주인 연락처가 그대로 들어갈 수 있다 — retired 2026-10-15 (뒤 절 "실행기는 … `_clean` · 길이 자르기만 하고 결과 파일에 쓰므로" 가 6G 에서 틀림: `_kept`(`tests/live_check.py:353-360`)가 키 가림 → 연락처 가림 → 자르기 순서로 씀 — 앞 절(착지가 레인 역사를 main 에 붙임)은 E-044 에 다시 씀)
+- E-042 · gotcha — [stop:red-unbucketable · 6g] ship-check BLOCKED 이고 통이 그 고침을 못 받는다 — 이 페이즈는 제 브랜치에서 아래 Blockers 를 범위로 다시 돈다 — retired 2026-10-15 (shipped)
 - E-003 · gotcha — `verify-run` 부터 다시(control retry)는 옛 verify-plan 을 그대로 쓴다 — 그 사이 인터뷰가 트래커만 커밋해도 범위 끝을 `HEAD` 로 둔 검사는 빨개진다 — retired 2026-10-15 (over cap; unconfirmed since 2026-10-14)
 - E-035 · codebase — 실행기 테스트의 가짜 Claude(`tests/test_live_check.py` `FakeClaude.create`)는 `system` 글이 `GRADE_SYSTEM` · `TOPIC_SYSTEM` 과 같은지로 호출 종류를 가리고, 둘 다 아니면 오류 없이 `write`(작성)로 센다 — 실행기에 새 system 글로 Claude 를 부르는 호출을 더하는 페이즈가 가짜에 갈래를 더하지 않으면 그 호출은 작성 큐의 답을 받는다. 최악 호출 수를 글자로 잠근 `test_default_limits_fit_under_ceilings` 도 함께 고쳐야 한다 — retired 2026-10-15 (6E 가 세 번째 갈래(`SKIP_GRADE_SYSTEM` → `skip_grade`, `tests/test_live_check.py:1591`)를 더해 "둘 다 아니면" 과 인용 줄(:1417-1426)이 코드와 어긋남 — 같은 사실을 고친 줄로 E-037 에 다시 씀)
 - E-011 · tooling — `retro_collect.py` 의 `_tokens` 는 `Files:` 줄 경로의 양끝에서 `.` 를 벗긴다 — 점으로 시작하는 파일은 plan 이 `Files:` 에 적어도 "계획 밖 파일" · T4 경보 ⑷ 에 늘 들어간다(`.env.example` → `env.example`, `.gitignore` → 점이 없어져 경로로 안 보고 버림) — retired 2026-10-15 (over cap; unconfirmed since 2026-10-13)

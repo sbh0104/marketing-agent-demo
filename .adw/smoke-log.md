@@ -940,3 +940,12 @@ other line is required on every item.
 - status: resolved
 - attempts: 0 · last failure: —
 - first seen: 2026-10-15 · last seen: 2026-10-15
+
+### S-093 — 작성기가 Claude Sonnet 5.5 에 도구를 강제해 작성 호출이 모두 400
+- source: human run tests.live_check 2026-10-15T08:20:33Z (Phase 6F 사람 실행) · tracker plans/interview-marketing-agent.md#phase-6e · deferred by smoke-triage
+- evidence: src/agent/writer.py:449 `tool_choice={"type": "tool", "name": WRITE_TOOL["name"]}` — 그 실행의 summary.md "오류: claude/write BadRequestError 400 ×15", 초안 0 (main 에 커밋 안 함); Claude API 는 Sonnet 5.5 · Opus 5.5 · Fable 5.1 에서 `tool_choice` 의 `tool` · `any` 를 400 으로 거절(`tool_choice: type "tool" and "any" are not supported for this model.`) — 같은 실행의 채점(tests/live_check.py:1146, claude-haiku-5-5)은 Haiku 5.5 가 강제를 받아 오류 0, 모델 확인(도구 없는 1토큰 호출)은 accepted 라 못 잡음; 운영 흐름(Phase 7)도 같은 작성기라 녹화에서 댓글 0개
+- direction: 작성 호출을 `tool_choice={"type": "auto"}` 로, `WRITE_TOOL` 에 `"strict": True`(스키마는 이미 `additionalProperties: false`); 도구 없이 글로 답하면 지금처럼 '답을 읽을 수 없습니다' → 한 번 다시 쓰기; 다시 쓰기 차례(`_rewrite_turns`)는 첫 답의 content 블록을 고치지 않고 그대로 되돌려 붙임(Sonnet 5.5 는 생각 블록이 늘 켜져 있고 같은 대화에 그대로 돌려받아야 함 — 지금은 tool_use 블록 하나만 붙임); 계약 '댓글 작성' 절의 `tool_choice` 문장(docs/contracts.md:911-916)을 맞추고, 가짜 Claude 가 받은 요청의 `tool_choice` 가 `auto` · `strict` 가 참임과 생각 블록이 든 첫 답의 다시 쓰기 차례가 그 블록을 그대로 담음을 테스트로 잠금; 채점기(Haiku)의 강제는 범위 밖(채점 모델을 Sonnet · Opus 5.5 로 바꾸면 같은 400)
+- touches: src/agent/writer.py, tests/test_writer.py, docs/contracts.md
+- status: open
+- attempts: 0 · last failure: —
+- first seen: 2026-10-15 · last seen: 2026-10-15
