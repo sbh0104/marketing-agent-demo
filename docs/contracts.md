@@ -833,7 +833,10 @@ watcher = Watcher(Store(Path("data/videos.json")), logbook, client, clock)
    다음 페이지면 `pageToken` 이 더해집니다.
 2. 다음 페이지는 셋이 모두 맞을 때만 받습니다 — 그 페이지에 `nextPageToken` 이 있고, 사이클 시작
    때 저장소에 있던 영상이 그 페이지에 없고, 그 검색어로 받은 페이지가 `MAX_PAGES_PER_KEYWORD`
-   (3) 보다 적을 때.
+   (3) 보다 적을 때. `nextPageToken` 이 빈 글자 `""` 도, 영문자 · 숫자 · `_` · `-` 로 된 글자도
+   아닌 값이면(글자가 아닌 값 포함) 그 페이지는 통째로 검색 오류입니다 — `ERROR where=search.list
+   reason="HTTP 200 nextPageToken 이 영문자 · 숫자 · _ · - 가 아닙니다" keyword=<검색어>` 를 남기고
+   남은 검색은 그만둔 채 추적으로 넘어갑니다('API 오류').
 3. 페이지 상한이 토큰을 남긴 채(아는 영상 없이) 검색어를 끝내면 최신 150개 뒤의 결과를 보지 못한
    것이므로 `QUOTA used=3 limit=3 call=search.list counter=pages keyword=<검색어>` 를 남기고
    `truncated` 에 셉니다. 정한 한도도 다른 한도처럼 로그에 남깁니다.

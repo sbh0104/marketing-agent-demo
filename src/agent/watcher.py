@@ -4,6 +4,8 @@
   nextPageToken 이 있고, 사이클 시작 때 저장소에 있던 영상이 없고, 그 키워드에서 받은 페이지가
   `MAX_PAGES_PER_KEYWORD` 보다 적을 때만 받습니다. 페이지 상한이 토큰을 남긴 채 키워드를 끝내면
   그 뒤 결과를 보지 못한 것이므로 `QUOTA … counter=pages` 줄을 남깁니다.
+- 다음 페이지 쪽지(nextPageToken)는 영문자 · 숫자 · _ · - 만 받고, 그 밖의 비어 있지 않은 값이면
+  그 페이지는 `ERROR` 입니다.
 - 추적: 새 영상과 `trigger.max_age_hours` 안에 올라온 저장 영상 모두에 조회수 한 번씩. 새 영상은
   `DETECT` · `VIEWS`, 아는 영상은 표본을 하나 덧붙이고 `VIEWS`. 명단 영상(allowed_videos)은
   검색 · 나이 창과 상관없이 늘 추적합니다.
@@ -33,6 +35,8 @@ _SURROGATE_RE = re.compile(r"[\ud800-\udfff]")
 _REPLACEMENT = chr(0xFFFD)
 _COUNT_RE = re.compile(r"[0-9]{1,19}")
 _PUBLISHED_RE = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]{1,9})?Z")
+# 다음 페이지 쪽지 — 실제 쪽지는 CAUQAA 같은 영문자 · 숫자 · _ · - 입니다 (계약 '탐지 · 조회수 추적' 절)
+_PAGE_TOKEN_RE = re.compile(r"[A-Za-z0-9_-]+")
 
 
 def _clean(text: str) -> str:
@@ -210,6 +214,10 @@ class Watcher:
         items = data.get("items", [])
         if not isinstance(items, list):
             raise YouTubeError("search.list", "HTTP 200 items 가 목록이 아닙니다")
+        token = data.get("nextPageToken")
+        # 빈 쪽지는 마지막 페이지 — 그 밖의 값은 영문자 · 숫자 · _ · - 만, 다른 값은 다음 페이지 주소를 만들다 예외를 냅니다 (계약 '탐지 · 조회수 추적' 절)
+        if token is not None and token != "" and not (isinstance(token, str) and _PAGE_TOKEN_RE.fullmatch(token)):
+            raise YouTubeError("search.list", "HTTP 200 nextPageToken 이 영문자 · 숫자 · _ · - 가 아닙니다")
         ids: list[str] = []
         for item in items:
             ident = item.get("id") if isinstance(item, Mapping) else None
@@ -224,7 +232,6 @@ class Watcher:
                 call="search.list",
                 keyword=query,
             )
-        token = data.get("nextPageToken")
         return ids, token if isinstance(token, str) and token else None
 
     def _track(

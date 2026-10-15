@@ -404,6 +404,12 @@ MUTANTS: dict[str, tuple[str, str, str, str]] = {
         "else type(value).__name__",
         'else f"{value!r:.40}"',
     ),
+    "watcher-any-page-token": (
+        "agent.watcher",
+        "tests.test_watcher",
+        "isinstance(token, str) and _PAGE_TOKEN_RE.fullmatch(token)",
+        "isinstance(token, str)",
+    ),
     "writer-hardcoded-model": (
         "agent.writer",
         "tests.test_writer",
