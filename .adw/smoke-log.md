@@ -991,7 +991,7 @@ other line is required on every item.
 - evidence: (a) src/agent/run.py:331 `_classify` 의 `self._store.put(record)` 를 지워도 스위트 OK — 타이밍 단계가 터지면 판별이 저장되지 않아 다음 주기에 jev 를 다시 부름(계약 "yes · no · 판정 보류는 저장하고 다시 묻지 않습니다"); (b) :137 `[:REASON_MAX]` 와 공백 접기를 지워도 스위트 OK(계약 docs/contracts.md:1500 "메시지 200자까지"); (c) :559 `echo=echo_stream(sys.stdout)` 을 `sys.stdout` 이나 `None` 으로 바꿔도 스위트 OK — 실제 프로세스 검사 `.adw/verify.sh` V9 (d) 만 잡음(헌법 9: 시험은 스위트에)
 - direction: tests/test_run.py 에 — 타이밍 단계가 영상 A 에서 터진 뒤 다음 주기에 A 의 판별을 다시 묻지 않음(jev 분류 호출 1번, 저장된 classification 있음) · 250자 · 줄바꿈 섞인 메시지의 울타리 이유가 `<종류>: ` + 200자 한 줄 · main 이 run_agent 에 넘기는 echo 가 `errors="backslashreplace"` 스트림 — 세 테스트를 더한다 — 코드 변경 없음
 - touches: tests/test_run.py
-- status: reverted
+- status: resolved
 - attempts: 1 · last failure: reverted f569184 — own check red (스윕 20261015-185700-adw/smoke-sweep-s094-s098)
 - first seen: 2026-10-15 · last seen: 2026-10-15
 

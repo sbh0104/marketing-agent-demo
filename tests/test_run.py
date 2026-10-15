@@ -666,6 +666,18 @@ class TestEntry(RunCase):
         self.assertIn(b"\\U0001f600", echoed)
         self.assertIn("연애".encode("cp949"), echoed)
 
+    def test_main_echoes_through_backslashreplace_stream(self) -> None:
+        console = io.TextIOWrapper(io.BytesIO(), encoding="cp949")
+        with (
+            mock.patch.object(run, "connect_real", return_value=self.services),
+            mock.patch.object(run, "run_agent", return_value=0) as agent,
+            contextlib.redirect_stdout(console),
+        ):
+            code = run.main(["--once"], root=self.root, environ=KEYS)
+        self.assertEqual(code, 0)
+        self.assertIs(agent.call_args.kwargs["echo"], console)
+        self.assertEqual(console.errors, "backslashreplace")
+
     def test_bad_initial_config_exits_2_with_config_error_line(self) -> None:
         self.write_config(config_text(daily_max_comments=999999))
         code = self.run_agent("--once")
@@ -784,6 +796,24 @@ class TestFence(TwoListedCase):
         )
         self.assertEqual(self.posted_live(), [B])
         self.assertEqual(self.cycle_errors(), ["1"])
+
+    def test_reason_folds_whitespace_and_caps_message(self) -> None:
+        message = "가" * 120 + "\n\n" + "나" * 128  # 250자 · 두 줄
+        with self.patch_stage("judge_trigger", ValueError(message)):
+            self.cycle(self.pipeline())
+        (line,) = self.fenced()
+        self.assertEqual(line["reason"], "ValueError: " + "가" * 120 + " " + "나" * 79)
+
+    def test_classification_kept_when_timing_raises(self) -> None:
+        pipeline = self.pipeline()
+        with self.patch_stage("judge_trigger", ValueError("타이밍이 터졌습니다")):
+            self.cycle(pipeline)
+        self.assertEqual([fields["where"] for fields in self.fenced()], ["run.trigger"])
+        self.assertIs(self.record(A).classification.verdict, Verdict.YES)
+        self.cycle(pipeline)
+        self.assertEqual(self.jev.asked(A), 1)
+        self.assertEqual(len(self.lines(Event.CLASSIFY, video=A)), 1)
+        self.assertEqual(self.posted_live(), [B, A])
 
     def test_fenced_video_retried_next_cycle(self) -> None:
         pipeline = self.pipeline()
