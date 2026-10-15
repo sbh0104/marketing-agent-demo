@@ -704,6 +704,19 @@ run_loop(cycle, reload, initial, *, on_error, sleep=time.sleep,
   python3 -m tests.mutants live-check-untrusted-unmasked-at-write
   python3 -m tests.mutants live-check-published-scan-blind
   python3 -m tests.mutants live-check-draft-masked-at-write-only
+  python3 -m tests.mutants live-check-kept-contacts-before-keys
+  python3 -m tests.mutants live-check-draft-contacts-before-keys
+  python3 -m tests.mutants live-check-gap-ambiguous
+  python3 -m tests.mutants live-check-dash-like-unbounded
+  python3 -m tests.mutants live-check-code-failures-raw
+  python3 -m tests.mutants live-check-code-failures-dropped
+  python3 -m tests.mutants live-check-repeat-count-shifted
+  python3 -m tests.mutants live-check-contact-keys-unread
+  python3 -m tests.mutants live-check-contact-line-summary-blind
+  python3 -m tests.mutants live-check-contact-line-one-place-passes
+  python3 -m tests.mutants live-check-code-check-reads-masked
+  python3 -m tests.mutants live-check-grade-reads-masked
+  python3 -m tests.mutants live-check-passed-ignores-code-check
   python3 -m tests.mutants live-check-applied-yes-floor-lowered
   python3 -m tests.mutants live-check-applied-floor-lowered
   python3 -m tests.mutants live-check-applied-reads-jev-models
