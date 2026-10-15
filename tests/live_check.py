@@ -97,6 +97,13 @@ POPULAR_DRAFTS_MIN = 3  # 인기 댓글을 재료로 쓴 초안이 이보다 적
 FRAME_CHARS = 6  # 과제 품질 ⓒ 조각 — 12글자 반복 검사가 놓치는 "저도연애사주에서" 꼴의 틀을 잡습니다
 MARGIN = 0.05
 KEY_FRAGMENT_MIN = 8
+CONTACT_MASK = "<연락처>"
+# 코드 검사 이유 — 작성기 src/agent/writer.py (code_failures) 의 이유 머리와 결과 파일에 적는 이름
+REPEAT_REASON = "이전 댓글과 겹칩니다: "  # 뒤는 겹친 글자 — 결과에는 그 글자 수만 적습니다
+LINK_REASON = "링크·주소 모양이 들어 있습니다: "  # 뒤는 링크 조각 — 결과에는 이름만 적습니다
+LINK_STORED = "링크·주소 모양이 들어 있습니다"
+LENGTH_REASON_RE = re.compile(r"글자 수 [0-9]+자 — [0-9]+–[0-9]+자여야 합니다")  # 숫자뿐이라 그대로
+OTHER_REASON = "그 밖의 코드 검사 이유"
 PROBE_MAX_TOKENS = 1
 GRADE_MAX_TOKENS = 1024
 CLAUDE_MAX_RETRIES = 2
@@ -287,6 +294,146 @@ class Redactor:
 
     def leaks(self, text: str) -> bool:
         return self._pattern.search(text) is not None
+
+
+# 전각 ASCII(U+FF01–U+FF5E)를 반각으로
+HALF_WIDTH = {code: code - 0xFEE0 for code in range(0xFF01, 0xFF5F)}
+_SPACE_LIKE = " 　  "  # 보이지 않는 띄어쓰기 — NBSP · 전각 · 얇은 · 좁은 NBSP
+_ZERO_WIDTH = "​‌‍⁠﻿"  # 너비 없는 글자 — 띄어쓰기처럼 끊는 자리로 봅니다
+_DASH_LIKE = "ㅡ─━ーｰ﹘﹣"  # 가로줄 닮은 글자 — ㅡ ─ ━ ー ｰ ﹘ ﹣
+MATCH_VIEW = {**HALF_WIDTH, **dict.fromkeys(map(ord, _SPACE_LIKE + _ZERO_WIDTH), ord(" "))}
+# 숫자와 숫자 사이(띄어쓰기는 받음)의 가로줄 닮은 글자만 하이픈으로 — 글자 뒤에 붙은 것까지 바꾸면 계좌 앞 경계가 막힙니다
+_DASH_BETWEEN_DIGITS = re.compile(rf"(?<=[0-9])([ \t]*)[{_DASH_LIKE}](?=[ \t]*[0-9])")
+_DASH = "\\-\u2010-\u2015\u2212"  # 하이픈 · 유니코드 대시 · 빼기 기호
+_AT = r"(?:@|[(\[{<][ \t]*at[ \t]*[)\]}>])"
+_DOT = r"(?:\.|[(\[{<][ \t]*dot[ \t]*[)\]}>])"
+# 띄어쓰기 · 하이픈이나 점 하나 · 띄어쓰기 — 별표 둘이 맞붙지 않게 묶어, 긴 띄어쓰기에도 되짚기가 늘지 않습니다
+_GAP = rf"[ \t]*(?:[.{_DASH}][ \t]*)?"
+_SEP = rf"[ \t]*[.{_DASH}][ \t]*"  # 하이픈이나 점이 반드시 있는 끊음
+# 숫자 한 덩이의 앞 — 주소 경로 · 쿼리 · 16진 해시 · 소수 · 다른 숫자 묶음 안이면 연락처로 세지 않습니다
+_EDGE = rf"(?<![0-9A-Za-z/=?&#%_.{_DASH}])"
+# 이은 숫자 묶음의 앞 — 위와 같되 '/' 는 받습니다(은행/계좌/이름 꼴)
+_JOINED_EDGE = rf"(?<![0-9A-Za-z=?&#%_.{_DASH}])"
+CONTACT_SHAPES = (
+    # 이메일 — (at) · [at] · {at} · <at> 와 같은 꼴의 dot 으로 쓴 것과 @ · 점 둘레의 띄어쓰기까지
+    rf"[A-Za-z0-9._%+\-]{{1,64}}[ \t]*{_AT}[ \t]*[A-Za-z0-9\-]{{1,63}}"
+    rf"(?:[ \t]*{_DOT}[ \t]*[A-Za-z0-9\-]{{1,63}})*[ \t]*{_DOT}[ \t]*[A-Za-z]{{2,24}}",
+    # 예금주 줄 — 예금주명 · 괄호 · 구분 기호(: | ㅣ / = > · -) 뒤의 이름 한 덩이까지
+    rf"예금주(?:명|자)?[\])】」]?(?:[ \t]*[:|ㅣ/=>·{_DASH}])*\s*[\[(「【]?[^\s,/|()\[\]<>:·ㅣ]{{1,20}}",
+    # 전화번호 — 010 · (02) · 031 꼴과 +82, 하이픈 · 점 · 띄어쓰기로 끊었거나 붙여 쓴 것
+    rf"(?<![0-9A-Za-z])(?:\+[ \t]*82{_GAP}(?:\(0\)[ \t]*)?|\(?0)(?:1[016789]|2|[3-6][1-5])\)?"
+    rf"{_GAP}[0-9]{{3,4}}{_GAP}[0-9]{{4}}(?![0-9A-Za-z])",
+    # 전화번호 — 하이픈 · 점으로 끊은 꼴은 영문자 바로 뒤에 붙어도(HP010-0000-1234)
+    rf"(?<=[A-Za-z])0(?:1[016789]|2|[3-6][1-5]){_SEP}[0-9]{{3,4}}{_SEP}[0-9]{{4}}(?![0-9A-Za-z])",
+    # 계좌번호 — 하이픈 · 점으로 이은 숫자 묶음 셋 이상, 숫자 10~16개
+    rf"{_JOINED_EDGE}\+?(?=(?:[.{_DASH}]?[0-9]){{10,16}}(?![.{_DASH}]?[0-9]))"
+    rf"[0-9]{{2,6}}(?:[.{_DASH}][0-9]{{1,7}}){{2,5}}(?![0-9A-Za-z])",
+    # 하이픈 없는 계좌번호 · 전화번호 — 숫자 10~14개 한 덩이
+    rf"{_EDGE}\+?[0-9]{{10,14}}(?![0-9A-Za-z])",
+)
+CONTACT_RE = re.compile("|".join(CONTACT_SHAPES), re.IGNORECASE)
+
+
+def _match_view(text: str) -> str:
+    """찾기 전 맞춤 — 한 글자를 한 글자로 바꿔 맞춘 글의 자리가 원문의 자리입니다(너비 없는 글자도 지우지 않습니다).
+
+    전각은 반각, 보이지 않는 띄어쓰기 · 너비 없는 글자는 띄어쓰기, 숫자 사이의 가로줄 닮은 글자는 하이픈입니다.
+    """
+    return _DASH_BETWEEN_DIGITS.sub(r"\1-", text.translate(MATCH_VIEW))
+
+
+def _contact_spans(text: str) -> list[tuple[int, int]]:
+    """연락처 모양(CONTACT_RE)의 자리 — 찾기 전 맞춤(_match_view)과 가로줄을 바꾸지 않은 맞춤에서 찾아 겹치면 하나로 묶습니다.
+
+    숫자 뒤의 가로줄 닮은 글자를 하이픈으로 보면 계좌 앞 경계가 막히거나(2024ㅡ000000123456) 숫자 수가 상한을
+    넘으니(000-000-123456ㅡ12345678), 바꾸지 않은 맞춤이 찾는 자리도 놓치지 않습니다.
+    """
+    plain = text.translate(MATCH_VIEW)
+    views = {_match_view(text), plain}
+    spans: list[tuple[int, int]] = []
+    for start, end in sorted(match.span() for view in views for match in CONTACT_RE.finditer(view)):
+        if spans and start < spans[-1][1]:
+            spans[-1] = (spans[-1][0], max(spans[-1][1], end))
+        else:
+            spans.append((start, end))
+    return spans
+
+
+def count_contacts(text: str) -> int:
+    """글 안 연락처 모양(CONTACT_RE)의 곳 수 — 두 맞춤에서 찾아 겹친 자리는 하나로 셉니다(_contact_spans)."""
+    return len(_contact_spans(text))
+
+
+def mask_contacts(text: str) -> str:
+    """연락처 모양을 CONTACT_MASK 로 바꿉니다 — 바꾼 자리 옆에 새 모양이 드러나면 없어질 때까지 다시 봅니다.
+
+    자리는 두 맞춤에서 찾고(_contact_spans), 바꾸기는 원문에 합니다.
+    """
+    while True:
+        pieces: list[str] = []
+        last = 0
+        for start, end in _contact_spans(text):
+            pieces += (text[last:start], CONTACT_MASK)
+            last = end
+        if not pieces:
+            return text
+        text = "".join(pieces) + text[last:]
+
+
+def _kept(text: str, limit: int, redactor: Callable[[str], str]) -> str:
+    """결과 파일에 남길 바깥 글 사본 — `<` `>` 를 전각으로 바꾸고 키를 가린 다음 연락처 모양을 가린 뒤 `limit` 자로
+    자르고, 자른 끝에 새로 생긴 모양도 가립니다.
+
+    키가 먼저라야 키 안의 연락처 모양이 키 꼬리를 남기지 않고, 자르기가 먼저면 반쯤 잘린 모양이 목록을 빠져나갑니다.
+    키 가림은 `_clean` 뒤라 `<키 이름>` 이 전각이 되지 않습니다. 키와 연락처가 없으면 `_clean(text, limit)` 과 같습니다.
+    """
+    return mask_contacts(mask_contacts(redactor(_clean(text, len(text))))[:limit])
+
+
+def _stored_failures(failures: Sequence[str]) -> list[str]:
+    """결과 파일에 적을 코드 검사 이유 — 이유 이름과 숫자만(반복은 겹친 글자 수, 링크는 이름, 글자 수는 그대로).
+
+    작성기의 이유 글은 겹친 글자(띄어쓰기 · 문장부호를 지운 글)와 링크 조각을 담아 연락처가 목록 밖 꼴로 남습니다.
+    """
+    stored: list[str] = []
+    for reason in failures:
+        if reason.startswith(REPEAT_REASON):
+            stored.append(f"이전 댓글과 겹칩니다 ({len(reason) - len(REPEAT_REASON)}글자)")
+        elif reason.startswith(LINK_REASON):
+            stored.append(LINK_STORED)
+        elif LENGTH_REASON_RE.fullmatch(reason):
+            stored.append(reason)
+        else:
+            stored.append(OTHER_REASON)
+    return stored
+
+
+def file_texts(path: Path) -> list[str]:
+    """결과 파일의 글 — `.json` 은 이스케이프를 푼 모든 문자열(키와 값)이고 숫자 칸은 들지 않습니다.
+
+    그 밖의 파일은 글 전체 한 덩이입니다. 깊은 JSON 에도 되부름 없이 훑습니다.
+    """
+    text = path.read_text(encoding="utf-8")
+    if path.suffix != ".json":
+        return [text]
+    found: list[str] = []
+    pending: list[object] = [json.loads(text)]
+    while pending:
+        node = pending.pop()
+        if isinstance(node, str):
+            found.append(node)
+        elif isinstance(node, dict):
+            for key, value in node.items():
+                found.append(key)
+                pending.append(value)
+        elif isinstance(node, list):
+            pending.extend(node)
+    return found
+
+
+def contact_places(paths: Iterable[Path]) -> int:
+    """파일들에 남은 연락처 모양의 곳 수 — 실행기 끝 줄과 커밋된 결과를 보는 스위트 테스트가 함께 부릅니다."""
+    return sum(count_contacts(text) for path in paths for text in file_texts(path))
 
 
 def _raised(current: float, values: Sequence[float]) -> list[float]:
@@ -630,19 +777,29 @@ def render_summary(result: dict) -> str:
     return "\n".join(lines) + "\n"
 
 
-def _scrub(value: object, redactor: Callable[[str], str]) -> object:
-    """내보낼 값 전체를 훑어 키를 가리고 외톨이 서로게이트를 U+FFFD 로 바꿉니다."""
+def _scrub(value: object, redactor: Callable[[str], str], outside: bool = False) -> object:
+    """내보낼 값 전체를 훑어 키를 가리고 외톨이 서로게이트를 U+FFFD 로 바꿉니다.
+
+    `untrusted` 칸 안의 글(outside)은 키를 가린 다음 연락처 모양도 가립니다.
+    """
     if isinstance(value, str):
-        return re.sub(r"[\ud800-\udfff]", "�", redactor(value))
+        text = redactor(value)
+        if outside:
+            text = mask_contacts(text)
+        return re.sub(r"[\ud800-\udfff]", "�", text)
     if isinstance(value, Mapping):
-        return {_scrub(key, redactor): _scrub(item, redactor) for key, item in value.items()}
+        return {
+            _scrub(key, redactor): _scrub(item, redactor, outside or key == "untrusted")
+            for key, item in value.items()
+        }
     if isinstance(value, (list, tuple)):
-        return [_scrub(item, redactor) for item in value]
+        return [_scrub(item, redactor, outside) for item in value]
     return value
 
 
 def write_outputs(result: dict, out_dir: Path, redactor: Redactor) -> list[Path]:
     """result.json 과 summary.md 를 임시 파일 + os.replace 로 씁니다.
+    `untrusted` 칸의 글은 연락처 모양을 `<연락처>` 로 가립니다(`_scrub`).
 
     쓴 뒤 두 파일을 다시 읽어 키 조각이 보이면 둘 다 지우고 KeyLeak 을 냅니다.
     """
@@ -1210,11 +1367,18 @@ def connect_real(keys: Keys) -> Services:
     )
 
 
-def run_live_check(services: Services, config: Config, now: datetime, limits: RunLimits) -> dict:
+def run_live_check(
+    services: Services,
+    config: Config,
+    now: datetime,
+    limits: RunLimits,
+    redactor: Callable[[str], str],
+) -> dict:
     """모델 이름 확인 → 예시 정확도 → 영상 한 바퀴를 돌고 결과를 돌려줍니다.
 
     천장 · 쿼터 · 그 밖의 예외(Ctrl-C 포함)는 그 자리에서 멈추고 stopped 에 적습니다. 결과는
     부르는 동안 채워 가므로 멈춘 데까지가 남고, 끝에 accuracy_tally 와 판정 줄을 셉니다.
+    redactor 는 main 이 만든 키 가림이고, 결과에 남길 바깥 글 사본에서 키를 연락처보다 먼저 가립니다.
     """
     calls = Calls(limits.ceilings)
     result = new_result(config, now, limits, calls)
@@ -1231,7 +1395,7 @@ def run_live_check(services: Services, config: Config, now: datetime, limits: Ru
             result["models"], config.comment.writer_model
         )
         _accuracy(ask, config, now, track, result, judged)
-        _VideoRound(ask, claude, youtube, config, now, limits, track, result).run()
+        _VideoRound(ask, claude, youtube, config, now, limits, track, result, redactor).run()
     except CeilingReached as exc:
         result["stopped"] = {"kind": "ceiling", "service": exc.service, "limit": exc.limit}
     except QuotaExhausted as exc:
@@ -1304,6 +1468,7 @@ class _VideoRound:
         limits: RunLimits,
         track: _Track,
         result: dict,
+        redactor: Callable[[str], str],
     ) -> None:
         self.ask = ask
         self.claude = claude
@@ -1313,6 +1478,7 @@ class _VideoRound:
         self.limits = limits
         self.track = track
         self.result = result
+        self.redactor = redactor  # 결과에 남길 사본의 키 가림(main 의 Redactor)
         self.seen: set[str] = set()
         self.drafts = 0
         self.classified = 0
@@ -1427,8 +1593,8 @@ class _VideoRound:
             "skip_human": "",
             "drafts": [],
             "untrusted": {
-                "title": _clean(record.title, TITLE_LIMIT),
-                "description": _clean(record.description, DESCRIPTION_LIMIT),
+                "title": _kept(record.title, TITLE_LIMIT, self.redactor),
+                "description": _kept(record.description, DESCRIPTION_LIMIT, self.redactor),
                 "classification_reason": None,
                 "top_comments": [],
                 "skip_reason": None,
@@ -1472,7 +1638,9 @@ class _VideoRound:
         video["comments_disabled"] = fetched is None
         video["material"] = "top_comments" if comments else "title_description"
         video["top_comment_count"] = len(comments)
-        video["untrusted"]["top_comments"] = [_clean(text, ITEM_LIMIT) for text in comments]
+        video["untrusted"]["top_comments"] = [
+            _kept(text, ITEM_LIMIT, self.redactor) for text in comments
+        ]
         self.written += 1
         recording = _Recording(self.claude, self.check)
         track.stage["claude"] = "write"
@@ -1581,7 +1749,13 @@ class _VideoRound:
                     ),
                     "frame_overlap": 0,  # 실행 끝에 mark_frame_overlaps 가 셉니다
                     "human": "",
-                    "untrusted": {"concern": concern, "comment": text, "code_failures": failures},
+                    # 결과에 남길 사본만 키 → 연락처 차례로 가립니다 — frame_overlap 이 결과 파일의 글로
+                    # 다시 세어지게(검사 · 채점은 위에서 원문으로)
+                    "untrusted": {
+                        "concern": mask_contacts(self.redactor(concern)),
+                        "comment": mask_contacts(self.redactor(text)),
+                        "code_failures": _stored_failures(failures),
+                    },
                 }
             )
             self.drafts += 1
@@ -1606,7 +1780,8 @@ def main(
     """`--verdict <파일>` 은 호출 없이 다시 세기, 인자가 없으면 실행입니다.
 
     실행의 종료 코드: 0 go · 1 stop · 2 시작 전 멈춤(인자 · 설정 · 키 · SDK · 키 모양 — 호출 0번,
-    파일 없음) · 3 결과 파일을 쓰지 못함 또는 키 조각이 보여 지움.
+    파일 없음) · 3 결과 파일을 쓰지 못함 또는 키 조각이 보여 지움 · 4 결과 두 파일은 썼으나 연락처
+    모양이 남음(두 파일은 남김 — 커밋하지 않음).
     """
     stdout = sys.stdout if stdout is None else stdout
     stderr = sys.stderr if stderr is None else stderr
@@ -1631,7 +1806,7 @@ def main(
     except ValueError as exc:
         print(redactor(f"실행하지 않습니다 — {exc}"), file=stderr)
         return 2
-    result = run_live_check(services, config, clock(), limits)
+    result = run_live_check(services, config, clock(), limits, redactor)
     try:
         paths = write_outputs(result, out_dir, redactor)
     except KeyLeak as exc:
@@ -1643,6 +1818,11 @@ def main(
     stdout.write(redactor(paths[1].read_text(encoding="utf-8")))
     print(redactor(f"결과: {paths[0]} · {paths[1]}"), file=stdout)
     print("키 검사: 결과 파일에 키 없음", file=stdout)
+    places = contact_places(paths)
+    if places:
+        print(f"개인 정보 검사: 결과 파일에 연락처 모양 {places}곳 — 커밋하지 마세요", file=stdout)
+        return 4
+    print("개인 정보 검사: 결과 파일에 연락처 모양 없음", file=stdout)
     return 0 if result["verdict"] == "6B: go" else 1
 
 
