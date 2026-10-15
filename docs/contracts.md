@@ -1105,6 +1105,12 @@ if result.draft is not None:
   제목 300 · 설명 2000 · 자막 6000자, 인기 댓글 · 판별 이유 · 이전 댓글 · 검사용 고민과 초안
   각 300자입니다. jev 상태는 같은 자료 블록에 `<video_concern>` · `<draft_comment>` 를 더한
   것입니다.
+- **짜임 (Phase 7C)** — `SHAPES` 는 글 전체의 꼴(첫머리 · 연애사주 경험을 꺼내는 말 · 끝맺음) 다섯 개입니다:
+  `scene_first` · `question_first` · `story_first` · `reply_first` · `feeling_first`. 모든 짜임에 비슷한 고민 때 연애사주를 봤던 경험의 자리가 있습니다.
+  `write_comment` 는 `previous` 의 길이(지금까지 쓴 댓글 수)로 `SHAPES` 를 차례로 돌아 하나를 고르고(`pick_shape`), `SHAPE_INSTRUCTION` 으로
+  사용자 메시지의 `USER_INSTRUCTION` 바로 앞에 넣습니다. 그래서 고른 짜임은 바로 앞 네 댓글이 쓰지 않은 것이고, 다시 쓰기도 같은 짜임입니다.
+  시스템 프롬프트 규칙 2 는 경험을 꺼내는 말을 이 짜임에 맡기고, 규칙 6 은 짜임은 이 지시를 따르되 첫머리 · 문장을 잇는 말 · 끝맺음에 쓰는 말을 최근 댓글과 다르게 쓰게 합니다.
+  짜임을 지켰는지 보는 검사는 없습니다 — jev 다섯 질문 · 코드 검사 · 아래 대조표는 그대로입니다. 음성 대조 `python3 -m tests.mutants writer-shape-fixed`.
 - **API 오류** — Claude 호출이나 jev 호출이 오류를 내거나 jev 답이 이상하면 다시 쓰지 않고(다시
   써도 고쳐지지 않음) `ERROR where=writer.claude` 또는 `where=writer.jev` 와, 같은 이유의
   `SKIP` 을 남깁니다:
@@ -1119,14 +1125,14 @@ if result.draft is not None:
   원인과 함께 `ERROR` 로 보입니다. 그 `ERROR` 위에 멈춤 정책을 세우는 것은 Phase 7 의
   몫입니다. `try` 안에는 `messages.create` 와 `check` 호출만 있으므로, 모양이 틀린 Claude
   응답(작성기 버그)은 건너뛰기로 숨지 않고 그대로 오류가 됩니다.
-- **로그** — `COMMENT` 는 필수 필드 뒤에 `attempt`(1 또는 2)와
+- **로그** — `COMMENT` 는 필수 필드 뒤에 `attempt`(1 또는 2) ·
   `check`(`mentions_scene=0.90 reads_like_ad=0.10 follows_concern=0.80 concern_is_love_worry=0.85
-  saju_story_fits=0.75`)를 더합니다(7절의 "나머지 필드").
+  saju_story_fits=0.75`) · `shape`(고른 짜임 이름, Phase 7C)를 더합니다(7절의 "나머지 필드").
 - **`self_check`** — 초안의 `self_check` 는 `Judgement(yes, "<질문>=<P(예)> …", now)` 입니다.
   `CommentDraft.at` 도 넘겨받은 `now` 이고, 숨은 시계는 없습니다.
 - 프롬프트 원문(`SYSTEM_PROMPT` · `USER_INSTRUCTION` · `REWRITE_PROMPT` · `WRITE_TOOL` ·
-  `CHECK_QUESTIONS` · `CHECK_LABELS`)은 `writer.py` 맨 위에만 있고, Phase 8 의 PROCESS.md 가 옮겨
-  적습니다.
+  `CHECK_QUESTIONS` · `CHECK_LABELS` · `SHAPES` · `SHAPE_INSTRUCTION`)은 `writer.py` 맨 위에만 있고, Phase 8 의 PROCESS.md 가 옮겨
+  적습니다(`SHAPES` · `SHAPE_INSTRUCTION` 은 Phase 8A 가 옮김).
 - **과제 문장 대조표 (Phase 6E).** 과제 안내 4쪽 ④ 여덟 문장과 7쪽 평가표 '댓글 품질' 세 문장마다 게시
   전에 막는 자리와 짝 테스트입니다(문장은 트래커 Phase 6E 인터뷰 질문 1 A 가 옮긴 원문). 스위트
   테스트(`tests/test_task_table.py`)가 열한 문장이 표에 하나씩 있는지, 표의 규칙 번호 · jev 질문 · 코드

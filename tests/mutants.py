@@ -1209,6 +1209,12 @@ MUTANTS: dict[str, tuple[str, str, str, str]] = {
         "events = None",
         "events = []",
     ),
+    "writer-shape-fixed": (
+        "agent.writer",
+        "tests.test_writer",
+        "return names[len(previous) % len(names)]",
+        "return names[0]",
+    ),
 }
 
 
