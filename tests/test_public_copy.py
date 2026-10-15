@@ -628,6 +628,32 @@ class HistoryCheckTest(GitCase):
         self.assertTrue(check.failed)
         self.assertNotIn("@", joined(check))
 
+    def test_amended_older_author_is_red(self) -> None:
+        """끝 판은 그대로 두고 앞 커밋의 작성자 이름만 바꿉니다 — 날짜와 다른 이름표는 원본 그대로."""
+        fmt = "--format=%an%x00%ae%x00%ad%x00%cn%x00%ce%x00%cd"
+        first, second = self.copy.git("rev-list", "--reverse", "main").split()
+
+        def identity(commit: str) -> dict[str, str]:
+            fields = self.copy.git("log", "-1", fmt, "--date=raw", commit).strip("\n").split("\0")
+            names = ("NAME", "EMAIL", "DATE")
+            return {
+                **{f"GIT_AUTHOR_{n}": v for n, v in zip(names, fields[:3])},
+                **{f"GIT_COMMITTER_{n}": v for n, v in zip(names, fields[3:])},
+            }
+
+        older = {**identity(first), "GIT_AUTHOR_NAME": "other"}
+        new_first = self.copy.git(
+            "commit-tree", f"{first}^{{tree}}", "-m", "하나", env=older
+        ).strip()
+        new_second = self.copy.git(
+            "commit-tree", f"{second}^{{tree}}", "-p", new_first, "-m", "둘", env=identity(second)
+        ).strip()
+        self.copy.git("update-ref", "refs/heads/main", new_second)
+        check = self.history()
+        self.assertTrue(check.failed)
+        self.assertIn("2번째", joined(check))
+        self.assertNotIn("@", joined(check))
+
     def test_extra_commit_is_red(self) -> None:
         self.copy.git("commit", "-q", "--allow-empty", "-m", "더")
         check = self.history()
@@ -690,6 +716,19 @@ class SetupTest(GitCase):
         code, out = run_main("--source", self.src.root, "--dest", dest, "--known", bad)
         self.assertEqual(code, pc.EXIT_SETUP)
         self.assertFalse(dest.exists())
+
+    def test_scan_only_refuses_bad_known_and_dest(self) -> None:
+        before = self.src.state()
+        for mode in ("--scan-only", "--print-known"):
+            with self.subTest(mode=mode):
+                code, out = run_main(mode, "--source", self.src.root, "--dest", self.tmp / "d")
+                self.assertEqual(code, pc.EXIT_SETUP)
+                self.assertTrue(last_line(out).startswith("준비 실패 — "))
+                self.assertFalse((self.tmp / "d").exists())
+        code, out = run_main("--scan-only", "--source", self.src.root, "--known", self.tmp / "none.json")
+        self.assertEqual(code, pc.EXIT_SETUP)
+        self.assertTrue(last_line(out).startswith("준비 실패 — "))
+        self.assertEqual(self.src.state(), before)
 
     def test_env_and_no_env_together_exit_2(self) -> None:
         with self.assertRaises(SystemExit) as raised:
