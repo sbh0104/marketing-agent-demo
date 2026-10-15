@@ -1093,3 +1093,79 @@ other line is required on every item.
 - status: open
 - attempts: 0 · last failure: —
 - first seen: 2026-10-16 · last seen: 2026-10-16
+
+### S-110 — 요청 전체 상한을 테스트로 잠그기: 상한을 두 배로 늘려도 스위트가 초록
+- source: cycle 20261015-213331-adw/phase-7a-watcher-network-fixes · tracker plans/interview-marketing-agent.md#phase-7a · deferred by ship-check
+- evidence: src/agent/youtube.py:214 `if not done.wait(timeout):` 을 `done.wait(2 * timeout)` 으로 바꿔도 `python3 -m unittest discover` 900개가 `OK`(ship-check 감사 5 손 변이 M2 — drip 테스트 2.079 · 2.009 · 2.007 s); tests/test_youtube.py:841-848 과 tests/test_watcher_network.py:151 이 1초 상한 둘레에 `assertLess(elapsed, 2.5)` 만 둠
+- direction: 테스트만 — tests/test_youtube.py 의 머리줄 · 본문 drip 테스트와 tests/test_watcher_network.py 의 drip 테스트가 1초 상한에 거는 시간 한도를 2.5초에서 상한의 두 배보다 작은 값(예: 1.8초)으로 좁혀 두 배 상한이 빨강이 되게; 코드 · 계약 변경 없음
+- touches: tests/test_youtube.py, tests/test_watcher_network.py
+- status: open
+- attempts: 0 · last failure: —
+- first seen: 2026-10-16 · last seen: 2026-10-16
+
+### S-111 — 쿼터 장부 48시간 보관 경계를 스위트 테스트로 잠그기
+- source: cycle 20261015-213331-adw/phase-7a-watcher-network-fixes · tracker plans/interview-marketing-agent.md#phase-7a · deferred by ship-check
+- evidence: tests/test_youtube.py:290-293 `test_old_entries_are_pruned_on_write` 의 씨앗(−50h · −30h · −1s)과 빠른 시계 테스트는 src/agent/youtube.py:47 `_KEEP` 이 (30h, 50h] 의 어느 값이어도 통과(ship-check 감사 5 소견 5, .adw/guard-matrix.md Coverage notes) — 48시간 경계는 verify 때의 V25 스크립트만 잼
+- direction: 테스트만 — 쓰기 한 번 뒤 NOW−48h 항목은 지워지고 NOW−48h+1s 항목은 남음을 단언(V25 가 잰 경계, 계약 '쓸 때 48시간이 지난 항목은 지움'); 코드 · 계약 변경 없음
+- touches: tests/test_youtube.py
+- status: open
+- attempts: 0 · last failure: —
+- first seen: 2026-10-16 · last seen: 2026-10-16
+
+### S-112 — 조용한 서버 테스트가 일꾼 스레드를 실제로 봤는지 · 읽기마다의 timeout 값 전달을 단언하기
+- source: cycle 20261015-213331-adw/phase-7a-watcher-network-fixes · tracker plans/interview-marketing-agent.md#phase-7a · deferred by ship-check
+- evidence: tests/test_youtube.py:921 은 `thread.name == "http_get"` 으로 거른 목록이 비었는지만 봐 스레드를 하나도 못 찾아도 통과(ship-check 감사 5 소견 3); HttpGetTest 를 루프백으로 옮기며 base 의 `kwargs == {"timeout": timeout}` 단언(cc80dd8 tests/test_youtube.py:754)이 빠져 src/agent/youtube.py:226 `open(request, timeout=timeout)` 은 값이 아니라 있음만 잠김(소견 2)
+- direction: 테스트만 — 조용한 서버 테스트가 새 `http_get` 스레드를 적어도 하나 봤음을 단언하고, `OpenerDirector.open` 을 감싼 spy 로 `_get` 이 받은 timeout 값을 그대로 넘기는지 단언; 코드 변경 없음
+- touches: tests/test_youtube.py
+- status: open
+- attempts: 0 · last failure: —
+- first seen: 2026-10-16 · last seen: 2026-10-16
+
+### S-113 — 테스트 가짜의 '모르는 호출' · '네트워크 금지' 가드가 _call 의 예외 잡기에 삼켜지지 않게
+- source: cycle 20261015-213331-adw/phase-7a-watcher-network-fixes · tracker plans/interview-marketing-agent.md#phase-7a · deferred by ship-check
+- evidence: src/agent/youtube.py:354 `except Exception as exc:` 가 테스트 가짜의 `AssertionError` 도 `YouTubeError` 로 바꿈 — tests/test_live_check.py:1951 `raise AssertionError(f"모르는 호출입니다: {endpoint}")` 와 :2008-2009 소켓 금지 가드는 tests/live_check.py:1513 · 1526 `except YouTubeError: continue` 에서 조용히 건너뛰어지고, tests/test_watcher_network.py:31 · 33 의 LoopbackFetch 가드는 :66 · :93 의 `reason.startswith("network ")` 를 그대로 통과(ship-check 감사 3 메모 6)
+- direction: 테스트만 — World 의 모르는 호출 가드 · 소켓 금지 가드 · LoopbackFetch 주소 가드가 걸린 횟수를 기록하고 addCleanup 에서 0 이 아니면 실패하게; 소스 변경 없음
+- touches: tests/test_live_check.py, tests/test_watcher_network.py
+- status: open
+- attempts: 0 · last failure: —
+- first seen: 2026-10-16 · last seen: 2026-10-16
+
+### S-114 — 요청 전체 상한을 테스트로 잠그기: 상한을 두 배로 늘려도 스위트가 초록
+- source: cycle 20261015-213331-adw/phase-7a-watcher-network-fixes · tracker plans/interview-marketing-agent.md#phase-7a · filed by smoke-file (one-pass)
+- evidence: .adw/ship-report.md
+- direction: drip 테스트의 시간 한도를 상한의 두 배보다 작은 값으로 좁혀 두 배 상한이 빨강이 되게, 코드 · 계약 변경 없음
+- touches: tests/test_youtube.py, tests/test_watcher_network.py
+- base: adw/phase-7a-watcher-network-fixes
+- phase: plans/interview-marketing-agent.md#phase-7a
+- status: open
+- attempts: 0 · last failure: —
+
+### S-115 — 쿼터 장부 48시간 보관 경계를 스위트 테스트로 잠그기
+- source: cycle 20261015-213331-adw/phase-7a-watcher-network-fixes · tracker plans/interview-marketing-agent.md#phase-7a · filed by smoke-file (one-pass)
+- evidence: .adw/ship-report.md
+- direction: 쓰기 한 번 뒤 NOW−48h 항목은 지워지고 NOW−48h+1s 항목은 남음을 단언, 코드 · 계약 변경 없음
+- touches: tests/test_youtube.py
+- base: adw/phase-7a-watcher-network-fixes
+- phase: plans/interview-marketing-agent.md#phase-7a
+- status: open
+- attempts: 0 · last failure: —
+
+### S-116 — 조용한 서버 테스트가 일꾼 스레드를 실제로 봤는지 · 읽기마다의 timeout 값 전달을 단언하기
+- source: cycle 20261015-213331-adw/phase-7a-watcher-network-fixes · tracker plans/interview-marketing-agent.md#phase-7a · filed by smoke-file (one-pass)
+- evidence: .adw/ship-report.md
+- direction: 새 http_get 스레드를 적어도 하나 봤음과 OpenerDirector.open 에 넘긴 timeout 이 받은 값 그대로임을 단언, 코드 변경 없음
+- touches: tests/test_youtube.py
+- base: adw/phase-7a-watcher-network-fixes
+- phase: plans/interview-marketing-agent.md#phase-7a
+- status: open
+- attempts: 0 · last failure: —
+
+### S-117 — 테스트 가짜의 '모르는 호출' · '네트워크 금지' 가드가 _call 의 예외 잡기에 삼켜지지 않게
+- source: cycle 20261015-213331-adw/phase-7a-watcher-network-fixes · tracker plans/interview-marketing-agent.md#phase-7a · filed by smoke-file (one-pass)
+- evidence: .adw/ship-report.md
+- direction: 가드가 걸린 횟수를 기록하고 addCleanup 에서 0 이 아니면 실패, 소스 변경 없음
+- touches: tests/test_live_check.py, tests/test_watcher_network.py
+- base: adw/phase-7a-watcher-network-fixes
+- phase: plans/interview-marketing-agent.md#phase-7a
+- status: open
+- attempts: 0 · last failure: —
