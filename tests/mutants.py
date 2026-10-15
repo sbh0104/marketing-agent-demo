@@ -722,6 +722,42 @@ MUTANTS: dict[str, tuple[str, str, str, str]] = {
         "if false_yes == 0 and (best is None or correct > best[1]):",
         "if false_yes == 0 and (best is None or correct >= best[1]):",
     ),
+    "live-check-contacts-unmasked": (
+        "tests.live_check",
+        "tests.test_live_check",
+        "for match in CONTACT_RE.finditer(text.translate(HALF_WIDTH)):",
+        "for match in ():",
+    ),
+    "live-check-contact-line-blind": (
+        "tests.live_check",
+        "tests.test_live_check",
+        "places = contact_places(paths)",
+        "places = 0",
+    ),
+    "live-check-clip-before-mask": (
+        "tests.live_check",
+        "tests.test_live_check",
+        "return mask_contacts(mask_contacts(_clean(text, len(text)))[:limit])",
+        "return mask_contacts(_clean(text, limit))",
+    ),
+    "live-check-untrusted-unmasked-at-write": (
+        "tests.live_check",
+        "tests.test_live_check",
+        '_scrub(item, redactor, outside or key == "untrusted")',
+        "_scrub(item, redactor, outside)",
+    ),
+    "live-check-published-scan-blind": (
+        "tests.live_check",
+        "tests.test_live_check_published",
+        "return sum(count_contacts(text) for path in paths for text in file_texts(path))",
+        "return 0",
+    ),
+    "live-check-draft-masked-at-write-only": (
+        "tests.live_check",
+        "tests.test_live_check",
+        '"comment": mask_contacts(text),',
+        '"comment": text,',
+    ),
     "live-check-applied-yes-floor-lowered": (
         "agent.config",
         "tests.test_live_check_applied",

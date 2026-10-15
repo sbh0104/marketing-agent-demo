@@ -698,6 +698,12 @@ run_loop(cycle, reload, initial, *, on_error, sleep=time.sleep,
   python3 -m tests.mutants live-check-grade-block-half-stops
   python3 -m tests.mutants live-check-grade-block-schema-ignored
   python3 -m tests.mutants live-check-popular-shortfall-ignored
+  python3 -m tests.mutants live-check-contacts-unmasked
+  python3 -m tests.mutants live-check-contact-line-blind
+  python3 -m tests.mutants live-check-clip-before-mask
+  python3 -m tests.mutants live-check-untrusted-unmasked-at-write
+  python3 -m tests.mutants live-check-published-scan-blind
+  python3 -m tests.mutants live-check-draft-masked-at-write-only
   python3 -m tests.mutants live-check-applied-yes-floor-lowered
   python3 -m tests.mutants live-check-applied-floor-lowered
   python3 -m tests.mutants live-check-applied-reads-jev-models
@@ -711,7 +717,8 @@ run_loop(cycle, reload, initial, *, on_error, sleep=time.sleep,
   `decide_post` · `video_id_from_ref` · `put` · `reserve_live` · `check_post` · `load_config` ·
   `config_from_mapping` · `run_loop` · `format_line` · `QuotaLedger.reserve` ·
   `YouTubeClient._call` · `Watcher.run` · `YouTubeClient.top_comments` · `tests/live_check.py` 의
-  `Calls.take` · `Redactor` · `best_correct` · `best_setting` · `verdict_line` · `cli` · `main` ·
+  `Calls.take` · `Redactor` · `mask_contacts` · `_kept` · `_scrub` · `_VideoRound._drafts` · `contact_places` ·
+  `best_correct` · `best_setting` · `verdict_line` · `cli` · `main` ·
   `write_comment` · `code_failures` · `self_check_failure` · `link_fragment` · `repeated_run` 의
   본문을 고칠 때는 이 명령들이 계속 1 로 끝나는지 함께 확인합니다. `tests/test_live_check_applied.py` 의
   `measured_drift` · `recount` · `admitted` · `stored_verdict_mismatches` 본문을 고칠 때도
@@ -1213,6 +1220,16 @@ python3 -m tests.live_check --verdict <결과 파일>     # 호출 없이 판정
   traceback 과 이어진 예외(`__context__`)는 찍지 않고 예외 이름만 찍습니다.
   `python3 -m tests.live_check` 의 진입은 `cli` 를 거치고, `cli` 는 `BaseException` 모두를 잡습니다.
   두 파일을 쓴 뒤 다시 읽어 키 조각이 보이면 두 파일을 지우고 종료 코드 3 입니다.
+- **개인 정보.** 결과 두 파일에 쓰는 `untrusted` 칸의 글은 연락처 모양(`CONTACT_RE` — 이메일 · 전화번호 · 계좌번호 · `예금주` 줄)을 `<연락처>` 로 바꿔 씁니다.
+  칸은 지우지 않고 글 안의 모양만 바꿉니다.
+  제목 · 설명 · 인기 댓글은 길이로 자르기 전에 바꾸므로, 잘려 반쯤 남은 모양이 결과에 남지 않습니다.
+  초안의 고민 · 글은 초안을 적는 자리에서 바꾸므로, `frame_overlap` 은 결과 파일에 남은 글로 다시 세어도 같습니다(서로 다른 연락처도 같은 `<연락처>` 로 셉니다).
+  Claude · jev 에 보내는 글은 바꾸지 않습니다 — 운영과 같은 재료입니다.
+  `untrusted` 밖의 칸(`fingerprint.jev_models` · `video_id` · 숫자 칸)은 바꾸지 않습니다.
+  두 파일을 쓴 뒤 `result.json` 의 모든 글(키와 값)과 `summary.md` 전체를 같은 목록으로 세어, `키 검사` 줄 다음 마지막 줄에 없으면 `개인 정보 검사: 결과 파일에 연락처 모양 없음` 을 찍고, 있으면 `개인 정보 검사: 결과 파일에 연락처 모양 N곳 — 커밋하지 마세요` 를 찍고 종료 코드 4 로 끝납니다.
+  이 줄은 곳 수만 찍고 그 글은 찍지 않습니다.
+  두 파일은 지우지 않습니다.
+  `tests/test_live_check_published.py` 가 커밋된 두 파일을 같은 목록으로 세어 한 곳이라도 있으면 빨강입니다(파일이 없으면 셀 글이 없어 초록).
 - **결과 파일.** `result.json` 은 6B 가 읽는 기계용(키 정렬, 2칸 들여쓰기, UTF-8, `os.replace`),
   `summary.md` 는 사람용 숫자 요약이고 같은 실행이 둘을 덮어씁니다.
   `summary.md` 에는 영상 · 인기 댓글 · 초안의 글이 들어가지 않습니다.
@@ -1308,7 +1325,8 @@ python3 -m tests.live_check --verdict <결과 파일>     # 호출 없이 판정
   맞음이 같은 설정이 여럿이면 덜 올린 쪽 하나입니다(`best_setting`) — `noul_yes_min` 이 작은 쪽, 그다음 `choice_min_confidence` 가 작은 쪽, 그다음 `noul_no_max` 가 지금 값에 가까운 쪽(거리가 같으면 작은 쪽).
 - **종료 코드.** 실행: 0 `go` · 1 `stop` · 2 시작 전 멈춤(인자 · 설정 · 키 · SDK · 키 모양 — 호출 0번,
   파일 없음) · 3 결과 파일을 쓰지 못함, 키 조각이 보여 지움, 또는 실행기 오류(예: 결과 파일을 읽다
-  `RecursionError`). `--verdict`: 0 `go` · 1 `stop` · 2 파일을 읽을 수 없음. 판정 줄과 다르게 저장된
+  `RecursionError`) · 4 결과 두 파일은 썼으나 연락처 모양이 남음(두 파일은 남김 — 위 '개인 정보').
+  `--verdict`: 0 `go` · 1 `stop` · 2 파일을 읽을 수 없음. 판정 줄과 다르게 저장된
   `verdict` 는 한 줄 더 알립니다.
 - **알려진 한계.** jev 응답의 `answers[이름].noul` · `model`, Claude 의 404 `status_code`, typesafe 의
   다시 시도 · 제한 시간 정책은 문서와 SDK 소스로 맞춘 모양이고 첫 진짜 실행이 처음 확인합니다.
