@@ -673,6 +673,7 @@ run_loop(cycle, reload, initial, *, on_error, sleep=time.sleep,
   python3 -m tests.mutants writer-no-concern-ignored
   python3 -m tests.mutants writer-no-frame
   python3 -m tests.mutants writer-frame-counts-required-word
+  python3 -m tests.mutants task-table-missing-sentence-ignored
   python3 -m tests.mutants classifier-error-yes
   python3 -m tests.mutants classifier-malformed-yes
   python3 -m tests.mutants classifier-unchecked-probability
@@ -1019,6 +1020,26 @@ if result.draft is not None:
 - 프롬프트 원문(`SYSTEM_PROMPT` · `USER_INSTRUCTION` · `REWRITE_PROMPT` · `WRITE_TOOL` ·
   `CHECK_QUESTIONS` · `CHECK_LABELS`)은 `writer.py` 맨 위에만 있고, Phase 8 의 PROCESS.md 가 옮겨
   적습니다.
+- **과제 문장 대조표 (Phase 6E).** 과제 안내 4쪽 ④ 여덟 문장과 7쪽 평가표 '댓글 품질' 세 문장마다 게시
+  전에 막는 자리와 짝 테스트입니다(문장은 트래커 Phase 6E 인터뷰 질문 1 A 가 옮긴 원문). 스위트
+  테스트(`tests/test_task_table.py`)가 열한 문장이 표에 하나씩 있는지, 표의 규칙 번호 · jev 질문 · 코드
+  검사 · 스스로 건너뜀 · 짝 테스트 이름이 실제로 있는지, 칸이 비지 않았는지 봅니다 — 막는 자리가 없거나
+  일부만 막는 행은 '막지 않음' 칸에 그 몫과 이유를 적습니다. 표는 막는 자리가 있는지만 지키고, 그 검사가
+  잘 판단하는지는 실제 실행이 잽니다.
+
+  | 번호 | 과제 문장 | 프롬프트 규칙 | jev 질문 | 코드 검사 | 스스로 건너뜀 | 짝 테스트 | 막지 않음 |
+  |---|---|---|---|---|---|---|---|
+  | ④-1 | 자막(없으면 제목·설명)과 인기 댓글을 읽고 | 규칙 7 | — | — | — | `tests/test_writer.py::test_transcript_replaces_top_comments` | 자막 — 공식 API 로 남의 영상 자막을 받을 수 없어 `transcript` 는 늘 비어 있습니다(트래커 Phase 6A); 제목 · 설명 · 인기 댓글은 자료 블록으로 넣습니다 |
+  | ④-2 | 영상이 다루는 연애 고민을 먼저 한 줄로 정리 | 규칙 1 | `concern_is_love_worry` | — | `재료에 연애 고민 없음` | `tests/test_writer.py::test_new_questions_below_threshold_rewrite` · `tests/test_writer.py::test_no_concern_answer_skips_without_jev` | — |
+  | ④-3 | 그 고민과 연결해 '비슷한 고민이 있었을 때 연애사주를 봤던 경험'을 담은 댓글 … 자연스럽게 이어지는 형태 | 규칙 2 | `saju_story_fits` · `follows_concern` | — | — | `tests/test_writer.py::test_new_questions_below_threshold_rewrite` · `tests/test_writer.py::test_each_question_can_fail_alone` | — |
+  | ④-4 | 40 ~ 120자 | 규칙 4 | — | `min_chars` · `max_chars` | — | `tests/test_writer.py::test_length_bounds_come_from_config` | — |
+  | ④-5 | 영상 속 구체적인 장면이나 말을 하나 이상 언급 | 규칙 3 | `mentions_scene` | — | `재료에 장면 없음` | `tests/test_writer.py::test_self_check_below_threshold_rewrites_once` · `tests/test_writer.py::test_no_scene_answer_skips_without_jev` | — |
+  | ④-6 | 링크 금지 | 규칙 5 | — | `link_fragment` | — | `tests/test_writer.py::test_link_shapes_are_rejected` | — |
+  | ④-7 | 이전 댓글과 같은 문장 반복 금지 | 규칙 6 | — | `repeated_run` · `shared_frame` | — | `tests/test_writer.py::test_repeated_sentence_inside_new_comment_is_found` · `tests/test_writer.py::test_frame_piece_shared_with_recent_comment_fails` · `tests/test_writer.py::test_six_d_skeleton_pair_is_not_caught` | 두 문장 뼈대만 같은 꼴 — '연애사주' 에 걸친 조각과 6글자보다 짧은 이음은 문장 틀로 세지 않아 프롬프트 규칙 6 에 맡깁니다 |
+  | ④-8 | 영상 내용과 댓글이 잘 맞는지 AI가 다시 검사하는 단계를 두면 가점 | — | `mentions_scene` · `follows_concern` | — | — | `tests/test_writer.py::test_check_request_holds_five_questions_concern_and_draft` | — |
+  | 평가-1 | 영상 속 고민을 정확히 짚고 | 규칙 1 | `concern_is_love_worry` · `follows_concern` | — | `재료에 연애 고민 없음` | `tests/test_writer.py::test_each_question_can_fail_alone` · `tests/test_writer.py::test_no_concern_answer_skips_without_jev` | — |
+  | 평가-2 | 연애사주 경험과 자연스럽게 연결되는가 | 규칙 2 | `saju_story_fits` | — | — | `tests/test_writer.py::test_each_question_can_fail_alone` | — |
+  | 평가-3 | 영상마다 다르게 쓰이는가 | 규칙 6 | — | `repeated_run` · `shared_frame` | — | `tests/test_writer.py::test_frame_piece_shared_with_recent_comment_fails` · `tests/test_writer.py::test_required_word_pieces_are_not_frames` · `tests/test_writer.py::test_six_d_skeleton_pair_is_not_caught` | 두 문장 뼈대만 같은 꼴 — '연애사주' 에 걸친 조각과 6글자보다 짧은 이음은 문장 틀로 세지 않아 프롬프트 규칙 6 에 맡깁니다 |
 
 ## 트리거 판정 — `trigger.py`
 

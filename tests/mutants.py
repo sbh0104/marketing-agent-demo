@@ -506,6 +506,12 @@ MUTANTS: dict[str, tuple[str, str, str, str]] = {
         "if not covered.intersection(range(start, start + FRAME_MIN_CHARS))",
         "if True",
     ),
+    "task-table-missing-sentence-ignored": (
+        "tests.test_task_table",
+        "tests.test_task_table",
+        'problems.append(f"없는 문장: {sentence}")',
+        "None",
+    ),
     "classifier-error-yes": (
         "agent.classifier",
         "tests.test_classifier",
