@@ -31,6 +31,7 @@ from agent.watcher import Watcher
 from agent.writer import TOP_COMMENTS_MAX
 from agent.youtube import QuotaLedger, YouTubeClient
 from tests.test_classifier import response
+from tests.test_config import LOOPBACK_ONLY
 from tests.test_watcher import FakeApi, google_error, search_page, video_item
 from tests.test_writer import reply, tool_reply
 
@@ -1388,6 +1389,41 @@ class TestConfigRejected(RunCase):
             [(1, False), (2, False), (3, True)],
         )
         self.assertEqual(self.modes(), ["live", "live", "test"])
+
+    def test_address_outside_this_computer_on_reload_stops_live_posting(self) -> None:
+        # 7G 질문 2 A — 실행 중 주소를 이 컴퓨터 밖으로 고치면 거절이 이어지는 동안 실제 게시가 멈춥니다(Phase 7 질문 1 A)
+        broken = replace_once(
+            config_text(),
+            "chrome_debug_url: http://localhost:9222\n",
+            f"chrome_debug_url: http://{MARK}.example\\@localhost:9222\n",
+        )
+        self.on_wait[1] = lambda: self.show(B, 2000, channel="UC2")
+        self.start(broken, 2)
+        (error,) = self.lines(Event.ERROR, where="config")
+        self.assertIn(f"{LOOPBACK_ONLY}: chrome_debug_url", error["reason"])
+        self.assertEqual(
+            self.lines(Event.POST, video=B),
+            [{"video": B, "mode": "test", "result": "saved", "reason": "config_rejected"}],
+        )
+        self.assertEqual([entry for entry in self.posted_via if entry[0] == 2], [])
+        self.assertEqual(len(self.chrome.sessions), 1)
+        self.assertEqual(self.modes(), ["live", "test"])
+        self.assertNotIn(MARK, self.log_text())
+
+    def test_address_outside_this_computer_at_start_exits_2(self) -> None:
+        self.write_config(
+            replace_once(
+                config_text(),
+                "chrome_debug_url: http://localhost:9222\n",
+                f"chrome_debug_url: http://user:{MARK}@localhost:9222\n",
+            )
+        )
+        self.assertEqual(self.run_agent("--once"), 2)
+        (error,) = self.lines(Event.ERROR, where="config")
+        self.assertIn(f"{LOOPBACK_ONLY}: chrome_debug_url", error["reason"])
+        self.assertEqual(self.lines(Event.START), [])
+        self.assertEqual(self.chrome.sessions, [])
+        self.assertNotIn(MARK, self.log_text())
 
 
 if __name__ == "__main__":
