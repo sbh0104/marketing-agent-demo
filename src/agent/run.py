@@ -24,17 +24,26 @@ from pathlib import Path
 from typing import Protocol, TextIO
 
 from agent.chrome import ChromeSession
-from agent.classifier import Ask, sdk_ask
+from agent.classifier import Ask, classify, is_error_hold, sdk_ask
 from agent.config import Config, ConfigError, load_config
 from agent.env import EnvError, require_secret
 from agent.guard import allowed_video_ids
 from agent.logbook import Event, Logbook
-from agent.poster import CommentPage, PageError
+from agent.models import Judgement, Verdict, VideoRecord
+from agent.poster import CommentPage, PageError, post_video
 from agent.scheduler import run_loop
 from agent.store import Store, StoreError
+from agent.trigger import judge_trigger, views_per_hour
 from agent.watcher import Watcher
-from agent.writer import ClaudeClient, anthropic_client
-from agent.youtube import QuotaError, QuotaLedger, YouTubeClient
+from agent.writer import (
+    TOP_COMMENTS_MAX,
+    ClaudeClient,
+    SelfCheck,
+    anthropic_client,
+    jev_self_check,
+    write_comment,
+)
+from agent.youtube import QuotaError, QuotaExhausted, QuotaLedger, YouTubeClient, YouTubeError
 
 ROOT = Path(__file__).resolve().parents[2]
 CONFIG_PATH = Path("config.yaml")
@@ -247,11 +256,26 @@ class Pipeline:
         self._cycles = 0
 
     def cycle(self, config: Config) -> None:
+        """run_loop 의 cycle 자리. 탐지의 예외는 run_loop 의 on_error("cycle") 로 갑니다(CYCLE 없음)."""
         self._cycles += 1
+        before = {r.video_id: len(r.view_history) for r in self._store.records()}
         self._watcher.cycle(config)
+        allowed = _allowed(config)
         test_run = is_test_run(self._dry_run, config)
         rejected = self._reloader.rejected
+        check = jev_self_check(self._services.ask, config.classifier.model)
         errors = 0
+        for record in self._store.records():
+            if len(record.view_history) > before.get(record.video_id, 0):
+                if not self._process(
+                    record.video_id,
+                    config,
+                    allowed=allowed,
+                    test_run=test_run,
+                    rejected=rejected,
+                    check=check,
+                ):
+                    errors += 1
         self._logbook.write(
             Event.CYCLE,
             n=self._cycles,
@@ -262,6 +286,164 @@ class Pipeline:
     def on_error(self, where: str, exc: Exception) -> None:
         """run_loop 의 on_error 자리 — 예외 자신의 종류와 메시지만 씁니다(R6)."""
         self._logbook.write(Event.ERROR, where=where, reason=short_reason(exc))
+
+    def _process(
+        self,
+        video_id: str,
+        config: Config,
+        *,
+        allowed: frozenset[str],
+        test_run: bool,
+        rejected: bool,
+        check: SelfCheck,
+    ) -> bool:
+        """영상 하나의 판별 → 타이밍 → 작성 → 게시. 울타리가 예외를 받았으면 False."""
+        stage = STAGE_CLASSIFY
+        try:
+            record = self._classify(video_id, config)
+            stage = STAGE_TRIGGER
+            record = self._time(record, config, allowed)
+            stage = STAGE_WRITE
+            record = self._write(record, config, check)
+            stage = STAGE_POST
+            self._post(record, config, allowed=allowed, test_run=test_run, rejected=rejected)
+        except Exception as exc:  # 영상 하나의 울타리 — BaseException 은 그대로 올라갑니다
+            self._logbook.write(Event.ERROR, where=stage, reason=short_reason(exc), video=video_id)
+            return False
+        return True
+
+    def _classify(self, video_id: str, config: Config) -> VideoRecord:
+        """판별은 영상마다 한 번 — 오류 보류는 저장하지 않아 다음 새 기록 때 다시 묻습니다."""
+        record = self._store.get(video_id)
+        if record is None:
+            raise LookupError(video_id)
+        if record.classification is None:
+            judgement = classify(record, config, self._services.ask, self._clock())
+            self._logbook.write(
+                Event.CLASSIFY, video=video_id, verdict=judgement.verdict, reason=judgement.reason
+            )
+            if is_error_hold(judgement):
+                self._logbook.write(
+                    Event.ERROR, where="classify", reason=judgement.reason, video=video_id
+                )
+                return record
+            record.classification = judgement
+            self._store.put(record)
+        return record
+
+    def _time(self, record: VideoRecord, config: Config, allowed: frozenset[str]) -> VideoRecord:
+        """새 기록마다 다시 판정합니다. 명단 영상은 규칙 판정을 함께 적고 통과합니다."""
+        now = self._clock()
+        rule = judge_trigger(record, config.trigger, now)
+        per_hour = views_per_hour(record)
+        exempt = record.video_id in allowed
+        if exempt:
+            record.trigger = Judgement(Verdict.YES, ALLOWLISTED, now)
+            self._logbook.write(
+                Event.TRIGGER,
+                video=record.video_id,
+                verdict=Verdict.YES,
+                reason=ALLOWLISTED,
+                per_hour=per_hour,
+                rule_verdict=rule.verdict,
+                rule_reason=rule.reason,
+            )
+        else:
+            record.trigger = rule
+            self._logbook.write(
+                Event.TRIGGER,
+                video=record.video_id,
+                verdict=rule.verdict,
+                reason=rule.reason,
+                per_hour=per_hour,
+            )
+        self._store.put(record)
+        return record
+
+    def _write(self, record: VideoRecord, config: Config, check: SelfCheck) -> VideoRecord:
+        """판별 · 타이밍이 모두 yes 이고 댓글이 없을 때만 씁니다. 인기 댓글을 못 받으면 이번엔 쉽니다."""
+        if (
+            record.classification is None
+            or record.classification.verdict is not Verdict.YES
+            or record.trigger is None
+            or record.trigger.verdict is not Verdict.YES
+            or record.comment is not None
+        ):
+            return record
+        now = self._clock()
+        try:
+            comments = self._services.youtube.top_comments(
+                record.video_id, now, config.limits, TOP_COMMENTS_MAX
+            )
+        except QuotaExhausted as exc:
+            self._logbook.write(
+                Event.QUOTA,
+                used=exc.used,
+                limit=exc.limit,
+                call=exc.call,
+                counter=exc.counter,
+                video=record.video_id,
+            )
+            return record
+        except YouTubeError as exc:
+            self._logbook.write(
+                Event.ERROR, where=exc.call, reason=exc.reason, video=record.video_id
+            )
+            return record
+        result = write_comment(
+            record,
+            config=config.comment,
+            claude=self._services.claude,
+            check=check,
+            previous=self._store.comments(),
+            logbook=self._logbook,
+            now=now,
+            transcript="",
+            top_comments=comments or (),
+        )
+        if result.draft is not None:
+            record.comment = result.draft
+            self._store.put(record)
+        return record
+
+    def _post(
+        self,
+        record: VideoRecord,
+        config: Config,
+        *,
+        allowed: frozenset[str],
+        test_run: bool,
+        rejected: bool,
+    ) -> None:
+        """댓글이 있으면 게시 단계로 — 명단 영상에만 게시마다 새 크롬 연결을 넘기고 끝나면 놓습니다."""
+        if record.comment is None:
+            return
+        if record.video_id not in allowed:
+            post_video(
+                record,
+                config=config,
+                dry_run=test_run,
+                store=self._store,
+                logbook=self._logbook,
+                open_page=_chrome_withheld,
+                clock=self._clock,
+                repo_root=self._repo_root,
+            )
+            return
+        session = self._services.chrome(config.chrome_debug_url)
+        try:
+            post_video(
+                record,
+                config=config,
+                dry_run=test_run,
+                store=self._store,
+                logbook=self._logbook,
+                open_page=session.new_page,
+                clock=self._clock,
+                repo_root=self._repo_root,
+            )
+        finally:
+            session.close()
 
 
 def run_agent(

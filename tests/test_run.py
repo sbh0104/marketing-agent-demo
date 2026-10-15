@@ -20,12 +20,15 @@ from types import SimpleNamespace
 from unittest import mock
 
 import agent.run as run
-from agent.classifier import MATCH_ID
+from agent.classifier import MATCH_ID, JevError
 from agent.config import ConfigError, load_config
+from agent.guard import decide_post
 from agent.logbook import Event, Logbook, read_log
+from agent.models import Judgement, Verdict, VideoRecord, ViewSample
 from agent.scheduler import run_loop
 from agent.store import Store
 from agent.watcher import Watcher
+from agent.writer import TOP_COMMENTS_MAX
 from agent.youtube import QuotaLedger, YouTubeClient
 from tests.test_classifier import response
 from tests.test_watcher import FakeApi, google_error, search_page, video_item
@@ -255,6 +258,39 @@ def raise_marked(*_args: object, **_kwargs: object) -> None:
         raise RuntimeError("boom") from cause
 
 
+class StrFails(Exception):
+    """str() 이 터지는 예외 — 울타리의 이유는 종류 이름만 남아야 합니다."""
+
+    def __str__(self) -> str:
+        raise RuntimeError("str 이 터졌습니다")
+
+
+def raise_for(video_id: str, error: BaseException | None, real: object) -> object:
+    """단계 함수 자리 — 그 영상에서는 error 를(None 이면 R6 표본을) 내고, 나머지는 진짜를 부릅니다."""
+
+    def stage(record: object, *args: object, **kwargs: object) -> object:
+        if record.video_id == video_id:
+            if error is None:
+                raise_marked()
+            raise error
+        return real(record, *args, **kwargs)
+
+    return stage
+
+
+def watch(video_id: str) -> str:
+    return f"https://www.youtube.com/watch?v={video_id}"
+
+
+# 단계 함수 이름(agent.run 의 이름) → 울타리 줄의 where
+STAGES = (
+    ("classify", "run.classify"),
+    ("judge_trigger", "run.trigger"),
+    ("write_comment", "run.write"),
+    ("post_video", "run.post"),
+)
+
+
 class RunCase(unittest.TestCase):
     """임시 저장소 뿌리 하나 — config.yaml · data/ · logs/ 와 가짜 서비스."""
 
@@ -296,6 +332,20 @@ class RunCase(unittest.TestCase):
     def find(self, *video_ids: str) -> None:
         """다음 검색이 이 영상들을 찾습니다."""
         self.api.pages[(KEYWORD, None)] = search_page(list(video_ids))
+
+    def seed_quota(self, units: int) -> None:
+        """한 시간 전에 units 만큼 쓴 쿼터 장부로 서비스를 다시 만듭니다."""
+        path = self.root / "data" / "quota.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        entry = {"at": (T0 - HOUR).isoformat(), "call": "videos.list", "units": units}
+        path.write_text(json.dumps({"calls": [entry], "schema_version": 1}), encoding="utf-8")
+        youtube = YouTubeClient("TESTKEY", QuotaLedger(path), self.api)
+        self.services = dataclasses.replace(self.services, youtube=youtube)
+
+    def patch_stage(self, name: str, error: BaseException | None, video_id: str = A) -> object:
+        """agent.run 의 단계 함수 하나가 그 영상에서만 error 를 내게 합니다."""
+        real = getattr(run, name)
+        return mock.patch.object(run, name, side_effect=raise_for(video_id, error, real))
 
     def pipeline(self, *, dry_run: bool = False, reloader: object = None) -> run.Pipeline:
         self.store = Store(self.root / "data" / "videos.json")
@@ -353,6 +403,14 @@ class RunCase(unittest.TestCase):
 
     def log_text(self) -> str:
         return self.log_path.read_text(encoding="utf-8") if self.log_path.exists() else ""
+
+    def record(self, video_id: str) -> object:
+        record = Store(self.root / "data" / "videos.json").get(video_id)
+        self.assertIsNotNone(record, video_id)
+        return record
+
+    def posted_live(self) -> list[str]:
+        return [f["video"] for f in self.lines(Event.POST, mode="live", result="posted")]
 
 
 class TestLock(RunCase):
@@ -546,10 +604,64 @@ class TestOneWorker(unittest.TestCase):
         self.assertEqual([name for name in names if name.split(".")[0] in banned], [])
 
 
-class TestFence(RunCase):
-    def test_r6_error_line_has_no_context_or_traceback(self) -> None:
-        # on_error 쪽 — 탐지가 낸 예외가 run_loop 의 on_error("cycle") 로 갑니다
+class TwoListedCase(RunCase):
+    """명단 영상 둘(A · B, 다른 채널)이 첫 사이클에 나타나 모두 대상이 되는 자리."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.show(A, 2000, channel="UC1")
+        self.show(B, 2000, channel="UC2")
+
+    def fenced(self, video_id: str = A) -> list[dict[str, str]]:
+        return [fields for fields in self.lines(Event.ERROR) if fields.get("video") == video_id]
+
+    def cycle_errors(self) -> list[str]:
+        return [fields["errors"] for fields in self.lines(Event.CYCLE)]
+
+
+class TestFence(TwoListedCase):
+    def test_exception_in_each_stage_moves_to_next_video(self) -> None:
+        for name, where in STAGES:
+            with self.subTest(stage=where):
+                self.setUp()
+                with self.patch_stage(name, ValueError("단계가 터졌습니다")):
+                    self.cycle(self.pipeline())
+                (line,) = self.fenced()
+                self.assertEqual(line["where"], where)
+                self.assertEqual(line["reason"], "ValueError: 단계가 터졌습니다")
+                self.assertEqual(self.lines(Event.ERROR, where="classify"), [])
+                self.assertEqual(self.posted_live(), [B])
+                self.assertEqual(
+                    self.lines(Event.CYCLE), [{"n": "1", "errors": "1", "mode": "live"}]
+                )
+
+    def test_keyboard_interrupt_propagates(self) -> None:
         pipeline = self.pipeline()
+        with self.patch_stage("classify", KeyboardInterrupt()):
+            with self.assertRaises(KeyboardInterrupt):
+                pipeline.cycle(self.load())
+        self.assertEqual(self.lines(Event.ERROR), [])
+        self.assertEqual(self.lines(Event.CLASSIFY), [])
+        self.assertEqual(self.jev.asked(B), 0)
+        self.assertEqual(self.lines(Event.CYCLE), [])
+
+    def test_run_agent_interrupt_writes_stop_interrupted(self) -> None:
+        with self.patch_stage("classify", KeyboardInterrupt()):
+            code = self.run_agent("--once")
+        self.assertEqual(code, 130)
+        self.assertEqual(self.lines(Event.STOP), [{"reason": "interrupted"}])
+        self.assertEqual(self.lines(Event.CYCLE), [])
+
+    def test_r6_error_line_has_no_context_or_traceback(self) -> None:
+        # 단계 쪽 — 판별에서 난 예외를 울타리가 받습니다
+        pipeline = self.pipeline()
+        with self.patch_stage("classify", None):
+            self.cycle(pipeline)
+        self.assertEqual(
+            self.fenced(), [{"where": "run.classify", "reason": "RuntimeError: boom", "video": A}]
+        )
+        self.assertEqual(self.posted_live(), [B])
+        # on_error 쪽 — 탐지가 낸 예외가 run_loop 의 on_error("cycle") 로 갑니다
         with mock.patch.object(Watcher, "cycle", side_effect=raise_marked):
             self.loop(pipeline, self.load(), 1, self.clock.sleep)
         self.assertEqual(
@@ -557,6 +669,443 @@ class TestFence(RunCase):
             [{"where": "cycle", "reason": "RuntimeError: boom"}],
         )
         self.assertNotIn(MARK, self.log_text())
+
+    def test_unicode_encode_error_is_fenced(self) -> None:
+        error = UnicodeEncodeError("utf-8", "\ud800", 0, 1, "surrogates not allowed")
+        with self.patch_stage("classify", error):
+            self.cycle(self.pipeline())
+        read_log(self.log_path)  # 모든 줄이 UTF-8 로 풀리고 parse_line 을 지납니다
+        self.assertEqual(
+            self.fenced(),
+            [
+                {
+                    "where": "run.classify",
+                    "reason": "UnicodeEncodeError: 'utf-8' codec can't encode character"
+                    " '\\ud800' in position 0: surrogates not allowed",
+                    "video": A,
+                }
+            ],
+        )
+        self.assertEqual(self.posted_live(), [B])
+        self.assertEqual(self.cycle_errors(), ["1"])
+
+    def test_reason_survives_raising_str(self) -> None:
+        with self.patch_stage("judge_trigger", StrFails()):
+            self.cycle(self.pipeline())
+        self.assertEqual(
+            self.fenced(), [{"where": "run.trigger", "reason": "StrFails", "video": A}]
+        )
+        self.assertEqual(self.posted_live(), [B])
+        self.assertEqual(self.cycle_errors(), ["1"])
+
+    def test_fenced_video_retried_next_cycle(self) -> None:
+        pipeline = self.pipeline()
+        with self.patch_stage("write_comment", ValueError("작성기가 터졌습니다")):
+            self.cycle(pipeline)
+        self.assertIsNone(self.record(A).comment)
+        self.assertEqual(self.claude.user_messages(A), [])
+        self.cycle(pipeline)
+        self.assertEqual(len(self.claude.user_messages(A)), 1)
+        self.assertIsNotNone(self.record(A).comment)
+        self.assertEqual(self.posted_live(), [B, A])
+        self.assertEqual(self.cycle_errors(), ["1", "0"])
+
+    def test_stage_reported_errors_not_counted(self) -> None:
+        self.claude.error = RuntimeError("Claude 가 답하지 않습니다")
+        self.cycle(self.pipeline())
+        where = [fields["video"] for fields in self.lines(Event.ERROR, where="writer.claude")]
+        self.assertEqual(where, [A, B])
+        self.assertEqual(self.cycle_errors(), ["0"])
+
+
+class TestChrome(TwoListedCase):
+    def test_new_session_per_allowlisted_post_and_closed(self) -> None:
+        config = self.load()
+        self.cycle(self.pipeline(), config)
+        self.assertEqual(self.posted_live(), [A, B])
+        self.assertEqual(self.chrome.submits, [watch(A), watch(B)])
+        first, second = self.chrome.sessions
+        self.assertIsNot(first, second)
+        self.assertEqual([first.debug_url, second.debug_url], [config.chrome_debug_url] * 2)
+        self.assertEqual([len(first.pages), len(second.pages)], [1, 1])
+        self.assertEqual([first.closes, second.closes], [1, 1])
+
+    def test_session_closed_when_post_raises(self) -> None:
+        with self.patch_stage("post_video", ValueError("게시가 터졌습니다")):
+            self.cycle(self.pipeline())
+        self.assertEqual([session.closes for session in self.chrome.sessions], [1, 1])
+        self.assertEqual([fields["where"] for fields in self.fenced()], ["run.post"])
+        self.assertEqual(self.posted_live(), [B])
+
+    def test_chrome_unreachable_stops_only_that_post(self) -> None:
+        self.chrome.unreachable = 1
+        self.cycle(self.pipeline())
+        (stopped,) = self.lines(Event.ERROR, where="poster")
+        self.assertEqual((stopped["video"], stopped["reason"]), (A, "chrome_unreachable"))
+        self.assertEqual(self.record(A).attempts, [])
+        self.assertEqual(self.posted_live(), [B])
+        self.assertEqual([session.closes for session in self.chrome.sessions], [1, 1])
+        self.assertEqual(self.cycle_errors(), ["0"])
+
+    def test_out_of_list_never_gets_chrome(self) -> None:
+        for dry_run in (False, True):
+            with self.subTest(dry_run=dry_run):
+                self.setUp()
+                self.write_config(allowed=(D,))
+                self.show(C, 2000, channel="UC3")
+                self.find(C)
+                self.cycle(self.pipeline(dry_run=dry_run))
+                self.assertEqual(self.chrome.sessions, [])
+                saved = {"video": C, "mode": "test", "result": "saved"}
+                self.assertEqual(self.lines(Event.POST), [{**saved, "reason": "not_in_allowlist"}])
+
+
+class TestRunMode(RunCase):
+    COMBINATIONS = ((False, False), (True, False), (False, True), (True, True))
+
+    def test_four_combinations_either_turns_test_run_on(self) -> None:
+        for dry_run, test_run in self.COMBINATIONS:
+            with self.subTest(dry_run=dry_run, test_run=test_run):
+                self.setUp()
+                self.write_config(test_run=test_run)
+                config = self.load()
+                expected = dry_run or test_run
+                self.assertIs(run.is_test_run(dry_run, config), expected)
+                decision = decide_post(A, config.allowed_videos, run.is_test_run(dry_run, config))
+                want = (False, "dry_run") if expected else (True, "allowlisted")
+                self.assertEqual((decision.live, decision.reason), want)
+                self.show(A, 2000)
+                with mock.patch.object(run, "post_video") as post:
+                    self.cycle(self.pipeline(dry_run=dry_run), config)
+                (call,) = post.call_args_list
+                self.assertIs(call.kwargs["dry_run"], expected)
+                mode = "test" if expected else "live"
+                self.assertEqual(
+                    self.lines(Event.CYCLE), [{"n": "1", "errors": "0", "mode": mode}]
+                )
+        # 둘 다 꺼짐 — 진짜 게시 단계로 끝까지, 한 번 누릅니다(Phase 7F 가 손대지 않는 길)
+        self.setUp()
+        self.show(A, 2000)
+        self.cycle(self.pipeline())
+        self.assertEqual(self.chrome.submits, [watch(A)])
+        self.assertEqual(
+            self.lines(Event.POST, video=A, result="posted"),
+            [{"video": A, "mode": "live", "result": "posted", "reason": "allowlisted"}],
+        )
+
+    def test_config_cannot_turn_dry_run_off(self) -> None:
+        config = self.load()
+        self.assertIs(config.test_run, False)
+        self.assertIs(run.is_test_run(True, config), True)
+        self.show(A, 2000)
+        with mock.patch.object(run, "post_video") as post:
+            code = self.run_agent("--dry-run", "--once")
+        self.assertEqual(code, 0)
+        (start,) = self.lines(Event.START)
+        self.assertEqual(
+            (start["mode"], start["dry_run"], start["test_run"]), ("test", "true", "false")
+        )
+        self.assertIs(post.call_args.kwargs["dry_run"], True)
+        self.assertEqual(self.lines(Event.CYCLE), [{"n": "1", "errors": "0", "mode": "test"}])
+        self.assertEqual(self.chrome.submits, [])
+
+    def test_test_run_hands_listed_video_a_fresh_session_opener(self) -> None:
+        self.write_config(test_run=True)
+        config = self.load()
+        self.show(A, 2000)
+        seen: list[tuple[str, object, object, int]] = []
+
+        def post(record: object, **kwargs: object) -> None:
+            opener = kwargs["open_page"]
+            seen.append((record.video_id, kwargs["dry_run"], opener, opener.__self__.closes))
+
+        with mock.patch.object(run, "post_video", side_effect=post):
+            self.cycle(self.pipeline(), config)
+        (session,) = self.chrome.sessions
+        ((video_id, dry_run, opener, closes_during_post),) = seen
+        self.assertEqual(video_id, A)
+        self.assertIs(dry_run, True)
+        self.assertEqual(session.debug_url, config.chrome_debug_url)
+        self.assertEqual(opener, session.new_page)
+        self.assertEqual((closes_during_post, session.closes), (0, 1))
+
+    def test_test_run_never_clicks(self) -> None:
+        for dry_run, test_run in self.COMBINATIONS[1:]:
+            with self.subTest(dry_run=dry_run, test_run=test_run):
+                self.setUp()
+                self.write_config(test_run=test_run)
+                self.show(A, 2000, channel="UC1")
+                self.show(B, 2000, channel="UC2")
+                self.cycle(self.pipeline(dry_run=dry_run))
+                self.assertEqual(self.chrome.submits, [])
+                self.assertEqual(self.lines(Event.POST, mode="live"), [])
+
+
+class TestOperatingRules(RunCase):
+    def test_one_comment_per_video(self) -> None:
+        config = self.load()
+        self.show(A, 2000)
+        pipeline = self.pipeline()
+        self.cycle(pipeline, config)
+        self.cycle(pipeline, config)
+        self.assertEqual(self.chrome.submits, [watch(A)])
+        self.assertEqual(len(self.claude.user_messages(A)), 1)
+        expected = self.store.check_post(A, "UC1", self.clock.now, config.limits, live=True)
+        self.assertEqual(
+            self.lines(Event.SKIP, video=A), [{"video": A, "reason": expected.reason}]
+        )
+
+    def test_daily_cap(self) -> None:
+        self.write_config(daily_max_comments=1)
+        config = self.load()
+        self.show(A, 2000, channel="UC1")
+        self.show(B, 2000, channel="UC2")
+        self.cycle(self.pipeline(), config)
+        self.assertEqual(self.posted_live(), [A])
+        expected = self.store.check_post(B, "UC2", self.clock.now, config.limits, live=True)
+        self.assertEqual(expected.reason, "daily_cap")
+        self.assertEqual(
+            self.lines(Event.SKIP, video=B), [{"video": B, "reason": expected.reason}]
+        )
+        self.assertEqual(self.record(B).attempts, [])
+
+    def test_channel_cooldown(self) -> None:
+        config = self.load()
+        self.show(A, 2000, channel="UC1")
+        self.show(B, 2000, channel="UC1")
+        self.cycle(self.pipeline(), config)
+        self.assertEqual(self.posted_live(), [A])
+        expected = self.store.check_post(B, "UC1", self.clock.now, config.limits, live=True)
+        self.assertEqual(expected.reason, "channel_cooldown")
+        self.assertEqual(
+            self.lines(Event.SKIP, video=B), [{"video": B, "reason": expected.reason}]
+        )
+        self.assertEqual(self.record(B).attempts, [])
+
+    def test_allowlist_enforced_in_log(self) -> None:
+        self.write_config(allowed=(A,))
+        self.show(A, 2000, channel="UC1")
+        self.show(C, 2000, channel="UC3")
+        self.show(D, 2000, channel="UC4")
+        self.find(C, D)
+        pipeline = self.pipeline()
+        self.cycle(pipeline)
+        self.cycle(pipeline)
+        listed = run._allowed(self.load())
+        posts = [fields for _, event, fields in read_log(self.log_path) if event is Event.POST]
+        live = [fields["video"] for fields in posts if fields["mode"] == "live"]
+        self.assertEqual(live, [A, A])  # reserved → posted
+        self.assertLessEqual(set(live), listed)
+        self.assertEqual(
+            [(fields["video"], fields["reason"]) for fields in posts if fields["mode"] == "test"],
+            [(C, "not_in_allowlist"), (D, "not_in_allowlist")],
+        )
+
+
+class TestStages(RunCase):
+    def bump(self, video_id: str, views: int) -> None:
+        """다음 videos.list 의 조회수만 바꿉니다 — 업로드 시각은 그대로."""
+        self.api.videos[video_id]["statistics"]["viewCount"] = str(views)
+
+    def test_classified_once(self) -> None:
+        self.show(A, 2000)
+        pipeline = self.pipeline()
+        self.cycle(pipeline)
+        self.cycle(pipeline)
+        self.assertEqual(self.jev.asked(A), 1)
+        self.assertEqual(len(self.lines(Event.CLASSIFY, video=A)), 1)
+        self.assertIs(self.record(A).classification.verdict, Verdict.YES)
+
+    def test_classify_hold_stored_not_asked_again(self) -> None:
+        self.jev.classify[A] = response(noul=0.5)
+        self.show(A, 2000)
+        pipeline = self.pipeline()
+        self.cycle(pipeline)
+        self.cycle(pipeline)
+        self.assertEqual(self.jev.asked(A), 1)
+        classification = self.record(A).classification
+        self.assertIs(classification.verdict, Verdict.HOLD)
+        self.assertTrue(classification.reason.startswith("확신 낮음"), classification)
+        self.assertEqual(self.lines(Event.ERROR, where="classify"), [])
+        self.assertEqual(self.claude.user_messages(A), [])
+
+    def test_error_hold_not_stored_and_asked_again_next_cycle(self) -> None:
+        self.jev.classify[A] = JevError("TypeSafeError 503")
+        self.show(A, 2000)
+        pipeline = self.pipeline()
+        self.cycle(pipeline)
+        (line,) = self.lines(Event.CLASSIFY, video=A)
+        self.assertEqual((line["verdict"], line["reason"]), ("hold", "API 오류: TypeSafeError 503"))
+        self.assertEqual(
+            self.lines(Event.ERROR, where="classify"),
+            [{"where": "classify", "reason": "API 오류: TypeSafeError 503", "video": A}],
+        )
+        self.assertIsNone(self.record(A).classification)
+        del self.jev.classify[A]
+        self.cycle(pipeline)
+        self.assertEqual(self.jev.asked(A), 2)
+        self.assertIs(self.record(A).classification.verdict, Verdict.YES)
+        self.assertEqual([fields["errors"] for fields in self.lines(Event.CYCLE)], ["0", "0"])
+
+    def test_trigger_rejudged_each_new_sample_with_per_hour(self) -> None:
+        self.show(C, 2000, channel="UC3")
+        self.find(C)
+        pipeline = self.pipeline()
+        self.cycle(pipeline)
+        self.bump(C, 2100)
+        self.cycle(pipeline)
+        record = self.record(C)
+        first, second = record.view_history
+
+        def rate(gained: int, start: datetime, end: datetime) -> str:
+            return f"{gained * 3_600_000_000 / ((end - start) // timedelta(microseconds=1)):.2f}"
+
+        lines = self.lines(Event.TRIGGER, video=C)
+        self.assertEqual(
+            [(fields["verdict"], fields["reason"], fields["per_hour"]) for fields in lines],
+            [
+                ("yes", "views_per_hour", rate(2000, record.published_at, first.at)),
+                ("no", "too_slow", rate(100, first.at, second.at)),
+            ],
+        )
+        self.assertNotIn("rule_verdict", lines[0])
+        self.assertEqual((record.trigger.verdict, record.trigger.reason), (Verdict.NO, "too_slow"))
+
+    def test_allowlisted_timing_exempt_with_rule_verdict(self) -> None:
+        cases = (
+            ("yes", "views_per_hour", 2000, 2 * HOUR),
+            ("no", "views_below_min", 500, 2 * HOUR),
+            ("hold", "too_few_samples", 2000, -HOUR),  # 미래 업로드 — 첫 표본을 잴 수 없음
+        )
+        for verdict, reason, views, age in cases:
+            with self.subTest(rule=verdict):
+                self.setUp()
+                self.show(A, views, channel="UC1", age=age)
+                self.show(C, views, channel="UC3", age=age)
+                self.find(C)
+                self.cycle(self.pipeline())
+                (listed,) = self.lines(Event.TRIGGER, video=A)
+                self.assertEqual(
+                    listed,
+                    {
+                        "video": A,
+                        "verdict": "yes",
+                        "reason": "allowlisted",
+                        "per_hour": listed["per_hour"],
+                        "rule_verdict": verdict,
+                        "rule_reason": reason,
+                    },
+                )
+                (twin,) = self.lines(Event.TRIGGER, video=C)
+                self.assertEqual(
+                    twin,
+                    {
+                        "video": C,
+                        "verdict": verdict,
+                        "reason": reason,
+                        "per_hour": listed["per_hour"],
+                    },
+                )
+                self.assertEqual(
+                    (self.record(A).trigger.verdict, self.record(A).trigger.reason),
+                    (Verdict.YES, "allowlisted"),
+                )
+                self.assertEqual(len(self.claude.user_messages(A)), 1)
+                self.assertEqual(len(self.claude.user_messages(C)), 1 if verdict == "yes" else 0)
+
+    def test_top_comments_passed_to_writer_transcript_empty(self) -> None:
+        self.api.comments[A] = ["답장 세 시간 장면 공감해요", "둘째 인기 댓글"]
+        self.show(A, 2000)
+        self.cycle(self.pipeline())
+        (message,) = self.claude.user_messages(A)
+        self.assertIn(
+            "<top_comments>\n<comment>답장 세 시간 장면 공감해요</comment>\n"
+            "<comment>둘째 인기 댓글</comment>\n</top_comments>",
+            message,
+        )
+        self.assertNotIn("<transcript>", message)
+        (query,) = [query for endpoint, query in self.api.calls if endpoint == "commentThreads"]
+        self.assertEqual((query["videoId"], query["maxResults"]), (A, str(TOP_COMMENTS_MAX)))
+
+    def test_comments_disabled_writes_with_empty_top_comments(self) -> None:
+        self.api.comments[A] = 403
+        self.show(A, 2000)
+        self.cycle(self.pipeline())
+        (message,) = self.claude.user_messages(A)
+        self.assertNotIn("<top_comments>", message)
+        self.assertIsNotNone(self.record(A).comment)
+        self.assertEqual(self.lines(Event.ERROR), [])
+
+    def test_top_comments_failure_skips_writing(self) -> None:
+        for case in ("http", "quota"):
+            with self.subTest(case=case):
+                self.setUp()
+                if case == "http":
+                    self.api.comments[A] = 500
+                else:
+                    self.seed_quota(9999)  # 검색은 막히고 videos.list 한 번만 남음
+                self.show(A, 2000)
+                self.cycle(self.pipeline())
+                self.assertEqual(self.claude.calls, [])
+                self.assertIsNone(self.record(A).comment)
+                if case == "http":
+                    (failed,) = self.lines(Event.ERROR, video=A)
+                    self.assertEqual(
+                        (failed["where"], failed["reason"]),
+                        ("commentThreads.list", "HTTP 500 backendError"),
+                    )
+                else:
+                    (held,) = self.lines(Event.QUOTA, video=A)
+                    self.assertEqual(
+                        (held["call"], held["counter"]), ("commentThreads.list", "units")
+                    )
+                self.assertEqual([fields["errors"] for fields in self.lines(Event.CYCLE)], ["0"])
+
+    def test_previous_comments_from_store(self) -> None:
+        self.show(A, 2000)
+        pipeline = self.pipeline()
+        self.cycle(pipeline)
+        first = self.record(A).comment.text
+        self.show(B, 2000, channel="UC2")
+        self.cycle(pipeline)
+        (message,) = self.claude.user_messages(B)
+        self.assertIn(
+            f"<my_previous_comments>\n<comment>{first}</comment>\n</my_previous_comments>", message
+        )
+
+    def test_out_of_list_comment_kept_in_store_and_log(self) -> None:
+        self.show(C, 2000, channel="UC3")
+        self.find(C)
+        self.cycle(self.pipeline())
+        text = self.record(C).comment.text
+        (line,) = self.lines(Event.COMMENT, video=C)
+        self.assertEqual((line["concern"], line["text"]), (CONCERN, text))
+        self.assertEqual(
+            self.lines(Event.POST, video=C),
+            [{"video": C, "mode": "test", "result": "saved", "reason": "not_in_allowlist"}],
+        )
+
+    def test_untracked_old_record_not_rejudged(self) -> None:
+        pipeline = self.pipeline()
+        judged = T0 - 12 * HOUR
+        old = VideoRecord(
+            video_id=D,
+            channel_id="UC4",
+            title=title_of(D),
+            description="",
+            published_at=T0 - 13 * HOUR,
+            detected_at=judged,
+            keyword=KEYWORD,
+            view_history=[ViewSample(judged, 800)],
+            classification=Judgement(Verdict.YES, "연애 고민 상담", judged),
+            trigger=Judgement(Verdict.NO, "views_below_min", judged),
+        )
+        self.store.put(old)
+        self.show(D, 3000, channel="UC4", age=13 * HOUR)
+        self.cycle(pipeline)
+        self.assertNotIn(D, self.api.sampled())
+        self.assertEqual(self.lines(Event.TRIGGER, video=D), [])
+        self.assertEqual(self.record(D), old)
 
 
 if __name__ == "__main__":
