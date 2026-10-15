@@ -1189,3 +1189,35 @@
 - source: adw/phase-8-submission-docs
 - tag: plain
 - status: open
+
+### H-146 — 늦은 로그 줄의 기준인 "저장소의 마지막 결과"에 판별 · 타이밍 시각도 넣을지 정하기. 지금은 댓글 · 시도가 없는 영상이면 지난 사이클의 `ERROR where=classify` · `SKIP unavailable` 같은 줄이 이유 배지로 계속 남음(1회차 판별 오류 보류, 2회차 `no` 판별 → "댓글 안 씀" + "판별 단계 오류")
+- project: marketing-agent-demo
+- when: 2026-10-16 · plans/interview-marketing-agent.md#phase-7d
+- from: ship-report.md § Human checks — .adw/ship-report.md § Risks
+- source: adw/phase-7d-run-report-html
+- tag: sensitive: tracker decision · confirmed 2026-10-16
+- status: confirmed
+
+### H-147 — 색을 정하지 않은 이름표 표본 셋 정하기: `invalid_item`(watcher 의 저장된 영상 SKIP, 이유 배지로 닿음) · `page_mismatch`(test/saved 시도 reason, 결과 배지로 닿음) · `search.list`(`where_label`, `video=` 가 없어 행에 닿지 않음). 지금은 모두 "기타 — 로그 참고"
+- project: marketing-agent-demo
+- when: 2026-10-16 · plans/interview-marketing-agent.md#phase-7d
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-7d-run-report-html
+- tag: sensitive: tracker decision · confirmed 2026-10-16
+- status: confirmed
+
+### H-148 — 테스트 실행에서 저장만 된 영상을 나중에 `allowed_videos` 에 넣으면 다음 테스트 실행에서 리허설할지 정하기. 지금은 저장소 `_is_duplicate(live=False)` 때문에 `SKIP duplicate_video` 가 되고, 화면은 그 영상의 옛 시도("허용 목록 밖이라 게시하지 않음" + 그 시각)를 보임(poster · store 의 동작)
+- project: marketing-agent-demo
+- when: 2026-10-16 · plans/interview-marketing-agent.md#phase-7d
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-7d-run-report-html
+- tag: sensitive: tracker decision · confirmed 2026-10-16
+- status: confirmed
+
+### H-149 — 진짜 `python3 -m agent.run --once --dry-run`(명단 영상 하나 · 명단 밖 영상 하나) 뒤 `data/report.html` 을 브라우저로 열어, "리허설 — 게시 버튼 앞에서 멈춤" · "허용 목록 밖이라 게시하지 않음" 과 그 시각이 맞게 읽히는지, 한글과 표 배치가 깨지지 않는지 보기(verify-plan 의 manual 행과 같은 일)
+- project: marketing-agent-demo
+- when: 2026-10-16 · plans/interview-marketing-agent.md#phase-7d
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-7d-run-report-html
+- tag: plain
+- status: open
