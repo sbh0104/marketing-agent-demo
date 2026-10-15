@@ -4,7 +4,7 @@
 
 agent.guard / agent.store / agent.config / agent.scheduler / agent.logbook / agent.poster /
 agent.chrome / agent.classifier / agent.writer / agent.youtube / agent.watcher / agent.run /
-tests.live_check 의 소스에서 정확한 글자 하나를 바꿔 메모리에서만 모듈을 다시
+agent.report / tests.live_check 의 소스에서 정확한 글자 하나를 바꿔 메모리에서만 모듈을 다시
 만들고(파일은 건드리지 않음), 해당 테스트 모듈을 돌립니다. agent.* 모듈은 src/ 에서,
 tests.* 모듈은 저장소 뿌리에서 읽습니다. 종료 코드 1 은 테스트가
 망가짐을 잡았다는 뜻, 2 는 이름을 모르거나 바꿀 글자가 정확히 한 번 나오지 않았다는
@@ -1057,6 +1057,42 @@ MUTANTS: dict[str, tuple[str, str, str, str]] = {
         "tests.test_run",
         "except Exception:  # __str__ 이 터져도",
         "except ZeroDivisionError:  # __str__ 이 터져도",
+    ),
+    "report-late-filter-off": (
+        "agent.report",
+        "tests.test_report",
+        "(floor is None or line[0] >= floor)",
+        "True",
+    ),
+    "report-raw-reason": (
+        "agent.report",
+        "tests.test_report",
+        "return OTHER",
+        "return reason",
+    ),
+    "report-unescaped": (
+        "agent.report",
+        "tests.test_report",
+        "html.escape(part, quote=True)",
+        "part",
+    ),
+    "report-prefix-anywhere": (
+        "agent.report",
+        "tests.test_report",
+        "if reason.startswith(prefix):",
+        "if prefix in reason:",
+    ),
+    "run-report-fence-narrow": (
+        "agent.run",
+        "tests.test_run",
+        "except Exception as exc:  # 화면 실패는",
+        "except ZeroDivisionError as exc:  # 화면 실패는",
+    ),
+    "run-report-log-degrade-silent": (
+        "agent.run",
+        "tests.test_run",
+        "events = None",
+        "events = []",
     ),
 }
 
