@@ -51,10 +51,15 @@ def _string(value: object, name: str) -> str:
     return _clean(value)
 
 
+def _shown(value: object) -> str:
+    # 글자가 아닌 값은 종류 이름만 — 수만 단 중첩 목록의 repr 은 RecursionError 를 냅니다 (계약 '탐지 · 조회수 추적' 절)
+    return f"{value!r:.40}" if isinstance(value, str) else type(value).__name__
+
+
 def _published(value: object) -> datetime:
     # UTC `Z` 모양만 — 다른 시간대 표기는 날짜 끝에서 Store.save 를 넘치게 할 수 있습니다 (계약 '탐지 · 조회수 추적' 절)
     if not isinstance(value, str) or not _PUBLISHED_RE.fullmatch(value):
-        raise ValueError(f"snippet.publishedAt: UTC 'YYYY-MM-DDTHH:MM:SSZ' 모양이 아닙니다: {value!r:.40}")
+        raise ValueError(f"snippet.publishedAt: UTC 'YYYY-MM-DDTHH:MM:SSZ' 모양이 아닙니다: {_shown(value)}")
     try:
         parsed = datetime.strptime(value[:19], "%Y-%m-%dT%H:%M:%S")
     except ValueError:
@@ -66,7 +71,7 @@ def _views(item: Mapping[str, object]) -> int:
     statistics = _mapping(item.get("statistics"), "statistics")
     value = statistics.get("viewCount")
     if not (isinstance(value, str) and _COUNT_RE.fullmatch(value)):
-        raise ValueError(f"statistics.viewCount: 0 이상의 10진수 글자가 아닙니다: {value!r:.40}")
+        raise ValueError(f"statistics.viewCount: 0 이상의 10진수 글자가 아닙니다: {_shown(value)}")
     return int(value)
 
 

@@ -398,6 +398,12 @@ MUTANTS: dict[str, tuple[str, str, str, str]] = {
         "if not isinstance(value, str) or not _PUBLISHED_RE.fullmatch(value):",
         "if not isinstance(value, str):",
     ),
+    "watcher-repr-any-value": (
+        "agent.watcher",
+        "tests.test_watcher",
+        "else type(value).__name__",
+        'else f"{value!r:.40}"',
+    ),
     "writer-hardcoded-model": (
         "agent.writer",
         "tests.test_writer",
