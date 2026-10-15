@@ -56,7 +56,8 @@ class HoldTests(unittest.TestCase):
         self.assertEqual(judged(record, AT), ("hold", "too_few_samples"))
 
     def test_single_sample_holds_even_when_other_conditions_fail(self) -> None:
-        record = video((20 * H, 6000), published_at=T0 + 20 * H)
+        # 나이 0 표본(잴 시간 없음)을 18시간 뒤에 판정 — 조회수 상한 · too_old 도 함께 걸립니다
+        record = video((2 * H, 6000), published_at=T0 + 2 * H)
         self.assertEqual(judged(record, 20 * H), ("hold", "too_few_samples"))
 
     def test_same_instant_samples_count_as_one(self) -> None:
