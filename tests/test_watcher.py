@@ -231,6 +231,30 @@ def skip(video: str, reason: str, call: str, **extra: str) -> tuple[Event, Field
     return Event.SKIP, fields
 
 
+TOKEN_REASON = "HTTP 200 nextPageToken 이 영문자 · 숫자 · _ · - 가 아닙니다"
+
+
+def token_error() -> tuple[Event, Fields]:
+    return Event.ERROR, {"where": "search.list", "reason": TOKEN_REASON, "keyword": "연애"}
+
+
+# 트래커 7A ① "[A-Za-z0-9_-]+ 일 때만 받고" 밖의 글자 쪽지 — 앞뒤 공백 · 끝 줄바꿈 · . = + / ·
+# 전각 · 켈빈 기호 K · 아랍-인도 숫자 · 외톨이 서로게이트
+RED_PAGE_TOKENS = (
+    " CAUQAA",
+    "CAUQAA ",
+    "CAUQAA\n",
+    "CAU.QAA",
+    "CAUQAA=",
+    "CAU+QAA",
+    "CAU/QAA",
+    "ＣＡＵＱＡＡ",
+    "KAUQAA",
+    "CAUQ١",
+    "\ud800",
+)
+
+
 class DetectTest(WatcherCase):
     def test_new_video_is_stored_with_its_first_view_sample(self) -> None:
         self.api.pages[("연애", None)] = search_page([A])
@@ -349,7 +373,7 @@ class DetectTest(WatcherCase):
         self.assertEqual(report, CycleReport(1, (), 1, 0, False, False))
 
     def test_store_write_error_propagates_s046(self) -> None:
-        # 계약 9절 — 저장소 쓰기 오류는 잡지 않고 run_loop 까지 올라갑니다
+        # 계약 9절 — 저장소 쓰기 오류는 잡지 않고 run_loop 까지 올라갑니다. 줄이 먼저라 이미 남아 있습니다
         error = OSError("디스크가 찼습니다")
         self.store = FailingStore(self.store_path, error)
         self.api.pages[("연애", None)] = search_page([A])
@@ -357,8 +381,92 @@ class DetectTest(WatcherCase):
         with self.assertRaises(OSError) as caught:
             self.run_cycle()
         self.assertIs(caught.exception, error)
-        self.assertEqual(self.events(), [])
+        self.assertEqual(self.events(), [detect(A), views(A, 1200)])
         self.assertIsNone(Store(self.store_path).get(A))
+
+    def cycle_with_logbook(self, logbook: Logbook) -> CycleReport:
+        client = YouTubeClient("test-key", QuotaLedger(self.quota_path), self.api)
+        return Watcher(self.store, logbook, client, lambda: NOW).run(CONFIG, NOW)
+
+    def file_counts(self, video_id: str) -> list[int]:
+        record = Store(self.store_path).get(video_id)
+        assert record is not None
+        return [sample.count for sample in record.view_history]
+
+    def test_failed_save_keeps_the_lines_and_the_next_cycle_stores_the_video(self) -> None:
+        # 줄이 먼저, 저장은 그다음 — 저장이 한 번 실패해도 DETECT · VIEWS 는 남고, 다음 주기는
+        # DETECT 없이 표본만 더해 저장합니다 (트래커 7A 질문 1 A · R9)
+        error = OSError("디스크가 찼습니다")
+        self.store = SaveFailsOnceStore(self.store_path, error)
+        self.api.pages[("연애", None)] = search_page([A])
+        self.api.videos[A] = video_item(A, 1200)
+        with self.assertRaises(OSError) as caught:
+            self.run_cycle()
+        self.assertIs(caught.exception, error)
+        self.assertEqual(self.events(), [detect(A), views(A, 1200)])
+        self.assertIsNone(Store(self.store_path).get(A))
+        later = NOW + HOUR
+        self.api.videos[A] = video_item(A, 1500)
+        report = self.watcher(lambda: later).cycle(CONFIG)
+        self.assertEqual(
+            self.events(), [detect(A), views(A, 1200), views(A, 1500, prev=1200)]
+        )
+        record = Store(self.store_path).get(A)
+        assert record is not None
+        self.assertEqual(record.view_history, [ViewSample(NOW, 1200), ViewSample(later, 1500)])
+        self.assertEqual(record.keyword, "연애")
+        self.assertEqual(record.detected_at, NOW)
+        self.assertEqual(report, CycleReport(1, (), 1, 0, False, False))
+
+    def test_restart_after_a_failed_save_detects_the_video_again(self) -> None:
+        # 그 사이 에이전트를 다시 켜면 메모리가 비어 새 영상으로 한 번 더 DETECT 를 남깁니다
+        self.store = SaveFailsOnceStore(self.store_path, OSError("디스크가 찼습니다"))
+        self.api.pages[("연애", None)] = search_page([A])
+        self.api.videos[A] = video_item(A, 1200)
+        with self.assertRaises(OSError):
+            self.run_cycle()
+        self.store = Store(self.store_path)
+        self.run_cycle()
+        self.assertEqual(
+            self.events(), [detect(A), views(A, 1200), detect(A), views(A, 1200)]
+        )
+
+    def test_known_video_failed_save_keeps_its_views_line_and_one_sample_each(self) -> None:
+        self.seed(K, views=1000)
+        self.store = SaveFailsOnceStore(self.store_path, OSError("디스크가 찼습니다"))
+        self.api.videos[K] = video_item(K, 1100)
+        with self.assertRaises(OSError):
+            self.run_cycle()
+        self.assertEqual(self.events(), [views(K, 1100, prev=1000)])
+        self.assertEqual(self.file_counts(K), [1000])
+        self.api.videos[K] = video_item(K, 1150)
+        self.watcher(lambda: NOW + HOUR).cycle(CONFIG)
+        self.assertEqual(self.file_counts(K), [1000, 1100, 1150])
+
+    def test_log_write_failure_at_detect_stores_nothing(self) -> None:
+        # 로그 쓰기가 실패하면 저장 전에 멈춥니다 — 다음에 찾을 때 새 영상으로 DETECT 를 남깁니다
+        error = OSError("로그를 쓸 수 없습니다")
+        self.api.pages[("연애", None)] = search_page([A])
+        self.api.videos[A] = video_item(A, 1200)
+        logbook = FailingLogbook(self.log_path, lambda: NOW, Event.DETECT, error)
+        with self.assertRaises(OSError) as caught:
+            self.cycle_with_logbook(logbook)
+        self.assertIs(caught.exception, error)
+        self.assertIsNone(self.store.get(A))
+        self.assertIsNone(Store(self.store_path).get(A))
+        self.assertEqual(self.raw_lines(), [])
+        self.run_cycle()
+        self.assertEqual(self.events(), [detect(A), views(A, 1200)])
+
+    def test_log_write_failure_at_views_keeps_the_known_video_unchanged(self) -> None:
+        error = OSError("로그를 쓸 수 없습니다")
+        self.seed(K, views=1000)
+        self.api.videos[K] = video_item(K, 1100)
+        logbook = FailingLogbook(self.log_path, lambda: NOW, Event.VIEWS, error)
+        with self.assertRaises(OSError) as caught:
+            self.cycle_with_logbook(logbook)
+        self.assertIs(caught.exception, error)
+        self.assertEqual(self.counts(K), [1000])
 
 
 class FailingStore(Store):
@@ -370,6 +478,57 @@ class FailingStore(Store):
 
     def put(self, record: VideoRecord) -> None:
         raise self.error
+
+
+class SaveFailsOnceStore(Store):
+    """파일 쓰기(save)가 처음 한 번만 쓰기 오류를 내는 저장소 — put 은 메모리에 먼저 넣습니다."""
+
+    def __init__(self, path: Path, error: OSError) -> None:
+        super().__init__(path)
+        self.error = error
+        self.failures = 1
+
+    def save(self) -> None:
+        if self.failures > 0:
+            self.failures -= 1
+            raise self.error
+        super().save()
+
+
+class FailingLogbook(Logbook):
+    """정한 사건 하나의 줄 쓰기만 쓰기 오류를 내는 로그."""
+
+    def __init__(
+        self, path: Path, clock: Callable[[], datetime], event: Event, error: OSError
+    ) -> None:
+        super().__init__(path, clock)
+        self.event = event
+        self.error = error
+
+    def write(self, event: Event, **fields: object) -> str:
+        if event is self.event:
+            raise self.error
+        return super().write(event, **fields)
+
+
+class RawVideosApi(FakeApi):
+    """videos.list 에는 정해 둔 날 본문을 그대로 답하는 가짜 YouTube — 검색은 FakeApi 그대로."""
+
+    def __init__(self, body: bytes) -> None:
+        super().__init__()
+        self.body = body
+
+    def __call__(self, url: str, timeout: float) -> tuple[int, bytes]:
+        answer = super().__call__(url, timeout)
+        if urllib.parse.urlsplit(url).path.endswith("/videos"):
+            return 200, self.body
+        return answer
+
+
+def nested_body(item: dict[str, object], depth: int = 47_500) -> bytes:
+    """item 의 "@@" 값을 depth 단 중첩 빈 목록으로 바꾼 videos.list 본문 (Phase 2 ship-report R2)."""
+    text = json.dumps({"items": [item]})
+    return text.replace('"@@"', "[" * depth + "]" * depth).encode("ascii")
 
 
 class PaginationTest(WatcherCase):
@@ -427,6 +586,7 @@ class PaginationTest(WatcherCase):
         self.assertEqual(report, CycleReport(1, (A,), 1, 0, False, False))
 
     def test_non_string_next_page_token_ends_the_keyword_s042(self) -> None:
+        # 글자가 아닌 쪽지도 "그 밖의 비어 있지 않은 값" — 다음 페이지 없이 검색 오류 한 줄 (트래커 7A ①)
         page = search_page([A])
         page["nextPageToken"] = 5
         self.api.pages[("연애", None)] = page
@@ -435,8 +595,32 @@ class PaginationTest(WatcherCase):
         self.api.videos[B] = video_item(B, 1300)
         report = self.run_cycle()
         self.assertEqual(self.api.searches(), [("연애", None)])
-        self.assertEqual(self.events(), [detect(A), views(A, 1200)])
-        self.assertEqual(report, CycleReport(1, (A,), 1, 0, False, False))
+        self.assertEqual(self.events(), [token_error()])
+        self.assertEqual(report, CycleReport(1, (), 0, 0, False, True))
+
+    def test_page_token_with_allowed_letters_fetches_the_next_page(self) -> None:
+        for token in ("CAUQAA", "caiqaa", "aZ09_-"):
+            with self.subTest(token=token):
+                self.reset(token)
+                self.api.pages[("연애", None)] = search_page([A], token)
+                self.api.pages[("연애", token)] = search_page([B])
+                self.api.videos[A] = video_item(A, 1200)
+                self.api.videos[B] = video_item(B, 1300)
+                report = self.run_cycle()
+                self.assertEqual(self.api.searches(), [("연애", None), ("연애", token)])
+                self.assertEqual(self.event_names(), [Event.DETECT, Event.VIEWS] * 2)
+                self.assertEqual(report, CycleReport(2, (A, B), 2, 0, False, False))
+
+    def test_page_token_outside_the_allowed_letters_is_an_error(self) -> None:
+        for n, token in enumerate(RED_PAGE_TOKENS):
+            with self.subTest(token=token):
+                self.reset(f"red-{n}")
+                self.api.pages[("연애", None)] = search_page([A], token)
+                self.api.videos[A] = video_item(A, 1200)
+                report = self.run_cycle()
+                self.assertEqual(self.api.searches(), [("연애", None)])
+                self.assertEqual(self.events(), [token_error()])
+                self.assertEqual(report, CycleReport(1, (), 0, 0, False, True))
 
     def test_pages_stop_at_the_page_cap(self) -> None:
         self.reset("endless", endless=True)
@@ -642,6 +826,36 @@ class ApiErrorTest(WatcherCase):
             )
             self.assertEqual(self.counts(K), [1000])
             self.assertEqual(report, CycleReport(1, (), 0, 0, False, True))
+
+    def test_broken_page_token_is_an_error_and_views_are_still_tracked(self) -> None:
+        # Phase 2 ship-report R1 — 외톨이 서로게이트 쪽지가 다음 페이지 주소에서
+        # UnicodeEncodeError 로 주기를 깨뜨렸습니다. 이제 그 페이지는 검색 오류이고 추적은 돕니다.
+        broken = "\ud800"
+        with self.subTest("first page"):
+            self.reset("first page")
+            self.seed(K)
+            self.api.pages[("연애", None)] = search_page([A], broken)
+            self.api.videos[A] = video_item(A, 1200)
+            self.api.videos[K] = video_item(K, 1100)
+            report = self.run_cycle()
+            self.assertEqual(self.events(), [token_error(), views(K, 1100, prev=1000)])
+            self.assertEqual(report, CycleReport(1, (), 1, 0, False, True))
+            self.assertEqual(self.api.video_batches(), [[K]])
+        with self.subTest("next page"):
+            self.reset("next page")
+            self.seed(K)
+            self.api.pages[("연애", None)] = search_page([A], "P1")
+            self.api.pages[("연애", "P1")] = search_page([B], broken)
+            self.api.videos[A] = video_item(A, 1200)
+            self.api.videos[B] = video_item(B, 1300)
+            self.api.videos[K] = video_item(K, 1100)
+            report = self.run_cycle()
+            self.assertEqual(
+                self.events(),
+                [token_error(), detect(A), views(A, 1200), views(K, 1100, prev=1000)],
+            )
+            self.assertEqual(report, CycleReport(2, (A,), 2, 0, False, True))
+            self.assertEqual(self.api.video_batches(), [[A, K]])
 
 
 def bad_item(**changes: object) -> dict[str, object]:
@@ -959,6 +1173,63 @@ class IntakeTest(WatcherCase):
                 ],
             )
             self.assertEqual(report, CycleReport(1, (), 0, 0, False, False))
+
+    def test_deeply_nested_values_end_the_cycle_without_an_exception(self) -> None:
+        # Phase 2 ship-report R2 — 47,500단 중첩 목록의 repr 이 RecursionError 로 주기를 깨뜨렸습니다.
+        # json.loads 가 그 깊이를 읽으면 SKIP, 못 읽으면(3.10) invalid JSON 의 ERROR 한 줄입니다.
+        published = video_item(A, 1200, published="@@")
+        counted = video_item(K, 1100)
+        counted["statistics"] = {"viewCount": "@@"}
+        rows = (
+            (
+                "publishedAt",
+                A,
+                published,
+                "snippet.publishedAt: UTC 'YYYY-MM-DDTHH:MM:SSZ' 모양이 아닙니다: list",
+            ),
+            ("viewCount", K, counted, "statistics.viewCount: 0 이상의 10진수 글자가 아닙니다: list"),
+        )
+        for label, video_id, item, detail in rows:
+            with self.subTest(label):
+                self.reset(label)
+                body = nested_body(item)
+                self.api = RawVideosApi(body)
+                if video_id == K:
+                    self.seed(K)
+                else:
+                    self.api.pages[("연애", None)] = search_page([A])
+                report = self.run_cycle()
+                try:
+                    json.loads(body)
+                except RecursionError:
+                    invalid = {"where": "videos.list", "reason": "HTTP 200 invalid JSON"}
+                    self.assertEqual(self.events(), [(Event.ERROR, invalid)])
+                    self.assertEqual(report, CycleReport(1, (), 0, 0, False, True))
+                else:
+                    self.assertEqual(
+                        self.events(),
+                        [skip(video_id, "invalid_item", "videos.list", detail=detail)],
+                    )
+                    self.assertEqual(report, CycleReport(1, (), 0, 0, False, False))
+                if video_id == K:
+                    self.assertEqual(self.counts(K), [1000])
+
+    def test_non_string_value_is_named_by_its_type(self) -> None:
+        # 글자가 아닌 값은 종류 이름만, 글자는 repr 그대로 (계약 '탐지 · 조회수 추적' 절)
+        rows = (
+            ("publishedAt None", bad_item(snippet__publishedAt=None), ": NoneType"),
+            ("viewCount 1200", bad_item(statistics__viewCount=1200), ": int"),
+            ("viewCount ' 12'", bad_item(statistics__viewCount=" 12"), ": ' 12'"),
+        )
+        for n, (label, item, ending) in enumerate(rows):
+            with self.subTest(label):
+                self.reset(f"typed-{n}")
+                self.api.pages[("연애", None)] = search_page([A])
+                self.api.videos[A] = item
+                self.run_cycle()
+                [(event, fields)] = self.events()
+                self.assertEqual(event, Event.SKIP)
+                self.assertTrue(fields["detail"].endswith(ending), fields["detail"])
 
 
 class ClockTest(WatcherCase):

@@ -2,10 +2,12 @@
 from __future__ import annotations
 
 import http.client
-import io
 import json
 import os
+import ssl
 import tempfile
+import threading
+import time
 import unittest
 import urllib.error
 import urllib.parse
@@ -13,8 +15,10 @@ import urllib.request
 from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import Any
 from unittest import mock
 
+from agent import youtube
 from agent.config import LimitsConfig
 from agent.youtube import (
     COMMENTS_DISABLED,
@@ -27,6 +31,7 @@ from agent.youtube import (
     YouTubeError,
     http_get,
 )
+from tests.loopback import NEGATIVE_CHUNK, RawServer, chunked, no_proxies, response
 
 NOW = datetime(2026, 10, 12, 12, 0, tzinfo=timezone.utc)
 DAY = timedelta(hours=24)
@@ -114,6 +119,10 @@ class FakeFetch:
         if isinstance(response, BaseException):
             raise response
         return response
+
+
+class _OddError(Exception):
+    """전송이 낼 수 있는, 이름을 미리 알 수 없는 예외 하나."""
 
 
 def query_of(url: str) -> dict[str, str]:
@@ -279,13 +288,43 @@ class LedgerTest(YouTubeCase):
         self.assertEqual(QuotaLedger(self.path).usage(NOW + SECOND), Usage(1, 101))
 
     def test_old_entries_are_pruned_on_write(self) -> None:
-        old = NOW - timedelta(hours=30)
-        client = self.client(FakeFetch(), searches(1, old) + searches(1, NOW - SECOND))
+        # 쓸 때 48시간이 지난 항목만 지웁니다 — 30시간 전 항목은 셈에서 빠져도 장부에는 남습니다
+        entries = (
+            searches(1, NOW - timedelta(hours=50))
+            + searches(1, NOW - timedelta(hours=30))
+            + searches(1, NOW - SECOND)
+        )
+        client = self.client(FakeFetch(), entries)
         client.search("연애", WINDOW_START, None, NOW, limits(90))
         self.assertEqual(
             [entry["at"] for entry in self.stored()],
-            ["2026-10-12T11:59:59+00:00", "2026-10-12T12:00:00+00:00"],
+            [
+                "2026-10-11T06:00:00+00:00",
+                "2026-10-12T11:59:59+00:00",
+                "2026-10-12T12:00:00+00:00",
+            ],
         )
+
+    def test_fast_clock_writes_keep_real_entries_rn3(self) -> None:
+        # 10시간 앞선 시계의 쓰기가 실제 검색 기록을 지우면 고친 시계에서 상한을 넘겨 허락합니다 (R-N3)
+        fast = NOW + timedelta(hours=10)
+        cases = (
+            ("one fast write", (20, 2, 1), ("videos",), 3),
+            ("two fast writes", (20, 2, 1), ("videos", "videos"), 3),
+            ("fast cycle", (20, 19, 2), ("first page", "videos"), 4),
+        )
+        for name, hours, sites, used in cases:
+            with self.subTest(name):
+                seeded = [e for h in hours for e in searches(1, NOW - timedelta(hours=h))]
+                client = self.client(FakeFetch(), seeded, name=name)
+                for site in sites:
+                    self.call(client, site, cap=3, now=fast)
+                client = self.client(FakeFetch(), name=name)
+                with self.assertRaises(QuotaExhausted) as caught:
+                    client.search("연애", WINDOW_START, None, NOW, limits(3))
+                self.assert_held(caught.exception, "search.list", "searches", used, 3)
+                stored = [entry["at"] for entry in self.stored()]
+                self.assertIn("2026-10-11T16:00:00+00:00", stored)
 
     def test_unreadable_ledger_refuses_and_keeps_the_file(self) -> None:
         def entry(**changes: object) -> bytes:
@@ -471,9 +510,29 @@ class ClientTest(YouTubeCase):
                 self.assertEqual(str(exc), f"search.list: {reason}")
 
     def test_network_error_never_carries_the_key(self) -> None:
+        # _fetch 의 예외는 무엇이든 ERROR 한 줄 — 깨진 덩어리 틀 · 리다이렉트 · 시간 상한도 (트래커 7A ③(가))
         rows = (
             (lambda url: OSError(f"연결 실패: {url}"), "network OSError: 연결 실패: ", True),
             (http.client.IncompleteRead(b"partial"), "network IncompleteRead: ", False),
+            (
+                ValueError("read length must be non-negative or -1"),
+                "network ValueError: read length must be non-negative or -1",
+                False,
+            ),
+            (
+                lambda url: TypeError(f"gethostbyname() argument 1 must be str: {url}"),
+                "network TypeError: gethostbyname()",
+                True,
+            ),
+            (UnicodeError("label empty or too long"), "network UnicodeError: label empty", False),
+            (OverflowError("port must be 0-65535."), "network OverflowError: port must", False),
+            (MemoryError(), "network MemoryError: ", False),
+            (
+                TimeoutError("요청 전체가 30초 상한을 넘었습니다"),
+                "network TimeoutError: 요청 전체가 30초 상한을 넘었습니다",
+                False,
+            ),
+            (lambda url: _OddError(f"이상한 실패 {url}"), "network _OddError: 이상한 실패 ", True),
         )
         for response, prefix, echoes_url in rows:
             with self.subTest(prefix):
@@ -490,6 +549,24 @@ class ClientTest(YouTubeCase):
                 # 원래 예외(키가 든 URL)는 traceback 에도 붙지 않습니다
                 self.assertIsNone(exc.__cause__)
                 self.assertTrue(exc.__suppress_context__)
+
+    def test_interrupt_from_fetch_is_not_wrapped(self) -> None:
+        # Ctrl+C 는 BaseException 이라 ERROR 줄로 바뀌지 않고 그대로 올라갑니다 — 장부에는 이미 적혔습니다
+        client = self.client(FakeFetch(KeyboardInterrupt()))
+        with self.assertRaises(KeyboardInterrupt):
+            client.videos(["abcdefghijk"], NOW, limits(90))
+        self.assertEqual(self.ledger.usage(NOW), Usage(0, 1))
+
+    def test_fetch_gets_the_whole_request_cap(self) -> None:
+        # _fetch 에 넘기는 값은 요청 전체의 상한 30초입니다 (계약 '탐지 · 조회수 추적' 절 'API 오류')
+        seen: list[float] = []
+
+        def fetch(url: str, timeout: float) -> tuple[int, bytes]:
+            seen.append(timeout)
+            return OK
+
+        YouTubeClient(KEY, QuotaLedger(self.path), fetch).videos(["abcdefghijk"], NOW, limits(90))
+        self.assertEqual(seen, [30.0])
 
     def test_url_echoed_twice_is_masked_twice_s043(self) -> None:
         client = self.client(FakeFetch(lambda url: OSError(f"{url} 다시 {url}")))
@@ -720,65 +797,157 @@ class CommentsTest(YouTubeCase):
         self.assertEqual(QuotaLedger(self.path).usage(NOW), Usage(1, 101))
 
 
-GET_URL = "https://www.googleapis.com/youtube/v3/videos?id=abcdefghijk&key=test-key"
-
-
-class FakeResponse:
-    """urlopen 이 돌려주는 응답 자리 — with 문 · status · read 만."""
-
-    def __init__(self, status: int, body: bytes) -> None:
-        self.status = status
-        self._body = body
-
-    def __enter__(self) -> FakeResponse:
-        return self
-
-    def __exit__(self, *exc: object) -> None:
-        return None
-
-    def read(self) -> bytes:
-        return self._body
+GET_PATH = "/youtube/v3/videos?id=abcdefghijk&key=test-key"
 
 
 class HttpGetTest(unittest.TestCase):
-    """http_get — urllib.request.urlopen 을 patch 해 네트워크 없이."""
+    """http_get — 날 바이트로 답하는 루프백 서버(tests/loopback.py)에 실제로 요청합니다."""
 
-    def assert_request(self, urlopen: mock.MagicMock, timeout: float) -> None:
-        urlopen.assert_called_once()
-        args, kwargs = urlopen.call_args
-        [request] = args
-        self.assertIsInstance(request, urllib.request.Request)
-        self.assertEqual(request.full_url, GET_URL)
-        self.assertEqual(request.get_method(), "GET")
-        self.assertEqual(request.get_header("Accept"), "application/json")
-        self.assertEqual(kwargs, {"timeout": timeout})
+    def setUp(self) -> None:
+        no_proxies(self)
+
+    def serve(self, route: Callable[[str], bytes | None], **kw: Any) -> RawServer:
+        server = RawServer(route, **kw)
+        self.addCleanup(server.close)
+        return server
+
+    def assert_request(self, server: RawServer) -> None:
+        self.assertEqual(len(server.heads), 1, server.heads)
+        [head] = server.heads
+        self.assertTrue(head.startswith(b"GET " + GET_PATH.encode() + b" HTTP/1.1\r\n"), head)
+        self.assertIn(b"\r\nAccept: application/json\r\n", head)
 
     def test_http_error_becomes_its_code_and_body_s037(self) -> None:
         body = b'{"error": {"code": 403, "errors": [{"reason": "quotaExceeded"}]}}'
-        error = urllib.error.HTTPError(
-            GET_URL, 403, "Forbidden", http.client.HTTPMessage(), io.BytesIO(body)
-        )
-        self.addCleanup(error.close)
-        with mock.patch("urllib.request.urlopen", side_effect=error) as urlopen:
-            result = http_get(GET_URL, 12.5)
+        server = self.serve(lambda target: response(403, body, reason="Forbidden"))
+        result = http_get(server.url + GET_PATH, 12.5)
         self.assertEqual(result, (403, body))
-        self.assert_request(urlopen, 12.5)
+        self.assert_request(server)
 
     def test_ok_response_becomes_its_status_and_body_s037(self) -> None:
         body = b'{"items": []}'
-        response = FakeResponse(200, body)
-        with mock.patch("urllib.request.urlopen", return_value=response) as urlopen:
-            result = http_get(GET_URL, 12.5)
+        server = self.serve(lambda target: response(200, body))
+        result = http_get(server.url + GET_PATH, 12.5)
         self.assertEqual(result, (200, body))
-        self.assert_request(urlopen, 12.5)
+        self.assert_request(server)
 
     def test_no_content_response_keeps_its_status_s047(self) -> None:
         # 200 이 아닌 2xx — 상태를 200 으로 바꾸지 않고 응답의 것 그대로 돌려줍니다
-        response = FakeResponse(204, b"")
-        with mock.patch("urllib.request.urlopen", return_value=response) as urlopen:
-            result = http_get(GET_URL, 12.5)
+        server = self.serve(lambda target: response(204))
+        result = http_get(server.url + GET_PATH, 12.5)
         self.assertEqual(result, (204, b""))
-        self.assert_request(urlopen, 12.5)
+        self.assert_request(server)
+
+    def assert_overrun(self, url: str) -> None:
+        """상한 1초 안에 TimeoutError("요청 전체가 1초 상한을 넘었습니다") 로 끝나는지 — 2.5초 안쪽."""
+        started = time.monotonic()
+        with self.assertRaises(TimeoutError) as caught:
+            http_get(url, 1.0)
+        elapsed = time.monotonic() - started
+        self.assertEqual(str(caught.exception), "요청 전체가 1초 상한을 넘었습니다")
+        self.assertLess(elapsed, 2.5)
+
+    def test_redirect_is_returned_not_followed(self) -> None:
+        # 트래커 7A ③(나) — 다섯 코드 모두 따라가지 않고 3xx 를 그대로 돌려줍니다
+        elsewhere = self.serve(lambda target: response(200, b'{"items": []}'))
+        location = f"Location: {elsewhere.url}/elsewhere"
+        for code in (301, 302, 303, 307, 308):
+            with self.subTest(code=code):
+                server = self.serve(
+                    lambda target, code=code: response(code, b"moved", headers=[location])
+                )
+                self.assertEqual(http_get(server.url + GET_PATH, 5.0), (code, b"moved"))
+        self.assertEqual(elsewhere.targets, [])
+        self.assertEqual(elsewhere.connections, 0)
+
+    def test_error_response_is_closed(self) -> None:
+        # R5 — 오류 응답(HTTPError)도 읽은 뒤 닫습니다
+        original = urllib.error.HTTPError.close
+        server = self.serve(lambda target: response(403, b"{}"))
+        with mock.patch.object(
+            urllib.error.HTTPError, "close", autospec=True, side_effect=original
+        ) as close:
+            self.assertEqual(http_get(server.url + GET_PATH, 5.0), (403, b"{}"))
+        self.assertTrue(close.called)
+
+    def test_truncated_error_body_keeps_its_status(self) -> None:
+        # R5 — 오류 상태의 본문을 읽다 실패해도 상태 코드는 남습니다
+        server = self.serve(lambda target: response(403, b'{"error": {', length=100))
+        self.assertEqual(http_get(server.url + GET_PATH, 5.0), (403, b""))
+
+    def test_negative_chunk_size_in_an_error_body_keeps_its_status(self) -> None:
+        server = self.serve(lambda target: chunked(403, NEGATIVE_CHUNK))
+        self.assertEqual(http_get(server.url + GET_PATH, 5.0), (403, b""))
+
+    def test_truncated_ok_body_is_an_error(self) -> None:
+        # 200 의 잘린 본문은 예전처럼 예외 — _call 이 network 오류 한 줄로 바꿉니다
+        server = self.serve(lambda target: response(200, b'{"items": [', length=100))
+        with self.assertRaises(http.client.IncompleteRead):
+            http_get(server.url + GET_PATH, 5.0)
+
+    def test_negative_chunk_size_in_an_ok_body_is_an_error(self) -> None:
+        server = self.serve(lambda target: chunked(200, NEGATIVE_CHUNK))
+        with self.assertRaises(Exception) as caught:
+            http_get(server.url + GET_PATH, 5.0)
+        self.assertNotIsInstance(caught.exception, TimeoutError)
+
+    def test_chunked_and_large_bodies_are_read_whole(self) -> None:
+        server = self.serve(lambda target: chunked(200, b"5\r\nhello\r\n0\r\n\r\n"))
+        self.assertEqual(http_get(server.url + GET_PATH, 5.0), (200, b"hello"))
+        large = b"x" * 200_000
+        server = self.serve(lambda target: response(200, large))
+        self.assertEqual(http_get(server.url + GET_PATH, 5.0), (200, large))
+
+    def test_drip_fed_headers_end_at_the_cap(self) -> None:
+        # urllib 의 timeout 은 읽기 한 번마다라 머리를 한 바이트씩 흘리면 막지 못합니다 (R5)
+        reply = response(200, b'{"items": []}', headers=["X-Pad: " + "p" * 240])
+        server = self.serve(lambda target: reply, drip_s=0.02, burst=0)
+        self.assert_overrun(server.url + GET_PATH)
+
+    def test_drip_fed_body_ends_at_the_cap(self) -> None:
+        body = b'{"items": []}' + b" " * 200
+        reply = response(200, body)
+        server = self.serve(lambda target: reply, drip_s=0.02, burst=len(reply) - len(body))
+        self.assert_overrun(server.url + GET_PATH)
+
+    def test_silent_server_frees_the_worker_at_the_cap(self) -> None:
+        # 답하지 않는 서버 — 부르는 쪽은 상한에, 일꾼 스레드는 읽기마다의 timeout 에 풀려납니다
+        server = self.serve(lambda target: None)
+        before = set(threading.enumerate())
+        with self.assertRaises(TimeoutError):
+            http_get(server.url + GET_PATH, 1.0)
+        workers = [
+            thread for thread in threading.enumerate()
+            if thread not in before and thread.name == "http_get"
+        ]
+        for worker in workers:
+            worker.join(timeout=1.5)
+        self.assertEqual([worker for worker in workers if worker.is_alive()], [])
+
+    def test_opener_is_urlopens_without_the_redirect_handler(self) -> None:
+        dropped = {
+            urllib.request.HTTPRedirectHandler,
+            urllib.request.FTPHandler,
+            urllib.request.FileHandler,
+            urllib.request.DataHandler,
+        }
+        proxy = {"https": "http://127.0.0.1:9"}
+        with mock.patch("urllib.request.getproxies", return_value=proxy):
+            ours = {type(handler) for handler in youtube._opener().handlers}
+            stock = {type(handler) for handler in urllib.request.build_opener().handlers}
+        self.assertEqual(ours, stock - dropped)
+        self.assertIn(urllib.request.ProxyHandler, ours)
+        self.assertIn(urllib.request.HTTPSHandler, ours)
+        self.assertEqual(youtube._TLS_CONTEXT.verify_mode, ssl.CERT_REQUIRED)
+        self.assertTrue(youtube._TLS_CONTEXT.check_hostname)
+
+    def test_https_goes_through_tls(self) -> None:
+        # 평문으로 먼저 말하는 서버 — https 는 TLS 를 거치므로 SSL 오류입니다
+        server = self.serve(lambda target: response(400), answer_first=True)
+        url = "https://" + server.url.removeprefix("http://") + GET_PATH
+        with self.assertRaises(urllib.error.URLError) as caught:
+            http_get(url, 5.0)
+        self.assertIsInstance(caught.exception.reason, ssl.SSLError)
 
 
 if __name__ == "__main__":

@@ -4,6 +4,8 @@
   nextPageToken 이 있고, 사이클 시작 때 저장소에 있던 영상이 없고, 그 키워드에서 받은 페이지가
   `MAX_PAGES_PER_KEYWORD` 보다 적을 때만 받습니다. 페이지 상한이 토큰을 남긴 채 키워드를 끝내면
   그 뒤 결과를 보지 못한 것이므로 `QUOTA … counter=pages` 줄을 남깁니다.
+- 다음 페이지 쪽지(nextPageToken)는 영문자 · 숫자 · _ · - 만 받고, 그 밖의 비어 있지 않은 값이면
+  그 페이지는 `ERROR` 입니다.
 - 추적: 새 영상과 `trigger.max_age_hours` 안에 올라온 저장 영상 모두에 조회수 한 번씩. 새 영상은
   `DETECT` · `VIEWS`, 아는 영상은 표본을 하나 덧붙이고 `VIEWS`. 명단 영상(allowed_videos)은
   검색 · 나이 창과 상관없이 늘 추적합니다.
@@ -12,6 +14,7 @@
 - 밖에서 온 글자의 외톨이 서로게이트는 U+FFFD 로 바꿉니다(HC1-2 R3). 영상 ID · 조회수 ·
   올린 시각은 허용한 모양(fullmatch)만 받고, 그 밖의 항목은 `SKIP` 으로 건너뜁니다.
 - 저장소 쓰기 오류는 잡지 않고 run_loop 까지 올라갑니다 (계약 9절).
+- 줄이 먼저, 저장은 그다음 — 저장이 실패해도 그 영상의 `DETECT` · `VIEWS` 는 이미 로그에 있습니다.
 """
 from __future__ import annotations
 
@@ -33,6 +36,8 @@ _SURROGATE_RE = re.compile(r"[\ud800-\udfff]")
 _REPLACEMENT = chr(0xFFFD)
 _COUNT_RE = re.compile(r"[0-9]{1,19}")
 _PUBLISHED_RE = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]{1,9})?Z")
+# 다음 페이지 쪽지 — 실제 쪽지는 CAUQAA 같은 영문자 · 숫자 · _ · - 입니다 (계약 '탐지 · 조회수 추적' 절)
+_PAGE_TOKEN_RE = re.compile(r"[A-Za-z0-9_-]+")
 
 
 def _clean(text: str) -> str:
@@ -51,10 +56,15 @@ def _string(value: object, name: str) -> str:
     return _clean(value)
 
 
+def _shown(value: object) -> str:
+    # 글자가 아닌 값은 종류 이름만 — 수만 단 중첩 목록의 repr 은 RecursionError 를 냅니다 (계약 '탐지 · 조회수 추적' 절)
+    return f"{value!r:.40}" if isinstance(value, str) else type(value).__name__
+
+
 def _published(value: object) -> datetime:
     # UTC `Z` 모양만 — 다른 시간대 표기는 날짜 끝에서 Store.save 를 넘치게 할 수 있습니다 (계약 '탐지 · 조회수 추적' 절)
     if not isinstance(value, str) or not _PUBLISHED_RE.fullmatch(value):
-        raise ValueError(f"snippet.publishedAt: UTC 'YYYY-MM-DDTHH:MM:SSZ' 모양이 아닙니다: {value!r:.40}")
+        raise ValueError(f"snippet.publishedAt: UTC 'YYYY-MM-DDTHH:MM:SSZ' 모양이 아닙니다: {_shown(value)}")
     try:
         parsed = datetime.strptime(value[:19], "%Y-%m-%dT%H:%M:%S")
     except ValueError:
@@ -66,7 +76,7 @@ def _views(item: Mapping[str, object]) -> int:
     statistics = _mapping(item.get("statistics"), "statistics")
     value = statistics.get("viewCount")
     if not (isinstance(value, str) and _COUNT_RE.fullmatch(value)):
-        raise ValueError(f"statistics.viewCount: 0 이상의 10진수 글자가 아닙니다: {value!r:.40}")
+        raise ValueError(f"statistics.viewCount: 0 이상의 10진수 글자가 아닙니다: {_shown(value)}")
     return int(value)
 
 
@@ -205,6 +215,10 @@ class Watcher:
         items = data.get("items", [])
         if not isinstance(items, list):
             raise YouTubeError("search.list", "HTTP 200 items 가 목록이 아닙니다")
+        token = data.get("nextPageToken")
+        # 빈 쪽지는 마지막 페이지 — 그 밖의 값은 영문자 · 숫자 · _ · - 만, 다른 값은 다음 페이지 주소를 만들다 예외를 냅니다 (계약 '탐지 · 조회수 추적' 절)
+        if token is not None and token != "" and not (isinstance(token, str) and _PAGE_TOKEN_RE.fullmatch(token)):
+            raise YouTubeError("search.list", "HTTP 200 nextPageToken 이 영문자 · 숫자 · _ · - 가 아닙니다")
         ids: list[str] = []
         for item in items:
             ident = item.get("id") if isinstance(item, Mapping) else None
@@ -219,7 +233,6 @@ class Watcher:
                 call="search.list",
                 keyword=query,
             )
-        token = data.get("nextPageToken")
         return ids, token if isinstance(token, str) and token else None
 
     def _track(
@@ -285,7 +298,6 @@ class Watcher:
                 detail=_clean(str(exc)),
             )
             return
-        self._store.put(record)
         tally.sampled += 1
         views = record.view_history[-1].count
         prev = record.view_history[-2].count if len(record.view_history) > 1 else None
@@ -307,6 +319,8 @@ class Watcher:
             prev=prev,
             delta=views - prev if prev is not None else None,
         )
+        # 줄이 먼저, 저장은 그다음 — 저장이 실패해도 찾았다는 줄은 남습니다 (계약 '탐지 · 조회수 추적' 절)
+        self._store.put(record)
 
     def _hold(self, exc: QuotaExhausted, **extra: object) -> None:
         self._logbook.write(Event.QUOTA, used=exc.used, limit=exc.limit, call=exc.call, counter=exc.counter, **extra)

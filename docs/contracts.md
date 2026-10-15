@@ -837,7 +837,10 @@ watcher = Watcher(Store(Path("data/videos.json")), logbook, client, clock)
    다음 페이지면 `pageToken` 이 더해집니다.
 2. 다음 페이지는 셋이 모두 맞을 때만 받습니다 — 그 페이지에 `nextPageToken` 이 있고, 사이클 시작
    때 저장소에 있던 영상이 그 페이지에 없고, 그 검색어로 받은 페이지가 `MAX_PAGES_PER_KEYWORD`
-   (3) 보다 적을 때.
+   (3) 보다 적을 때. `nextPageToken` 이 빈 글자 `""` 도, 영문자 · 숫자 · `_` · `-` 로 된 글자도
+   아닌 값이면(글자가 아닌 값 포함) 그 페이지는 통째로 검색 오류입니다 — `ERROR where=search.list
+   reason="HTTP 200 nextPageToken 이 영문자 · 숫자 · _ · - 가 아닙니다" keyword=<검색어>` 를 남기고
+   남은 검색은 그만둔 채 추적으로 넘어갑니다('API 오류').
 3. 페이지 상한이 토큰을 남긴 채(아는 영상 없이) 검색어를 끝내면 최신 150개 뒤의 결과를 보지 못한
    것이므로 `QUOTA used=3 limit=3 call=search.list counter=pages keyword=<검색어>` 를 남기고
    `truncated` 에 셉니다. 정한 한도도 다른 한도처럼 로그에 남깁니다.
@@ -845,8 +848,12 @@ watcher = Watcher(Store(Path("data/videos.json")), logbook, client, clock)
    저장 영상(`records()` 순)을 50개씩 `videos.list`(`part=snippet,statistics`)로 묻습니다. 영상
    정보는 검색 결과가 아니라 `videos.list` 에서 씁니다 — 검색 제목은 HTML 이스케이프되고 설명은
    잘려 있습니다.
-5. 새 영상은 `view_history=[ViewSample(now, 조회수)]` 로 저장하고 `DETECT` 다음 `VIEWS` 를
-   남깁니다. `keyword` 는 처음 찾은 검색어입니다.
+5. 새 영상은 `DETECT` 다음 `VIEWS` 를 남긴 뒤 `view_history=[ViewSample(now, 조회수)]` 로 저장하고,
+   아는 영상(6번)도 `VIEWS` 를 남긴 뒤 저장합니다 — 줄이 먼저, 저장은 그다음입니다. 저장이 실패하면
+   예외가 탐지기 밖으로 나가지만(9절) 그 주기 로그에 줄은 이미 있고, 다음 주기는 메모리가 그 영상을
+   알므로 `DETECT` 없이 표본만 더해 저장합니다(그 사이 에이전트를 다시 켜면 새 영상으로 한 번 더
+   `DETECT`). 로그 쓰기가 실패하면 저장 전에 멈추므로 그 영상은 저장소에 없고, 다음에 찾을 때 새
+   영상으로 `DETECT` 를 남깁니다. `keyword` 는 처음 찾은 검색어입니다.
 6. 아는 영상은 `get` 사본에 표본 하나를 덧붙여 `put` 합니다 — 제목 등은 처음 본 값 그대로이고
    `attempts` 는 건드리지 않습니다. 로그는 `VIEWS … prev=<이전 조회수> delta=<차이>` 입니다.
 
@@ -866,8 +873,9 @@ watcher = Watcher(Store(Path("data/videos.json")), logbook, client, clock)
 - 허락된 호출은 요청을 보내기 *전에* `data/quota.json` 에 적습니다. 실패한 요청도 Google 이
   쿼터를 떼므로 셉니다. 페이지 넘김도 `search.list` 한 번이라 가드를 비켜 가지 못합니다.
 - 기록 파일은 `{"calls": [{"at": "<UTC ISO>", "call": "search.list", "units": 100}, …],
-  "schema_version": 1}` 모양입니다(키 정렬, 2칸 들여쓰기, 쓸 때 24시간이 지난 항목은 지움,
-  임시 파일에 쓴 뒤 `os.replace`). JSON · 버전 · 항목 모양이 틀리면 `QuotaError` 를 내고
+  "schema_version": 1}` 모양입니다(키 정렬, 2칸 들여쓰기, 쓸 때 48시간이 지난 항목은 지움 — 셈은
+  24시간 그대로이고, 시계가 하루 안쪽으로 앞서도 실제 호출 기록이 남게, 임시 파일에 쓴 뒤
+  `os.replace`). JSON · 버전 · 항목 모양이 틀리면 `QuotaError` 를 내고
   **파일은 그대로 둡니다** — 지우면 오늘 쓴 쿼터를 잊으므로, 고치거나 오늘 쓴 쿼터를 확인한 뒤
   사람이 지웁니다.
 - 막힌 호출은 보내지 않고, watcher 가 `QUOTA used=<사용> limit=<한도> call=<호출>
@@ -885,12 +893,19 @@ watcher = Watcher(Store(Path("data/videos.json")), logbook, client, clock)
 **API 오류**
 
 - HTTP 200 이 아니면 `ERROR where=<호출> reason="HTTP <상태> <Google reason>"` 입니다(예:
-  `ERROR where=search.list reason="HTTP 403 quotaExceeded"`). 네트워크 오류는
-  `reason="network <종류>: …"`, 본문이 JSON 객체가 아니면 `reason="HTTP 200 invalid JSON"`.
-  검색 오류에는 `keyword` 가 붙습니다.
+  `ERROR where=search.list reason="HTTP 403 quotaExceeded"`). 리다이렉트(301 · 302 · 303 · 307 ·
+  308)도 따라가지 않고 그 상태로 같은 모양이며(본문에 Google reason 이 없으면 `reason="HTTP 302"`),
+  오류 상태의 본문을 읽다 실패하면 Google reason 없이 `reason="HTTP <상태>"` 입니다. 요청이 예외로
+  끝나면 — 연결 · 읽기 실패, 깨진 응답 틀, 요청 전체 30초 상한(`TimeoutError`) 등 무엇이든 —
+  `reason="network <종류>: …"`, 본문이 JSON 객체가 아니면 `reason="HTTP 200 invalid JSON"`. 검색
+  오류에는 `keyword` 가 붙습니다.
 - 오류가 난 단계는 멈춥니다 — 검색 오류면 남은 검색을 그만두고 추적으로 넘어가고, 조회수 오류면
   추적을 그만둡니다.
 - 오류 글 속 API 키는 `<YOUTUBE_API_KEY>` 로 가리고, 원래 예외(키가 든 URL)는 덧붙이지 않습니다.
+- **음성 대조.** `python3 -m tests.mutants <이름>` — `youtube-narrow-network-catch` · `youtube-follows-redirects` ·
+  `youtube-no-request-cap` · `youtube-open-without-read-timeout` · `youtube-error-body-failure-raises` ·
+  `youtube-error-left-open` · `youtube-opener-without-https` · `youtube-opener-without-proxy` · `youtube-prune-at-window` ·
+  `watcher-repr-any-value` · `watcher-any-page-token` · `watcher-put-before-lines`.
 
 **인기 댓글** — `YouTubeClient.top_comments(video_id, now, limits, max_results) -> tuple[str, ...] | None`
 

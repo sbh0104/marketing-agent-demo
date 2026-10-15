@@ -20,6 +20,8 @@ import http.client
 import json
 import os
 import re
+import ssl
+import threading
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -41,6 +43,11 @@ MAX_COMMENTS_PER_CALL = 100
 COMMENTS_DISABLED = "HTTP 403 commentsDisabled"
 LEDGER_SCHEMA_VERSION = 1
 _WINDOW = timedelta(hours=24)
+# 장부는 48시간치를 보관하고 셈은 24시간 — 하루 안쪽으로 앞선 시계가 실제 호출 기록을 지우지 않게 (계약 '탐지 · 조회수 추적' 절)
+_KEEP = 2 * _WINDOW
+# https 확인용 SSL 문맥 하나 — opener 마다 새로 만들면 요청마다 CA 묶음을 다시 읽습니다
+_TLS_CONTEXT = ssl.create_default_context()
+# 요청 하나의 전체 상한(초) — http_get 이 연결부터 마지막 바이트까지 잽니다 (계약 '탐지 · 조회수 추적' 절)
 _TIMEOUT_S = 30.0
 _KEY_RE = re.compile(r"[A-Za-z0-9_-]+")
 _KEY_MASK = "<YOUTUBE_API_KEY>"
@@ -48,6 +55,7 @@ _SURROGATE_RE = re.compile(r"[\ud800-\udfff]")
 _REPLACEMENT = chr(0xFFFD)
 _TEXT_PATH = ("snippet", "topLevelComment", "snippet", "textDisplay")
 
+# (주소, 요청 전체 상한 초) → (상태, 본문)
 Fetch = Callable[[str, float], tuple[int, bytes]]
 
 
@@ -116,7 +124,7 @@ class QuotaLedger:
             raise QuotaExhausted(call, "searches", used.searches, limits.daily_max_searches)
         if used.units + cost > DAILY_QUOTA_UNITS:
             raise QuotaExhausted(call, "units", used.units, DAILY_QUOTA_UNITS)
-        calls = [*self._recent(now - _WINDOW), _Entry(now, call, cost)]
+        calls = [*self._recent(now - _KEEP), _Entry(now, call, cost)]
         self._save(calls)
         self._calls = calls
 
@@ -186,13 +194,69 @@ class QuotaLedger:
 
 
 def http_get(url: str, timeout: float) -> tuple[int, bytes]:
-    """GET 한 번 → (상태, 본문). HTTP 오류 상태도 본문과 함께 돌려줍니다."""
+    """GET 한 번 → (상태, 본문). 오류 상태 · 3xx 도 본문과 함께 돌려주고, 리다이렉트는 따라가지 않습니다.
+
+    timeout 은 요청 전체의 상한입니다 — urllib 의 timeout 은 읽기 한 번마다라 조금씩 흘려 보내는 응답을
+    막지 못하므로, 요청은 일꾼 스레드에서 돌고 상한에 닿으면 TimeoutError 입니다 (계약 '탐지 · 조회수 추적' 절).
+    """
+    outcome: list[tuple[int, bytes] | BaseException] = []
+    done = threading.Event()
+
+    def work() -> None:
+        try:
+            outcome.append(_get(url, timeout))
+        except BaseException as exc:  # 일꾼의 예외는 무엇이든 부르는 쪽에서 다시 냅니다
+            outcome.append(exc)
+        finally:
+            done.set()
+
+    threading.Thread(target=work, name="http_get", daemon=True).start()
+    if not done.wait(timeout):
+        raise _overrun(timeout)
+    result = outcome[0]
+    if isinstance(result, BaseException):
+        raise result
+    return result
+
+
+def _get(url: str, timeout: float) -> tuple[int, bytes]:
+    """http_get 의 일꾼 — 리다이렉트 처리기 없는 opener 로 GET 한 번. 읽기마다의 timeout 은 urllib 그대로."""
     request = urllib.request.Request(url, headers={"Accept": "application/json"})
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
-            return response.status, response.read()
+        response = _opener().open(request, timeout=timeout)
     except urllib.error.HTTPError as exc:
-        return exc.code, exc.read()
+        # 오류 상태 — 본문을 읽다 실패해도 상태 코드는 남기고, 응답은 늘 닫습니다
+        try:
+            return exc.code, exc.read()
+        except Exception:
+            return exc.code, b""
+        finally:
+            exc.close()
+    with response:
+        return response.status, response.read()
+
+
+def _overrun(timeout: float) -> TimeoutError:
+    return TimeoutError(f"요청 전체가 {timeout:g}초 상한을 넘었습니다")
+
+
+def _opener() -> urllib.request.OpenerDirector:
+    """urlopen 의 http · https 처리기에서 리다이렉트 처리기만 뺀 opener — 3xx 는 HTTPError 로 옵니다.
+
+    덮어쓰지 않고 빼는 까닭: http_error_302 만 고치면 301 · 303 · 307 · 308 은 따라가고, redirect_request 가
+    None 을 돌려도 Location 은 그 전에 urlparse 를 거칩니다 (계약 '탐지 · 조회수 추적' 절).
+    """
+    opener = urllib.request.OpenerDirector()
+    for handler in (
+        urllib.request.ProxyHandler(),
+        urllib.request.UnknownHandler(),
+        urllib.request.HTTPHandler(),
+        urllib.request.HTTPSHandler(context=_TLS_CONTEXT),
+        urllib.request.HTTPDefaultErrorHandler(),
+        urllib.request.HTTPErrorProcessor(),
+    ):
+        opener.add_handler(handler)
+    return opener
 
 
 class YouTubeClient:
@@ -286,7 +350,8 @@ class YouTubeClient:
         self._ledger.reserve(call, now, limits)
         try:
             status, body = self._fetch(url, _TIMEOUT_S)
-        except (OSError, http.client.HTTPException) as exc:
+        # _fetch 의 예외는 무엇이든 — 깨진 리다이렉트 · 덩어리 틀 · 시간 상한도 ERROR 한 줄입니다. Ctrl+C 는 BaseException 이라 빠집니다 (계약 '탐지 · 조회수 추적' 절)
+        except Exception as exc:
             raise YouTubeError(call, self._redact(f"network {type(exc).__name__}: {exc}")) from None
         try:
             data = json.loads(body)
