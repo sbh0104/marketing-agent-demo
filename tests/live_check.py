@@ -96,6 +96,7 @@ POPULAR_DRAFTS_MIN = 3  # 인기 댓글을 재료로 쓴 초안이 이보다 적
 FRAME_CHARS = 6  # 과제 품질 ⓒ 조각 — 12글자 반복 검사가 놓치는 "저도연애사주에서" 꼴의 틀을 잡습니다
 MARGIN = 0.05
 KEY_FRAGMENT_MIN = 8
+CONTACT_MASK = "<연락처>"
 PROBE_MAX_TOKENS = 1
 GRADE_MAX_TOKENS = 1024
 CLAUDE_MAX_RETRIES = 2
@@ -257,6 +258,92 @@ class Redactor:
 
     def leaks(self, text: str) -> bool:
         return self._pattern.search(text) is not None
+
+
+# 전각 ASCII(U+FF01–U+FF5E)를 반각으로 — 한 글자가 한 글자라 맞춘 글의 자리가 원문의 자리입니다
+HALF_WIDTH = {code: code - 0xFEE0 for code in range(0xFF01, 0xFF5F)}
+_DASH = "\\-\u2010-\u2015\u2212"  # 하이픈 · 유니코드 대시 · 빼기 기호
+_AT = r"(?:@|[(\[][ \t]*at[ \t]*[)\]])"
+_DOT = r"(?:\.|[(\[][ \t]*dot[ \t]*[)\]])"
+_GAP = rf"[ \t]*[.{_DASH}]?[ \t]*"
+# 숫자 한 덩이의 앞 — 주소 경로 · 쿼리 · 16진 해시 · 소수 · 다른 숫자 묶음 안이면 연락처로 세지 않습니다
+_EDGE = rf"(?<![0-9A-Za-z/=?&#%_.{_DASH}])"
+# 이은 숫자 묶음의 앞 — 위와 같되 '/' 는 받습니다(은행/계좌/이름 꼴)
+_JOINED_EDGE = rf"(?<![0-9A-Za-z=?&#%_.{_DASH}])"
+CONTACT_SHAPES = (
+    # 이메일 — (at) · [dot] 로 쓴 꼴과 @ · 점 둘레의 띄어쓰기까지
+    rf"[A-Za-z0-9._%+\-]{{1,64}}[ \t]*{_AT}[ \t]*[A-Za-z0-9\-]{{1,63}}"
+    rf"(?:[ \t]*{_DOT}[ \t]*[A-Za-z0-9\-]{{1,63}})*[ \t]*{_DOT}[ \t]*[A-Za-z]{{2,24}}",
+    # 예금주 줄 — 예금주명 · 괄호 · 구분 기호(: | ㅣ / = > · -) 뒤의 이름 한 덩이까지
+    rf"예금주(?:명|자)?[\])】」]?(?:[ \t]*[:|ㅣ/=>·{_DASH}])*\s*[\[(「【]?[^\s,/|()\[\]<>:·ㅣ]{{1,20}}",
+    # 전화번호 — 010 · (02) · 031 꼴과 +82, 하이픈 · 점 · 띄어쓰기로 끊었거나 붙여 쓴 것
+    rf"(?<![0-9A-Za-z])(?:\+[ \t]*82{_GAP}(?:\(0\)[ \t]*)?|\(?0)(?:1[016789]|2|[3-6][1-5])\)?"
+    rf"{_GAP}[0-9]{{3,4}}{_GAP}[0-9]{{4}}(?![0-9A-Za-z])",
+    # 계좌번호 — 하이픈 · 점으로 이은 숫자 묶음 셋 이상, 숫자 10~16개
+    rf"{_JOINED_EDGE}\+?(?=(?:[.{_DASH}]?[0-9]){{10,16}}(?![.{_DASH}]?[0-9]))"
+    rf"[0-9]{{2,6}}(?:[.{_DASH}][0-9]{{1,7}}){{2,5}}(?![0-9A-Za-z])",
+    # 하이픈 없는 계좌번호 · 전화번호 — 숫자 10~14개 한 덩이
+    rf"{_EDGE}\+?[0-9]{{10,14}}(?![0-9A-Za-z])",
+)
+CONTACT_RE = re.compile("|".join(CONTACT_SHAPES), re.IGNORECASE)
+
+
+def count_contacts(text: str) -> int:
+    """글 안 연락처 모양(CONTACT_RE)의 곳 수 — 전각 글자는 반각으로 맞춰 봅니다."""
+    return sum(1 for _ in CONTACT_RE.finditer(text.translate(HALF_WIDTH)))
+
+
+def mask_contacts(text: str) -> str:
+    """연락처 모양을 CONTACT_MASK 로 바꿉니다 — 바꾼 자리 옆에 새 모양이 드러나면 없어질 때까지 다시 봅니다.
+
+    자리는 전각을 반각으로 맞춘 글에서 찾고, 바꾸기는 원문에 합니다.
+    """
+    while True:
+        pieces: list[str] = []
+        last = 0
+        for match in CONTACT_RE.finditer(text.translate(HALF_WIDTH)):
+            pieces += (text[last : match.start()], CONTACT_MASK)
+            last = match.end()
+        if not pieces:
+            return text
+        text = "".join(pieces) + text[last:]
+
+
+def _kept(text: str, limit: int) -> str:
+    """결과 파일에 남길 바깥 글 사본 — `<` `>` 를 전각으로 바꾸고 연락처 모양을 가린 뒤 `limit` 자로 자르고,
+    자른 끝에 새로 생긴 모양도 가립니다.
+
+    자르기가 먼저면 반쯤 잘린 모양이 목록을 빠져나갑니다. 연락처가 없으면 `_clean(text, limit)` 과 같습니다.
+    """
+    return mask_contacts(mask_contacts(_clean(text, len(text)))[:limit])
+
+
+def file_texts(path: Path) -> list[str]:
+    """결과 파일의 글 — `.json` 은 이스케이프를 푼 모든 문자열(키와 값)이고 숫자 칸은 들지 않습니다.
+
+    그 밖의 파일은 글 전체 한 덩이입니다. 깊은 JSON 에도 되부름 없이 훑습니다.
+    """
+    text = path.read_text(encoding="utf-8")
+    if path.suffix != ".json":
+        return [text]
+    found: list[str] = []
+    pending: list[object] = [json.loads(text)]
+    while pending:
+        node = pending.pop()
+        if isinstance(node, str):
+            found.append(node)
+        elif isinstance(node, dict):
+            for key, value in node.items():
+                found.append(key)
+                pending.append(value)
+        elif isinstance(node, list):
+            pending.extend(node)
+    return found
+
+
+def contact_places(paths: Iterable[Path]) -> int:
+    """파일들에 남은 연락처 모양의 곳 수 — 실행기 끝 줄과 커밋된 결과를 보는 스위트 테스트가 함께 부릅니다."""
+    return sum(count_contacts(text) for path in paths for text in file_texts(path))
 
 
 def _raised(current: float, values: Sequence[float]) -> list[float]:
