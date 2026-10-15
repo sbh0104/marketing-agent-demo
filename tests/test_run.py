@@ -7,9 +7,11 @@ from __future__ import annotations
 import ast
 import contextlib
 import dataclasses
+import html
 import io
 import json
 import os
+import re
 import tempfile
 import unittest
 import urllib.parse
@@ -25,6 +27,7 @@ from agent.config import ConfigError, load_config
 from agent.guard import decide_post
 from agent.logbook import Event, Logbook, read_log
 from agent.models import Judgement, Verdict, VideoRecord, ViewSample
+from agent.report import render_report
 from agent.scheduler import run_loop
 from agent.store import Store
 from agent.watcher import Watcher
@@ -79,6 +82,11 @@ def title_of(video_id: str) -> str:
 def draft(n: int) -> str:
     """n 번째 초안 — 부를 때마다 다른 한글 50자라 반복 · 문장 틀 검사에 걸리지 않습니다."""
     return "".join(chr(0xAC00 + 100 * n + k) for k in range(50))
+
+
+def mark(field: str) -> str:
+    """결과 화면의 표시 글 — test_report 의 mark 와 같은 꼴(`<script>` · `"` · `&`, `~` 로 끝남)."""
+    return f'<script>"&MRK-{field}~'
 
 
 class FakeClock:
@@ -187,7 +195,7 @@ class FakeTab:
         self.closed = False
 
     def open(self, url: str) -> None:
-        self.url = url
+        self.url = url + self._chrome.url_suffix
 
     def prepare_comment(self, text: str) -> None:
         self._chrome.typed.append(text)
@@ -233,6 +241,7 @@ class FakeChrome:
 
     unreachable 이 n 이면 처음 n 번의 new_page 가 chrome_unreachable 로 멈춥니다.
     close_error 가 있으면 세션의 close 가 (센 뒤) 그 예외를 냅니다.
+    url_suffix 는 탭이 연 주소 뒤에 붙는 글 — 탭 주소에 바깥 글을 싣는 자리입니다(기본 빈 글).
     """
 
     def __init__(self) -> None:
@@ -241,6 +250,7 @@ class FakeChrome:
         self.typed: list[str] = []
         self.unreachable = 0
         self.close_error: BaseException | None = None
+        self.url_suffix = ""
 
     def __call__(self, debug_url: str) -> FakeSession:
         session = FakeSession(self, debug_url)
@@ -974,6 +984,190 @@ class TestRunMode(RunCase):
                 self.cycle(self.pipeline(dry_run=dry_run))
                 self.assertEqual(self.chrome.submits, [])
                 self.assertEqual(self.lines(Event.POST, mode="live"), [])
+
+
+class MarkedClaude(WriterClaude):
+    """WriterClaude 의 답 칸마다 표시 글 — 글 블록 · 도구 id · 고민 · 댓글. error 가 있으면 그것을 냅니다."""
+
+    def create(self, **kwargs: object) -> object:
+        self.calls.append(kwargs)
+        if self.error is not None:
+            raise self.error
+        message = tool_reply(
+            reply(mark("concern"), draft(len(self.calls)) + mark("comment")),
+            text=mark("claude-text"),
+        )
+        message.content[-1].id = mark("tool-id")
+        return message
+
+
+class TestReport(RunCase):
+    """결과 화면 — 사이클마다 CYCLE 줄 뒤에 data/report.html 을 저장소와 로그로만 다시 씁니다."""
+
+    UNREADABLE = '<span class="badge reason">로그를 읽지 못함</span>'
+
+    def page_path(self) -> Path:
+        return self.root / "data" / "report.html"
+
+    def page(self) -> str:
+        return self.page_path().read_text(encoding="utf-8")
+
+    def row(self, video_id: str) -> str:
+        match = re.search(rf'<tr id="v-{video_id}">.*?</tr>', self.page())
+        self.assertIsNotNone(match, video_id)
+        return match.group()
+
+    def run_scene(self) -> None:
+        """테스트 실행 한 사이클 — 명단 영상 A(리허설)와 검색으로 찾은 명단 밖 C."""
+        self.write_config(allowed=(A,), test_run=True)
+        self.show(A, 2000)
+        self.find(C)
+        self.show(C, 2000, channel="UC2")
+        self.cycle(self.pipeline())
+
+    def test_screen_is_store_plus_log(self) -> None:
+        self.run_scene()
+        events = read_log(self.log_path)
+        self.assertIs(events[-1][1], Event.CYCLE)
+        records = Store(self.root / "data" / "videos.json").records()
+        self.assertEqual([record.video_id for record in records], [A, C])
+        expected = render_report(records, events, generated_at=events[-1][0])
+        self.assertEqual(self.page_path().read_bytes(), expected.encode("utf-8"))
+
+    def test_screen_failure_changes_no_judgement_or_post(self) -> None:
+        self.run_scene()
+        store = (self.root / "data" / "videos.json").read_bytes()
+        events = read_log(self.log_path)
+        self.setUp()
+        self.page_path().mkdir(parents=True)  # 폴더라 화면 파일을 바꿔 끼울 수 없습니다
+        self.run_scene()
+        self.assertEqual(self.lines(Event.CYCLE), [{"n": "1", "errors": "0", "mode": "test"}])
+        self.assertEqual(len(self.lines(Event.ERROR, where="report")), 1)
+        self.assertEqual((self.root / "data" / "videos.json").read_bytes(), store)
+        kept = [
+            line
+            for line in read_log(self.log_path)
+            if not (line[1] is Event.ERROR and line[2].get("where") == "report")
+        ]
+        self.assertEqual(kept, events)
+
+    def test_unreadable_log_still_writes_screen(self) -> None:
+        for case in ("ValueError", "OSError"):
+            with self.subTest(case=case):
+                self.setUp()
+                if case == "ValueError":
+                    self.log_path.parent.mkdir(parents=True)
+                    self.log_path.write_text("not a log line\n", encoding="utf-8")
+                    self.run_scene()
+                    text = self.log_text()
+                    self.assertIn('ERROR where=report reason="ValueError: 1번째 줄: ', text)
+                    self.assertIn(" CYCLE n=1 ", text)
+                else:
+                    denied = PermissionError("denied")
+                    with mock.patch.object(run, "read_log", side_effect=denied):
+                        self.run_scene()
+                    self.assertEqual(
+                        self.lines(Event.ERROR, where="report"),
+                        [{"where": "report", "reason": "PermissionError: denied"}],
+                    )
+                page = self.page()
+                self.assertIn('<p class="warning">로그를 읽지 못해 ', page)
+                rows = re.findall(r'<tr id="v-[^"]+">.*?</tr>', page)
+                self.assertEqual(len(rows), 2)
+                for shown in rows:
+                    self.assertIn(self.UNREADABLE, shown)
+
+    def test_test_run_badges(self) -> None:
+        self.run_scene()
+        self.assertIn('<span class="badge">리허설 — 게시 버튼 앞에서 멈춤</span>', self.row(A))
+        self.assertIn('<span class="badge">허용 목록 밖이라 게시하지 않음</span>', self.row(C))
+        # 보통 실행 — 같은 명단 영상이 실제로 게시됩니다
+        self.setUp()
+        self.show(A, 2000)
+        self.cycle(self.pipeline())
+        self.assertIn('<span class="badge">게시됨</span>', self.row(A))
+
+    def test_marked_service_text_reaches_screen_escaped_or_not_at_all(self) -> None:
+        """가짜 서비스가 돌려주는 글 칸 모두와 설정 글에 표시 글 — 화면에는 이스케이프로만 나옵니다.
+
+        영상 ID 는 11자 모양이 정해져 있어 MRK 모양 ID 이고, 탭 주소는 연 ID 뒤에 표시 글이 붙습니다.
+        """
+        listed, searched = "MRKlistedAA", "MRKsearchCC"
+        self.write_config(allowed=(listed,), test_run=True)
+        loaded = self.load()
+        config = dataclasses.replace(
+            loaded,
+            topic=mark("topic"),
+            keywords=(mark("keyword"),),
+            classifier=dataclasses.replace(
+                loaded.classifier,
+                model=mark("model"),
+                on_topic_reasons=(mark("label"), *loaded.classifier.on_topic_reasons),
+                off_topic_reasons=(*loaded.classifier.off_topic_reasons, mark("off-label")),
+            ),
+            comment=dataclasses.replace(loaded.comment, writer_model=mark("writer-model")),
+            chrome_debug_url="http://" + mark("chrome"),
+        )
+        self.jev.classify[None] = response(choice=mark("label"))  # 표시 제목은 어느 ID 와도 안 맞음
+        self.claude = MarkedClaude()
+        self.services = dataclasses.replace(self.services, claude=self.claude)
+        self.chrome.url_suffix = "&x=" + mark("page-url")
+
+        def appear(video_id: str, name: str) -> None:
+            self.show(video_id, 2000)
+            self.api.videos[video_id]["snippet"].update(
+                title=mark(f"title-{name}"),
+                description=mark(f"description-{name}"),
+                channelId=mark(f"channel-{name}"),
+            )
+            self.api.comments[video_id] = [mark("top-comment")]
+
+        appear(listed, "listed")
+        pipeline = self.pipeline()
+        self.cycle(pipeline, config)
+        self.api.pages[(mark("keyword"), None)] = search_page([searched])
+        appear(searched, "searched")
+        self.claude.error = RuntimeError(mark("claude-error"))
+        self.cycle(pipeline, config)
+
+        # 표시 글이 정말 저장소와 로그까지 왔는지
+        stored = (self.root / "data" / "videos.json").read_text(encoding="utf-8")
+        for field in ("description-listed", "channel-searched", "keyword"):
+            self.assertIn(f"MRK-{field}~", stored)
+        for field in ("page-url", "claude-error", "title-searched"):
+            self.assertIn(f"MRK-{field}~", self.log_text())
+        page = self.page()
+        self.assertNotIn("<script", page.lower())
+        for field in ("title-listed", "title-searched", "label", "concern", "comment"):
+            with self.subTest(shown=field):
+                escaped = html.escape(mark(field), quote=True)
+                self.assertIn(escaped, page)
+                self.assertNotIn(mark(field), page)
+                self.assertEqual(page.count(f"MRK-{field}~"), page.count(escaped))
+        absent = (
+            "description-listed",
+            "description-searched",
+            "channel-listed",
+            "channel-searched",
+            "top-comment",
+            "keyword",
+            "topic",
+            "model",
+            "writer-model",
+            "off-label",
+            "chrome",
+            "claude-text",
+            "tool-id",
+            "claude-error",
+            "page-url",
+        )
+        for field in absent:
+            with self.subTest(absent=field):
+                self.assertNotIn(f"MRK-{field}~", page)
+        self.assertIn('<span class="badge">리허설 — 게시 버튼 앞에서 멈춤</span>', self.row(listed))
+        self.assertIn('<span class="badge reason">AI 호출 오류 (Claude)</span>', self.row(searched))
+        hrefs = set(re.findall(r'href="([^"]*)"', page))
+        self.assertEqual(hrefs, {watch(listed), watch(searched)})
 
 
 class TestOperatingRules(RunCase):
