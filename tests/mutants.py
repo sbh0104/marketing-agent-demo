@@ -288,6 +288,18 @@ MUTANTS: dict[str, tuple[str, str, str, str]] = {
         "if len(topic) > _MAX_TOPIC_CHARS:",
         "if False:",
     ),
+    "config-debug-url-any-host": (
+        "agent.config",
+        "tests.test_config",
+        "if not _LOOPBACK_URL.fullmatch(url):",
+        'if not url.startswith(("http://", "https://")):',
+    ),
+    "config-debug-url-prefix-only": (
+        "agent.config",
+        "tests.test_config",
+        "_LOOPBACK_URL.fullmatch(url)",
+        "_LOOPBACK_URL.match(url)",
+    ),
     "scheduler-one-sleep": (
         "agent.scheduler",
         "tests.test_scheduler",
@@ -623,7 +635,7 @@ MUTANTS: dict[str, tuple[str, str, str, str]] = {
     "trigger-same-instant": (
         "agent.trigger",
         "tests.test_trigger",
-        "earlier = [sample for sample in ordered if _utc(sample.at) < _utc(latest.at)]",
+        "earlier = [sample for sample in ordered if _utc(latest.at) - _utc(sample.at) >= _MIN_GAP]",
         "earlier = ordered[:-1]",
     ),
     "trigger-min-views-exclusive": (
@@ -661,6 +673,24 @@ MUTANTS: dict[str, tuple[str, str, str, str]] = {
         "tests.test_trigger",
         "if rate < config.min_views_per_hour:",
         "if rate <= config.min_views_per_hour:",
+    ),
+    "trigger-gap-ignored": (
+        "agent.trigger",
+        "tests.test_trigger",
+        "_MIN_GAP = timedelta(minutes=10)",
+        "_MIN_GAP = _MICROSECOND",
+    ),
+    "trigger-gap-exclusive": (
+        "agent.trigger",
+        "tests.test_trigger",
+        "_utc(latest.at) - _utc(sample.at) >= _MIN_GAP",
+        "_utc(latest.at) - _utc(sample.at) > _MIN_GAP",
+    ),
+    "trigger-gap-wall-clock": (
+        "agent.trigger",
+        "tests.test_trigger",
+        "_utc(latest.at) - _utc(sample.at) >= _MIN_GAP",
+        "latest.at - sample.at >= _MIN_GAP",
     ),
     "youtube-comments-free": (
         "agent.youtube",
@@ -935,8 +965,8 @@ MUTANTS: dict[str, tuple[str, str, str, str]] = {
     "live-check-applied-exception-any-run": (
         "tests.test_live_check_applied",
         "tests.test_live_check_applied",
-        "(run_at == BEFORE_FIX_RUN_AT and line == BEFORE_FIX_LINE)",
-        "(line == BEFORE_FIX_LINE)",
+        "(run_at == AFTER_FIX_RUN_AT and line == AFTER_FIX_LINE)",
+        "(line == AFTER_FIX_LINE)",
     ),
     "live-check-applied-stored-verdicts-unchecked": (
         "tests.test_live_check_applied",
@@ -955,6 +985,19 @@ MUTANTS: dict[str, tuple[str, str, str, str]] = {
         "tests.test_live_check_applied",
         "return lowest_score(scores) + _TOLERANCE >= threshold",
         "return lowest_score(scores) >= threshold",
+    ),
+    "live-check-applied-answer-three-cells": (
+        "tests.test_live_check_applied",
+        "tests.test_live_check_applied",
+        "cells = [task.get(name) if isinstance(task, Mapping) else None for name in TASK_CELLS]",
+        "cells = [True for name in TASK_CELLS]",
+    ),
+    "live-check-applied-skip-reads-reason": (
+        "tests.test_live_check_applied",
+        "tests.test_live_check_applied",
+        'kind = video.get("skip_kind")',
+        'kind = live_check.SKIP_KIND_OF.get(str((video.get("untrusted") or {})'
+        '.get("skip_reason", "")).split(" — ")[0], video.get("skip_kind"))',
     ),
     "live-check-skip-grade-every-skip": (
         "tests.live_check",

@@ -24,6 +24,7 @@ from agent.classifier import LANGUAGES, QUESTION_LANGUAGE, _decide
 from agent.config import ClassifierConfig, load_config
 from agent.models import Verdict
 from agent.writer import (
+    CHECK_LABELS,
     CHECK_QUESTIONS,
     INVERTED_QUESTIONS,
     RECENT_WINDOW,
@@ -51,11 +52,36 @@ TOPIC_ANSWERS = ("연애", "아님")
 TRACKER_FLOORS = (0.75, 0.6)  # 트래커 Phase 6D 의 기록 줄(결정 아님)이 본 두 하한 — 기록만
 DATE_KEYS = frozenset({"published_at", "published_after", "published_before"})
 GO_LINE = "6B: go"
-# 트래커 Phase 6D 드리프트 인터뷰 질문 1 A — 작성 막힘인 채로 '고치기 전' 기록으로 반영한 단 한 실행
+# 트래커 Phase 6F 사람 실행 뒤 인터뷰('6F 예외로 착지') — 작성 막힘인 채로 '6E 뒤' 기록으로 반영한 단 한 실행
+AFTER_FIX_RUN_AT = "2026-10-15T08:42:22.401654+00:00"
+AFTER_FIX_LINE = "6B: stop — 작성 막힘(SKIP 8/13)"
+# 트래커 Phase 6D 드리프트 인터뷰 질문 1 A 가 '고치기 전'(6E 전) 기록으로 반영했던 실행 — 이제 반영하지 않고, 결과
+# 파일은 이 트리에 없습니다(커밋 a2b2f2f 의 docs/live-check/result.json). 과제 품질 세 칸은 그 결과의 운영 창
+# 셈이고 6D 가 계약 '댓글 작성' 절에 적은 기록과 같습니다 — 6D 는 운영 창 하나뿐인 실행이라 실행 전체 셈이기도 합니다
 BEFORE_FIX_RUN_AT = "2026-10-14T14:09:02.882902+00:00"
 BEFORE_FIX_LINE = "6B: stop — 작성 막힘(SKIP 5/7)"
+BEFORE_FIX_TASKS: dict[str, dict[str, int] | None] = {
+    "operation": {"love": 4, "saju": 4, "tasks": 11, "framed": 10, "drafts": 11},
+    "widened": None,
+}
+NO_CONCERN = "no_concern"  # 재료에 연애 고민 없음 — 6E 뒤 작성기가 초안 없이 건너뛸 수 있는 이유 낱말
 WINDOW_LABELS = {"operation": "운영 창", "widened": "넓힌 창"}
 ANSWERS = ("ok", "bad")
+TASK_CELLS = ("concern_is_love_worry", "saju_story_fits")
+TASK_PHRASES = (
+    ("love", "tasks", "ⓐ 고민 한 줄이 연애 고민"),
+    ("saju", "tasks", "ⓑ 연애사주 경험이 고민과 이어짐"),
+    ("framed", "drafts", f"ⓒ 다른 영상 초안과 겹치는 {live_check.FRAME_CHARS}글자 조각이 있는 초안"),
+)
+# Claude 채점 세 칸이 나쁨인 값과 그 칸에 맞는 jev 질문 이름 — tests/live_check.py (GRADE_KEYS) 의 셋이 ok 인 쪽의 반대
+GRADE_BAD = (
+    ("scene_in_material", False, "mentions_scene"),
+    ("reads_like_ad", True, "reads_like_ad"),
+    ("follows_concern", False, "follows_concern"),
+)
+SKIP_HUMAN = ("정당", "부당")
+SKIP_GRADE_CELL = {"no_scene": "material_has_scene", "no_concern": "material_has_love_worry"}
+CHECKS_FAILED = "checks_failed"  # 실행기가 검사 두 번 탈락 영상의 skip_kind 에 적는 낱말
 _NOW = datetime(2026, 1, 1, tzinfo=timezone.utc)
 
 
@@ -90,11 +116,11 @@ def cell(fingerprint: Mapping[str, object], key: str) -> object:
 
 
 def admitted(run_at: object, line: str) -> bool:
-    """반영하는 판정 줄인지 — `6B: go` 이거나, 고치기 전 기록으로 반영한 한 실행의 그 판정 줄.
+    """반영하는 판정 줄인지 — `6B: go` 이거나, '6E 뒤' 기록으로 반영한 한 실행(트래커 Phase 6F)의 그 판정 줄.
 
     실행 시각과 판정 줄은 글자 그대로 같아야 합니다 — 다른 실행이거나 다른 경우가 섞이면 멈춥니다.
     """
-    return line == GO_LINE or (run_at == BEFORE_FIX_RUN_AT and line == BEFORE_FIX_LINE)
+    return line == GO_LINE or (run_at == AFTER_FIX_RUN_AT and line == AFTER_FIX_LINE)
 
 
 def measured_drift(
@@ -253,13 +279,28 @@ def classification_lines(result: dict) -> list[str]:
     return lines
 
 
+def claude_answer(draft: Mapping[str, object]) -> str | None:
+    """Claude 채점 다섯 칸의 정답 — 초안 채점 세 칸(`claude_grade`)과 과제 품질 두 칸(`task_quality`).
+
+    하나라도 나쁨이면 `bad`, 다섯이 모두 좋음이면 `ok`, 그 밖은 None(트래커 Phase 6F — 6D 드리프트
+    인터뷰 질문 3 A). 과제 칸은 참거짓 그대로만 읽습니다.
+    """
+    grade = draft["claude_grade"] if draft["claude_grade"] in ANSWERS else None
+    task = draft.get("task_quality")
+    cells = [task.get(name) if isinstance(task, Mapping) else None for name in TASK_CELLS]
+    if grade == "bad" or any(cell is False for cell in cells):
+        return "bad"
+    if grade == "ok" and all(cell is True for cell in cells):
+        return "ok"
+    return None
+
+
 def draft_answer(draft: Mapping[str, object]) -> str | None:
-    """초안의 정답 — 사람 칸(`ok` · `bad`)이 있으면 그것, 없으면 Claude 채점, 둘 다 없으면 None."""
+    """초안의 정답 — 사람 칸(`ok` · `bad`)이 있으면 그것, 없으면 Claude 채점 다섯 칸(`claude_answer`),
+    둘 다 없으면 None."""
     if draft["human"] in ANSWERS:
         return draft["human"]
-    if draft["claude_grade"] in ANSWERS:
-        return draft["claude_grade"]
-    return None
+    return claude_answer(draft)
 
 
 def draft_counts(result: dict, window: str) -> dict[str, int]:
@@ -274,6 +315,8 @@ def draft_counts(result: dict, window: str) -> dict[str, int]:
         "human": 0,
         "claude": 0,
         "answered": 0,
+        "ok": 0,
+        "bad": 0,
         "grade_errors": 0,
         "differ": 0,
         "bad_passed": 0,
@@ -281,11 +324,13 @@ def draft_counts(result: dict, window: str) -> dict[str, int]:
     }
     for draft in drafts:
         human = draft["human"] if draft["human"] in ANSWERS else None
-        claude = draft["claude_grade"] if draft["claude_grade"] in ANSWERS else None
+        claude = claude_answer(draft)
         answer = draft_answer(draft)
         counts["human"] += human is not None
         counts["claude"] += claude is not None
         counts["answered"] += answer is not None
+        counts["ok"] += answer == "ok"
+        counts["bad"] += answer == "bad"
         counts["grade_errors"] += draft["grade_error"] is not None
         counts["differ"] += human is not None and claude is not None and human != claude
         counts["bad_passed"] += answer == "bad" and draft["self_check_pass"] is True
@@ -304,6 +349,7 @@ def draft_lines(result: dict) -> list[str]:
         lines.append(
             f"초안 {label}: 쓴 영상 {c['written']} · SKIP {c['skip']} · 초안 {c['drafts']}"
             f" · 정답 있음 {c['answered']} (사람 칸 {c['human']} · Claude 채점 {c['claude']})"
+            f" · 정답 ok {c['ok']} · 정답 bad {c['bad']}"
             f" · 채점 오류 {c['grade_errors']} · 사람 칸과 Claude 채점이 다름 {c['differ']}"
             f" · 정답 bad 인데 통과 {c['bad_passed']} · 정답 ok 인데 탈락 {c['ok_failed']}"
         )
@@ -335,6 +381,23 @@ def lowest_score(scores: Mapping[str, float]) -> float:
         raise ValueError(f"초안 점수의 질문 이름을 셀 수 없습니다: {unknown}")
     return min(
         1.0 - value if name in INVERTED_QUESTIONS else value for name, value in scores.items()
+    )
+
+
+def comparison_label(name: str) -> str:
+    """비교 점수의 이름표 — '예' 가 나쁜 질문은 비교 점수가 1 − P(예)라 ' 아님' 을 붙입니다."""
+    return CHECK_LABELS[name] + (" 아님" if name in INVERTED_QUESTIONS else "")
+
+
+def lowest_question(scores: Mapping[str, float]) -> str:
+    """가장 낮은 비교 점수의 질문 이름 — 같은 값이면 CHECK_QUESTIONS 차례가 앞선 것; 이름 검사는
+    `lowest_score` 그대로(모르는 이름은 ValueError)."""
+    floor = lowest_score(scores)
+    return next(
+        name
+        for name in CHECK_QUESTIONS
+        if name in scores
+        and (1.0 - scores[name] if name in INVERTED_QUESTIONS else scores[name]) == floor
     )
 
 
@@ -572,16 +635,176 @@ def task_lines(result: dict) -> list[str]:
     return lines
 
 
-def todo_line(result: dict) -> str:
-    """보고서 첫머리의 6E 줄 — 이번 결과는 늘 "할 일 있음"(트래커 Phase 6D 드리프트 인터뷰 질문 3 A)."""
-    c = task_counts(result, None)
-    return (
-        f"6E: 할 일 있음 — ⓐ 고민 한 줄이 연애 고민 {c['love']}/{c['tasks']}"
-        f" · ⓑ 연애사주 경험이 고민과 이어짐 {c['saju']}/{c['tasks']}"
-        f" · ⓒ 다른 영상 초안과 겹치는 {live_check.FRAME_CHARS}글자 조각이 있는 초안"
-        f" {c['framed']}/{c['drafts']} · 건너뜀 SKIP {c['skip']}/{c['written']}"
-        f" · 작성기 답을 JSON 으로 못 읽은 초안 {c['unparsed']}/{c['drafts']}"
+def _skip_kind(video: Mapping[str, object]) -> str | None:
+    """건너뛴 이유 낱말 — 정해진 칸 `skip_kind` 만 읽습니다(`untrusted.skip_reason` 은 읽지 않음, E-045)."""
+    kind = video.get("skip_kind")
+    return kind if isinstance(kind, str) else None
+
+
+def skip_justified(video: Mapping[str, object]) -> bool | None:
+    """사람 칸(`정당` · `부당`)이 있으면 그것, 없으면 건너뜀 채점에서 그 이유의 칸 — 거짓이면 정당, 참이면
+    부당, 채점이 없거나(오류) 칸이 참거짓이 아니면 None; 빈 사람 칸은 동의가 아닙니다(트래커 Phase 6E
+    질문 2 A · 3 A)."""
+    cell = SKIP_GRADE_CELL.get(_skip_kind(video))
+    if cell is None:
+        return None
+    human = video.get("skip_human")
+    if human in SKIP_HUMAN:
+        return human == "정당"
+    grade = video.get("skip_grade")
+    value = grade.get(cell) if isinstance(grade, Mapping) else None
+    if value is False:
+        return True
+    if value is True:
+        return False
+    return None
+
+
+def skip_lines(result: dict) -> list[str]:
+    """창마다 스스로 건너뜀의 이유별 정당 n/m — 기록만이고 판정 줄 · 통과선을 움직이지 않습니다."""
+    names = {kind: name for name, kind in live_check.SKIP_KIND_OF.items()}
+    lines: list[str] = []
+    for window, label in WINDOW_LABELS.items():
+        if window not in result["windows"]:
+            lines.append(f"정당한 건너뜀 {label}: 실행 없음")
+            continue
+        skipped = [video for video in _window_videos(result, window) if video["result"] == "skip"]
+        parts: list[str] = []
+        for kind in live_check.SELF_SKIP_KINDS:
+            group = [video for video in skipped if _skip_kind(video) == kind]
+            parts.append(
+                f"{names[kind]}"
+                f" {sum(1 for video in group if skip_justified(video) is True)}/{len(group)}"
+            )
+        unknown = sum(
+            1
+            for video in skipped
+            if _skip_kind(video) in SKIP_GRADE_CELL and skip_justified(video) is None
+        )
+        failed = sum(1 for video in skipped if _skip_kind(video) == CHECKS_FAILED)
+        lines.append(
+            f"정당한 건너뜀 {label}: "
+            + " · ".join(parts)
+            + f" · 정답 없음 {unknown} · 검사 두 번 탈락 {failed}"
+        )
+    return lines
+
+
+def _share(counts: Mapping[str, int] | None, top: str, bottom: str) -> str:
+    return "실행 없음" if counts is None else f"{counts[top]}/{counts[bottom]}"
+
+
+def _size(counts: Mapping[str, int] | None) -> str:
+    return "실행 없음" if counts is None else str(counts["drafts"])
+
+
+def _after(result: dict, window: str) -> dict[str, int] | None:
+    return task_counts(result, window) if window in result["windows"] else None
+
+
+def _gated(result: dict, window: str) -> str:
+    """재료에 연애 고민이 없다고 보고 초안 없이 건너뛴 영상 수 — 정해진 칸 `skip_kind` 와 `parsed` 만 읽습니다."""
+    if window not in result["windows"]:
+        return "실행 없음"
+    return str(
+        sum(
+            1
+            for video in _window_videos(result, window)
+            if _skip_kind(video) == NO_CONCERN
+            and not any(draft["parsed"] is True for draft in video["drafts"])
+        )
     )
+
+
+def before_after_lines(result: dict) -> list[str]:
+    """과제 품질 전후 — 창마다 6E 전(Phase 6D 의 실행, 고정값) → 6E 뒤(이 결과의 셈) 세 칸(트래커 Phase 6F
+    전후 숫자)."""
+    return [
+        f"과제 품질 전후 {label}: "
+        + " · ".join(
+            f"{phrase} {_share(BEFORE_FIX_TASKS[window], top, bottom)}"
+            f" → {_share(_after(result, window), top, bottom)}"
+            for top, bottom, phrase in TASK_PHRASES
+        )
+        for window, label in WINDOW_LABELS.items()
+    ]
+
+
+def before_after_notes(result: dict) -> list[str]:
+    sizes = " · ".join(
+        f"{label} {_size(BEFORE_FIX_TASKS[w])} → {_size(_after(result, w))}"
+        for w, label in WINDOW_LABELS.items()
+    )
+    gates = " · ".join(f"{label} {_gated(result, w)}" for w, label in WINDOW_LABELS.items())
+    return [
+        f"초안 수는 {sizes} 라 전후 차이는 표본 안의 우연일 수 있습니다 — 두 실행의 창 비율이 달라"
+        " ⓐ · ⓑ 는 창마다 따로 견줍니다",
+        "ⓒ 는 초안마다 실행 전체의 다른 영상 초안과 겹친 조각을 센 칸(`frame_overlap`)이라 창 줄의 ⓒ 는"
+        " 그 셈을 창으로 나눈 것입니다 — 6D 는 운영 창 하나뿐인 실행이라 실행 전체로 견주면"
+        f" {_share(BEFORE_FIX_TASKS['operation'], 'framed', 'drafts')}"
+        f" → {_share(task_counts(result, None), 'framed', 'drafts')} 입니다(6F 는 연락처 모양을 가린"
+        " 글로, 6D 는 가리기 전 글로 셌습니다 — Phase 6G)",
+        f"재료에 연애 고민이 없다고 보고 초안 없이 건너뛴 영상은 {gates} 이고, 이 영상들은 ⓐ · ⓑ · ⓒ"
+        " 의 분모 밖입니다 — ⓐ 와 같은 것(고민이 연애 고민인지)을 보고 거른 것이라 ⓐ 의 전후 차이에는"
+        " 이 거름이 섞여 있을 수 있습니다",
+    ]
+
+
+def bad_questions(draft: Mapping[str, object]) -> list[str]:
+    """Claude 채점 다섯 칸 가운데 나쁨인 칸의 jev 질문 이름 — 참거짓 그대로만 읽고, 채점이 없거나
+    참거짓이 아닌 칸은 빠집니다."""
+    grade = draft.get("grade")
+    task = draft.get("task_quality")
+    names = [
+        question
+        for cell, bad, question in GRADE_BAD
+        if isinstance(grade, Mapping) and grade.get(cell) is bad
+    ]
+    names += [name for name in TASK_CELLS if isinstance(task, Mapping) and task.get(name) is False]
+    return names
+
+
+def without_human_cells(result: dict) -> dict:
+    """초안의 사람 칸(`human`)을 모두 비운 깊은 복사본 — 정답이 Claude 채점 다섯 칸만일 때의 다시 셈을
+    봅니다."""
+    blank = copy.deepcopy(result)
+    for video in blank["videos"]:
+        for draft in video["drafts"]:
+            draft["human"] = ""
+    return blank
+
+
+def limit_lines(result: dict) -> list[str]:
+    """통과선 알려진 한계의 기록 두 줄 — 사람 칸을 비우면 막을 초안(창 · 영상 · 시도, 나쁨 칸 · 가장 낮은
+    비교 점수)과 다시 셈, 초안마다 가장 낮은 비교 점수의 질문 수(트래커 Phase 6F 보류 문 인터뷰 질문
+    3 A). 기록만."""
+    blank = without_human_cells(result)
+    blocking = {id(draft) for draft in blocking_drafts(blank)}
+    cases: list[str] = []
+    for video in blank["videos"]:
+        for draft in video["drafts"]:
+            if id(draft) not in blocking:
+                continue
+            low = lowest_score(draft["scores"])
+            cases.append(
+                f"{WINDOW_LABELS[video['window']]} {video['video_id']} 시도 {draft['attempt']}"
+                f"(나쁨: {', '.join(CHECK_LABELS[name] for name in bad_questions(draft)) or '없음'}"
+                f" / 가장 낮은 비교 점수: {comparison_label(lowest_question(draft['scores']))}"
+                f" {low:.2f} → {round(low + live_check.MARGIN, 6)})"
+            )
+    floor = check_floor(blank)
+    first = (
+        f"사람 칸을 비우면: 정답 bad 인데 자체 검사를 통과한 초안 {len(cases)}"
+        f" · 다시 셈 {'없음(1 을 넘음)' if floor is None else floor}"
+    )
+    if cases:
+        first += " — " + " · ".join(cases)
+    scored = [draft for draft in _parsed_drafts(result) if isinstance(draft["scores"], Mapping)]
+    counts = Counter(lowest_question(draft["scores"]) for draft in scored)
+    second = f"가장 낮은 비교 점수의 질문: 초안 {len(scored)} 가운데 " + " · ".join(
+        f"{comparison_label(name)} {counts[name]}" for name in CHECK_QUESTIONS
+    )
+    return [first, second]
 
 
 def mark_text(value: object, path: str = "") -> object:
@@ -625,7 +848,10 @@ def record_heads() -> list[str]:
             f"보류 영상 하한 내림 {label}:",
             f"과제 품질 {label}:",
             f"인기 댓글 {label}:",
+            f"정당한 건너뜀 {label}:",
+            f"과제 품질 전후 {label}:",
         ]
+    heads += ["사람 칸을 비우면:", "가장 낮은 비교 점수의 질문:"]
     heads.append("모델 이름:")
     return heads
 
@@ -693,6 +919,9 @@ class ContractHeadTest(unittest.TestCase):
             *lowering_lines(result),
             *draft_lines(result),
             *task_lines(result),
+            *skip_lines(result),
+            *before_after_lines(result),
+            *limit_lines(result),
             model_line(result),
         ]
         for line in lines:
@@ -768,28 +997,32 @@ class CommittedResultTest(unittest.TestCase):
 
 
 class AdmittedTest(ContractCase):
-    """`admitted` — `6B: go` 와, 고치기 전 기록으로 반영한 한 실행의 한 판정 줄만(트래커 Phase 6D
-    드리프트 인터뷰 질문 1 A)."""
+    """`admitted` — `6B: go` 와, '6E 뒤' 기록으로 반영한 한 실행의 한 판정 줄만(트래커 Phase 6F
+    사람 실행 뒤 인터뷰 — '6F 예외로 착지'). 6D 가 반영한 실행은 이제 빨강 표본입니다."""
 
-    RUN = "2026-10-14T14:09:02.882902+00:00"
-    LINE = "6B: stop — 작성 막힘(SKIP 5/7)"
+    RUN = "2026-10-15T08:42:22.401654+00:00"
+    LINE = "6B: stop — 작성 막힘(SKIP 8/13)"
+    OLD = ("2026-10-14T14:09:02.882902+00:00", "6B: stop — 작성 막힘(SKIP 5/7)")
     GREEN = (
         ("2026-10-20T00:00:00+00:00", "6B: go"),
         (RUN, LINE),
     )
     RED = (
-        ("2026-10-14T04:28:16.180435+00:00", LINE),
-        ("2026-10-14T14:09:02+00:00", LINE),
-        ("2026-10-14T14:09:02.882902Z", LINE),
-        (" 2026-10-14T14:09:02.882902+00:00", LINE),
-        (RUN, "6B: stop — 작성 막힘(SKIP 5/7); 채점 막힘(오류 6/11)"),
-        (RUN, "6B: stop — 작성 막힘(SKIP 6/7)"),
-        (RUN, "6B: stop - 작성 막힘(SKIP 5/7)"),
-        (RUN, "6B: stop – 작성 막힘(SKIP 5/7)"),
-        (RUN, "6B: stop — 작성 막힘(SKIP ５/7)"),
-        (RUN, "6B: stop —  작성 막힘(SKIP 5/7)"),
-        (RUN, "6b: stop — 작성 막힘(SKIP 5/7)"),
-        (RUN, "6B: stop — 작성 막힘(SKIP 5/7) "),
+        OLD,
+        (OLD[0], LINE),
+        (RUN, OLD[1]),
+        ("2026-10-15T08:20:33+00:00", LINE),
+        ("2026-10-15T08:42:22+00:00", LINE),
+        ("2026-10-15T08:42:22.401654Z", LINE),
+        (" 2026-10-15T08:42:22.401654+00:00", LINE),
+        (RUN, "6B: stop — 작성 막힘(SKIP 8/13); 채점 막힘(오류 6/11)"),
+        (RUN, "6B: stop — 작성 막힘(SKIP 7/13)"),
+        (RUN, "6B: stop - 작성 막힘(SKIP 8/13)"),
+        (RUN, "6B: stop – 작성 막힘(SKIP 8/13)"),
+        (RUN, "6B: stop — 작성 막힘(SKIP ８/13)"),
+        (RUN, "6B: stop —  작성 막힘(SKIP 8/13)"),
+        (RUN, "6b: stop — 작성 막힘(SKIP 8/13)"),
+        (RUN, "6B: stop — 작성 막힘(SKIP 8/13) "),
     )
 
     def test_green_samples_are_admitted(self) -> None:
@@ -803,9 +1036,12 @@ class AdmittedTest(ContractCase):
                 self.assertFalse(admitted(run_at, line))
 
     def test_exception_is_written_in_contract(self) -> None:
-        self.assert_in_contract(
-            f"예외는 하나뿐입니다 — 실행 `{BEFORE_FIX_RUN_AT}` 의 `{BEFORE_FIX_LINE}`"
-        )
+        for phrase in (
+            f"예외는 하나뿐입니다 — 실행 `{AFTER_FIX_RUN_AT}` 의 `{AFTER_FIX_LINE}`",
+            f"실행 `{BEFORE_FIX_RUN_AT}` 의 `{BEFORE_FIX_LINE}` 도 이제 빨강입니다",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assert_in_contract(phrase)
 
 
 def _with_cell(fingerprint: Mapping[str, object], key: str, value: object) -> dict:
@@ -889,12 +1125,46 @@ class MeasuredDriftTest(unittest.TestCase):
             topic_grade_lines,
             lowering_lines,
             task_lines,
-            todo_line,
+            skip_lines,
+            before_after_lines,
+            before_after_notes,
+            limit_lines,
         )
         for render in renders:
             with self.subTest(render=render.__name__):
                 self.assertEqual(render(tampered), render(result))
         self.assertEqual(recount(tampered), recount(result))
+
+    def test_untrusted_cells_are_not_read(self) -> None:
+        # E-045 — 결과의 untrusted 글은 기록 셈에 들어가지 않습니다: 표식을 심고, 건너뜀 이유에는 반대 이유 이름을 심습니다
+        names = {kind: name for name, kind in live_check.SKIP_KIND_OF.items()}
+        swap = {"no_scene": "no_concern", "no_concern": "no_scene"}
+        tampered = copy.deepcopy(self.result)
+        for i, video in enumerate(tampered["videos"]):
+            if isinstance(video.get("untrusted"), Mapping):
+                video["untrusted"] = mark_text(video["untrusted"], f"videos[{i}].untrusted")
+            for n, draft in enumerate(video["drafts"]):
+                if isinstance(draft.get("untrusted"), Mapping):
+                    draft["untrusted"] = mark_text(
+                        draft["untrusted"], f"videos[{i}].drafts[{n}].untrusted"
+                    )
+        for video in tampered["videos"]:
+            if video["result"] == "skip" and isinstance(video.get("untrusted"), Mapping):
+                video["untrusted"]["skip_reason"] = (
+                    names[swap.get(video["skip_kind"], "no_scene")] + " — 1차: 표식"
+                )
+        for render in (
+            skip_lines,
+            draft_lines,
+            task_lines,
+            check_floor_line,
+            before_after_lines,
+            before_after_notes,
+            limit_lines,
+        ):
+            with self.subTest(render=render.__name__):
+                self.assertEqual(render(tampered), render(self.result))
+        self.assertEqual(recount(tampered), recount(self.result))
 
     def test_every_fingerprint_key_is_sorted(self) -> None:
         keys = (*GUARDED, *RECOUNTED, *WRITE_SIDE)
@@ -962,6 +1232,7 @@ class RecountTest(unittest.TestCase):
         human: str = "",
         claude: str | None = "ok",
         passed: bool = True,
+        tasks: tuple[bool, bool] = (True, True),
     ) -> dict:
         result = load_result()
         found = next(
@@ -977,6 +1248,8 @@ class RecountTest(unittest.TestCase):
             claude_grade=claude,
             grade_error=None if claude is not None else "응답 모양",
             self_check_pass=passed,
+            task_quality=dict(zip(TASK_CELLS, tasks)),
+            task_error=None,
         )
         return draft
 
@@ -1106,8 +1379,8 @@ class RecountTest(unittest.TestCase):
         fake = self.fake(drafts=(self.draft((0.95, 0.05, 0.95), claude="bad"),))
         self.assertEqual(check_floor(fake), 1.0)
 
-    def test_todo_line_counts_both_windows(self) -> None:
-        # 6E 줄은 모든 창의 셈 — 운영 창 초안 하나와 넓힌 창 초안 하나의 분모는 2
+    def test_task_counts_without_window_counts_both_windows(self) -> None:
+        # 창 없이 센 task_counts 는 모든 창의 셈 — 운영 창 초안 하나와 넓힌 창 초안 하나의 분모는 2
         fake = self.fake(drafts=(self.draft(),))
         widened = copy.deepcopy(fake["videos"][0])
         widened["window"] = "widened"
@@ -1115,24 +1388,54 @@ class RecountTest(unittest.TestCase):
         both, operation = task_counts(fake, None), task_counts(fake, "operation")
         self.assertEqual((both["tasks"], both["drafts"]), (2, 2))
         self.assertEqual((operation["tasks"], operation["drafts"]), (1, 1))
-        line = todo_line(fake)
-        for phrase in (
-            f"ⓐ 고민 한 줄이 연애 고민 {both['love']}/{both['tasks']} ·",
-            f"ⓑ 연애사주 경험이 고민과 이어짐 {both['saju']}/{both['tasks']} ·",
-            f"글자 조각이 있는 초안 {both['framed']}/{both['drafts']} ·",
-        ):
-            with self.subTest(phrase=phrase):
-                self.assertIn(phrase, line)
 
     def test_draft_answer_samples(self) -> None:
+        # 트래커 Phase 6F — 6D 드리프트 인터뷰 질문 3 A: 정답은 채점 다섯 칸(사람 칸이 있으면 그것)이고,
+        # 과제 칸은 참거짓 그대로만 읽습니다(결과 파일은 믿을 수 없는 입력 — 정해진 칸만)
+        def five(human: str, grade: object, **task: object) -> dict[str, object]:
+            cells = {"concern_is_love_worry": True, "saju_story_fits": True} | task
+            return {"human": human, "claude_grade": grade, "task_quality": cells}
+
         samples = (
             ({"human": "ok", "claude_grade": "bad"}, "ok"),
             ({"human": "bad", "claude_grade": "ok"}, "bad"),
             ({"human": "", "claude_grade": "bad"}, "bad"),
+            (five("", "ok"), "ok"),
+            (five("", "ok", concern_is_love_worry=False), "bad"),
+            (five("", "ok", saju_story_fits=False), "bad"),
+            ({"human": "", "claude_grade": "bad", "task_quality": None}, "bad"),
+            (five("ok", "bad", concern_is_love_worry=False, saju_story_fits=False), "ok"),
+            (five("", "OK"), None),
+            (five("", " ok"), None),
+            (five("", "ok", concern_is_love_worry="false"), None),
+            (five("", "ok", concern_is_love_worry=0), None),
+            (five("", "ok", saju_story_fits=1), None),
+            (
+                {
+                    "human": "",
+                    "claude_grade": "ok",
+                    "task_quality": {"concern_is_love_worry": True},
+                },
+                None,
+            ),
         )
         for draft, expected in samples:
             with self.subTest(draft=draft):
                 self.assertEqual(draft_answer(draft), expected)
+
+    def test_task_quality_moves_check_floor(self) -> None:
+        # 약속 "과제 품질 ⓐ · ⓑ 는 위 정답 다섯 칸에 들어 통과선을 움직입니다" — Claude 채점 ok 로 통과한
+        # 초안도 ⓐ 나 ⓑ 가 거짓이면 정답 bad 라 통과선을 올리고, 사람 칸이 있으면 그것이 이깁니다
+        cases = (
+            ((True, True), "", 0.7),
+            ((False, True), "", 0.85),
+            ((True, False), "", 0.85),
+            ((False, False), "ok", 0.7),
+        )
+        for tasks, human, expected in cases:
+            with self.subTest(tasks=tasks, human=human):
+                draft = self.draft((0.80, 0.1, 0.9), human=human, claude="ok", tasks=tasks)
+                self.assertEqual(check_floor(self.fake(drafts=(draft,))), expected)
 
     def test_lowered_recorded_floors_are_caught(self) -> None:
         on_topic = load_result()["fingerprint"]["classifier"]["on_topic_reasons"][0]
@@ -1216,11 +1519,15 @@ class RecountTest(unittest.TestCase):
 
         self.assertEqual(floors(tampered), floors(result))
 
-    def test_task_cells_do_not_move_check_floor(self) -> None:
-        # 약속 "과제 품질 · 인기 댓글 숫자는 기록입니다 — 통과선은 이 숫자로 움직이지 않습니다"
+    def test_overlap_and_popular_cells_do_not_move_check_floor(self) -> None:
+        # 약속 "과제 품질 ⓒ · 과제 칸 오류 · 인기 댓글 숫자는 기록입니다 — 통과선은 이 숫자로 움직이지
+        # 않습니다"
         raised = self.fake(drafts=(self.draft((0.71, 0.1, 0.9), claude="bad"),))
         swap = {"top_comments": "title_description", "title_description": "top_comments"}
-        cases = (("committed", load_result(), 0.7), ("raised", raised, 0.76))
+        cases = (
+            ("committed", load_result(), load_config(REPO_CONFIG).comment.check_min_probability),
+            ("raised", raised, 0.76),
+        )
         for name, result, expected in cases:
             with self.subTest(result=name):
                 self.assertEqual(check_floor(result), expected)
@@ -1231,10 +1538,135 @@ class RecountTest(unittest.TestCase):
                     for draft in video["drafts"]:
                         if draft["parsed"] is not True:
                             continue
-                        self._flip_tasks(draft)
                         draft.update(task_error="응답 모양", frame_overlap=99)
                 self.assertNotEqual(task_lines(changed), task_lines(result))
                 self.assertEqual(check_floor(changed), expected)
+                self.assertEqual(check_floor_line(changed), check_floor_line(result))
+
+    def test_skip_justified_samples(self) -> None:
+        # 트래커 Phase 6E 질문 2 A · 3 A — 정답은 사람 칸이 있으면 그것, 없으면 건너뜀 채점의 그 이유 칸이고,
+        # 정해진 칸(skip_kind · skip_human · skip_grade)을 글자 · 참거짓 그대로만 읽습니다
+        self.assertEqual(set(SKIP_GRADE_CELL), set(live_check.SELF_SKIP_KINDS))
+
+        def video(kind: str, human: str, grade: object) -> dict[str, object]:
+            return {"skip_kind": kind, "skip_human": human, "skip_grade": grade}
+
+        def grade(scene: object, love: object) -> dict[str, object]:
+            return {"material_has_scene": scene, "material_has_love_worry": love}
+
+        samples = (
+            (video("no_scene", "정당", grade(True, False)), True),
+            (video("no_scene", "부당", grade(False, True)), False),
+            (video("no_scene", "", grade(False, True)), True),
+            (video("no_concern", "", grade(False, True)), False),
+            (video("no_scene", "", None), None),
+            (video("no_scene", "정당 ", grade(True, False)), False),
+            (video("no_scene", " 정당", grade(True, False)), False),
+            (video("no_scene", "정당함", grade(True, False)), False),
+            (video("no_scene", "부당 ", grade(False, True)), True),
+            (video("no_scene", "", grade("false", False)), None),
+            (video("no_scene", "", grade(0, False)), None),
+            (video("no_scene", "", {"material_has_love_worry": False}), None),
+            (video("checks_failed", "정당", grade(False, False)), None),
+        )
+        for sample, expected in samples:
+            with self.subTest(video=sample):
+                self.assertEqual(skip_justified(sample), expected)
+        fake = self.fake()
+        both = {"material_has_scene": False, "material_has_love_worry": False}
+        fake["videos"] = [
+            {
+                "window": "operation",
+                "result": "skip",
+                "skip_human": "",
+                "skip_kind": kind,
+                "skip_grade": dict(both),
+            }
+            for kind in ("no_scene", "No_scene", "no-scene", "checks_failed")
+        ]
+        fake["videos"].append(
+            {"window": "operation", "result": "skip", "skip_human": "", "skip_grade": None}
+        )
+        self.assertEqual(
+            skip_lines(fake)[0],
+            "정당한 건너뜀 운영 창: 재료에 장면 없음 1/1 · 재료에 연애 고민 없음 0/0 · 정답 없음 0"
+            " · 검사 두 번 탈락 1",
+        )
+
+    def test_skip_cells_do_not_move_floor_or_verdict(self) -> None:
+        # 약속 "이 숫자는 기록이고, 판정 줄과 통과선은 이 숫자로 움직이지 않습니다"
+        result = load_result()
+        changed = copy.deepcopy(result)
+        swap = {"no_scene": "no_concern", "no_concern": "no_scene"}
+        for video in changed["videos"]:
+            if video["result"] != "skip":
+                continue
+            video.update(
+                skip_human="부당",
+                skip_grade={"material_has_love_worry": True, "material_has_scene": True},
+                skip_kind=swap.get(video["skip_kind"], video["skip_kind"]),
+            )
+        self.assertNotEqual(skip_lines(changed), skip_lines(result))
+        self.assertEqual(recount(changed), recount(result))
+        self.assertEqual(check_floor_line(changed), check_floor_line(result))
+        self.assertEqual(live_check.verdict_line(changed), live_check.verdict_line(result))
+
+    def test_skip_human_value_moves_the_record_but_other_text_does_not(self) -> None:
+        # 약속 "사람 칸의 다른 값(… skip_human 의 정당 · 부당 밖의 글)은 … 빨강으로 만들지 않습니다"
+        result = load_result()
+        index = next(
+            i
+            for i, video in enumerate(result["videos"])
+            if video["window"] == "operation"
+            and video["result"] == "skip"
+            and skip_justified(video) is True
+        )
+        for value, moves in (("부당", True), ("정당", False), ("엉뚱한 글", False), ("부당 ", False)):
+            with self.subTest(skip_human=value):
+                changed = copy.deepcopy(result)
+                changed["videos"][index]["skip_human"] = value
+                self.assertEqual(skip_lines(changed) != skip_lines(result), moves)
+
+    def test_no_concern_gate_counts_videos_without_drafts(self) -> None:
+        # 전후 줄의 거름 수 — 재료에 연애 고민 없음으로 초안 없이 건너뛴 영상만(정해진 칸 skip_kind · parsed)
+        fake = self.fake()
+        fake["videos"] = [
+            {"window": window, "result": "skip", "skip_kind": kind, "drafts": drafts}
+            for window, kind, drafts in (
+                ("operation", "no_concern", []),
+                ("operation", "no_concern", [{"parsed": True}]),
+                ("operation", "No_concern", []),
+                ("operation", "no_scene", []),
+                ("widened", "no_concern", [{"parsed": False}]),
+            )
+        ]
+        self.assertEqual([_gated(fake, window) for window in WINDOW_LABELS], ["1", "1"])
+
+    def test_bad_questions_samples(self) -> None:
+        # 알려진 한계 줄의 '나쁨' — Claude 채점 다섯 칸을 참거짓 그대로만 읽습니다(결과 파일은 믿을 수 없는 입력)
+        ok_grade = {"scene_in_material": True, "reads_like_ad": False, "follows_concern": True}
+        ok_task = {"concern_is_love_worry": True, "saju_story_fits": True}
+
+        def draft(grade: object, **task: object) -> dict[str, object]:
+            return {"grade": grade, "task_quality": ok_task | task}
+
+        case_key = {"scene_in_material": True, "reads_like_ad": False, "Follows_concern": False}
+        samples = (
+            (draft(ok_grade | {"follows_concern": False}), ["follows_concern"]),
+            (draft(ok_grade | {"reads_like_ad": True}), ["reads_like_ad"]),
+            (draft(ok_grade | {"scene_in_material": False}), ["mentions_scene"]),
+            (draft(ok_grade, concern_is_love_worry=False), ["concern_is_love_worry"]),
+            (draft(None, saju_story_fits=False), ["saju_story_fits"]),
+            (draft(ok_grade), []),
+            (draft(ok_grade | {"follows_concern": "false"}), []),
+            (draft(ok_grade | {"follows_concern": 0}), []),
+            (draft(ok_grade | {"reads_like_ad": 1}), []),
+            (draft(ok_grade, saju_story_fits="False"), []),
+            (draft(case_key), []),
+        )
+        for sample, expected in samples:
+            with self.subTest(draft=sample):
+                self.assertEqual(bad_questions(sample), expected)
 
 
 FIVE_SCORE_NAMES = (*SCORE_NAMES, "concern_is_love_worry", "saju_story_fits")
@@ -1256,23 +1688,49 @@ class LowestScoreTest(unittest.TestCase):
         scores.update(values)
         return scores
 
-    def test_three_question_drafts_recount(self) -> None:
+    def test_committed_drafts_recount(self) -> None:
+        # 6E 뒤 결과의 초안은 질문 다섯 — 통과선 다시 셈과 저장된 판정 다시 판정이 다섯 이름으로 읽습니다
         result = load_result()
         drafts = [draft for draft in _parsed_drafts(result) if draft["scores"] is not None]
         self.assertTrue(drafts)
         for draft in drafts:
             scores = draft["scores"]
             with self.subTest(scores=scores):
-                self.assertEqual(set(scores), set(SCORE_NAMES))
+                self.assertEqual(set(scores), set(FIVE_SCORE_NAMES))
                 expected = min(
                     scores["mentions_scene"],
                     1.0 - scores["reads_like_ad"],
                     scores["follows_concern"],
+                    scores["concern_is_love_worry"],
+                    scores["saju_story_fits"],
                 )
                 self.assertEqual(lowest_score(scores), expected)
-        # 두 자리 모두 질문 셋의 초안을 읽습니다 — 고치기 전에는 KeyError: 'concern_is_love_worry'
-        self.assertEqual(check_floor(result), 0.7)
+        self.assertEqual(
+            check_floor(result), load_config(REPO_CONFIG).comment.check_min_probability
+        )
         self.assertEqual(stored_verdict_mismatches(result), [])
+
+    def test_lowest_question_samples(self) -> None:
+        # 알려진 한계 줄의 '가장 낮은 비교 점수의 질문' — 광고는 1 − P(예), 같은 값이면 CHECK_QUESTIONS 차례가 앞선 것
+        self.assertEqual(lowest_question(self.five(saju_story_fits=0.6)), "saju_story_fits")
+        self.assertEqual(lowest_question(self.five(reads_like_ad=0.4)), "reads_like_ad")
+        self.assertEqual(
+            lowest_question(self.five(mentions_scene=0.7, saju_story_fits=0.7)), "mentions_scene"
+        )
+        # 키 차례가 CHECK_QUESTIONS 와 다른 동점 — five() 는 CHECK_QUESTIONS 차례로 넣어 `scores` 를
+        # 도는 구현도 위 표본을 통과하므로, saju_story_fits 를 먼저 넣은 사전으로 가릅니다
+        tie = {
+            "saju_story_fits": 0.7,
+            "mentions_scene": 0.7,
+            "reads_like_ad": 0.0,
+            "follows_concern": 1.0,
+            "concern_is_love_worry": 1.0,
+        }
+        self.assertEqual(lowest_question(tie), "mentions_scene")
+        self.assertEqual(comparison_label("reads_like_ad"), "광고처럼 읽힘 아님")
+        self.assertEqual(comparison_label("mentions_scene"), "영상 속 장면·말 언급")
+        with self.assertRaises(ValueError):
+            lowest_question({"mentions_scene": 0.9, "Mentions_scene": 0.1})
 
     def test_five_question_fake_result_recounts(self) -> None:
         draft = RecountTest.draft(claude="bad")
@@ -1350,6 +1808,7 @@ class DraftBoundaryTest(unittest.TestCase):
             "claude_grade": claude,
             "grade_error": None if claude is not None else "응답 모양",
             "self_check_pass": self_check,
+            "task_quality": {"concern_is_love_worry": True, "saju_story_fits": True},
         }
 
     @staticmethod
@@ -1391,6 +1850,8 @@ class DraftBoundaryTest(unittest.TestCase):
                 "human": 2,
                 "claude": 3,
                 "answered": 3,
+                "ok": 1,
+                "bad": 2,
                 "grade_errors": 1,
                 "differ": 2,
                 "bad_passed": 2,
@@ -1592,42 +2053,75 @@ class WriterRecordTest(ContractCase):
         )
         self.assert_in_contract(check_floor_line(self.result))
 
-    def test_todo_line_counts_come_from_the_result(self) -> None:
-        line = todo_line(self.result)
-        self.assertTrue(line.startswith("6E: 할 일 있음 — "), line)
-        found = re.fullmatch(
-            r"6E: 할 일 있음 — ⓐ 고민 한 줄이 연애 고민 ([0-9]+)/([0-9]+)"
-            r" · ⓑ 연애사주 경험이 고민과 이어짐 ([0-9]+)/([0-9]+)"
-            rf" · ⓒ 다른 영상 초안과 겹치는 {live_check.FRAME_CHARS}글자 조각이 있는 초안"
-            r" ([0-9]+)/([0-9]+) · 건너뜀 SKIP ([0-9]+)/([0-9]+)"
-            r" · 작성기 답을 JSON 으로 못 읽은 초안 ([0-9]+)/([0-9]+)",
-            line,
-        )
-        self.assertIsNotNone(found, line)
-        love, tasks, saju, tasks_b, framed, drafts, skip, written, unparsed, drafts_b = (
-            found.groups()
-        )
-        self.assertEqual((tasks_b, drafts_b), (tasks, drafts))
+    def test_answer_definition_is_in_contract(self) -> None:
+        for phrase in (
+            "정답은 사람 칸(`ok` · `bad`)이 있으면 그것, 없으면 Claude 채점 다섯 칸입니다",
+            "6D 의 기록은 세 칸(`claude_grade` 만) 정답이라 `ok` · `bad` 수의 정의가 이 기록과 다릅니다",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assert_in_contract(phrase)
+
+    def test_summary_task_line_is_the_result_count(self) -> None:
+        # 요약의 과제 품질 줄과 판정 줄의 SKIP 은 결과 파일의 셈 그대로(창 없이 센 task_counts)
+        c = task_counts(self.result, None)
         summary = live_check.render_summary(self.result).splitlines()
         task_line = next(text for text in summary if text.startswith("- 과제 품질:"))
         for phrase in (
-            f"고민이 연애 고민 {love}/{tasks}",
-            f"연애사주 경험이 고민과 이어짐 {saju}/{tasks}",
-            f"조각이 있는 초안 {framed}/{drafts}",
+            f"고민이 연애 고민 {c['love']}/{c['tasks']}",
+            f"연애사주 경험이 고민과 이어짐 {c['saju']}/{c['tasks']}",
+            f"조각이 있는 초안 {c['framed']}/{c['drafts']}",
         ):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, task_line)
-        self.assertIn(f"SKIP {skip}/{written}", live_check.verdict_line(self.result))
-        attempts = [draft for video in self.result["videos"] for draft in video["drafts"]]
+        self.assertIn(f"SKIP {c['skip']}/{c['written']}", live_check.verdict_line(self.result))
+
+    def test_skip_record_is_in_contract(self) -> None:
+        for phrase in (
+            *skip_lines(self.result),
+            "빈 사람 칸은 동의가 아닙니다",
+            "이 숫자는 기록이고, 판정 줄과 통과선은 이 숫자로 움직이지 않습니다",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assert_in_contract(phrase)
+
+    def test_before_after_record_is_in_contract(self) -> None:
+        for phrase in (
+            *before_after_lines(self.result),
+            *before_after_notes(self.result),
+            f"6E 전(Phase 6D 의 실행 `{BEFORE_FIX_RUN_AT}`, 6D 가 이 절에 적은 기록)"
+            f" → 6E 뒤(이번 실행 `{self.result['run_at']}`)",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assert_in_contract(phrase)
+
+    def test_human_cells_decide_the_check_floor(self) -> None:
+        # 트래커 Phase 6F 보류 문 인터뷰 질문 1 A · 2 A — 이 실행의 통과선은 사람 칸 둘이 정합니다:
+        # 그대로면 0.7, 둘을 비우면 다시 셈 0.87. 다음 다시 반영이 새 결과를 커밋하면 이 잠금을 걷고
+        # 알려진 한계의 6F 사례를 옮겨 적습니다
+        self.assertEqual(self.result["run_at"], AFTER_FIX_RUN_AT)
         self.assertEqual(
-            int(unparsed), sum(1 for draft in attempts if draft["parsed"] is not True)
+            [
+                (video["video_id"], draft["attempt"], draft["human"])
+                for video in self.result["videos"]
+                for draft in video["drafts"]
+                if draft["parsed"] is True and draft["human"] in ANSWERS
+            ],
+            [("om-TAoBO0Rc", 1, "ok"), ("nPMEi5NDSnU", 2, "ok")],
         )
-        tampered = copy.deepcopy(self.result)
-        for video in tampered["videos"]:
-            for draft in video["drafts"]:
-                if isinstance(draft.get("task_quality"), Mapping):
-                    draft["task_quality"]["concern_is_love_worry"] = True
-        self.assertIn(f"ⓐ 고민 한 줄이 연애 고민 {tasks}/{tasks} ·", todo_line(tampered))
+        self.assertEqual(check_floor(self.result), 0.7)
+        self.assertEqual(load_config(REPO_CONFIG).comment.check_min_probability, 0.7)
+        self.assertEqual(check_floor(without_human_cells(self.result)), 0.87)
+
+    def test_limit_record_is_in_contract(self) -> None:
+        for phrase in (
+            *limit_lines(self.result),
+            f"올림은 막을 초안의 가장 낮은 비교 점수 + {live_check.MARGIN} 이고 그 초안이 나쁨을 받은"
+            " 질문과 상관없습니다",
+            "6D 에서 한 번(나쁨은 '고민 이음' · 그 질문의 jev 점수 0.90 · 올림은 '장면' 0.71 → 0.76)",
+            "실행 뒤 사람이 두 초안을 원문 · 재료와 함께 읽고 `ok` 로 적은 값입니다(커밋 `36ded73`)",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assert_in_contract(phrase)
 
     def test_repeat_min_chars_stays_unmeasured(self) -> None:
         self.assert_in_contract(

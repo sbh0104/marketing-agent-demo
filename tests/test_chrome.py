@@ -39,7 +39,7 @@ from agent.chrome import (
 )
 from agent.config import load_config
 from agent.poster import PageError
-from tests.test_config import TEXT_VALUES, variant, write_config
+from tests.test_config import LOOPBACK_ONLY, TEXT_VALUES, variant, write_config
 
 ROOT = Path(__file__).resolve().parent.parent
 WARNING_PHRASE = "로그인된 계정의 쿠키를 읽을 수 있습니다"
@@ -264,6 +264,20 @@ class ChromeCliTest(ProfileCase):
                 self.err = io.StringIO()
                 self.assert_refused(self.run_cli())
                 self.assertEqual(self.err.getvalue(), f"크롬 실행 준비 실패: {bad.needle}\n")
+
+    def test_debug_url_outside_this_computer_exits_2_without_the_address(self) -> None:
+        # Phase 1C ship-report R3 — 포트 읽기는 9222 로 rc 0 이었고, 연결은 evil.example 에 붙었습니다
+        write_config(
+            self.repo,
+            variant(
+                "chrome_debug_url: http://localhost:9222\n",
+                "chrome_debug_url: http://evil.example\\@localhost:9222\n",
+            ),
+        )
+        self.assert_refused(self.run_cli())
+        self.assertEqual(
+            self.err.getvalue(), f"크롬 실행 준비 실패: {LOOPBACK_ONLY}: chrome_debug_url\n"
+        )
 
 
 class ChromeModuleEntryTest(unittest.TestCase):

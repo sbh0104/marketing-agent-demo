@@ -989,3 +989,203 @@
 - source: adw/phase-7f-chrome-rehearsal
 - tag: plain
 - status: open
+
+### H-121 — 착지 전에 정한다: `d2d8942` 가 커밋한 `docs/live-check/result.json` 의 `videos[].untrusted.description`(영상 6 · 14 · 15 · 18 · 21 · 29)에 채널 주인의 메신저 연락처(카카오톡 아이디 넷 · 텔레그램 링크 · 디스코드 초대 · `@` 아이디)가 있다 — 6G 연락처 모양 밖이라 검사는 0. 공개 저장소 역사에 그대로 둘지, 레인 기록을 가린 글로 다시 쓸지(트래커 6F Q9 의 길)
+- project: marketing-agent-demo
+- when: 2026-10-16 · plans/interview-marketing-agent.md#phase-6f
+- from: ship-report.md § Human checks — .adw/ship-report.md § Risks
+- source: adw/phase-6f-live-check-reapply-after-fix
+- tag: sensitive: sensitive area · confirmed 2026-10-16
+- status: confirmed
+
+### H-122 — 트래커에서 `claude_answer` 의 색 미정 표본 "grade ok · task_quality None"(과제 채점 오류)의 색을 정한다 — 그 답이 계약 C:1028 '과제 칸 오류 … 통과선은 이 숫자로 움직이지 않습니다' 를 좁힐지도 정한다
+- project: marketing-agent-demo
+- when: 2026-10-16 · plans/interview-marketing-agent.md#phase-6f
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-6f-live-check-reapply-after-fix
+- tag: plain
+- status: open
+
+### H-123 — ⓐ 의 전후 차이 가운데 '재료에 연애 고민 없음' 거름이 얼마를 설명하는지는 재지 않았다 — PROCESS.md 가 ⓐ 의 오름을 개선이라 불러도 되는지 사람이 읽고 정한다
+- project: marketing-agent-demo
+- when: 2026-10-16 · plans/interview-marketing-agent.md#phase-6f
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-6f-live-check-reapply-after-fix
+- tag: plain
+- status: open
+
+### H-124 — 제출 공개 전에 커밋 author · committer 메일(레인 17개와 main 역사 전체)을 그대로 공개할지 정한다
+- project: marketing-agent-demo
+- when: 2026-10-16 · plans/interview-marketing-agent.md#phase-6f
+- from: ship-report.md § Human checks — .adw/ship-report.md § Risks
+- source: adw/phase-6f-live-check-reapply-after-fix
+- tag: plain
+- status: open
+
+### H-125 — Phase 8: README 에 한 줄 — 크롬 주소는 이 컴퓨터만 받으므로, 기본(NAT) 네트워크의 WSL 은 `.wslconfig` 에 `networkingMode=mirrored` 를 켜야 `localhost` 가 윈도우 크롬에 닿는다(트래커 Phase 8 1031행 · 8A 1078행이 같은 일을 적음)
+- project: marketing-agent-demo
+- when: 2026-10-16 · plans/interview-marketing-agent.md#phase-7g
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-7g-chrome-url-sample-gap
+- tag: plain
+- status: open
+
+### H-126 — Phase 8A: README 에 한 줄 — 터미널 프록시 설정(`http_proxy` · `all_proxy`)이 있는 컴퓨터는 `no_proxy` 에 `localhost,127.0.0.1,[::1]` 을 넣는다. 없으면 연결 찾기가 이 컴퓨터를 떠나 `chrome_unreachable` 이 되고, 악의적인 프록시면 다른 브라우저에 붙는다(트래커 Phase 8A 1078행)
+- project: marketing-agent-demo
+- when: 2026-10-16 · plans/interview-marketing-agent.md#phase-7g
+- from: ship-report.md § Human checks — plans/interview-marketing-agent.md § Phase 7G Decisions (HC1 질문 2 A)
+- source: adw/phase-7g-chrome-url-sample-gap
+- tag: plain
+- status: open
+
+### H-127 — Phase 8A 녹화의 두 실행(`--once --dry-run` 뒤 몇 분 안에 `--once`)에서 `logs/` 를 본다. 둘째 실행의 `TRIGGER` 줄 `per_hour` 가 업로드 0 짝이나 10분 넘게 앞선 기록과의 짝으로 재졌는지 확인한다. 20초 사이 1회가 시간당 180 같은 값이면 7G 가 착지하지 않은 트리로 돈 것이다. 같은 줄의 `VIEWS … delta` 와 숫자가 어긋나는 것은 정상이다(Risks 7). 실제 `agent.run` 프로세스는 바깥 서비스가 필요해 이 사이클에서 돌리지 못했다
+- project: marketing-agent-demo
+- when: 2026-10-16 · plans/interview-marketing-agent.md#phase-7g
+- from: ship-report.md § Human checks — .adw/verify-plan.md § Coverage decisions
+- source: adw/phase-7g-chrome-url-sample-gap
+- tag: plain
+- status: open
+
+### H-128 — 계획의 🚨 좁히기 셋을 받아들일지 고쳐 쓸지 정하기 — (a) 트래커 "연락처 모양 0" 을 "검토한 알려진 목록(103개, `Co-Authored-By` 꼬리의 Anthropic 주소 포함) 밖 0" 으로, (b) "끝 판 `/home/` 경로 0" 을 "홈 폴더 안 경로(끝 판 파일 · 커밋 메시지)" 로 좁히고 메시지 49개는 사본에서 `~/` 로 바꾸되 옛 `.adw/expertise.md` 9판과 트래커 1028줄의 맨 사용자 이름은 남김, (c) 남기는 `.adw/` 기록물의 ADWS 설치 머리글을 공개함 — 계획 관문이 `autonomy: full` 로 자동 승인돼 사람이 본 기록이 없음
+- project: marketing-agent-demo
+- when: 2026-10-16 · plans/interview-marketing-agent.md#phase-8
+- from: ship-report.md § Human checks — .adw/plan.md § Approach
+- source: adw/phase-8-submission-docs
+- tag: sensitive: tracker decision · confirmed 2026-10-16
+- status: confirmed
+
+### H-129 — 공개용 사본 도구의 남은 위험 셋을 진짜 사본을 뜨기 전에 고칠지, 대가로 받아들일지 정하기 — R1 git 훅처럼 git 환경 변수가 내보내진 셸에서는 원본을 다시 쓰고 걷어내지 않은 사본에 통과를 냄 · R2 `키 모양` · `--print-known` 이 진짜 키를 화면에 통째로 찍음 · R3 알려진 목록 파일 안의 값은 비밀 값 검사도 보지 않음
+- project: marketing-agent-demo
+- when: 2026-10-16 · plans/interview-marketing-agent.md#phase-8
+- from: ship-report.md § Human checks — .adw/ship-report.md § Risks
+- source: adw/phase-8-submission-docs
+- tag: sensitive: tracker decision · confirmed 2026-10-16
+- status: confirmed
+
+### H-130 — `tests/public_copy.py::HARNESS_PATHS` 의 undecided 표본 둘의 색을 정하기 — `.claude-notes/a.md`(앞글자만 같은 형제) · `.Claude/settings.json`(대소문자); 답은 트래커 결정
+- project: marketing-agent-demo
+- when: 2026-10-16 · plans/interview-marketing-agent.md#phase-8
+- from: ship-report.md § Human checks — .adw/plan.md § Test plan
+- source: adw/phase-8-submission-docs
+- tag: plain
+- status: open
+
+### H-131 — `.gitignore` 의 과제 PDF 줄의 undecided 표본 둘의 색을 정하기 — `docs/Marketing-Agent.pdf`(대소문자) · `docs/marketing-agent (1).pdf`(내려받기 중복); 답은 트래커 결정
+- project: marketing-agent-demo
+- when: 2026-10-16 · plans/interview-marketing-agent.md#phase-8
+- from: ship-report.md § Human checks — .adw/plan.md § Test plan
+- source: adw/phase-8-submission-docs
+- tag: plain
+- status: open
+
+### H-132 — `tests/public_copy.py::check_contacts` 의 undecided 표본 둘의 색을 정하기 — 알려진 목록에 든 가짜 전화번호(🚨 (a)) · `Co-Authored-By` 꼬리의 Anthropic 주소(알려진 목록); 답은 트래커 결정
+- project: marketing-agent-demo
+- when: 2026-10-16 · plans/interview-marketing-agent.md#phase-8
+- from: ship-report.md § Human checks — .adw/plan.md § Test plan
+- source: adw/phase-8-submission-docs
+- tag: plain
+- status: open
+
+### H-133 — `tests/public_copy.py::KEY_SHAPES` 의 undecided 표본 둘의 색을 정하기 — 대문자 `SK-ANT-` + 30글자 · YAML 쌍점 꼴 `TYPESAFE_API_KEY: ` + 24글자(모양 판정은 못 잡고 비밀 값 검사만 잡음); 답은 트래커 결정
+- project: marketing-agent-demo
+- when: 2026-10-16 · plans/interview-marketing-agent.md#phase-8
+- from: ship-report.md § Human checks — .adw/plan.md § Test plan
+- source: adw/phase-8-submission-docs
+- tag: plain
+- status: open
+
+### H-134 — `tests/public_copy.py::check_secret_values` 의 undecided 표본 둘의 색을 정하기 — 값의 앞 7글자 · 대소문자를 바꾼 값; 답은 트래커 결정
+- project: marketing-agent-demo
+- when: 2026-10-16 · plans/interview-marketing-agent.md#phase-8
+- from: ship-report.md § Human checks — .adw/plan.md § Test plan
+- source: adw/phase-8-submission-docs
+- tag: plain
+- status: open
+
+### H-135 — `tests/public_copy.py::HOME_PATH_RE` 의 undecided 표본 셋의 색을 정하기 — 뒤 구분자 없는 맨 홈 이름(트래커 자신의 Phase 8 줄, 🚨 (b)) · `tests/test_chrome.py` 의 가짜 윈도우 홈 경로(알려진 목록) · 옛 blob 에만 있는 홈 경로(🚨 (b), 9판); 답은 트래커 결정
+- project: marketing-agent-demo
+- when: 2026-10-16 · plans/interview-marketing-agent.md#phase-8
+- from: ship-report.md § Human checks — .adw/plan.md § Test plan
+- source: adw/phase-8-submission-docs
+- tag: plain
+- status: open
+
+### H-136 — `tests/public_copy.py::MSG_FILTER_CODE` 의 undecided 표본 하나의 색을 정하기 — 커밋 메시지 속 홈 경로를 사본에서 `~/` 로 바꿈(🚨 (b), 메시지 49개); 답은 트래커 결정
+- project: marketing-agent-demo
+- when: 2026-10-16 · plans/interview-marketing-agent.md#phase-8
+- from: ship-report.md § Human checks — .adw/plan.md § Test plan
+- source: adw/phase-8-submission-docs
+- tag: plain
+- status: open
+
+### H-137 — 제출 직전 공개용 사본에서 `git ls-files` 로 계약 8절 밖 이름(`credentials.json` 류 · 스크린샷)이 추적되지 않는지 보기 — 사본의 `무시 규칙 경로` 검사는 `.gitignore` 에 적힌 이름만 봄(H-004 · H-025 를 사람에게 넘김; 받아들이거나 주인을 정하기)
+- project: marketing-agent-demo
+- when: 2026-10-16 · plans/interview-marketing-agent.md#phase-8
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-8-submission-docs
+- tag: plain
+- status: open
+
+### H-138 — Phase 8A 가 README 시연 링크 · PROCESS 실제 실행 숫자 · Phase 8 뒤 착지한 페이즈의 README/PROCESS 줄 옮기기를 맡음
+- project: marketing-agent-demo
+- when: 2026-10-16 · plans/interview-marketing-agent.md#phase-8
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-8-submission-docs
+- tag: plain
+- status: open
+
+### H-139 — Phase 8A 가 착지 직전 `python3 -m tests.public_copy --scan-only --branch HEAD --no-env` 를 돌려 이 페이즈 뒤 착지분이 들인 새 연락처 · 키 모양 글을 검토함(검토한 가짜면 `tests/public_copy_known.json` 에 더해 커밋, 아니면 사람에게 멈춤)
+- project: marketing-agent-demo
+- when: 2026-10-16 · plans/interview-marketing-agent.md#phase-8
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-8-submission-docs
+- tag: plain
+- status: open
+
+### H-140 — Phase 8A 착지 뒤 홈 체크아웃에서, git 훅이 아닌 평범한 터미널(R1)에서 `python3 -m tests.public_copy --dest <저장소 밖 새 폴더> --env <실제로 키를 쓴 .env — 맥에서 돌렸다면 맥의 것>` 을 돌려 종료 코드 0 · 마지막 줄 `공개용 사본 검사 통과` · `비밀 값 건너뜀` 없음을 확인하고, `✗` 글은 하나씩 본 뒤에만 알려진 목록에 더하기
+- project: marketing-agent-demo
+- when: 2026-10-16 · plans/interview-marketing-agent.md#phase-8
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-8-submission-docs
+- tag: plain
+- status: open
+
+### H-141 — 새 GitHub 저장소를 만들고 사본의 `main` 만 push 하기(이 저장소 · `adw/*` 가지는 올리지 않음), 제출 때 Public 으로(과제 8쪽)
+- project: marketing-agent-demo
+- when: 2026-10-16 · plans/interview-marketing-agent.md#phase-8
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-8-submission-docs
+- tag: plain
+- status: open
+
+### H-142 — GitHub 설정 "Block command line pushes that expose my email"(GH007)을 push 전에 확인해 끄거나 트래커 Phase 8 질문 2 를 다시 열기
+- project: marketing-agent-demo
+- when: 2026-10-16 · plans/interview-marketing-agent.md#phase-8
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-8-submission-docs
+- tag: plain
+- status: open
+
+### H-143 — `config.yaml` 의 `allowed_videos` 자리 표시를 본인 테스트 영상 ID 로 바꿔 커밋하기(ID 가 공개됨; README.md:145 의 문장이 이때 참이 됨)
+- project: marketing-agent-demo
+- when: 2026-10-16 · plans/interview-marketing-agent.md#phase-8
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-8-submission-docs
+- tag: plain
+- status: open
+
+### H-144 — 맥에서 깨끗한 복제본으로 README 를 따라 하며 `playwright install` 이 필요 없는지와 크롬을 먼저 켠 뒤 약 10분 안에 테스트 모드가 켜지는지 확인하기
+- project: marketing-agent-demo
+- when: 2026-10-16 · plans/interview-marketing-agent.md#phase-8
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-8-submission-docs
+- tag: plain
+- status: open
+
+### H-145 — README '시연 준비' 순서대로 시연을 녹화하기(링크는 Phase 8A 가 채움)
+- project: marketing-agent-demo
+- when: 2026-10-16 · plans/interview-marketing-agent.md#phase-8
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-8-submission-docs
+- tag: plain
+- status: open

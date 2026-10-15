@@ -1013,6 +1013,78 @@ other line is required on every item.
 - attempts: 0 · last failure: —
 - first seen: 2026-10-15 · last seen: 2026-10-15
 
+### S-101 — README 7단계 사람 칸 안내가 세 칸(`claude_grade`)만 보라고 함 — 통과선 셈의 정답은 이제 다섯 칸
+- source: cycle 20261015-175919-adw/phase-6f-live-check-reapply-after-fix · tracker plans/interview-marketing-agent.md#phase-6f · deferred by ship-check
+- evidence: docs/live-check/README.md:24 "`claude_grade`(`ok` / `bad`)를 보고, 동의하지 않으면 그 초안의 `"human": ""` 을 … 고칩니다" — `100b615` 뒤 사람 칸이 빈 초안의 정답은 다섯 칸(tests/test_live_check_applied.py:282-295 `claude_answer`: `claude_grade` + `task_quality` ⓐ · ⓑ, 트래커 6F 결정 줄 716). 커밋된 결과에서 `claude_grade` ok 인데 다섯 칸 정답 bad 인 초안 3(om-TAoBO0Rc 시도 1 · dM2hFpUH6qg 시도 2 · qAgY7WxXWs4 시도 1); README 대로 om-TAoBO0Rc 시도 1 에 동의해 사람 칸을 비우면 `check_floor` 0.79(지금 0.7) — ship-check 감사 3, 탐침으로 확인
+- direction: README 7단계 초안 줄을 "Claude 채점 다섯 칸(`claude_grade` 와 `task_quality` 의 ⓐ `concern_is_love_worry` · ⓑ `saju_story_fits`)을 보고, 그 정답에 동의하지 않으면 …" 으로 고친다 — 코드 · 결과 파일 · 계약 변경 없음
+- touches: docs/live-check/README.md
+- status: resolved
+- attempts: 0 · last failure: —
+- first seen: 2026-10-15 · last seen: 2026-10-15
+
+### S-102 — 테스트 두 곳 다지기: 늘 참인 단언 하나 · 동점 표본이 사전 차례와 `CHECK_QUESTIONS` 차례를 못 가름
+- source: cycle 20261015-175919-adw/phase-6f-live-check-reapply-after-fix · tracker plans/interview-marketing-agent.md#phase-6f · deferred by ship-check
+- evidence: tests/test_live_check.py:4272 `assertFalse(any(key in video …))` 는 바로 위 루프가 그 키를 지운 뒤라 늘 참(ship-check 감사 5 F1); tests/test_live_check_applied.py:1706 `test_lowest_question_samples` 의 동점 표본(`mentions_scene` · `saju_story_fits` 0.7)은 `five()` 가 키를 `CHECK_QUESTIONS` 차례로 넣어, `scores` 를 도는 구현도 통과(감사 3 N3 탐침 `naive on test tie: mentions_scene`)
+- direction: 늘 참인 단언을 지우거나 `stored` 에 스스로 건너뜀 칸이 있음을 단언으로 바꾸고, `test_lowest_question_samples` 에 키 차례가 `CHECK_QUESTIONS` 와 다른 동점 표본 하나(예: `saju_story_fits` 를 먼저 넣은 사전)를 더한다 — 동작 변경 없음
+- touches: tests/test_live_check.py, tests/test_live_check_applied.py
+- status: resolved
+- attempts: 0 · last failure: —
+- first seen: 2026-10-15 · last seen: 2026-10-15
+
+### S-103 — 크롬 주소 판정의 `127.0.0.1` 점을 잠그는 빨강 표본 하나
+- source: cycle 20261015-211343-adw/phase-7g-chrome-url-sample-gap · tracker plans/interview-marketing-agent.md#phase-7g · deferred by ship-check
+- evidence: src/agent/config.py:124 `_LOOPBACK_URL` 의 `127\.0\.0\.1` 을 `127.0.0.1`(점 이스케이프 없음)로 바꿔도 전체 스위트 887개 `OK`(ship-check 감사 5 손 변이 M13, 임시 복사본) — 그 판본은 `http://127-0-0-1:9222` · `http://127x0y0z1:9222`(DNS 로 찾는 다른 호스트 이름)를 받음(HEAD 는 둘 다 거절, 메모리 확인); tests/test_config.py:908 `LoopbackUrlTest.RED` 에 점을 다른 글자로 바꾼 표본이 없음
+- direction: `LoopbackUrlTest.RED` 에 `"http://127-0-0-1:9222"` 를 더하고 한 줄 주석으로 닮은 꼴 종류(점 바꿈 → 다른 호스트 이름)와 색의 근거(트래커 Phase 7G 질문 2 A "다른 호스트 이름")를 적는다 — 코드 · 계약 변경 없음. (2026-10-16 7G 출하 전 사람 확인 인터뷰 · 슬롯 7g HC1 질문 1 A 로 보탬) 같은 `RED` 묶음에 사람이 빨강으로 정한 일곱도 더한다 — `"https://localhost:9222"` · `"http://LOCALHOST:9222"` · `"http://127.0.0.2:9222"` · `"http://localhost"` · `"http://ｌｏｃａｌｈｏｓｔ:9222"`(전각) · `"http://localhost:123456"` · `"http://localhost:9222//"`, 줄마다 주석에 꼴 종류와 근거(트래커 Phase 7G Decisions 의 "HC1 질문 1 A" 줄 — 꼴마다 이유가 적혀 있음). 이 일곱은 ship-check 손 변이 `http://` → `https?://` · `[0-9]{1,5}` → `[0-9]+` · `/?` → `/*`(셋 다 887 `OK` 로 살아남음, `.adw/ship-report.md` Test integrity 표)를 잡는다 — 더한 뒤 각 변이가 빨강인지 임시 복사본에서 확인한다
+- touches: tests/test_config.py
+- status: resolved
+- attempts: 0 · last failure: —
+- first seen: 2026-10-15 · last seen: 2026-10-15
+
+### S-104 — 최소 간격 폴백 길에서 건너뛴 더 큰 기록을 쓰지 않음을 잠그는 테스트
+- source: cycle 20261015-211343-adw/phase-7g-chrome-url-sample-gap · tracker plans/interview-marketing-agent.md#phase-7g · deferred by ship-check
+- evidence: src/agent/trigger.py:52 `_first_pair` 의 `newest` 고르는 열쇠를 `(sample.count, _utc(sample.at))` 로 바꿔도 전체 스위트 887개 `OK`(ship-check 직접 변이, 임시 복사본) — 7G 전에는 이 줄이 같은 시각 기록끼리만 닿았지만 이제 10분 안 기록끼리도 닿는다. 기록 `(1h, 1500), (1h05m, 1450)` 에서 HEAD 는 views_per_hour 1338.46(업로드 0 ↔ 최신 1450), 변이는 1500.0(건너뛴 기록을 최신으로 씀). docs/contracts.md:1148 "건너뛴 기록(최신보다 10분 안)은 판정 어디에도 쓰지 않습니다" 의 짝 테스트(`test_decrease_is_seen_on_the_measured_pair_only` · `test_skips_near_sample_and_uses_latest_far_enough`)는 10분 넘게 앞선 기록이 있는 길만 봄
+- direction: tests/test_trigger.py `TestMinimumGap` 에 테스트 하나 — `video((1 * H, 1500), (1 * H + 5 * M, 1450))` 이 업로드 0 과 최신(1450)으로 재짐: `views_per_hour == 1450 * 60 / 65`, 같은 짝으로 `judge_trigger` 의 경계(`min_views_per_hour` 1338 에서 yes, 1339 에서 `too_slow`). 같은 손으로 `TestFirstSample` docstring(tests/test_trigger.py:315 "시각이 다른 기록이 하나면 …")을 "최신보다 10분 이상 앞선 기록이 없으면 …" 으로 넓힌다 — 코드 · 계약 변경 없음
+- touches: tests/test_trigger.py
+- status: resolved
+- attempts: 0 · last failure: —
+- first seen: 2026-10-15 · last seen: 2026-10-15
+
+### S-105 — 크롬 주소 판정의 포트를 ASCII 숫자로 잠그는 빨강 표본 하나(전각 숫자 포트)
+- source: cycle 20261015-211343-adw/phase-7g-chrome-url-sample-gap · tracker plans/interview-marketing-agent.md#phase-7g · deferred by ship-check
+- evidence: src/agent/config.py:124 `_LOOPBACK_URL` 의 `[0-9]{1,5}` 를 `\d{1,5}` 로 바꿔도 전체 스위트 887개 `OK (skipped=3)`(ship-check 2회차 감사 5 와 이 단계가 따로 확인, `.git` 없는 임시 복사본 — 건너뜀 3은 그 탓) — 그 판본은 `http://localhost:９２２２` · `http://127.0.0.1:٩٢٢٢` 를 받음(HEAD 는 둘 다 거절, 메모리 확인). 받은 주소는 파이썬 `urlsplit` 의 `.port` 가 `ValueError`, WHATWG `new URL` 이 `ERR_INVALID_URL` 이라 설정 읽기만 지나고 준비 도구 rc 2 · 게시마다 연결 실패로 늦게 터짐. tests/test_config.py:908 `LoopbackUrlTest.RED` 에 ASCII 가 아닌 숫자 포트 표본이 없고, `S-103` 의 표본 여덟은 이 변이를 잡지 못함(그중 전각은 호스트 `ｌｏｃａｌｈｏｓｔ` 뿐)
+- direction: `LoopbackUrlTest.RED` 에 `"http://localhost:９２２２"`(포트 숫자만 전각)를 더하고 한 줄 주석으로 꼴 종류(포트 숫자의 전각 닮은 꼴 — 두 해석기 모두 포트로 읽지 못함)와 색의 근거(트래커 Phase 7G Decisions "HC1 질문 1 A" 의 `https` 줄 "받아도 게시 때 `chrome_unreachable`" · `:123456` 줄 "계약 2절 숫자 1–5자리")를 적는다 — 코드 · 계약 변경 없음. `S-103` 과 같은 묶음이라 한 스윕에서 함께 넣어도 된다. 더한 뒤 `\d{1,5}` 변이가 빨강인지 임시 복사본에서 확인한다
+- touches: tests/test_config.py
+- status: resolved
+- attempts: 0 · last failure: —
+- first seen: 2026-10-16 · last seen: 2026-10-16
+
+### S-106 — README 문제 해결의 '에이전트를 시작할 수 없습니다' 줄을 코드대로 좁히기(설정 오류는 그 문구 없이 `ERROR where=config`)
+- source: cycle 20261015-211335-adw/phase-8-submission-docs · tracker plans/interview-marketing-agent.md#phase-8 · deferred by ship-check
+- evidence: README.md:167 "SDK 나 키가 없거나, 설정에 오류가 있습니다" — src/agent/run.py:554-556 은 그 문구를 `connect_real` 의 EnvError · QuotaError · ImportError · ValueError · OSError 에만 찍고, 설정 오류는 src/agent/run.py:492-494 가 `ERROR where=config` 를 쓰고 그 문구 없이 종료 코드 2 로 끝남. 계약 '실행 진입점 — run.py (Phase 7)' 절 "(설정은 `ERROR where=config` … 도 남김)". ship-check 감사 1 재현: 깨진 config.yaml → rc 2 · stderr 빈 칸 · 화면에 `ERROR where=config reason="ConfigError: …"`. 틀린 문장은 Phase 8 계획 R8 줄에서 옴
+- direction: 그 줄을 SDK · 키 · 쿼터 장부 문제로 좁히고, 설정 오류는 그 문구 없이 `ERROR where=config` 한 줄과 종료 코드 2 로 보인다는 줄을 더함 — 코드 · 계약 변경 없음
+- touches: README.md
+- status: open
+- attempts: 0 · last failure: —
+- first seen: 2026-10-16 · last seen: 2026-10-16
+
+### S-107 — 공개용 사본 테스트 빈칸 셋: 알려진 목록의 글자 그대로 비교 · 형식이 틀린 .env · 기본 --env
+- source: cycle 20261015-211335-adw/phase-8-submission-docs · tracker plans/interview-marketing-agent.md#phase-8 · deferred by ship-check
+- evidence: tests/public_copy.py:316 `if found not in known` 을 부분 일치(`any(k in found …)` · `any(found in k …)`)로 바꿔도 스위트 `Ran 938 … OK`(ship-check 감사 5 변이 M2 · M2b) — 표본이 글자 바꿈 · 대소문자뿐(tests/test_public_copy.py:313-320 · :376-380 · :515-522); tests/public_copy.py:344-345 `except EnvError` 를 건너뜀으로 바꿔도 OK(M5a — 없는 파일 표본은 :347 빈 값 갈래로 감); :438 기본 `source / ".env"` 를 지워도 OK(M5c). 계약 '공개용 사본' 절 "한 글자라도 다르면 목록 밖입니다" · "파일이 없거나 세 값이 모두 비면 이 검사가 걸리고" · "`--env`(기본: 원본의 `.env`)"
+- direction: tests/test_public_copy.py 에 — 알려진 연락처 · 키 · 홈 글자에 한 글자를 덧붙인 꼴과 끝 글자를 자른 꼴이 빨강(홈은 이름 칸에서) · `이름=값` 꼴이 아닌 줄이 든 .env 로 `✗ 비밀 값`(건너뜀 아님) · `--env` · `--no-env` 없이 돌리면 가짜 원본 뿌리의 .env 값을 찾아 빨강 — 세 표본을 더함, 코드 변경 없음
+- touches: tests/test_public_copy.py
+- status: open
+- attempts: 0 · last failure: —
+- first seen: 2026-10-16 · last seen: 2026-10-16
+
+### S-108 — README 의 실행 줄을 줄마다 잠그기(맥 첫 실행 · 녹화 3단계 · 윈도우)
+- source: cycle 20261015-211335-adw/phase-8-submission-docs · tracker plans/interview-marketing-agent.md#phase-8 · deferred by ship-check
+- evidence: tests/test_submission_docs.py:62-64 가 `PYTHONPATH=src python3 -m agent.run --once --dry-run` 을 `assertIn` 으로만 봄 — 같은 명령이 README.md:90 과 :154 에 두 번 있어 한 줄만 틀려도 OK(ship-check 감사 5 변이 R1b · R2), 윈도우 줄 README.md:91 은 잠기지 않음. Phase 8A 가 README 줄을 옮길 예정(트래커 Phase 8A 질문 3 A)
+- direction: 그 명령이 README 에 2번 이상 나오는지, 윈도우 줄이 `$env:PYTHONPATH = "src"` 와 `python -m agent.run --once --dry-run` 을 함께 갖는지 단언을 더함 — 테스트만, 코드 · 문서 변경 없음
+- touches: tests/test_submission_docs.py
+- status: open
+- attempts: 0 · last failure: —
+- first seen: 2026-10-16 · last seen: 2026-10-16
+
 ### S-NEW-1 — 결과 화면 테스트 빈칸 셋: 표시 글 일곱의 글자 고정 · 리허설 줄 reason 표시 글 · 보이지 않는 U+2028 두 자
 - source: cycle 20261015-211359-adw/phase-7d-run-report-html · tracker plans/interview-marketing-agent.md#phase-7d · deferred by ship-check
 - evidence: src/agent/report.py:26-35 의 표시 글 일곱(`NO_POST` "게시 기록 없음" · `NO_DRAFT` "댓글 안 씀" · `OTHER` "기타 — 로그 참고" · `RESERVED` · `FAILED` · `NOT_JUDGED` · `NOT_TIMED`)이 tests/test_report.py · tests/test_run.py 에 글자로 0번 — 테스트가 상수와만 비교해 글을 바꿔도 스위트 초록이고 계약 '결과 화면' 절만 낡음(이번엔 verify 의 V22 가 잡았지만 V22 는 스위트 밖); tests/test_report.py:95-98 `rehearsal()` 이 `reason=DRY_RUN` 을 박아 :590 의 모양 갖춘 리허설 줄 reason 에 표시 글이 없음(plan Test plan 은 표시 글을 약속); tests/test_report.py:517 · :524 의 날 U+2028 두 자는 편집기 · diff 에서 안 보임(.adw/ship-report.md § Test integrity)

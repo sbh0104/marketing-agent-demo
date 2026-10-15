@@ -73,6 +73,19 @@ def valid() -> dict[str, object]:
     return copy.deepcopy(VALID)
 
 
+def marked() -> dict[str, object]:
+    """valid() 의 글자 칸마다 MARK 를 넣은 설정 — 거절 메시지에 설정 글이 실리지 않는지 보는 경계 표본."""
+    data = valid()
+    data["topic"] = f"{MARK} 연애 고민"
+    data["keywords"] = [f"{MARK}연애", f"{MARK}썸"]
+    data["comment"]["writer_model"] = f"{MARK}-writer"
+    data["classifier"]["model"] = f"{MARK}-jev"
+    data["classifier"]["on_topic_reasons"] = [f"{MARK} 연애 고민 상담", f"{MARK} 연애 경험담"]
+    data["classifier"]["off_topic_reasons"] = [f"{MARK} 키워드만 겹침: 게임", f"{MARK} 연애와 관계없음"]
+    data["allowed_videos"] = [f"https://youtu.be/{MARK}abcdefgh"]
+    return data
+
+
 class BadValue(NamedTuple):
     """실행 중에 잘못 고친 설정 한 줄 — 읽기 오류의 재현 입력."""
 
@@ -292,6 +305,8 @@ TEXT_CHARS = (
     "(줄바꿈 · 탭 · 전각 공백 · 폭 없는 공백, 이 파이썬이 모르는 새 글자(최근 이모지 등) 등은 안 됩니다)"
 )
 EDGE_SPACE = "스페이스로 시작하거나 끝나면 안 됩니다"
+LOOPBACK_ONLY = "이 컴퓨터 주소만 받습니다 (localhost · 127.0.0.1 · [::1] 와 포트)"
+MARK = "MRK"  # 오류 메시지 어디에도 나오면 안 되는 표시
 
 # Phase 1C 인터뷰(2026-10-14) 재현 입력 — 실제 파일에 그대로 씁니다
 TEXT_VALUES: tuple[RangeValue, ...] = (
@@ -837,14 +852,20 @@ class TextKeyTest(unittest.TestCase):
                         config_from_mapping(data)
                     self.assertEqual(str(caught.exception), message)
 
-    def test_every_allowed_category_loads_in_every_text_key(self) -> None:
+    def test_every_allowed_category_passes_the_text_rule_in_every_text_key(self) -> None:
         text = "연애  상담" + "".join(ALLOWED_BY_CATEGORY.values())
         for path, _, setter, getter in TEXT_KEYS:
-            value = "http://localhost:9222/" + text if path == "chrome_debug_url" else text
             with self.subTest(path=path):
                 data = valid()
-                setter(data, value)
-                self.assertEqual(getter(config_from_mapping(data)), value)
+                if path == "chrome_debug_url":
+                    # 글자 규칙은 지나고 그 뒤의 주소 규칙(이 컴퓨터만)이 거절합니다 — 거절 이유가 글자 규칙이 아님을 봅니다
+                    setter(data, "http://localhost:9222/" + text)
+                    with self.assertRaises(ConfigError) as caught:
+                        config_from_mapping(data)
+                    self.assertEqual(str(caught.exception), f"{LOOPBACK_ONLY}: chrome_debug_url")
+                else:
+                    setter(data, text)
+                    self.assertEqual(getter(config_from_mapping(data)), text)
 
     def test_text_rule_is_the_log_raw_rule(self) -> None:
         # 두 목록이 갈라지지 않습니다 — 설정 문지기의 판정은 로그 날 글자 판정 함수 그 자체입니다
@@ -872,6 +893,64 @@ class TextKeyTest(unittest.TestCase):
         with self.assertRaises(ConfigError) as caught:
             config_from_mapping(data)
         self.assertEqual(str(caught.exception), f"{EDGE_SPACE}: chrome_debug_url")
+
+
+class LoopbackUrlTest(unittest.TestCase):
+    """크롬 주소는 이 컴퓨터만 — 받는 꼴 하나와 목록 밖 닮은 꼴 표본(헌법 12조 · 트래커 Phase 7G 질문 2 A)."""
+
+    GREEN = (
+        "http://localhost:9222",
+        "http://127.0.0.1:9222",
+        "http://[::1]:9222",
+        "http://localhost:9222/",
+        "http://localhost:9333",
+    )
+    RED = (
+        "http://evil.example\\@localhost:9222",  # '\' — 파이썬과 브라우저가 다른 호스트로 읽는 꼴
+        "http://user:pw@localhost:9222",  # 사용자 이름 · 비밀번호
+        "http://localhost:9222@evil.example:9222",  # 받는 꼴을 사용자 이름으로, 진짜 호스트는 뒤
+        "http://localhost.evil.example:9222",  # 앞부분만 닮은 다른 호스트 이름
+        "http://evil.example:9222",  # 다른 호스트
+        "http://localhost9222",  # ':' 빠짐 — 호스트가 localhost9222
+        "localhost:9222",  # 스킴 빠짐
+        "http://127-0-0-1:9222",  # '.' 대신 '-' — 다른 호스트 이름(7G 질문 2 A)
+        "https://localhost:9222",  # https — 받아도 게시 때 chrome_unreachable(7G HC1 질문 1 A)
+        "http://LOCALHOST:9222",  # 대문자 — 받을 꼴만 적음(7G HC1 질문 1 A · 헌법 12조)
+        "http://127.0.0.2:9222",  # 127.0.0.1 밖 루프백 — 크롬이 문을 열지 않음(7G HC1 질문 1 A)
+        "http://localhost",  # 포트 없음 — 준비 도구도 "포트가 없습니다"(7G HC1 질문 1 A)
+        "http://ｌｏｃａｌｈｏｓｔ:9222",  # 전각 호스트 — 두 해석기가 다르게 읽음(7G HC1 질문 1 A)
+        "http://localhost:123456",  # 여섯 자리 포트 — 계약 2절 숫자 1–5자리(7G HC1 질문 1 A)
+        "http://localhost:9222//",  # 끝 '/' 둘 — 계약 2절 끝의 '/' 하나까지(7G HC1 질문 1 A)
+        # 포트 숫자만 전각 — urlsplit · WHATWG 모두 포트로 읽지 못함(7G HC1 질문 1 A 의 https 줄
+        # "받아도 게시 때 chrome_unreachable" · :123456 줄 "계약 2절 숫자 1–5자리")
+        "http://localhost:９２２２",
+    )
+
+    def test_this_computer_addresses_load_as_written(self) -> None:
+        for url in self.GREEN:
+            with self.subTest(url=url):
+                data = valid()
+                data["chrome_debug_url"] = url
+                self.assertEqual(config_from_mapping(data).chrome_debug_url, url)
+
+    def test_other_shapes_are_refused_with_the_fixed_message(self) -> None:
+        for url in self.RED:
+            with self.subTest(url=url):
+                data = valid()
+                data["chrome_debug_url"] = url
+                with self.assertRaises(ConfigError) as caught:
+                    config_from_mapping(data)
+                self.assertEqual(str(caught.exception), f"{LOOPBACK_ONLY}: chrome_debug_url")
+
+    def test_refusal_message_holds_no_config_text(self) -> None:
+        # 비밀번호 든 주소가 오류에 찍히지 않게(Phase 1C ship-report R5) — 글자 칸마다 표시를 넣고 메시지를 봅니다
+        self.assertEqual(config_from_mapping(marked()).topic, f"{MARK} 연애 고민")
+        data = marked()
+        data["chrome_debug_url"] = f"http://{MARK}:{MARK}@{MARK}.example:9222"
+        with self.assertRaises(ConfigError) as caught:
+            config_from_mapping(data)
+        self.assertEqual(str(caught.exception), f"{LOOPBACK_ONLY}: chrome_debug_url")
+        self.assertNotIn(MARK, str(caught.exception))
 
 
 class LoadConfigTest(unittest.TestCase):

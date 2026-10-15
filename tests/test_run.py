@@ -34,6 +34,7 @@ from agent.watcher import Watcher
 from agent.writer import TOP_COMMENTS_MAX
 from agent.youtube import QuotaLedger, YouTubeClient
 from tests.test_classifier import response
+from tests.test_config import LOOPBACK_ONLY
 from tests.test_watcher import FakeApi, google_error, search_page, video_item
 from tests.test_writer import reply, tool_reply
 
@@ -187,7 +188,7 @@ class WriterClaude:
 
 
 class FakeTab:
-    """CommentPage 가짜 — 연 주소를 url 로 돌려주고 submit 을 셉니다."""
+    """CommentPage 가짜 — 연 주소를 url 로 돌려주고 submit · clear_comment 를 셉니다."""
 
     def __init__(self, chrome: FakeChrome) -> None:
         self._chrome = chrome
@@ -199,6 +200,9 @@ class FakeTab:
 
     def prepare_comment(self, text: str) -> None:
         self._chrome.typed.append(text)
+
+    def clear_comment(self) -> None:
+        self._chrome.cleared.append(self.url)
 
     def submit(self) -> None:
         self._chrome.submits.append(self.url)
@@ -237,7 +241,7 @@ class FakeSession:
 
 
 class FakeChrome:
-    """Services.chrome 자리 — 받은 debug_url 과 만든 세션, 눌린 submit 을 적습니다.
+    """Services.chrome 자리 — 받은 debug_url 과 만든 세션, 눌린 submit, 지운 탭 주소를 적습니다.
 
     unreachable 이 n 이면 처음 n 번의 new_page 가 chrome_unreachable 로 멈춥니다.
     close_error 가 있으면 세션의 close 가 (센 뒤) 그 예외를 냅니다.
@@ -248,6 +252,7 @@ class FakeChrome:
         self.sessions: list[FakeSession] = []
         self.submits: list[str] = []
         self.typed: list[str] = []
+        self.cleared: list[str] = []
         self.unreachable = 0
         self.close_error: BaseException | None = None
         self.url_suffix = ""
@@ -985,6 +990,19 @@ class TestRunMode(RunCase):
                 self.assertEqual(self.chrome.submits, [])
                 self.assertEqual(self.lines(Event.POST, mode="live"), [])
 
+    def test_dry_run_once_rehearses_listed_video_cleanly(self) -> None:
+        # H-117 (Phase 7F 가 넘김) — 리허설 줄에 detail(clear_failed …)이 없고, 포스터 ERROR · 누름이 없습니다
+        self.show(A, 2000)
+        self.assertEqual(self.run_agent("--dry-run", "--once"), 0)
+        (post,) = self.lines(Event.POST, video=A)
+        self.assertEqual(
+            (post["mode"], post["result"], post["reason"]), ("test", "rehearsed", "dry_run")
+        )
+        self.assertNotIn("detail", post)
+        self.assertEqual(self.lines(Event.ERROR, where="poster"), [])
+        self.assertEqual(self.chrome.cleared, [watch(A)])
+        self.assertEqual(self.chrome.submits, [])
+
 
 class MarkedClaude(WriterClaude):
     """WriterClaude 의 답 칸마다 표시 글 — 글 블록 · 도구 id · 고민 · 댓글. error 가 있으면 그것을 냅니다."""
@@ -1582,6 +1600,41 @@ class TestConfigRejected(RunCase):
             [(1, False), (2, False), (3, True)],
         )
         self.assertEqual(self.modes(), ["live", "live", "test"])
+
+    def test_address_outside_this_computer_on_reload_stops_live_posting(self) -> None:
+        # 7G 질문 2 A — 실행 중 주소를 이 컴퓨터 밖으로 고치면 거절이 이어지는 동안 실제 게시가 멈춥니다(Phase 7 질문 1 A)
+        broken = replace_once(
+            config_text(),
+            "chrome_debug_url: http://localhost:9222\n",
+            f"chrome_debug_url: http://{MARK}.example\\@localhost:9222\n",
+        )
+        self.on_wait[1] = lambda: self.show(B, 2000, channel="UC2")
+        self.start(broken, 2)
+        (error,) = self.lines(Event.ERROR, where="config")
+        self.assertIn(f"{LOOPBACK_ONLY}: chrome_debug_url", error["reason"])
+        self.assertEqual(
+            self.lines(Event.POST, video=B),
+            [{"video": B, "mode": "test", "result": "saved", "reason": "config_rejected"}],
+        )
+        self.assertEqual([entry for entry in self.posted_via if entry[0] == 2], [])
+        self.assertEqual(len(self.chrome.sessions), 1)
+        self.assertEqual(self.modes(), ["live", "test"])
+        self.assertNotIn(MARK, self.log_text())
+
+    def test_address_outside_this_computer_at_start_exits_2(self) -> None:
+        self.write_config(
+            replace_once(
+                config_text(),
+                "chrome_debug_url: http://localhost:9222\n",
+                f"chrome_debug_url: http://user:{MARK}@localhost:9222\n",
+            )
+        )
+        self.assertEqual(self.run_agent("--once"), 2)
+        (error,) = self.lines(Event.ERROR, where="config")
+        self.assertIn(f"{LOOPBACK_ONLY}: chrome_debug_url", error["reason"])
+        self.assertEqual(self.lines(Event.START), [])
+        self.assertEqual(self.chrome.sessions, [])
+        self.assertNotIn(MARK, self.log_text())
 
 
 if __name__ == "__main__":

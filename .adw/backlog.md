@@ -27,6 +27,9 @@
 
 ## To do
 
+- [~] [smoke] 스모크 스윕 — S-106, S-107, S-108
+- [x] [smoke] 스모크 스윕 — S-103, S-104, S-105
+- [x] [smoke] 스모크 스윕 — S-101, S-102
 - [x] [smoke] 스모크 스윕 — S-100
 - [x] [smoke] 스모크 스윕 — S-099
 - [x] [smoke] 스모크 스윕 — S-098
@@ -74,16 +77,17 @@
 - [x] Phase 6D — 다시 잰 결과 반영 (plans/interview-marketing-agent.md#phase-6d)
 - [x] Phase 6E — 댓글 품질 고치기 (게시 전 검사를 과제 문장에 맞춤 · 작성 프롬프트) (plans/interview-marketing-agent.md#phase-6e)
 - [x] Phase 6G — 결과 파일 개인 정보 가림 (실행기가 쓸 때 연락처 모양 가림 · 끝 줄 검사) (plans/interview-marketing-agent.md#phase-6g)
-- [~] Phase 6F — 고친 뒤 다시 반영 (전후 숫자) (plans/interview-marketing-agent.md#phase-6f)
+- [x] Phase 6F — 고친 뒤 다시 반영 (전후 숫자) (plans/interview-marketing-agent.md#phase-6f)
 - [x] Phase 7 — 파이프라인 연결 · 운영 규칙 통합 (plans/interview-marketing-agent.md#phase-7)
 - [x] Phase 7F — 명단 영상 크롬 리허설 (테스트 실행에서 버튼 직전까지) (plans/interview-marketing-agent.md#phase-7f)
-- [~] Phase 8 — 제출 문서 (README · PROCESS.md · 공개 정리) (plans/interview-marketing-agent.md#phase-8)
+- [x] Phase 8 — 제출 문서 (README · PROCESS.md · 공개 정리) (plans/interview-marketing-agent.md#phase-8)
 - [ ] Phase 8A — 실제 실행 반영 (sample.log · 시연 링크 · 실제 숫자) (plans/interview-marketing-agent.md#phase-8a)
-- [ ] Phase 7A — 탐지기 · 네트워크 오류 고침 (plans/interview-marketing-agent.md#phase-7a)
-- [~] Phase 7G — 크롬 주소 · 표본 간격 다지기 (이 컴퓨터 주소만 · 최소 표본 간격) (plans/interview-marketing-agent.md#phase-7g)
+- [~] Phase 7A — 탐지기 · 네트워크 오류 고침 (plans/interview-marketing-agent.md#phase-7a)
+- [x] Phase 7G — 크롬 주소 · 표본 간격 다지기 (이 컴퓨터 주소만 · 최소 표본 간격) (plans/interview-marketing-agent.md#phase-7g)
 - [ ] Phase 7B — jev 키가 없을 때 Claude 판단 (plans/interview-marketing-agent.md#phase-7b)
-- [ ] Phase 7D — 결과 화면 data/report.html (plans/interview-marketing-agent.md#phase-7d)
+- [~] Phase 7D — 결과 화면 data/report.html (plans/interview-marketing-agent.md#phase-7d)
 - [ ] Phase 7C — 댓글 수 · 여는 방식 (건너뛴 영상 다시 쓰기 · 문장 짜임 고르기) (plans/interview-marketing-agent.md#phase-7c)
+- [ ] Phase 7H — 결과 화면 다지기 (낡은 이유 배지 · 이름표 둘) (plans/interview-marketing-agent.md#phase-7h)
 - [ ] (example) Add social login buttons to the login screen
 - [ ] (example) Add retry logic on payment failure
 - [ ] (example) [ui] Redesign the product card grid (plans/interview-shop.md#phase-4)
@@ -110,6 +114,8 @@
 - [x] ~~(retro 후보 · E-034) 트래커만 고친 확인 인터뷰 뒤 두 번째 ship-check 가 같은 코드 트리에서 새 결함을 찾음(1C R7 · R8, 6B R12 · S-075) — E-030 상류 고침이 받아들인 "새 트래커 줄은 기계가 다시 대조하지 않음"을 다시 볼지 — 최소 계약 고침: ADWS 백로그 `(retro 후보 · marketing-agent-demo E-030 이관)` 줄의 받아들인 값 — `human_checks.py confirm` 이 verify-report 를 이어받을 때 인터뷰가 더한 트래커 줄만 Spec compliance 로 다시 추적하는 좁은 ship-check 하나를 남김 (sightings: 20261014-112313-adw/phase-1c-text-config-allow · 20261014-112322-adw/phase-6b-live-check-apply)~~ — ADWS 백로그 E-030 이관 줄에 보탬으로 흡수 (2026-10-14 원격 인터뷰 · 슬롯 738761dc · Q1 A · Q2 A · Q3 A) — `~/project/ADWS/.adw/backlog.md` 의 `(retro 후보 · marketing-agent-demo E-030 이관)` 줄 안 "E-034 보탬" 과 고친 받아들인 값. 두 번째 검사가 찾은 것은 두 종류였다: 인터뷰가 쓴 새 줄 자체의 거짓(6B R12, `plans/interview-marketing-agent.md:487` — 지금 H-064 로 6C 를 기다림)과, 인터뷰와 상관없이 두 번째 눈이 본 코드 결함(1C R7 · R8 · 6B S-066 — 이 줄의 'S-075' 는 S-066(다시 접수된 S-073)을 잘못 적은 번호). 고침은 앞 종류만 겨냥한다: 확인 인터뷰가 도장 전에 판정 뒤 `plans/` 의 바뀐 줄 전체를 읽기 전용 `adw-auditor` 에게 넘겨 사실 주장을 사본에서 시험하고, 거짓이면 글만 좁히는 고침은 인터뷰가 · 결정이 바뀌는 고침은 같은 인터뷰에서 사람에게 묻고, 커밋 꼬리말 `Claims-checked: N found · 0 false` 가 없거나 거짓이 남으면 `confirm` 이 verify-report 를 이어받지 않아 지금처럼 전부 다시 돈다. 원안의 "도장 뒤 좁은 ship-check" 는 버림 — 세 곳 고침이 되살아나고, R12 는 Spec compliance 가 아니라 품질 감사가 바꿈을 심어 찾았기에 원안 글대로면 놓친다. 받아들인 값: 코드 쪽 우연한 두 번째 감사는 사라짐(두 번 보기는 모든 페이즈에 따로 정할 규칙, 열지 않음) · 꼬리말은 실수 막이일 뿐. 오늘 전체 재실행도 R12 를 위험으로만 적어 거짓 줄이 착지했다(그래서 찾은 자리에서 고치는 손을 둠). 고침이 올 때까지는 E-030 그대로 확인마다 전부 다시 돈다. 다시 오르면 ADWS 줄로 흡수해 닫는다
 
 - [ ] (retro 후보 · E-041) plan 이 등록하는 변이가 새 판정의 경계(비교 연산 · 범위 양 끝)를 비틀지 않아 ship-check 변이 점검이 살아남은 변이를 찾음 — 최소 계약 고침: `.claude/skills/plan/SKILL.md:128` 가드 매트릭스 변이 행에 "새 비교 · 범위 끝마다 양쪽 한 칸 변이" 를 요구(또는 ship-check 가 이미 잡으니 그대로 둘지 인터뷰가 정함) (sightings: 20261014-172227-adw/phase-6c-live-check-grader-fix · 20261015-091934-adw/phase-6e-comment-quality-fix)
+
+- [ ] (retro 후보 · E-052) 계획이 "Hold gate-plan" · "Deferred to a human: … before implement" 로 사람 결정을 계획 관문에 맡겨도 `autonomy: full` 이 관문을 자동 승인해, 그 결정이 implement · verify 를 다 쓴 뒤 ship-check 민감 정지로만 돌아옴 — 최소 계약 고침: `.claude/skills/plan/scripts/cycle_driver.py:712` 자동 승인 앞에서 plan.md 의 기계 읽기 표지(예: `Hold gate-plan` 줄)를 보면 관문을 사람에게 열기 — 또는 plan 스킬이 그런 결정을 계획 관문 전 🎤 인터뷰로 보내기(어느 쪽인지, ADWS 로 넘길지 인터뷰가 정함) (sightings: 20261015-211343-adw/phase-7g-chrome-url-sample-gap · 20261015-211335-adw/phase-8-submission-docs)
 
 ## Done
 

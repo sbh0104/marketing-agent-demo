@@ -50,7 +50,14 @@ KEPT = (
     "docs/live-check/README.md",
     "docs/live-check/result.json",
     "docs/live-check/summary.md",
+    "README.md",
+    "PROCESS.md",
+    "tests/public_copy.py",
+    "tests/public_copy_known.json",
 )
+
+# 회사 과제 안내 PDF — 공개하지 않습니다 (트래커 Phase 8)
+ASSIGNMENT_PDF = "docs/marketing-agent.pdf"
 
 
 def check_ignore(paths: list[str]) -> dict[str, tuple[str, str]]:
@@ -92,6 +99,9 @@ class GitignoreTest(unittest.TestCase):
     def test_chrome_profile_folder_is_ignored_whole(self) -> None:
         path = "chrome-profile/Default/Bookmarks"
         self.assert_ignored_by_repo(check_ignore([path]), path)
+
+    def test_assignment_pdf_is_ignored(self) -> None:
+        self.assert_ignored_by_repo(check_ignore([ASSIGNMENT_PDF]), ASSIGNMENT_PDF)
 
     def test_submitted_files_are_not_ignored(self) -> None:
         matches = check_ignore(list(KEPT))
