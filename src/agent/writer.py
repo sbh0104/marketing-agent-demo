@@ -53,6 +53,7 @@ NO_CONCERN = "재료에 연애 고민 없음"  # 스스로 건너뜀 이유 — 
 WRITE_TOOL: dict[str, object] = {
     "name": "submit_comment",
     "description": "자료에 연애 고민과 짚을 장면이 있는지, 있으면 고민 한 줄과 댓글을 적습니다.",
+    "strict": True,
     "input_schema": {
         "type": "object",
         "properties": {
@@ -347,28 +348,22 @@ def _reply_text(response: object) -> str:
 def _rewrite_turns(response: object, reason: str) -> list[dict[str, object]]:
     """다시 쓰기 차례 둘 — 원래 답(assistant)과 REWRITE_PROMPT(user).
 
-    원래 답에 도구 호출이 있으면 그 호출 하나를 되돌려 붙이고 REWRITE_PROMPT 를 그 호출의
-    tool_result 로 답합니다(Messages API 는 tool_use 마다 다음 user 차례에 tool_result 를 요구).
+    원래 답에 도구 호출이 있으면 원래 답의 블록(생각 · 글 · 도구 호출)을 차례 그대로, 바꾸지 않고
+    되돌려 붙이고, 도구 호출마다 REWRITE_PROMPT 를 그 호출의 tool_result 로 하나씩 답합니다
+    (Messages API 는 tool_use 마다 다음 user 차례에 tool_result 를 요구).
     없으면 원래 글(비었으면 "(빈 응답)")과 REWRITE_PROMPT 글입니다.
     """
     prompt = REWRITE_PROMPT.format(reason=reason)
-    used = _tool_block(response)
-    if used is not None:
+    if _tool_block(response) is not None:
         return [
-            {
-                "role": "assistant",
-                "content": [
-                    {
-                        "type": "tool_use",
-                        "id": used.id,
-                        "name": used.name,
-                        "input": used.input if isinstance(used.input, dict) else {},
-                    }
-                ],
-            },
+            {"role": "assistant", "content": list(response.content)},
             {
                 "role": "user",
-                "content": [{"type": "tool_result", "tool_use_id": used.id, "content": prompt}],
+                "content": [
+                    {"type": "tool_result", "tool_use_id": block.id, "content": prompt}
+                    for block in response.content
+                    if block.type == "tool_use"
+                ],
             },
         ]
     raw = _reply_text(response)
@@ -446,7 +441,7 @@ def write_comment(
                 max_tokens=MAX_TOKENS,
                 system=system,
                 tools=[WRITE_TOOL],
-                tool_choice={"type": "tool", "name": WRITE_TOOL["name"]},
+                tool_choice={"type": "auto"},
                 messages=messages,
             )
         except Exception as exc:

@@ -694,6 +694,7 @@ class WriteCommentTest(unittest.TestCase):
                 "description": (
                     "자료에 연애 고민과 짚을 장면이 있는지, 있으면 고민 한 줄과 댓글을 적습니다."
                 ),
+                "strict": True,
                 "input_schema": {
                     "type": "object",
                     "properties": {
@@ -721,7 +722,7 @@ class WriteCommentTest(unittest.TestCase):
         for call in claude.calls:
             with self.subTest(messages=len(call["messages"])):
                 self.assertEqual(call["tools"], [WRITE_TOOL])
-                self.assertEqual(call["tool_choice"], {"type": "tool", "name": "submit_comment"})
+                self.assertEqual(call["tool_choice"], {"type": "auto"})
         self.assertTrue(self.user_message(claude).endswith("\n\n" + USER_INSTRUCTION))
 
     def test_check_questions_are_pinned_verbatim(self) -> None:
@@ -872,7 +873,7 @@ class WriteCommentTest(unittest.TestCase):
         result = self.write(claude, jev)
         user = {"role": "user", "content": self.user_message(claude)}
         self.assertEqual(claude.calls[0]["messages"], [user])
-        used = {"type": "tool_use", "id": "toolu_fake", "name": "submit_comment", "input": first}
+        used = SimpleNamespace(type="tool_use", id="toolu_fake", name="submit_comment", input=first)
         self.assertEqual(
             claude.calls[1]["messages"],
             [
@@ -1013,12 +1014,13 @@ class WriteCommentTest(unittest.TestCase):
             ],
         )
         self.assertEqual(self.events()[0][1]["attempt"], "2")
-        # 도구 블록은 있는데 모양이 다른 답 — 그 호출에 tool_result 로 다시 쓰기를 답합니다
+        # 도구 블록은 있는데 모양이 다른 답 — 원래 블록을 그대로 되돌려 붙이고 그 호출에
+        # tool_result 로 다시 쓰기를 답합니다
         truncated = {"has_love_concern": True, "has_scene": True, "concern": CONCERN}
         listed = [reply(CONCERN, GOOD)]
         for label, first, replayed in (
             ("잘린 답", truncated, truncated),
-            ("입력이 목록", listed, {}),
+            ("입력이 목록", listed, listed),
         ):
             with self.subTest(label):
                 claude = FakeClaude(
@@ -1033,12 +1035,12 @@ class WriteCommentTest(unittest.TestCase):
                         {
                             "role": "assistant",
                             "content": [
-                                {
-                                    "type": "tool_use",
-                                    "id": "toolu_fake",
-                                    "name": "submit_comment",
-                                    "input": replayed,
-                                }
+                                SimpleNamespace(
+                                    type="tool_use",
+                                    id="toolu_fake",
+                                    name="submit_comment",
+                                    input=replayed,
+                                )
                             ],
                         },
                         {
@@ -1056,27 +1058,23 @@ class WriteCommentTest(unittest.TestCase):
 
     def test_rewrite_answers_the_tool_call(self) -> None:
         first = reply(CONCERN, GOOD)
-        # 설명 글 블록이 함께 와도 다시 쓰기 차례에는 도구 호출 하나만 되돌려 붙입니다
-        claude = FakeClaude([tool_reply(first, text="설명 글"), reply(CONCERN, GOOD2)])
+        # 생각 블록 · 설명 글 블록이 함께 와도 다시 쓰기 차례에는 원래 블록을 차례 그대로,
+        # 바꾸지 않고 되돌려 붙입니다
+        answer = tool_reply(first, text="설명 글")
+        thought = SimpleNamespace(type="thinking", thinking="고민과 장면을 먼저 봅니다", signature="sig")
+        answer.content.insert(0, thought)
+        blocks = copy.deepcopy(answer.content)
+        claude = FakeClaude([answer, reply(CONCERN, GOOD2)])
         jev = FakeJev([{**PASSING, "mentions_scene": 0.25}, PASSING])
         result = self.write(claude, jev)
         self.assertEqual(result.draft.text, GOOD2)
+        self.assertEqual([block.type for block in blocks], ["thinking", "text", "tool_use"])
         user = {"role": "user", "content": self.user_message(claude)}
         self.assertEqual(
             claude.calls[1]["messages"],
             [
                 user,
-                {
-                    "role": "assistant",
-                    "content": [
-                        {
-                            "type": "tool_use",
-                            "id": "toolu_fake",
-                            "name": "submit_comment",
-                            "input": first,
-                        }
-                    ],
-                },
+                {"role": "assistant", "content": blocks},
                 {
                     "role": "user",
                     "content": [
@@ -1087,6 +1085,34 @@ class WriteCommentTest(unittest.TestCase):
                                 reason="자체 검사 미달 — 영상 속 장면·말 언급 0.25"
                             ),
                         }
+                    ],
+                },
+            ],
+        )
+
+    def test_rewrite_answers_every_tool_call(self) -> None:
+        # 도구 호출이 둘이면 다시 쓰기 차례의 user 에 tool_result 도 둘 — 호출 차례 그대로
+        calls = [
+            SimpleNamespace(
+                type="tool_use", id=f"toolu_{mark}", name="submit_comment", input=reply(CONCERN, text)
+            )
+            for mark, text in (("first", GOOD), ("second", GOOD2))
+        ]
+        answer = SimpleNamespace(content=calls, stop_reason="tool_use")
+        claude = FakeClaude([answer, reply(CONCERN, GOOD2)])
+        jev = FakeJev([{**PASSING, "mentions_scene": 0.25}, PASSING])
+        result = self.write(claude, jev)
+        self.assertEqual(result.draft.text, GOOD2)
+        prompt = REWRITE_PROMPT.format(reason="자체 검사 미달 — 영상 속 장면·말 언급 0.25")
+        self.assertEqual(
+            claude.calls[1]["messages"][1:],
+            [
+                {"role": "assistant", "content": calls},
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "tool_result", "tool_use_id": "toolu_first", "content": prompt},
+                        {"type": "tool_result", "tool_use_id": "toolu_second", "content": prompt},
                     ],
                 },
             ],

@@ -913,9 +913,11 @@ if result.draft is not None:
   가 실제 클라이언트를 만듭니다. `anthropic` 패키지는 이 함수 안에서만 가져오므로 테스트는 설치
   없이 돕니다. 제한 시간은 60초(`CLAUDE_TIMEOUT_S` — SDK 기본값 10분이면 한 줄로 도는 루프가
   멈춥니다)이고, 429/529 재시도는 SDK 기본값 그대로입니다. 모델 이름은 `comment.writer_model`
-  (2절)에서 읽습니다. 작성 답은 도구 `submit_comment` 의 입력으로 받습니다(`tool_choice` 로 그
-  도구를 정함). 모델이 그 도구로 답하는지와 `tool_result` 다시 쓰기 차례를 받는지는 다음 진짜
-  실행이 처음 확인합니다.
+  (2절)에서 읽습니다. 작성 답은 도구 `submit_comment` 의 입력으로 받습니다(`tool_choice` 는
+  `auto`, 도구는 `strict` — 모델이 도구 대신 글로 답하면 읽을 수 없는 답이라 다시 쓰기 한 번을
+  씁니다). 다시 쓰기 차례는 첫 답의 블록(생각 · 글 · 도구 호출)을 통째로 되돌려 붙이고, 도구
+  호출마다 `tool_result` 하나로 답합니다. 모델이 `auto` 에서 그 도구로 답하는지와 되돌려 붙인
+  생각 블록을 받는지는 다음 진짜 실행이 처음 확인합니다.
 - **`check` 포트** — `check(state, questions) -> {질문 이름: P(예)}`. 초안 한 개에 `noul` 질문
   다섯 개(`CHECK_QUESTIONS`: `mentions_scene` · `reads_like_ad` · `follows_concern` ·
   `concern_is_love_worry` · `saju_story_fits`)를 **한 요청**으로 묻습니다. 접속(키 `TYPESAFE_API_KEY` · jev 모델 · `typesafe-sdk`)은 Phase 3 의
