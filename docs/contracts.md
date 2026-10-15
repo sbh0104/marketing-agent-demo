@@ -898,6 +898,10 @@ watcher = Watcher(Store(Path("data/videos.json")), logbook, client, clock)
 - 오류가 난 단계는 멈춥니다 — 검색 오류면 남은 검색을 그만두고 추적으로 넘어가고, 조회수 오류면
   추적을 그만둡니다.
 - 오류 글 속 API 키는 `<YOUTUBE_API_KEY>` 로 가리고, 원래 예외(키가 든 URL)는 덧붙이지 않습니다.
+- **음성 대조.** `python3 -m tests.mutants <이름>` — `youtube-narrow-network-catch` · `youtube-follows-redirects` ·
+  `youtube-no-request-cap` · `youtube-open-without-read-timeout` · `youtube-error-body-failure-raises` ·
+  `youtube-error-left-open` · `youtube-opener-without-https` · `youtube-opener-without-proxy` · `youtube-prune-at-window` ·
+  `watcher-repr-any-value` · `watcher-any-page-token` · `watcher-put-before-lines`.
 
 **인기 댓글** — `YouTubeClient.top_comments(video_id, now, limits, max_results) -> tuple[str, ...] | None`
 
