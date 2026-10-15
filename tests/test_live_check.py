@@ -3010,8 +3010,9 @@ class VideoRoundTest(LiveCheckCase):
         videos = self.by_id(result)
         self.assertTrue(videos[vid(1)]["drafts"][0]["code_pass"])
         repeat = videos[vid(2)]["drafts"][0]
-        expected = code_failures(passed, [passed], self.config.comment)
-        self.assertTrue(expected)
+        run = repeated_run(passed, [passed], REPEAT_MIN_CHARS)
+        self.assertTrue(run)
+        expected = [f"이전 댓글과 겹칩니다 ({len(run)}글자)"]
         self.assertEqual(repeat["untrusted"]["code_failures"], expected)
         self.assertFalse(repeat["code_pass"])
 

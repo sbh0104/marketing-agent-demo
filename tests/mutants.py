@@ -782,6 +782,24 @@ MUTANTS: dict[str, tuple[str, str, str, str]] = {
         r'_DASH_BETWEEN_DIGITS.sub(r"\1-", text.translate(MATCH_VIEW))',
         r'text.translate({**MATCH_VIEW, **dict.fromkeys(map(ord, _DASH_LIKE), ord("-"))})',
     ),
+    "live-check-code-failures-raw": (
+        "tests.live_check",
+        "tests.test_live_check",
+        '"code_failures": _stored_failures(failures),',
+        '"code_failures": failures,',
+    ),
+    "live-check-code-failures-dropped": (
+        "tests.live_check",
+        "tests.test_live_check",
+        '"code_failures": _stored_failures(failures),',
+        '"code_failures": [],',
+    ),
+    "live-check-repeat-count-shifted": (
+        "tests.live_check",
+        "tests.test_live_check",
+        "len(reason) - len(REPEAT_REASON)",
+        "len(reason) - len(REPEAT_REASON) + 1",
+    ),
     "live-check-applied-yes-floor-lowered": (
         "agent.config",
         "tests.test_live_check_applied",

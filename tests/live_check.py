@@ -97,6 +97,12 @@ FRAME_CHARS = 6  # 과제 품질 ⓒ 조각 — 12글자 반복 검사가 놓치
 MARGIN = 0.05
 KEY_FRAGMENT_MIN = 8
 CONTACT_MASK = "<연락처>"
+# 코드 검사 이유 — 작성기 src/agent/writer.py (code_failures) 의 이유 머리와 결과 파일에 적는 이름
+REPEAT_REASON = "이전 댓글과 겹칩니다: "  # 뒤는 겹친 글자 — 결과에는 그 글자 수만 적습니다
+LINK_REASON = "링크·주소 모양이 들어 있습니다: "  # 뒤는 링크 조각 — 결과에는 이름만 적습니다
+LINK_STORED = "링크·주소 모양이 들어 있습니다"
+LENGTH_REASON_RE = re.compile(r"글자 수 [0-9]+자 — [0-9]+–[0-9]+자여야 합니다")  # 숫자뿐이라 그대로
+OTHER_REASON = "그 밖의 코드 검사 이유"
 PROBE_MAX_TOKENS = 1
 GRADE_MAX_TOKENS = 1024
 CLAUDE_MAX_RETRIES = 2
@@ -335,6 +341,24 @@ def _kept(text: str, limit: int, redactor: Callable[[str], str]) -> str:
     키 가림은 `_clean` 뒤라 `<키 이름>` 이 전각이 되지 않습니다. 키와 연락처가 없으면 `_clean(text, limit)` 과 같습니다.
     """
     return mask_contacts(mask_contacts(redactor(_clean(text, len(text))))[:limit])
+
+
+def _stored_failures(failures: Sequence[str]) -> list[str]:
+    """결과 파일에 적을 코드 검사 이유 — 이유 이름과 숫자만(반복은 겹친 글자 수, 링크는 이름, 글자 수는 그대로).
+
+    작성기의 이유 글은 겹친 글자(띄어쓰기 · 문장부호를 지운 글)와 링크 조각을 담아 연락처가 목록 밖 꼴로 남습니다.
+    """
+    stored: list[str] = []
+    for reason in failures:
+        if reason.startswith(REPEAT_REASON):
+            stored.append(f"이전 댓글과 겹칩니다 ({len(reason) - len(REPEAT_REASON)}글자)")
+        elif reason.startswith(LINK_REASON):
+            stored.append(LINK_STORED)
+        elif LENGTH_REASON_RE.fullmatch(reason):
+            stored.append(reason)
+        else:
+            stored.append(OTHER_REASON)
+    return stored
 
 
 def file_texts(path: Path) -> list[str]:
@@ -1646,7 +1670,7 @@ class _VideoRound:
                     "untrusted": {
                         "concern": mask_contacts(self.redactor(concern)),
                         "comment": mask_contacts(self.redactor(text)),
-                        "code_failures": failures,
+                        "code_failures": _stored_failures(failures),
                     },
                 }
             )
