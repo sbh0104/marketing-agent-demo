@@ -288,13 +288,43 @@ class LedgerTest(YouTubeCase):
         self.assertEqual(QuotaLedger(self.path).usage(NOW + SECOND), Usage(1, 101))
 
     def test_old_entries_are_pruned_on_write(self) -> None:
-        old = NOW - timedelta(hours=30)
-        client = self.client(FakeFetch(), searches(1, old) + searches(1, NOW - SECOND))
+        # 쓸 때 48시간이 지난 항목만 지웁니다 — 30시간 전 항목은 셈에서 빠져도 장부에는 남습니다
+        entries = (
+            searches(1, NOW - timedelta(hours=50))
+            + searches(1, NOW - timedelta(hours=30))
+            + searches(1, NOW - SECOND)
+        )
+        client = self.client(FakeFetch(), entries)
         client.search("연애", WINDOW_START, None, NOW, limits(90))
         self.assertEqual(
             [entry["at"] for entry in self.stored()],
-            ["2026-10-12T11:59:59+00:00", "2026-10-12T12:00:00+00:00"],
+            [
+                "2026-10-11T06:00:00+00:00",
+                "2026-10-12T11:59:59+00:00",
+                "2026-10-12T12:00:00+00:00",
+            ],
         )
+
+    def test_fast_clock_writes_keep_real_entries_rn3(self) -> None:
+        # 10시간 앞선 시계의 쓰기가 실제 검색 기록을 지우면 고친 시계에서 상한을 넘겨 허락합니다 (R-N3)
+        fast = NOW + timedelta(hours=10)
+        cases = (
+            ("one fast write", (20, 2, 1), ("videos",), 3),
+            ("two fast writes", (20, 2, 1), ("videos", "videos"), 3),
+            ("fast cycle", (20, 19, 2), ("first page", "videos"), 4),
+        )
+        for name, hours, sites, used in cases:
+            with self.subTest(name):
+                seeded = [e for h in hours for e in searches(1, NOW - timedelta(hours=h))]
+                client = self.client(FakeFetch(), seeded, name=name)
+                for site in sites:
+                    self.call(client, site, cap=3, now=fast)
+                client = self.client(FakeFetch(), name=name)
+                with self.assertRaises(QuotaExhausted) as caught:
+                    client.search("연애", WINDOW_START, None, NOW, limits(3))
+                self.assert_held(caught.exception, "search.list", "searches", used, 3)
+                stored = [entry["at"] for entry in self.stored()]
+                self.assertIn("2026-10-11T16:00:00+00:00", stored)
 
     def test_unreadable_ledger_refuses_and_keeps_the_file(self) -> None:
         def entry(**changes: object) -> bytes:
