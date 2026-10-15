@@ -491,6 +491,22 @@ class WriteCommentTest(unittest.TestCase):
         claude = FakeClaude([reply(CONCERN, GOOD[:55])])
         self.write(claude, FakeJev([PASSING]), config=CommentConfig(50, 60, "m", 0.5))
         system = claude.calls[0]["system"]
+        # 규칙 1 · 2 · 3 · 6 — 고민의 뜻 · 고민에 잇는 연애사주 경험 · 재료 속 장면 · 문장 짜임
+        rules = (
+            "1. 먼저 영상이 다루는 연애 고민을 한 줄로 정리합니다. 고민은 자료 속 사람(출연자 ·"
+            " 사연자 · 영상이 다루는 상황에 인기 댓글을 단 시청자)이 겪는 연애 상황의 고민입니다."
+            ' 줄거리 · 주제 요약 · "점을 보고 싶다" 는 고민이 아닙니다. 타로 · 사주 풀이 영상은'
+            " 그 풀이가 답하려는 상황(연락이 올지 · 재회 · 새 인연)이 고민입니다.",
+            "2. 댓글은 그 고민에 공감하면서, 비슷한 고민이 있었을 때 '연애사주'를 봤던 자기 경험을"
+            " 그 고민에 자연스럽게 잇습니다(예: 연락 텀이 고민이면 그때 연애사주에서 들은 말).",
+            "3. 영상 속 구체적인 장면이나 말을 하나 이상 짚습니다. 장면 · 말은 설명이나 인기 댓글이"
+            " 전하는 영상 속 장면 · 말뿐이고, 제목을 되풀이하는 것은 장면이 아닙니다.",
+            "6. <my_previous_comments> 안의 문장을 다시 쓰지 않고, 문장 짜임(첫머리 · 문장을 잇는"
+            " 말 · 끝맺음)도 그 댓글들과 다르게 씁니다.",
+        )
+        for rule in rules:
+            with self.subTest(rule=rule[:2]):
+                self.assertIn("\n" + rule + "\n", system)
         self.assertIn("댓글 길이는 공백과 문장부호를 포함해 50자 이상 60자 이하입니다.", system)
         self.assertNotIn("{min_chars}", system)
         self.assertIn(
