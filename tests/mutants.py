@@ -914,6 +914,12 @@ MUTANTS: dict[str, tuple[str, str, str, str]] = {
         "return lowest_score(scores) + _TOLERANCE >= threshold",
         "return lowest_score(scores) >= threshold",
     ),
+    "live-check-applied-answer-three-cells": (
+        "tests.test_live_check_applied",
+        "tests.test_live_check_applied",
+        "cells = [task.get(name) if isinstance(task, Mapping) else None for name in TASK_CELLS]",
+        "cells = [True for name in TASK_CELLS]",
+    ),
     "live-check-skip-grade-every-skip": (
         "tests.live_check",
         "tests.test_live_check",

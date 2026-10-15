@@ -731,6 +731,7 @@ run_loop(cycle, reload, initial, *, on_error, sleep=time.sleep,
   python3 -m tests.mutants live-check-applied-stored-verdicts-unchecked
   python3 -m tests.mutants live-check-applied-unknown-question-ignored
   python3 -m tests.mutants live-check-applied-recheck-no-tolerance
+  python3 -m tests.mutants live-check-applied-answer-three-cells
   python3 -m tests.mutants live-check-skip-grade-every-skip
   ```
 
@@ -742,7 +743,7 @@ run_loop(cycle, reload, initial, *, on_error, sleep=time.sleep,
   `best_correct` · `best_setting` · `verdict_line` · `cli` · `main` ·
   `write_comment` · `code_failures` · `self_check_failure` · `link_fragment` · `repeated_run` 의
   본문을 고칠 때는 이 명령들이 계속 1 로 끝나는지 함께 확인합니다. `tests/test_live_check_applied.py` 의
-  `measured_drift` · `recount` · `admitted` · `stored_verdict_mismatches` 본문을 고칠 때도
+  `measured_drift` · `recount` · `admitted` · `stored_verdict_mismatches` · `claude_answer` 본문을 고칠 때도
   `live-check-applied-*` 명령이 계속 1 로 끝나는지 함께
   확인합니다. 음성 대조 실행기는 `agent.*` 모듈과 `tests.live_check` · `tests.test_live_check_applied`
   를 메모리에서 바꿉니다.
@@ -999,20 +1000,24 @@ if result.draft is not None:
   - 초안 운영 창: 쓴 영상 7 · SKIP 5 · 초안 11 · 정답 있음 11 (사람 칸 1 · Claude 채점 11) · 채점 오류 0 · 사람 칸과 Claude 채점이 다름 1 · 정답 bad 인데 통과 0 · 정답 ok 인데 탈락 0
   - 초안 넓힌 창: 실행 없음
   - 정답 있고 자체 검사를 통과한 초안 2(사람 칸 1) 가운데 정답 bad 가 0 이라 `check_min_probability` 는 0.7 그대로입니다(근거가 있어 그대로).
-  - 정답은 사람 칸(`ok` · `bad`)이 있으면 그것, 없으면 Claude 채점입니다. Claude 채점은 또 하나의 AI
-    의견이라, 그 정답에 맞춰 옮긴 통과선은 단단하지 못합니다.
-  - 통과선은 올리기만 하고 내리지 않습니다 — 정답이 `bad` 인데 jev 자체 검사를 통과한 초안이 있으면 세
-    비교 점수(장면 · 고민은 P(예), 광고는 1 − P(예)) 가운데 가장 낮은 것 + 0.05 로 올리고, 그런 초안이
-    여럿이면 초안마다 가장 낮은 비교 점수 중 가장 높은 값 + 0.05 로 올리며, 그 값이 1 을 넘으면 고치지
-    않고 사람에게 넘깁니다, 정답이 `ok` 인데 자체 검사에서 떨어진 초안은 숫자만 위에 적습니다. 내리는
-    쪽은 사람이 정합니다.
+  - 정답은 사람 칸(`ok` · `bad`)이 있으면 그것, 없으면 Claude 채점 다섯 칸입니다 — 초안 채점 세
+    칸(`claude_grade`: 장면 · 광고 · 고민 이음)과 과제 품질 ⓐ · ⓑ(`task_quality`) 가운데 하나라도
+    나쁨이면 `bad`, 다섯이 모두 좋음이면 `ok`, 그 밖은 정답 없음입니다(트래커 Phase 6F — 6D 드리프트
+    인터뷰 질문 3 A). Claude 채점은 또 하나의 AI 의견이라, 그 정답에 맞춰 옮긴 통과선은 단단하지 못합니다.
+  - 6D 의 기록은 세 칸(`claude_grade` 만) 정답이라 `ok` · `bad` 수의 정의가 이 기록과 다릅니다 — 전후는
+    아래 과제 품질 칸으로 견줍니다.
+  - 통과선은 올리기만 하고 내리지 않습니다 — 정답이 `bad` 인데 jev 자체 검사를 통과한 초안이 있으면 초안
+    `scores` 의 비교 점수(6E 뒤 결과는 다섯 — 장면 · 고민 이음 · 연애 고민 · 연애사주 이음은 P(예), 광고는
+    1 − P(예)) 가운데 가장 낮은 것 + 0.05 로 올리고, 그런 초안이 여럿이면 초안마다 가장 낮은 비교 점수 중
+    가장 높은 값 + 0.05 로 올리며, 그 값이 1 을 넘으면 고치지 않고 사람에게 넘깁니다, 정답이 `ok` 인데 자체
+    검사에서 떨어진 초안은 숫자만 위에 적습니다. 내리는 쪽은 사람이 정합니다.
   - `REPEAT_MIN_CHARS`(12) 는 그대로입니다 — 표본 부족: 최근 내 댓글 20개끼리 비교하는 값이라 초안 약
     10개짜리 한 바퀴로는 잴 수 없습니다.
   - 과제 품질 운영 창: ⓐ 고민 한 줄이 연애 고민 4/11 · ⓑ 연애사주 경험이 고민과 이어짐 4/11 · 과제 칸 오류 0 · ⓒ 다른 영상 초안과 겹치는 6글자 조각이 있는 초안 10/11 · 겹친 조각 최다 9
   - 과제 품질 넓힌 창: 실행 없음
   - 인기 댓글 운영 창: 재료 초안 9 · 항목은 왔는데 글 0개인 영상 0
   - 인기 댓글 넓힌 창: 실행 없음
-  - 과제 품질 · 인기 댓글 숫자는 기록입니다 — 통과선은 이 숫자로 움직이지 않습니다(트래커 Phase 6C 질문 1 A).
+  - 과제 품질 ⓒ · 과제 칸 오류 · 인기 댓글 숫자는 기록입니다 — 통과선은 이 숫자로 움직이지 않습니다(트래커 Phase 6C 질문 1 A). 과제 품질 ⓐ · ⓑ 는 위 정답 다섯 칸에 들어 통과선을 움직입니다(트래커 Phase 6F — 6D 드리프트 인터뷰 질문 3 A).
 - **자료** — 태그 블록 `<video_title>` · `<video_description>` · `<transcript>`(자막이 비었으면
   대신 `<top_comments>` — 비어 있지 않은 인기 댓글 앞 10개) · `<classification>` ·
   `<my_previous_comments>`(최근 댓글이 있을 때만). 시스템 프롬프트가 태그 안의 글을 지시가 아닌

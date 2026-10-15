@@ -258,13 +258,28 @@ def classification_lines(result: dict) -> list[str]:
     return lines
 
 
+def claude_answer(draft: Mapping[str, object]) -> str | None:
+    """Claude 채점 다섯 칸의 정답 — 초안 채점 세 칸(`claude_grade`)과 과제 품질 두 칸(`task_quality`).
+
+    하나라도 나쁨이면 `bad`, 다섯이 모두 좋음이면 `ok`, 그 밖은 None(트래커 Phase 6F — 6D 드리프트
+    인터뷰 질문 3 A). 과제 칸은 참거짓 그대로만 읽습니다.
+    """
+    grade = draft["claude_grade"] if draft["claude_grade"] in ANSWERS else None
+    task = draft.get("task_quality")
+    cells = [task.get(name) if isinstance(task, Mapping) else None for name in TASK_CELLS]
+    if grade == "bad" or any(cell is False for cell in cells):
+        return "bad"
+    if grade == "ok" and all(cell is True for cell in cells):
+        return "ok"
+    return None
+
+
 def draft_answer(draft: Mapping[str, object]) -> str | None:
-    """초안의 정답 — 사람 칸(`ok` · `bad`)이 있으면 그것, 없으면 Claude 채점, 둘 다 없으면 None."""
+    """초안의 정답 — 사람 칸(`ok` · `bad`)이 있으면 그것, 없으면 Claude 채점 다섯 칸(`claude_answer`),
+    둘 다 없으면 None."""
     if draft["human"] in ANSWERS:
         return draft["human"]
-    if draft["claude_grade"] in ANSWERS:
-        return draft["claude_grade"]
-    return None
+    return claude_answer(draft)
 
 
 def draft_counts(result: dict, window: str) -> dict[str, int]:
@@ -279,6 +294,8 @@ def draft_counts(result: dict, window: str) -> dict[str, int]:
         "human": 0,
         "claude": 0,
         "answered": 0,
+        "ok": 0,
+        "bad": 0,
         "grade_errors": 0,
         "differ": 0,
         "bad_passed": 0,
@@ -286,11 +303,13 @@ def draft_counts(result: dict, window: str) -> dict[str, int]:
     }
     for draft in drafts:
         human = draft["human"] if draft["human"] in ANSWERS else None
-        claude = draft["claude_grade"] if draft["claude_grade"] in ANSWERS else None
+        claude = claude_answer(draft)
         answer = draft_answer(draft)
         counts["human"] += human is not None
         counts["claude"] += claude is not None
         counts["answered"] += answer is not None
+        counts["ok"] += answer == "ok"
+        counts["bad"] += answer == "bad"
         counts["grade_errors"] += draft["grade_error"] is not None
         counts["differ"] += human is not None and claude is not None and human != claude
         counts["bad_passed"] += answer == "bad" and draft["self_check_pass"] is True
@@ -309,6 +328,7 @@ def draft_lines(result: dict) -> list[str]:
         lines.append(
             f"초안 {label}: 쓴 영상 {c['written']} · SKIP {c['skip']} · 초안 {c['drafts']}"
             f" · 정답 있음 {c['answered']} (사람 칸 {c['human']} · Claude 채점 {c['claude']})"
+            f" · 정답 ok {c['ok']} · 정답 bad {c['bad']}"
             f" · 채점 오류 {c['grade_errors']} · 사람 칸과 Claude 채점이 다름 {c['differ']}"
             f" · 정답 bad 인데 통과 {c['bad_passed']} · 정답 ok 인데 탈락 {c['ok_failed']}"
         )
@@ -1269,11 +1289,15 @@ class RecountTest(unittest.TestCase):
 
         self.assertEqual(floors(tampered), floors(result))
 
-    def test_task_cells_do_not_move_check_floor(self) -> None:
-        # 약속 "과제 품질 · 인기 댓글 숫자는 기록입니다 — 통과선은 이 숫자로 움직이지 않습니다"
+    def test_overlap_and_popular_cells_do_not_move_check_floor(self) -> None:
+        # 약속 "과제 품질 ⓒ · 과제 칸 오류 · 인기 댓글 숫자는 기록입니다 — 통과선은 이 숫자로 움직이지
+        # 않습니다"
         raised = self.fake(drafts=(self.draft((0.71, 0.1, 0.9), claude="bad"),))
         swap = {"top_comments": "title_description", "title_description": "top_comments"}
-        cases = (("committed", load_result(), 0.7), ("raised", raised, 0.76))
+        cases = (
+            ("committed", load_result(), load_config(REPO_CONFIG).comment.check_min_probability),
+            ("raised", raised, 0.76),
+        )
         for name, result, expected in cases:
             with self.subTest(result=name):
                 self.assertEqual(check_floor(result), expected)
@@ -1284,10 +1308,10 @@ class RecountTest(unittest.TestCase):
                     for draft in video["drafts"]:
                         if draft["parsed"] is not True:
                             continue
-                        self._flip_tasks(draft)
                         draft.update(task_error="응답 모양", frame_overlap=99)
                 self.assertNotEqual(task_lines(changed), task_lines(result))
                 self.assertEqual(check_floor(changed), expected)
+                self.assertEqual(check_floor_line(changed), check_floor_line(result))
 
 
 FIVE_SCORE_NAMES = (*SCORE_NAMES, "concern_is_love_worry", "saju_story_fits")
