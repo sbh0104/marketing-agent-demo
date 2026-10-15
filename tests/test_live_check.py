@@ -4265,7 +4265,11 @@ class SelfSkipRecordTest(LiveCheckCase):
             (live_check.RESULT_DIR / live_check.RESULT_NAME).read_text(encoding="utf-8-sig")
         )
         self.assertEqual(stored["schema_version"], 2)
+        # 6E 뒤 결과도 덮을 칸을 뺀 사본과 같은 판정 줄 · 요약 — 판정 줄 · 요약은 스스로 건너뜀 칸을 읽지 않습니다
         old = copy.deepcopy(stored)
+        for video in old["videos"]:
+            for key in SKIP_CELLS:
+                video.pop(key, None)
         self.assertFalse(any(key in video for video in old["videos"] for key in SKIP_CELLS))
         new = copy.deepcopy(stored)
         for video in new["videos"]:
@@ -4276,8 +4280,9 @@ class SelfSkipRecordTest(LiveCheckCase):
                 skip_grade_shape=None,
                 skip_human="",
             )
-        self.assertEqual(live_check.verdict_line(old), live_check.verdict_line(new))
-        self.assertEqual(live_check.render_summary(old), live_check.render_summary(new))
+        for other in (new, stored):
+            self.assertEqual(live_check.verdict_line(old), live_check.verdict_line(other))
+            self.assertEqual(live_check.render_summary(old), live_check.render_summary(other))
 
 
 class GraderBoundaryTest(unittest.TestCase):
