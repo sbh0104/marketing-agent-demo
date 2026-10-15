@@ -312,7 +312,7 @@ class ContractTests(unittest.TestCase):
 
 
 class TestFirstSample(unittest.TestCase):
-    """시각이 다른 기록이 하나면 업로드 시각의 조회수 0 을 직전 기록으로 칩니다(2026-10-15 질문 3 B)."""
+    """최신보다 10분 이상 앞선 기록이 없으면 업로드 시각의 조회수 0 을 직전 기록으로 칩니다(2026-10-15 질문 3 B)."""
 
     def test_single_sample_judged_from_upload_zero(self) -> None:
         record = video((2 * H, 2000))  # 업로드 2시간 뒤 2000회 — 시간당 1000회
@@ -482,6 +482,15 @@ class TestMinimumGap(unittest.TestCase):
             record = video((2 * H, 1500), (2 * H + 25 * M, 1400), (2 * H + 30 * M, 1450))
             self.assertEqual(judged(record, AT), ("hold", "views_decreased"))
             self.assertIsNone(views_per_hour(record))
+
+    def test_skipped_near_sample_is_not_used_as_latest_on_the_upload_zero_path(self) -> None:
+        # 5분 앞선 더 큰 기록(1500)은 건너뜀 — 업로드 0 과 최신(1450 · 65분)으로 잽니다
+        record = video((1 * H, 1500), (1 * H + 5 * M, 1450))
+        at_1338 = dataclasses.replace(DEFAULTS, min_views_per_hour=1338.0)
+        at_1339 = dataclasses.replace(DEFAULTS, min_views_per_hour=1339.0)
+        self.assertEqual(views_per_hour(record), 1450 * 60 / 65)
+        self.assertEqual(judged(record, 1 * H + 5 * M, at_1338), ("yes", "views_per_hour"))
+        self.assertEqual(judged(record, 1 * H + 5 * M, at_1339), ("no", "too_slow"))
 
     def test_upload_zero_side_has_no_gap(self) -> None:
         record = video((1 * M, 1100))
