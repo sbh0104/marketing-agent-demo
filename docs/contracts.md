@@ -869,8 +869,9 @@ watcher = Watcher(Store(Path("data/videos.json")), logbook, client, clock)
 - 허락된 호출은 요청을 보내기 *전에* `data/quota.json` 에 적습니다. 실패한 요청도 Google 이
   쿼터를 떼므로 셉니다. 페이지 넘김도 `search.list` 한 번이라 가드를 비켜 가지 못합니다.
 - 기록 파일은 `{"calls": [{"at": "<UTC ISO>", "call": "search.list", "units": 100}, …],
-  "schema_version": 1}` 모양입니다(키 정렬, 2칸 들여쓰기, 쓸 때 24시간이 지난 항목은 지움,
-  임시 파일에 쓴 뒤 `os.replace`). JSON · 버전 · 항목 모양이 틀리면 `QuotaError` 를 내고
+  "schema_version": 1}` 모양입니다(키 정렬, 2칸 들여쓰기, 쓸 때 48시간이 지난 항목은 지움 — 셈은
+  24시간 그대로이고, 시계가 하루 안쪽으로 앞서도 실제 호출 기록이 남게, 임시 파일에 쓴 뒤
+  `os.replace`). JSON · 버전 · 항목 모양이 틀리면 `QuotaError` 를 내고
   **파일은 그대로 둡니다** — 지우면 오늘 쓴 쿼터를 잊으므로, 고치거나 오늘 쓴 쿼터를 확인한 뒤
   사람이 지웁니다.
 - 막힌 호출은 보내지 않고, watcher 가 `QUOTA used=<사용> limit=<한도> call=<호출>

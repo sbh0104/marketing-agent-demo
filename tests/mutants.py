@@ -408,6 +408,12 @@ MUTANTS: dict[str, tuple[str, str, str, str]] = {
         "urllib.request.ProxyHandler(),",
         "",
     ),
+    "youtube-prune-at-window": (
+        "agent.youtube",
+        "tests.test_youtube",
+        "self._recent(now - _KEEP)",
+        "self._recent(now - _WINDOW)",
+    ),
     "watcher-silent-hold": (
         "agent.watcher",
         "tests.test_watcher",

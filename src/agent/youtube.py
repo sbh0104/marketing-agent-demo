@@ -43,6 +43,8 @@ MAX_COMMENTS_PER_CALL = 100
 COMMENTS_DISABLED = "HTTP 403 commentsDisabled"
 LEDGER_SCHEMA_VERSION = 1
 _WINDOW = timedelta(hours=24)
+# 장부는 48시간치를 보관하고 셈은 24시간 — 하루 안쪽으로 앞선 시계가 실제 호출 기록을 지우지 않게 (계약 '탐지 · 조회수 추적' 절)
+_KEEP = 2 * _WINDOW
 # https 확인용 SSL 문맥 하나 — opener 마다 새로 만들면 요청마다 CA 묶음을 다시 읽습니다
 _TLS_CONTEXT = ssl.create_default_context()
 # 요청 하나의 전체 상한(초) — http_get 이 연결부터 마지막 바이트까지 잽니다 (계약 '탐지 · 조회수 추적' 절)
@@ -122,7 +124,7 @@ class QuotaLedger:
             raise QuotaExhausted(call, "searches", used.searches, limits.daily_max_searches)
         if used.units + cost > DAILY_QUOTA_UNITS:
             raise QuotaExhausted(call, "units", used.units, DAILY_QUOTA_UNITS)
-        calls = [*self._recent(now - _WINDOW), _Entry(now, call, cost)]
+        calls = [*self._recent(now - _KEEP), _Entry(now, call, cost)]
         self._save(calls)
         self._calls = calls
 
