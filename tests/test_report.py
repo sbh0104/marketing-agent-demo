@@ -48,6 +48,7 @@ from agent.writer import NO_CONCERN, NO_SCENE
 T = datetime(2026, 10, 12, 12, 0, tzinfo=timezone.utc)
 S = timedelta(seconds=1)
 HOUR = timedelta(hours=1)
+MS = timedelta(milliseconds=1)
 A = "AAAAAAAAAAA"
 B = "BBBBBBBBBBB"
 C = "CCCCCCCCCCC"
@@ -397,6 +398,101 @@ class TestLateLines(unittest.TestCase):
         )
         self.assertEqual(badges(posted, None)[2], "로그를 읽지 못함")
         self.assertEqual(badges(posted, None), (POSTED, T + HOUR, LOG_UNREADABLE))
+
+
+class TestJudgedFloor(unittest.TestCase):
+    """판별 · 타이밍 시각도 늦은 줄의 기준 — 판별 보류 영상만 타이밍 시각을 세지 않습니다 (트래커 Phase 7H 결정 1)."""
+
+    def test_classify_error_then_judged_no_has_no_reason(self) -> None:
+        held = line(T, Event.ERROR, where="classify", reason="API 오류: 503", video=A)
+        first = record(A, trigger=Judgement(Verdict.HOLD, "too_few_samples", T + 5 * MS))
+        self.assertEqual(badges(first, [held]), (NO_DRAFT, None, "판별 단계 오류"))
+        second = record(
+            A,
+            classification=Judgement(Verdict.NO, "연애 고민 아님", T + HOUR),
+            trigger=Judgement(Verdict.HOLD, "too_few_samples", T + HOUR + 5 * MS),
+        )
+        self.assertEqual(late_lines(second, [held]), [])
+        self.assertEqual(badges(second, [held]), (NO_DRAFT, None, None))
+
+    def test_claude_failure_then_timing_no_has_no_reason(self) -> None:
+        failed = [
+            line(
+                T + S,
+                Event.SKIP,
+                video=A,
+                reason="claude 호출 실패: RuntimeError: " + mark("server"),
+            ),
+            line(T + S, Event.ERROR, where="writer.claude", reason=mark("e"), video=A),
+        ]
+        timed_yes = record(
+            A, classification=JUDGED, trigger=Judgement(Verdict.YES, "규칙 통과", T)
+        )
+        self.assertEqual(badges(timed_yes, failed), (NO_DRAFT, None, "AI 호출 오류 (Claude)"))
+        timed_no = record(
+            A, classification=JUDGED, trigger=Judgement(Verdict.NO, "규칙 미달", T + HOUR)
+        )
+        self.assertEqual(late_lines(timed_no, failed), [])
+        self.assertEqual(badges(timed_no, failed), (NO_DRAFT, None, None))
+
+    def test_unavailable_shown_until_seen_again(self) -> None:
+        gone = line(T + HOUR, Event.SKIP, video=A, reason="unavailable", call="videos.list")
+        waiting = record(
+            A, classification=JUDGED, trigger=Judgement(Verdict.NO, "규칙 미달", T)
+        )
+        self.assertEqual(badges(waiting, [gone]), (NO_DRAFT, None, "영상을 볼 수 없음"))
+        again = record(
+            A, classification=JUDGED, trigger=Judgement(Verdict.NO, "규칙 미달", T + 2 * HOUR)
+        )
+        self.assertEqual(late_lines(again, [gone]), [])
+        self.assertEqual(badges(again, [gone]), (NO_DRAFT, None, None))
+
+    def test_hold_keeps_classify_error_when_timing_ticks_second(self) -> None:
+        error = line(
+            T + 10 * S + 999 * MS, Event.ERROR, where="classify", reason="API 오류: 503", video=A
+        )
+        self.assertEqual(error[0], T + 10 * S)  # 로그 시각은 초 단위
+        held = record(A, trigger=Judgement(Verdict.HOLD, "too_few_samples", T + 11 * S + 4 * MS))
+        self.assertEqual(late_lines(held, [error]), [error])
+        self.assertEqual(badges(held, [error]), (NO_DRAFT, None, "판별 단계 오류"))
+
+    def test_classification_time_counts_alone(self) -> None:
+        judged = record(
+            A, classification=Judgement(Verdict.YES, "연애 고민 상담", T + 10 * S + 400 * MS)
+        )
+        early = line(T + 9 * S, Event.SKIP, video=A, reason="daily_cap")
+        same = line(T + 10 * S + 600 * MS, Event.SKIP, video=A, reason="channel_cooldown")
+        self.assertEqual(late_lines(judged, [early, same]), [same])
+        self.assertEqual(badges(judged, [early]), (NO_DRAFT, None, None))
+        self.assertEqual(badges(judged, [early, same]), (NO_DRAFT, None, "같은 채널 대기 중"))
+
+    def test_rehearsal_before_new_timing_is_not_the_outcome(self) -> None:
+        again = record(
+            A,
+            classification=JUDGED,
+            trigger=Judgement(Verdict.YES, "allowlisted", T + HOUR),
+            comment=drafted(T),
+        )
+        old = rehearsal(T + S)
+        self.assertEqual(badges(again, [old]), (NO_POST, None, None))
+        fresh = rehearsal(T + HOUR)
+        self.assertEqual(badges(again, [old, fresh]), (REHEARSED, T + HOUR, None))
+
+    def test_rerecorded_reason_after_new_timing_keeps_badge(self) -> None:
+        """다시 다룬 주기에 다시 적힌 이유는 남습니다 — Phase 7C 가 기억한 건너뜀을 SKIP 으로 다시 남기는 자리."""
+        again = record(
+            A,
+            classification=JUDGED,
+            trigger=Judgement(Verdict.YES, "규칙 통과", T + HOUR + 400 * MS),
+        )
+        dropped = "검사 두 번 탈락 — 1차: 글자 수 30자 — 40–120자여야 합니다 / 2차: …"
+        first = line(T + S, Event.SKIP, video=A, reason=dropped)
+        self.assertEqual(badges(again, [first]), (NO_DRAFT, None, None))
+        rerecorded = line(T + HOUR + 600 * MS, Event.SKIP, video=A, reason=dropped)
+        self.assertEqual(late_lines(again, [first, rerecorded]), [rerecorded])
+        self.assertEqual(
+            badges(again, [first, rerecorded]), (NO_DRAFT, None, "검사 두 번 탈락")
+        )
 
 
 class TestRender(unittest.TestCase):
