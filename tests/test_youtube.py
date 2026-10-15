@@ -116,6 +116,10 @@ class FakeFetch:
         return response
 
 
+class _OddError(Exception):
+    """전송이 낼 수 있는, 이름을 미리 알 수 없는 예외 하나."""
+
+
 def query_of(url: str) -> dict[str, str]:
     pairs = urllib.parse.parse_qsl(urllib.parse.urlsplit(url).query, keep_blank_values=True)
     result = dict(pairs)
@@ -471,9 +475,29 @@ class ClientTest(YouTubeCase):
                 self.assertEqual(str(exc), f"search.list: {reason}")
 
     def test_network_error_never_carries_the_key(self) -> None:
+        # _fetch 의 예외는 무엇이든 ERROR 한 줄 — 깨진 덩어리 틀 · 리다이렉트 · 시간 상한도 (트래커 7A ③(가))
         rows = (
             (lambda url: OSError(f"연결 실패: {url}"), "network OSError: 연결 실패: ", True),
             (http.client.IncompleteRead(b"partial"), "network IncompleteRead: ", False),
+            (
+                ValueError("read length must be non-negative or -1"),
+                "network ValueError: read length must be non-negative or -1",
+                False,
+            ),
+            (
+                lambda url: TypeError(f"gethostbyname() argument 1 must be str: {url}"),
+                "network TypeError: gethostbyname()",
+                True,
+            ),
+            (UnicodeError("label empty or too long"), "network UnicodeError: label empty", False),
+            (OverflowError("port must be 0-65535."), "network OverflowError: port must", False),
+            (MemoryError(), "network MemoryError: ", False),
+            (
+                TimeoutError("요청 전체가 30초 상한을 넘었습니다"),
+                "network TimeoutError: 요청 전체가 30초 상한을 넘었습니다",
+                False,
+            ),
+            (lambda url: _OddError(f"이상한 실패 {url}"), "network _OddError: 이상한 실패 ", True),
         )
         for response, prefix, echoes_url in rows:
             with self.subTest(prefix):
@@ -490,6 +514,24 @@ class ClientTest(YouTubeCase):
                 # 원래 예외(키가 든 URL)는 traceback 에도 붙지 않습니다
                 self.assertIsNone(exc.__cause__)
                 self.assertTrue(exc.__suppress_context__)
+
+    def test_interrupt_from_fetch_is_not_wrapped(self) -> None:
+        # Ctrl+C 는 BaseException 이라 ERROR 줄로 바뀌지 않고 그대로 올라갑니다 — 장부에는 이미 적혔습니다
+        client = self.client(FakeFetch(KeyboardInterrupt()))
+        with self.assertRaises(KeyboardInterrupt):
+            client.videos(["abcdefghijk"], NOW, limits(90))
+        self.assertEqual(self.ledger.usage(NOW), Usage(0, 1))
+
+    def test_fetch_gets_the_whole_request_cap(self) -> None:
+        # _fetch 에 넘기는 값은 요청 전체의 상한 30초입니다 (계약 '탐지 · 조회수 추적' 절 'API 오류')
+        seen: list[float] = []
+
+        def fetch(url: str, timeout: float) -> tuple[int, bytes]:
+            seen.append(timeout)
+            return OK
+
+        YouTubeClient(KEY, QuotaLedger(self.path), fetch).videos(["abcdefghijk"], NOW, limits(90))
+        self.assertEqual(seen, [30.0])
 
     def test_url_echoed_twice_is_masked_twice_s043(self) -> None:
         client = self.client(FakeFetch(lambda url: OSError(f"{url} 다시 {url}")))
