@@ -768,28 +768,32 @@ class CommittedResultTest(unittest.TestCase):
 
 
 class AdmittedTest(ContractCase):
-    """`admitted` — `6B: go` 와, 고치기 전 기록으로 반영한 한 실행의 한 판정 줄만(트래커 Phase 6D
-    드리프트 인터뷰 질문 1 A)."""
+    """`admitted` — `6B: go` 와, '6E 뒤' 기록으로 반영한 한 실행의 한 판정 줄만(트래커 Phase 6F
+    사람 실행 뒤 인터뷰 — '6F 예외로 착지'). 6D 가 반영한 실행은 이제 빨강 표본입니다."""
 
-    RUN = "2026-10-14T14:09:02.882902+00:00"
-    LINE = "6B: stop — 작성 막힘(SKIP 5/7)"
+    RUN = "2026-10-15T08:42:22.401654+00:00"
+    LINE = "6B: stop — 작성 막힘(SKIP 8/13)"
+    OLD = ("2026-10-14T14:09:02.882902+00:00", "6B: stop — 작성 막힘(SKIP 5/7)")
     GREEN = (
         ("2026-10-20T00:00:00+00:00", "6B: go"),
         (RUN, LINE),
     )
     RED = (
-        ("2026-10-14T04:28:16.180435+00:00", LINE),
-        ("2026-10-14T14:09:02+00:00", LINE),
-        ("2026-10-14T14:09:02.882902Z", LINE),
-        (" 2026-10-14T14:09:02.882902+00:00", LINE),
-        (RUN, "6B: stop — 작성 막힘(SKIP 5/7); 채점 막힘(오류 6/11)"),
-        (RUN, "6B: stop — 작성 막힘(SKIP 6/7)"),
-        (RUN, "6B: stop - 작성 막힘(SKIP 5/7)"),
-        (RUN, "6B: stop – 작성 막힘(SKIP 5/7)"),
-        (RUN, "6B: stop — 작성 막힘(SKIP ５/7)"),
-        (RUN, "6B: stop —  작성 막힘(SKIP 5/7)"),
-        (RUN, "6b: stop — 작성 막힘(SKIP 5/7)"),
-        (RUN, "6B: stop — 작성 막힘(SKIP 5/7) "),
+        OLD,
+        (OLD[0], LINE),
+        (RUN, OLD[1]),
+        ("2026-10-15T08:20:33+00:00", LINE),
+        ("2026-10-15T08:42:22+00:00", LINE),
+        ("2026-10-15T08:42:22.401654Z", LINE),
+        (" 2026-10-15T08:42:22.401654+00:00", LINE),
+        (RUN, "6B: stop — 작성 막힘(SKIP 8/13); 채점 막힘(오류 6/11)"),
+        (RUN, "6B: stop — 작성 막힘(SKIP 7/13)"),
+        (RUN, "6B: stop - 작성 막힘(SKIP 8/13)"),
+        (RUN, "6B: stop – 작성 막힘(SKIP 8/13)"),
+        (RUN, "6B: stop — 작성 막힘(SKIP ８/13)"),
+        (RUN, "6B: stop —  작성 막힘(SKIP 8/13)"),
+        (RUN, "6b: stop — 작성 막힘(SKIP 8/13)"),
+        (RUN, "6B: stop — 작성 막힘(SKIP 8/13) "),
     )
 
     def test_green_samples_are_admitted(self) -> None:
@@ -803,9 +807,12 @@ class AdmittedTest(ContractCase):
                 self.assertFalse(admitted(run_at, line))
 
     def test_exception_is_written_in_contract(self) -> None:
-        self.assert_in_contract(
-            f"예외는 하나뿐입니다 — 실행 `{BEFORE_FIX_RUN_AT}` 의 `{BEFORE_FIX_LINE}`"
-        )
+        for phrase in (
+            f"예외는 하나뿐입니다 — 실행 `{AFTER_FIX_RUN_AT}` 의 `{AFTER_FIX_LINE}`",
+            f"실행 `{BEFORE_FIX_RUN_AT}` 의 `{BEFORE_FIX_LINE}` 도 이제 빨강입니다",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assert_in_contract(phrase)
 
 
 def _with_cell(fingerprint: Mapping[str, object], key: str, value: object) -> dict:
