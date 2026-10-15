@@ -20,6 +20,7 @@ import pkgutil
 import socket
 import sys
 import tempfile
+import time
 import unittest
 import urllib.parse
 from collections.abc import Callable, Sequence
@@ -715,6 +716,21 @@ class ContactMaskTest(unittest.TestCase):
                 self.assertEqual(
                     live_check._kept(text, limit, NO_KEYS), live_check._clean(text, limit)
                 )
+
+    def test_worst_spacing_within_time_bound(self) -> None:
+        # 긴 띄어쓰기 사이의 전화번호 꼴 — 되짚기가 늘면 한 번에 몇 초가 걸립니다
+        calls = (
+            ("count_contacts", live_check.count_contacts),
+            ("mask_contacts", live_check.mask_contacts),
+            ("_kept", lambda text: live_check._kept(text, live_check.DESCRIPTION_LIMIT, NO_KEYS)),
+        )
+        for sample in SLOW_SPACING:
+            for name, call in calls:
+                with self.subTest(sample=sample[:3], length=len(sample), call=name):
+                    start = time.perf_counter()
+                    call(sample)
+                    elapsed = time.perf_counter() - start
+                    self.assertLess(elapsed, CONTACT_TIME_LIMIT)
 
     def test_scrub_masks_every_untrusted_field(self) -> None:
         result = healthy_result()
@@ -1500,6 +1516,13 @@ HOLDER_FIRST_CHUNK = (
     ("예금주, 가나다", "예금주, 가나다"),
     ("가나다(예금주)", "가나다(예금주)"),
 )
+# 출하 점검의 느려짐 입력(트래커 6G 질문 4 A ①) — 고치기 전 1.9–7.0초
+SLOW_SPACING = (
+    "010" + " " * 1000 + "1234" + " " * 1000,
+    "+82" + " " * 150,
+    "+82" + " " * 150 + "10" + " " * 150 + "0000" + " " * 150,
+)
+CONTACT_TIME_LIMIT = 1.0  # 초 — 한 번 부르는 데의 상한(_GAP 의 느려짐 입력)
 CONTACT_RED = (
     "fake.owner@example.com", "abc (at) example.com", "abc [at] example [dot] com",
     "abc@example . com", "abc @ example.com", "ABC@EXAMPLE.COM", "abc＠example.com",
