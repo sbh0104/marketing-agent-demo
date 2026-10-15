@@ -51,7 +51,11 @@ TOPIC_ANSWERS = ("연애", "아님")
 TRACKER_FLOORS = (0.75, 0.6)  # 트래커 Phase 6D 의 기록 줄(결정 아님)이 본 두 하한 — 기록만
 DATE_KEYS = frozenset({"published_at", "published_after", "published_before"})
 GO_LINE = "6B: go"
-# 트래커 Phase 6D 드리프트 인터뷰 질문 1 A — 작성 막힘인 채로 '고치기 전' 기록으로 반영한 단 한 실행
+# 트래커 Phase 6F 사람 실행 뒤 인터뷰('6F 예외로 착지') — 작성 막힘인 채로 '6E 뒤' 기록으로 반영한 단 한 실행
+AFTER_FIX_RUN_AT = "2026-10-15T08:42:22.401654+00:00"
+AFTER_FIX_LINE = "6B: stop — 작성 막힘(SKIP 8/13)"
+# 트래커 Phase 6D 드리프트 인터뷰 질문 1 A 가 '고치기 전'(6E 전) 기록으로 반영했던 실행 — 이제 반영하지 않고, 결과
+# 파일은 트리에 없습니다.
 BEFORE_FIX_RUN_AT = "2026-10-14T14:09:02.882902+00:00"
 BEFORE_FIX_LINE = "6B: stop — 작성 막힘(SKIP 5/7)"
 WINDOW_LABELS = {"operation": "운영 창", "widened": "넓힌 창"}
@@ -90,11 +94,11 @@ def cell(fingerprint: Mapping[str, object], key: str) -> object:
 
 
 def admitted(run_at: object, line: str) -> bool:
-    """반영하는 판정 줄인지 — `6B: go` 이거나, 고치기 전 기록으로 반영한 한 실행의 그 판정 줄.
+    """반영하는 판정 줄인지 — `6B: go` 이거나, '6E 뒤' 기록으로 반영한 한 실행(트래커 Phase 6F)의 그 판정 줄.
 
     실행 시각과 판정 줄은 글자 그대로 같아야 합니다 — 다른 실행이거나 다른 경우가 섞이면 멈춥니다.
     """
-    return line == GO_LINE or (run_at == BEFORE_FIX_RUN_AT and line == BEFORE_FIX_LINE)
+    return line == GO_LINE or (run_at == AFTER_FIX_RUN_AT and line == AFTER_FIX_LINE)
 
 
 def measured_drift(

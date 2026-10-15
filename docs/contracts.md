@@ -1424,14 +1424,15 @@ python3 -m tests.live_check --verdict <결과 파일>     # 호출 없이 판정
   Claude 채점은 정답이 아니라 또 하나의 의견입니다(트래커 Phase 6A).
   도구 강제(`tool_choice`)로 받은 채점 답의 모양은 SDK 로 맞춘 모양이고, 모델이 그 도구로 답하는지는
   다음 진짜 실행이 처음 확인합니다.
-- **결과 반영 (Phase 6B · 6D).** 사람이 커밋한 결과를 `tests/test_live_check_applied.py` 가 계약 · 설정과
+- **결과 반영 (Phase 6B · 6D · 6F).** 사람이 커밋한 결과를 `tests/test_live_check_applied.py` 가 계약 · 설정과
   맞댑니다. 결과 파일과 요약이 BOM 없이 있고, 결과가 판 2 이상(`schema_version` ≥ 2)이며, `--verdict` 가
   결과 파일로 다시 센 판정 줄 한 줄을 내고 요약 첫 줄이 같은 줄이며, 언어마다 예시 행 수가 `example_count` 와
   예시 묶음 수와 같아야 합니다.
   - 판정 줄은 `6B: go`(종료 코드 0)여야 합니다.
-    예외는 하나뿐입니다 — 실행 `2026-10-14T14:09:02.882902+00:00` 의 `6B: stop — 작성 막힘(SKIP 5/7)`(종료 코드 1).
-    트래커 Phase 6D 의 드리프트 인터뷰(질문 1 A)가 이 실행을 보고 '고치기 전'(6E 전) 기록으로 반영했고, 다른
-    실행이거나 다시 센 판정 줄이 한 글자라도 다르면 빨강입니다.
+    예외는 하나뿐입니다 — 실행 `2026-10-15T08:42:22.401654+00:00` 의 `6B: stop — 작성 막힘(SKIP 8/13)`(종료 코드 1).
+    트래커 Phase 6F 의 사람 실행 뒤 인터뷰('6F 예외로 착지')가 이 실행을 보고 '6E 뒤' 기록으로 반영했고, 다른
+    실행이거나 다시 센 판정 줄이 한 글자라도 다르면 빨강입니다. Phase 6D 가 '고치기 전'(6E 전) 기록으로 반영한
+    실행 `2026-10-14T14:09:02.882902+00:00` 의 `6B: stop — 작성 막힘(SKIP 5/7)` 도 이제 빨강입니다 — 그 예외는 그 결과 하나에만 걸렸습니다.
   - 지문 맞대기(`measured_drift`) — jev 의 답을 바꾸는 칸(`questions` · `examples_sha256` · `classifier.model` ·
     `classifier.on_topic_reasons` · `classifier.off_topic_reasons` · `margin` · `pass_correct`)은 결과와 지금 코드 ·
     `config.yaml` 이 같아야 합니다.

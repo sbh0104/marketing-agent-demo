@@ -893,8 +893,8 @@ MUTANTS: dict[str, tuple[str, str, str, str]] = {
     "live-check-applied-exception-any-run": (
         "tests.test_live_check_applied",
         "tests.test_live_check_applied",
-        "(run_at == BEFORE_FIX_RUN_AT and line == BEFORE_FIX_LINE)",
-        "(line == BEFORE_FIX_LINE)",
+        "(run_at == AFTER_FIX_RUN_AT and line == AFTER_FIX_LINE)",
+        "(line == AFTER_FIX_LINE)",
     ),
     "live-check-applied-stored-verdicts-unchecked": (
         "tests.test_live_check_applied",
