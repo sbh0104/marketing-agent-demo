@@ -3655,9 +3655,10 @@ class ContactRunTest(LiveCheckCase):
                 )
 
     def test_frame_overlap_recounts_from_masked_drafts(self) -> None:
+        # 두 초안에 같은 연락처 — 원문으로 세면 그 조각이 겹침 수에 더해집니다
         raws = {
             vid(1): f"{DRAFT_POOL[0]} 문의 {FAKE_PHONE}",
-            vid(2): f"{DRAFT_POOL[1]} 문의 {FAKE_ACCOUNT}",
+            vid(2): f"{DRAFT_POOL[1]} 문의 {FAKE_PHONE}",
         }
         self.claude.writes = [writer_reply(comment=text) for text in raws.values()]
         code, out, err, result = self.run_main()
@@ -3667,18 +3668,24 @@ class ContactRunTest(LiveCheckCase):
                 comment = videos[video_id]["drafts"][0]["untrusted"]["comment"]
                 self.assertIn("<연락처>", comment)
                 self.assertNotIn(FAKE_PHONE, comment)
-                self.assertNotIn(FAKE_ACCOUNT, comment)
         # 결과 파일만으로 다시 세어도 같은 수입니다(트래커 6C — 6D 의 다시 세기)
         recount = copy.deepcopy(result["videos"])
         for draft in (draft for video in recount for draft in video["drafts"] if draft["parsed"]):
             draft["frame_overlap"] = 0
         live_check.mark_frame_overlaps(recount)
         self.assertEqual(recount, result["videos"])
-        # 원문 글과 가린 글의 조각 묶음은 다릅니다
-        for video_id, raw in raws.items():
-            with self.subTest(video_id):
-                comment = videos[video_id]["drafts"][0]["untrusted"]["comment"]
-                self.assertNotEqual(live_check._frames(raw), live_check._frames(comment))
+        # 첫 초안 둘에 원문 글을 넣고 다시 센 수는 저장된 수와 다릅니다 —
+        # 원문 글로 센 수를 저장하면 위 다시 세기가 틀립니다
+        raw_videos = copy.deepcopy(result["videos"])
+        for video in raw_videos:
+            if video["video_id"] in raws:
+                video["drafts"][0]["untrusted"]["comment"] = raws[video["video_id"]]
+        live_check.mark_frame_overlaps(raw_videos)
+        raw_by_id = self.by_id({"videos": raw_videos})
+        self.assertNotEqual(
+            [raw_by_id[video_id]["drafts"][0]["frame_overlap"] for video_id in raws],
+            [videos[video_id]["drafts"][0]["frame_overlap"] for video_id in raws],
+        )
 
     def test_end_line_catches_broken_masking(self) -> None:
         self.add_video(
