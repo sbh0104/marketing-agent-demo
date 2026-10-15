@@ -82,7 +82,7 @@ GRADE_BAD = (
 SKIP_HUMAN = ("정당", "부당")
 SKIP_GRADE_CELL = {"no_scene": "material_has_scene", "no_concern": "material_has_love_worry"}
 CHECKS_FAILED = "checks_failed"  # 실행기가 검사 두 번 탈락 영상의 skip_kind 에 적는 낱말
-_NOW =datetime(2026, 1, 1, tzinfo=timezone.utc)
+_NOW = datetime(2026, 1, 1, tzinfo=timezone.utc)
 
 
 def load_result() -> dict:
