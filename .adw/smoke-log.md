@@ -1063,7 +1063,7 @@ other line is required on every item.
 - evidence: README.md:167 "SDK 나 키가 없거나, 설정에 오류가 있습니다" — src/agent/run.py:554-556 은 그 문구를 `connect_real` 의 EnvError · QuotaError · ImportError · ValueError · OSError 에만 찍고, 설정 오류는 src/agent/run.py:492-494 가 `ERROR where=config` 를 쓰고 그 문구 없이 종료 코드 2 로 끝남. 계약 '실행 진입점 — run.py (Phase 7)' 절 "(설정은 `ERROR where=config` … 도 남김)". ship-check 감사 1 재현: 깨진 config.yaml → rc 2 · stderr 빈 칸 · 화면에 `ERROR where=config reason="ConfigError: …"`. 틀린 문장은 Phase 8 계획 R8 줄에서 옴
 - direction: 그 줄을 SDK · 키 · 쿼터 장부 문제로 좁히고, 설정 오류는 그 문구 없이 `ERROR where=config` 한 줄과 종료 코드 2 로 보인다는 줄을 더함 — 코드 · 계약 변경 없음
 - touches: README.md
-- status: open
+- status: resolved
 - attempts: 0 · last failure: —
 - first seen: 2026-10-16 · last seen: 2026-10-16
 
@@ -1072,7 +1072,7 @@ other line is required on every item.
 - evidence: tests/public_copy.py:316 `if found not in known` 을 부분 일치(`any(k in found …)` · `any(found in k …)`)로 바꿔도 스위트 `Ran 938 … OK`(ship-check 감사 5 변이 M2 · M2b) — 표본이 글자 바꿈 · 대소문자뿐(tests/test_public_copy.py:313-320 · :376-380 · :515-522); tests/public_copy.py:344-345 `except EnvError` 를 건너뜀으로 바꿔도 OK(M5a — 없는 파일 표본은 :347 빈 값 갈래로 감); :438 기본 `source / ".env"` 를 지워도 OK(M5c). 계약 '공개용 사본' 절 "한 글자라도 다르면 목록 밖입니다" · "파일이 없거나 세 값이 모두 비면 이 검사가 걸리고" · "`--env`(기본: 원본의 `.env`)"
 - direction: tests/test_public_copy.py 에 — 알려진 연락처 · 키 · 홈 글자에 한 글자를 덧붙인 꼴과 끝 글자를 자른 꼴이 빨강(홈은 이름 칸에서) · `이름=값` 꼴이 아닌 줄이 든 .env 로 `✗ 비밀 값`(건너뜀 아님) · `--env` · `--no-env` 없이 돌리면 가짜 원본 뿌리의 .env 값을 찾아 빨강 — 세 표본을 더함, 코드 변경 없음
 - touches: tests/test_public_copy.py
-- status: open
+- status: resolved
 - attempts: 0 · last failure: —
 - first seen: 2026-10-16 · last seen: 2026-10-16
 
@@ -1081,7 +1081,7 @@ other line is required on every item.
 - evidence: tests/test_submission_docs.py:62-64 가 `PYTHONPATH=src python3 -m agent.run --once --dry-run` 을 `assertIn` 으로만 봄 — 같은 명령이 README.md:90 과 :154 에 두 번 있어 한 줄만 틀려도 OK(ship-check 감사 5 변이 R1b · R2), 윈도우 줄 README.md:91 은 잠기지 않음. Phase 8A 가 README 줄을 옮길 예정(트래커 Phase 8A 질문 3 A)
 - direction: 그 명령이 README 에 2번 이상 나오는지, 윈도우 줄이 `$env:PYTHONPATH = "src"` 와 `python -m agent.run --once --dry-run` 을 함께 갖는지 단언을 더함 — 테스트만, 코드 · 문서 변경 없음
 - touches: tests/test_submission_docs.py
-- status: open
+- status: resolved
 - attempts: 0 · last failure: —
 - first seen: 2026-10-16 · last seen: 2026-10-16
 
