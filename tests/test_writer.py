@@ -4,6 +4,7 @@ Claude 와 jev 는 가짜 응답으로 돕니다 — 네트워크도 설치도 �
 """
 from __future__ import annotations
 
+import ast
 import copy
 import dataclasses
 import itertools
@@ -180,6 +181,40 @@ def logged(path: Path) -> list[tuple[datetime, Event, dict[str, str]]]:
     if not path.exists():
         return []
     return [parse_line(line) for line in path.read_text(encoding="utf-8").splitlines()]
+
+
+# 계약 '댓글 작성' 절 — 프롬프트 원문은 writer.py 맨 위에만 둡니다. 이 길이 이상의 줄을 복사본으로 찾습니다
+COPY_MIN_CHARS = 15
+WRITER_PATH = ROOT / "src" / "agent" / "writer.py"
+
+
+def prompt_lines(value: object) -> set[str]:
+    """프롬프트 값 안의 글 줄(15글자 이상) — 이름꼴(`has_love_concern` 같은 칸 · 질문 이름)은 뺍니다.
+
+    이름꼴은 답을 읽는 코드가 함께 쓰는 이름이지 프롬프트 글이 아닙니다.
+    """
+    if isinstance(value, str):
+        lines = (line.strip() for line in value.splitlines())
+        return {line for line in lines if len(line) >= COPY_MIN_CHARS and not line.isidentifier()}
+    if isinstance(value, Mapping):
+        return set().union(*(prompt_lines(part) for item in value.items() for part in item))
+    if isinstance(value, (list, tuple)):
+        return set().union(*(prompt_lines(part) for part in value))
+    return set()
+
+
+def string_constants(node: ast.AST) -> list[str]:
+    """그 노드 아래의 글 상수 — 이어 붙인 글은 ast 가 한 상수로 합쳐 둡니다."""
+    return [
+        part.value
+        for part in ast.walk(node)
+        if isinstance(part, ast.Constant) and isinstance(part.value, str)
+    ]
+
+
+def copies(needles: set[str], constants: Sequence[str]) -> list[str]:
+    """글 상수 안에 그대로 든 프롬프트 줄."""
+    return sorted({needle for needle in needles for text in constants if needle in text})
 
 
 class CheckTest(unittest.TestCase):
@@ -739,6 +774,71 @@ class WriteCommentTest(unittest.TestCase):
                 "saju_story_fits": "연애사주 경험이 고민과 이어짐",
             },
         )
+
+    def test_prompt_originals_live_only_at_top_of_writer(self) -> None:
+        # 계약 '댓글 작성' 절 — 여섯 이름은 writer.py 첫 def/class 앞에서 한 번씩 정하고, 다른 src
+        # 모듈과 writer 함수 본문에는 그 15글자 이상 줄 · 질문의 복사본이 없습니다
+        names = (
+            "SYSTEM_PROMPT",
+            "USER_INSTRUCTION",
+            "REWRITE_PROMPT",
+            "WRITE_TOOL",
+            "CHECK_QUESTIONS",
+            "CHECK_LABELS",
+        )
+        tree = ast.parse(WRITER_PATH.read_text(encoding="utf-8"))
+        first = min(
+            node.lineno
+            for node in tree.body
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
+        )
+        top_level = {
+            target.id: node.lineno
+            for node in tree.body
+            if isinstance(node, (ast.Assign, ast.AnnAssign))
+            for target in (node.targets if isinstance(node, ast.Assign) else [node.target])
+            if isinstance(target, ast.Name)
+        }
+        for name in names:
+            with self.subTest(name):
+                stores = [
+                    node.lineno
+                    for node in ast.walk(tree)
+                    if isinstance(node, ast.Name)
+                    and isinstance(node.ctx, ast.Store)
+                    and node.id == name
+                ]
+                self.assertEqual(stores, [top_level.get(name)])
+                self.assertLess(stores[0], first)
+        needles = set().union(*(prompt_lines(getattr(agent.writer, n)) for n in names))
+        self.assertTrue(needles)
+        others = sorted(path for path in (ROOT / "src").rglob("*.py") if path != WRITER_PATH)
+        self.assertTrue(others)
+        elsewhere = {
+            str(path.relative_to(ROOT)): copies(
+                needles, string_constants(ast.parse(path.read_text(encoding="utf-8")))
+            )
+            for path in others
+        }
+        self.assertEqual({path: found for path, found in elsewhere.items() if found}, {})
+        bodies = [
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        ]
+        self.assertTrue(bodies)
+        inside = {node.name: copies(needles, string_constants(node)) for node in bodies}
+        self.assertEqual({name: found for name, found in inside.items() if found}, {})
+        # 빨강 표본 — 함수 본문에 옮긴 규칙 줄, 둘로 나눠 이어 붙인 질문
+        rule = next(line for line in SYSTEM_PROMPT.splitlines() if line.startswith("3. "))
+        question = CHECK_QUESTIONS["saju_story_fits"]
+        samples = {
+            "함수 본문의 규칙 줄": f"def f() -> str:\n    return {rule!r}\n",
+            "이어 붙인 질문": f"QUESTION = ({question[:40]!r} {question[40:]!r})\n",
+        }
+        for label, source in samples.items():
+            with self.subTest(label):
+                self.assertTrue(copies(needles, string_constants(ast.parse(source))))
 
     def test_new_questions_below_threshold_rewrite(self) -> None:
         labels = {
