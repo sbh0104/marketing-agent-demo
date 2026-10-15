@@ -1012,3 +1012,21 @@ other line is required on every item.
 - status: resolved
 - attempts: 0 · last failure: —
 - first seen: 2026-10-15 · last seen: 2026-10-15
+
+### S-NEW-1 — README 7단계 사람 칸 안내가 세 칸(`claude_grade`)만 보라고 함 — 통과선 셈의 정답은 이제 다섯 칸
+- source: cycle 20261015-175919-adw/phase-6f-live-check-reapply-after-fix · tracker plans/interview-marketing-agent.md#phase-6f · deferred by ship-check
+- evidence: docs/live-check/README.md:24 "`claude_grade`(`ok` / `bad`)를 보고, 동의하지 않으면 그 초안의 `"human": ""` 을 … 고칩니다" — `100b615` 뒤 사람 칸이 빈 초안의 정답은 다섯 칸(tests/test_live_check_applied.py:282-295 `claude_answer`: `claude_grade` + `task_quality` ⓐ · ⓑ, 트래커 6F 결정 줄 716). 커밋된 결과에서 `claude_grade` ok 인데 다섯 칸 정답 bad 인 초안 3(om-TAoBO0Rc 시도 1 · dM2hFpUH6qg 시도 2 · qAgY7WxXWs4 시도 1); README 대로 om-TAoBO0Rc 시도 1 에 동의해 사람 칸을 비우면 `check_floor` 0.79(지금 0.7) — ship-check 감사 3, 탐침으로 확인
+- direction: README 7단계 초안 줄을 "Claude 채점 다섯 칸(`claude_grade` 와 `task_quality` 의 ⓐ `concern_is_love_worry` · ⓑ `saju_story_fits`)을 보고, 그 정답에 동의하지 않으면 …" 으로 고친다 — 코드 · 결과 파일 · 계약 변경 없음
+- touches: docs/live-check/README.md
+- status: open
+- attempts: 0 · last failure: —
+- first seen: 2026-10-15 · last seen: 2026-10-15
+
+### S-NEW-2 — 테스트 두 곳 다지기: 늘 참인 단언 하나 · 동점 표본이 사전 차례와 `CHECK_QUESTIONS` 차례를 못 가름
+- source: cycle 20261015-175919-adw/phase-6f-live-check-reapply-after-fix · tracker plans/interview-marketing-agent.md#phase-6f · deferred by ship-check
+- evidence: tests/test_live_check.py:4272 `assertFalse(any(key in video …))` 는 바로 위 루프가 그 키를 지운 뒤라 늘 참(ship-check 감사 5 F1); tests/test_live_check_applied.py:1706 `test_lowest_question_samples` 의 동점 표본(`mentions_scene` · `saju_story_fits` 0.7)은 `five()` 가 키를 `CHECK_QUESTIONS` 차례로 넣어, `scores` 를 도는 구현도 통과(감사 3 N3 탐침 `naive on test tie: mentions_scene`)
+- direction: 늘 참인 단언을 지우거나 `stored` 에 스스로 건너뜀 칸이 있음을 단언으로 바꾸고, `test_lowest_question_samples` 에 키 차례가 `CHECK_QUESTIONS` 와 다른 동점 표본 하나(예: `saju_story_fits` 를 먼저 넣은 사전)를 더한다 — 동작 변경 없음
+- touches: tests/test_live_check.py, tests/test_live_check_applied.py
+- status: open
+- attempts: 0 · last failure: —
+- first seen: 2026-10-15 · last seen: 2026-10-15

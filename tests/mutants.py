@@ -935,8 +935,8 @@ MUTANTS: dict[str, tuple[str, str, str, str]] = {
     "live-check-applied-exception-any-run": (
         "tests.test_live_check_applied",
         "tests.test_live_check_applied",
-        "(run_at == BEFORE_FIX_RUN_AT and line == BEFORE_FIX_LINE)",
-        "(line == BEFORE_FIX_LINE)",
+        "(run_at == AFTER_FIX_RUN_AT and line == AFTER_FIX_LINE)",
+        "(line == AFTER_FIX_LINE)",
     ),
     "live-check-applied-stored-verdicts-unchecked": (
         "tests.test_live_check_applied",
@@ -955,6 +955,19 @@ MUTANTS: dict[str, tuple[str, str, str, str]] = {
         "tests.test_live_check_applied",
         "return lowest_score(scores) + _TOLERANCE >= threshold",
         "return lowest_score(scores) >= threshold",
+    ),
+    "live-check-applied-answer-three-cells": (
+        "tests.test_live_check_applied",
+        "tests.test_live_check_applied",
+        "cells = [task.get(name) if isinstance(task, Mapping) else None for name in TASK_CELLS]",
+        "cells = [True for name in TASK_CELLS]",
+    ),
+    "live-check-applied-skip-reads-reason": (
+        "tests.test_live_check_applied",
+        "tests.test_live_check_applied",
+        'kind = video.get("skip_kind")',
+        'kind = live_check.SKIP_KIND_OF.get(str((video.get("untrusted") or {})'
+        '.get("skip_reason", "")).split(" — ")[0], video.get("skip_kind"))',
     ),
     "live-check-skip-grade-every-skip": (
         "tests.live_check",
