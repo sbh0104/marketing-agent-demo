@@ -7,11 +7,13 @@
 글자 키는 범주 L · M · N · P · S 의 글자와 U+0020 만 받고, 스페이스로 시작하거나 끝나는 값은
 잘라 쓰지 않고 오류이며(허용 목록 항목은 쓴 그대로), 주제(topic)는 500자까지입니다.
 참 · 거짓 키(test_run)는 bool 값만 받습니다 — 글자 "false" · 0 · 빈 값은 오류입니다.
+크롬 주소(chrome_debug_url)는 글자 규칙 뒤에 이 컴퓨터 주소 꼴(http:// 와 localhost · 127.0.0.1 · [::1], 포트, 끝의 / 하나까지)만 받습니다 — 계약 2절.
 """
 from __future__ import annotations
 
 import collections.abc
 import math
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -116,6 +118,10 @@ def parse_yaml(text: str) -> dict[str, object]:
         raise ConfigError("최상위는 '키: 값' 형식이어야 합니다")
     return data
 
+
+# 크롬 주소는 이 컴퓨터만(7G 질문 2 A) — http:// · 루프백 호스트 셋 · ':' 포트 · 끝의 '/' 하나까지, 글 전체가 이 꼴이어야 합니다.
+# 호스트를 urlsplit 으로 뽑지 않습니다 — 파이썬과 브라우저가 '\' · '@' 든 주소를 서로 다른 호스트로 읽습니다.
+_LOOPBACK_URL = re.compile(r"http://(?:localhost|127\.0\.0\.1|\[::1\]):[0-9]{1,5}/?")
 
 _TOP_KEYS = (
     "topic",
@@ -327,8 +333,9 @@ def config_from_mapping(data: Mapping[str, object]) -> Config:
 
     # 크롬 주소도 글자 규칙을 거칩니다 — 폭 없는 공백이 든 주소는 포트 읽기를 지나 게시마다 chrome_unreachable 로 멈췄습니다
     url = _text(data["chrome_debug_url"], "chrome_debug_url")
-    if not url.startswith(("http://", "https://")):
-        raise ConfigError("http:// 또는 https:// 로 시작해야 합니다: chrome_debug_url")
+    # 그다음 이 컴퓨터 주소 꼴 전체(_LOOPBACK_URL)만 받습니다 — 메시지에 주소를 싣지 않습니다(비밀번호가 든 주소)
+    if not _LOOPBACK_URL.fullmatch(url):
+        raise ConfigError("이 컴퓨터 주소만 받습니다 (localhost · 127.0.0.1 · [::1] 와 포트): chrome_debug_url")
 
     allowed = data["allowed_videos"]
     if allowed is None:

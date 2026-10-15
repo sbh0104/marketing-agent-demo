@@ -288,6 +288,18 @@ MUTANTS: dict[str, tuple[str, str, str, str]] = {
         "if len(topic) > _MAX_TOPIC_CHARS:",
         "if False:",
     ),
+    "config-debug-url-any-host": (
+        "agent.config",
+        "tests.test_config",
+        "if not _LOOPBACK_URL.fullmatch(url):",
+        'if not url.startswith(("http://", "https://")):',
+    ),
+    "config-debug-url-prefix-only": (
+        "agent.config",
+        "tests.test_config",
+        "_LOOPBACK_URL.fullmatch(url)",
+        "_LOOPBACK_URL.match(url)",
+    ),
     "scheduler-one-sleep": (
         "agent.scheduler",
         "tests.test_scheduler",

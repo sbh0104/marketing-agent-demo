@@ -55,7 +55,7 @@ Phase 2–7 의 모든 단계가 기대는 계약입니다. 설정 읽기, 영�
 | `classifier.choice_min_confidence` | 숫자 | ≥ 0, ≤ 1 — 이유 보기 확신이 이보다 낮으면 보류 | `0.5` |
 | `classifier.on_topic_reasons` | 글자 목록 | 1개 이상, 각 1–40자이고 스페이스로 시작하거나 끝나지 않음, 글자 규칙(아래), 두 목록 합쳐 50개 이하, 이름 겹침 금지 | 4개 (config.yaml) |
 | `classifier.off_topic_reasons` | 글자 목록 | 같은 규칙 — jev 에 먼저 보임 | 4개 (config.yaml) |
-| `chrome_debug_url` | 글자 | 비어 있지 않고, 스페이스로 시작하거나 끝나지 않음, 글자 규칙(아래), `http://` 또는 `https://` 로 시작 | `http://localhost:9222` |
+| `chrome_debug_url` | 글자 | 비어 있지 않고, 스페이스로 시작하거나 끝나지 않음, 글자 규칙(아래), 그다음 주소 글의 꼴 — 글 전체가 `http://` + `localhost` · `127.0.0.1` · `[::1]` 중 하나 + `:` 포트(숫자 1–5자리) + 끝의 `/` 하나까지. 그 밖의 꼴(사용자 이름 · `\` · 다른 호스트 이름 등)은 `이 컴퓨터 주소만 받습니다 (localhost · 127.0.0.1 · [::1] 와 포트): chrome_debug_url` 오류이고, 메시지는 이 글 그대로입니다 (Phase 7G) | `http://localhost:9222` |
 | `allowed_videos` | 글자 목록 | 비워 두면 `()`; 항목은 쓴 그대로 보관 (글자 규칙 밖) | `- https://youtu.be/내-테스트-영상-ID` |
 | `test_run` | 참 · 거짓 | `true` · `false` | `false` |
 
@@ -663,6 +663,8 @@ run_loop(cycle, reload, initial, *, on_error, sleep=time.sleep,
   python3 -m tests.mutants config-text-any-char
   python3 -m tests.mutants config-text-edge-spaces
   python3 -m tests.mutants config-debug-url-skips-text
+  python3 -m tests.mutants config-debug-url-any-host
+  python3 -m tests.mutants config-debug-url-prefix-only
   python3 -m tests.mutants config-no-topic-ceiling
   python3 -m tests.mutants scheduler-one-sleep
   python3 -m tests.mutants scheduler-unclamped-wait
