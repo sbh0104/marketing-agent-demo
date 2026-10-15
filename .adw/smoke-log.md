@@ -949,3 +949,12 @@ other line is required on every item.
 - status: resolved
 - attempts: 0 · last failure: —
 - first seen: 2026-10-15 · last seen: 2026-10-15
+
+### S-NEW-1 — 리허설 테스트 빈칸: `detail` 200자 자르기 두 곳 · 리허설 뒤 게시 테스트의 첫 결과
+- source: cycle 20261015-182947-adw/phase-7f-chrome-rehearsal · tracker plans/interview-marketing-agent.md#phase-7f · deferred by ship-check
+- evidence: src/agent/poster.py:311 `shown_url[:DETAIL_MAX]` 와 src/agent/poster.py:320 `…[:DETAIL_MAX]` 를 지워도 `tests.test_poster tests.test_chrome` 93개가 초록(ship-check 감사 5 손 변이 g · h, 각각 rc=0 `OK`) — 테스트 어디에도 `DETAIL_MAX` 가 없음; tests/test_poster.py:299 `test_live_post_follows_rehearsal` 은 첫 실행(리허설)의 결과를 단언하지 않음(감사 1 메모 3)
+- direction: 테스트만 더함 — 다시 확인이 어긋난 화면의 주소가 200자를 넘을 때 `ERROR` 줄 `detail` 이 200자인지, 긴 원인의 글 지우기 실패에서 `rehearsed` 줄 `detail` 이 200자인지, `test_live_post_follows_rehearsal` 의 첫 결과가 `PostOutcome(VID, "test", "rehearsed", "dry_run", shot)` 인지 단언; 코드 · 계약 변경 없음
+- touches: tests/test_poster.py
+- status: open
+- attempts: 0 · last failure: —
+- first seen: 2026-10-15 · last seen: 2026-10-15
