@@ -1300,8 +1300,20 @@ class CliTest(unittest.TestCase):
 
 JEV_MODEL = "jev-1.13.0"
 NO_NETWORK = "테스트는 네트워크를 쓰지 않습니다"
-PASSING = {"mentions_scene": 0.9, "reads_like_ad": 0.1, "follows_concern": 0.9}
-FAILING = {"mentions_scene": 0.9, "reads_like_ad": 0.9, "follows_concern": 0.9}
+PASSING = {
+    "mentions_scene": 0.9,
+    "reads_like_ad": 0.1,
+    "follows_concern": 0.9,
+    "concern_is_love_worry": 0.9,
+    "saju_story_fits": 0.9,
+}
+FAILING = {
+    "mentions_scene": 0.9,
+    "reads_like_ad": 0.9,
+    "follows_concern": 0.9,
+    "concern_is_love_worry": 0.9,
+    "saju_story_fits": 0.9,
+}
 NO_NOUL = object()  # 자체 검사 답에 .noul 이 없는 응답 — 어댑터 모양 오류
 CONCERN = "썸 상대의 답장이 늦어 불안한 마음 고민표식"
 COMMENT = (
@@ -2800,7 +2812,13 @@ class SelfCheckAdapterTest(unittest.TestCase):
 
     def test_answers_read_as_noul_probabilities(self) -> None:
         jev = FakeJev([])
-        answer = {"mentions_scene": 0.81, "reads_like_ad": 0.12, "follows_concern": 0.67}
+        answer = {
+            "mentions_scene": 0.81,
+            "reads_like_ad": 0.12,
+            "follows_concern": 0.67,
+            "concern_is_love_worry": 0.9,
+            "saju_story_fits": 0.9,
+        }
         jev.checks = [answer, NO_NOUL]
         check = live_check.jev_self_check(jev, "jev-latest")
         self.assertEqual(check("자료", CHECK_QUESTIONS), answer)

@@ -770,6 +770,18 @@ MUTANTS: dict[str, tuple[str, str, str, str]] = {
         "return mismatches",
         "return []",
     ),
+    "live-check-applied-unknown-question-ignored": (
+        "tests.test_live_check_applied",
+        "tests.test_live_check_applied",
+        "if unknown or not scores:",
+        "if not scores:",
+    ),
+    "live-check-applied-recheck-no-tolerance": (
+        "tests.test_live_check_applied",
+        "tests.test_live_check_applied",
+        "return lowest_score(scores) + _TOLERANCE >= threshold",
+        "return lowest_score(scores) >= threshold",
+    ),
 }
 
 

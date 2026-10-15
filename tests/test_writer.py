@@ -63,7 +63,13 @@ GOOD2 = (
     " 기다리는 쪽이 편한 사람이라는 걸 알게 됐어요."
 )
 CONCERN = "썸 상대의 답장이 늦어 불안한 마음"
-PASSING = {"mentions_scene": 0.9, "reads_like_ad": 0.1, "follows_concern": 0.8}
+PASSING = {
+    "mentions_scene": 0.9,
+    "reads_like_ad": 0.1,
+    "follows_concern": 0.8,
+    "concern_is_love_worry": 0.85,
+    "saju_story_fits": 0.75,
+}
 CLASSIFIED = Judgement(Verdict.YES, "연애 고민 상담 (0.91)", NOW)
 
 
@@ -298,7 +304,13 @@ class CheckTest(unittest.TestCase):
         self.assertEqual(repeated_run(text, previous, 12), "연락텀때문에불안했던적이")
 
     def test_self_check_passes_at_threshold(self) -> None:
-        answer = {"mentions_scene": 0.5, "reads_like_ad": 0.5, "follows_concern": 0.5}
+        answer = {
+            "mentions_scene": 0.5,
+            "reads_like_ad": 0.5,
+            "follows_concern": 0.5,
+            "concern_is_love_worry": 0.5,
+            "saju_story_fits": 0.5,
+        }
         self.assertIsNone(self_check_failure(answer, 0.5))
 
     def test_each_question_can_fail_alone(self) -> None:
@@ -332,6 +344,8 @@ class CheckTest(unittest.TestCase):
                     "mentions_scene": 1.0,
                     "reads_like_ad": probability,
                     "follows_concern": 1.0,
+                    "concern_is_love_worry": 1.0,
+                    "saju_story_fits": 1.0,
                 }
                 self.assertIsNone(self_check_failure(answer, floor))
                 if i <= 98:
@@ -703,21 +717,34 @@ class WriteCommentTest(unittest.TestCase):
         self.assertEqual(self.events(), [(Event.SKIP, {"video": VIDEO_ID, "reason": reason})])
 
     def test_threshold_is_read_from_config(self) -> None:
-        answer = {"mentions_scene": 0.75, "reads_like_ad": 0.25, "follows_concern": 0.75}
+        answer = {
+            "mentions_scene": 0.75,
+            "reads_like_ad": 0.25,
+            "follows_concern": 0.75,
+            "concern_is_love_worry": 0.75,
+            "saju_story_fits": 0.75,
+        }
         claude = FakeClaude([reply(CONCERN, GOOD)])
         result = self.write(claude, FakeJev([answer]))
         self.assertEqual((len(claude.calls), result.draft.text), (1, GOOD))
 
         strict = dataclasses.replace(CONFIG, check_min_probability=0.875)
         claude = FakeClaude([reply(CONCERN, GOOD), reply(CONCERN, GOOD2)])
-        perfect = {"mentions_scene": 1.0, "reads_like_ad": 0.0, "follows_concern": 1.0}
+        perfect = {
+            "mentions_scene": 1.0,
+            "reads_like_ad": 0.0,
+            "follows_concern": 1.0,
+            "concern_is_love_worry": 1.0,
+            "saju_story_fits": 1.0,
+        }
         result = self.write(
             claude, FakeJev([answer, perfect]), config=strict, log_path=self.dir / "strict.log"
         )
         self.assertEqual((len(claude.calls), result.draft.text), (2, GOOD2))
         self.assertEqual(
             self.rewrite_reason(claude),
-            "자체 검사 미달 — 영상 속 장면·말 언급 0.75, 광고처럼 읽힘 0.25, 영상 고민과 이어짐 0.75",
+            "자체 검사 미달 — 영상 속 장면·말 언급 0.75, 광고처럼 읽힘 0.25, 영상 고민과 이어짐 0.75,"
+            " 고민 한 줄이 연애 고민 0.75, 연애사주 경험이 고민과 이어짐 0.75",
         )
 
     def test_code_check_failure_also_rewrites(self) -> None:
@@ -976,7 +1003,11 @@ class WriteCommentTest(unittest.TestCase):
 
     def test_invalid_jev_answer_logs_error_and_skips(self) -> None:
         cases = (
-            ("missing", {"mentions_scene": 0.9, "reads_like_ad": 0.1}, "follows_concern"),
+            (
+                "missing",
+                {key: value for key, value in PASSING.items() if key != "follows_concern"},
+                "follows_concern",
+            ),
             ("above_one", {**PASSING, "follows_concern": 1.5}, "follows_concern"),
             ("nan", {**PASSING, "mentions_scene": float("nan")}, "mentions_scene"),
             ("bool", {**PASSING, "reads_like_ad": True}, "reads_like_ad"),

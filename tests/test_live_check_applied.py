@@ -28,6 +28,7 @@ from agent.writer import (
     INVERTED_QUESTIONS,
     RECENT_WINDOW,
     REPEAT_MIN_CHARS,
+    _TOLERANCE,
     self_check_failure,
 )
 from tests import live_check
@@ -149,7 +150,7 @@ def stored_verdict_mismatches(result: Mapping[str, object]) -> list[str]:
                 continue
             if not isinstance(stored, bool):
                 continue
-            rechecked = self_check_failure(scores, threshold) is None
+            rechecked = self_check_passes(scores, threshold)
             if rechecked != stored:
                 mismatches.append(
                     f"videos[{i}].drafts[{n}] self_check_pass {stored} -> {rechecked}"
@@ -324,11 +325,26 @@ def _parsed_drafts(result: dict) -> list[dict]:
 
 
 def lowest_score(scores: Mapping[str, float]) -> float:
-    """초안의 가장 낮은 비교 점수 — P(예), '예' 가 나쁜 질문은 1 − P(예)."""
+    """초안의 가장 낮은 비교 점수 — 그 초안 `scores` 의 질문 이름마다 P(예), '예' 가 나쁜 질문은 1 − P(예).
+
+    질문 이름은 실행 때의 CHECK_QUESTIONS 라 판마다 다릅니다(6D 셋 · 6E 뒤 다섯). 비었거나 지금 코드에
+    없는 이름이 하나라도 있으면 ValueError — 모르는 이름을 건너뛰면 통과선 맞대기가 느슨해집니다.
+    """
+    unknown = sorted(name for name in scores if name not in CHECK_QUESTIONS)
+    if unknown or not scores:
+        raise ValueError(f"초안 점수의 질문 이름을 셀 수 없습니다: {unknown}")
     return min(
-        1.0 - scores[name] if name in INVERTED_QUESTIONS else scores[name]
-        for name in CHECK_QUESTIONS
+        1.0 - value if name in INVERTED_QUESTIONS else value for name, value in scores.items()
     )
+
+
+def self_check_passes(scores: Mapping[str, float], threshold: float) -> bool:
+    """초안 자신의 질문 이름으로 다시 판정한 자체 검사 통과 — `src/agent/writer.py (self_check_failure)` 와 같은 비교.
+
+    writer 는 이름마다 `score + _TOLERANCE < threshold` 이면 떨어뜨리므로, 통과는 가장 낮은 점수에
+    `_TOLERANCE` 를 더해 하한 이상인 것과 같습니다(덧셈은 단조). 결과의 초안은 실행 때 질문만 담습니다.
+    """
+    return lowest_score(scores) + _TOLERANCE >= threshold
 
 
 def passed_answered(result: dict) -> list[dict]:

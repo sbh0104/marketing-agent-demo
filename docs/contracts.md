@@ -707,6 +707,8 @@ run_loop(cycle, reload, initial, *, on_error, sleep=time.sleep,
   python3 -m tests.mutants live-check-applied-recount-ignored
   python3 -m tests.mutants live-check-applied-exception-any-run
   python3 -m tests.mutants live-check-applied-stored-verdicts-unchecked
+  python3 -m tests.mutants live-check-applied-unknown-question-ignored
+  python3 -m tests.mutants live-check-applied-recheck-no-tolerance
   ```
 
   `classify` · `read_answers` · `build_state` · `is_error_hold` · `sdk_ask` ·
@@ -891,8 +893,8 @@ if result.draft is not None:
   도구를 정함). 모델이 그 도구로 답하는지와 `tool_result` 다시 쓰기 차례를 받는지는 다음 진짜
   실행이 처음 확인합니다.
 - **`check` 포트** — `check(state, questions) -> {질문 이름: P(예)}`. 초안 한 개에 `noul` 질문
-  세 개(`CHECK_QUESTIONS`: `mentions_scene` · `reads_like_ad` · `follows_concern`)를 **한
-  요청**으로 묻습니다. 접속(키 `TYPESAFE_API_KEY` · jev 모델 · `typesafe-sdk`)은 Phase 3 의
+  다섯 개(`CHECK_QUESTIONS`: `mentions_scene` · `reads_like_ad` · `follows_concern` ·
+  `concern_is_love_worry` · `saju_story_fits`)를 **한 요청**으로 묻습니다. 접속(키 `TYPESAFE_API_KEY` · jev 모델 · `typesafe-sdk`)은 Phase 3 의
   것이고, Phase 7 이 Phase 3 의 클라이언트를 이 자리에 이어 붙입니다.
 - **자료의 출처** — 자막은 공식 API 로 남의 영상에서 받을 수 없어 비어 있습니다.
   `captions.download` 는 OAuth 와 그 영상의 편집 권한(200단위)을 요구하고, 비공식 긁기는 약관 · 차단
@@ -927,10 +929,11 @@ if result.draft is not None:
 | 링크 | 링크 보기에 `_LINK_RE` 조각이 없음 | `링크·주소 모양이 들어 있습니다: <조각>` |
 | 반복 | 최근 댓글과 같지 않고, 겹친 연속 글자 < 12 | `이전 댓글과 겹칩니다: <겹친 글자>` |
 
-- 이름표(`CHECK_LABELS`)는 `영상 속 장면·말 언급` · `광고처럼 읽힘` · `영상 고민과 이어짐`
-  이고, 확률은 소수 둘째 자리입니다(`자체 검사 미달 — 영상 속 장면·말 언급 0.25`).
-- **하한 비교** — 점수는 `mentions_scene` · `follows_concern` 이 P(예), `reads_like_ad` 는
-  1 − P(예)입니다. jev 는 부정을 글자 그대로 읽으므로 광고 질문은 긍정으로 묻고 뒤집습니다.
+- 이름표(`CHECK_LABELS`)는 `영상 속 장면·말 언급` · `광고처럼 읽힘` · `영상 고민과 이어짐` ·
+  `고민 한 줄이 연애 고민` · `연애사주 경험이 고민과 이어짐` 이고, 확률은 소수 둘째
+  자리입니다(`자체 검사 미달 — 영상 속 장면·말 언급 0.25`).
+- **하한 비교** — 점수는 `mentions_scene` · `follows_concern` · `concern_is_love_worry` ·
+  `saju_story_fits` 가 P(예), `reads_like_ad` 는 1 − P(예)입니다. jev 는 부정을 글자 그대로 읽으므로 광고 질문은 긍정으로 묻고 뒤집습니다.
   `score + _TOLERANCE < check_min_probability` 이면 떨어집니다(`_TOLERANCE = 1e-9`). 그냥 `<`
   로 비교하면 1 − P 의 부동소수 오차(`1 - 0.9 = 0.0999…98`) 때문에 두 자리 하한 99개 중 20개에서
   "하한과 같으면 통과" 가 깨집니다.
@@ -994,8 +997,8 @@ if result.draft is not None:
   몫입니다. `try` 안에는 `messages.create` 와 `check` 호출만 있으므로, 모양이 틀린 Claude
   응답(작성기 버그)은 건너뛰기로 숨지 않고 그대로 오류가 됩니다.
 - **로그** — `COMMENT` 는 필수 필드 뒤에 `attempt`(1 또는 2)와
-  `check`(`mentions_scene=0.90 reads_like_ad=0.10 follows_concern=0.80`)를 더합니다(7절의
-  "나머지 필드").
+  `check`(`mentions_scene=0.90 reads_like_ad=0.10 follows_concern=0.80 concern_is_love_worry=0.85
+  saju_story_fits=0.75`)를 더합니다(7절의 "나머지 필드").
 - **`self_check`** — 초안의 `self_check` 는 `Judgement(yes, "<질문>=<P(예)> …", now)` 입니다.
   `CommentDraft.at` 도 넘겨받은 `now` 이고, 숨은 시계는 없습니다.
 - 프롬프트 원문(`SYSTEM_PROMPT` · `USER_INSTRUCTION` · `REWRITE_PROMPT` · `WRITE_TOOL` ·
@@ -1349,6 +1352,10 @@ python3 -m tests.live_check --verdict <결과 파일>     # 호출 없이 판정
     다시 셈의 출발점인 결과의 기준값(`fingerprint.classifier` 의 하한 셋 · `check_min_probability`)은 결과의 판정 ·
     `self_check_pass` 칸을 다시 판정한 값과 같아야 합니다(`stored_verdict_mismatches`) — 저장된 판정을 바꾸는 만큼
     옮긴 기준값은 결과와 설정을 함께 고쳐도 빨강입니다.
+    통과선 다시 셈의 비교 점수와 저장된 `self_check_pass` 의 다시 판정은 초안마다 그 초안 `scores` 의 질문
+    이름으로 셉니다(6D 결과는 질문 셋, 6E 뒤 결과는 다섯) — 다시 판정은 '댓글 작성' 절의 하한 비교
+    (`_TOLERANCE` 포함) 그대로입니다. 이름이 비었거나 지금 `CHECK_QUESTIONS` 에 없는 이름이 하나라도 있으면
+    빨강입니다 — 그래서 질문을 더하는 사이클도 사람의 재실행을 먼저 요구하지 않습니다.
   - 작성 쪽 칸(`check_questions` · `self_check_criteria` · `trigger` · `grade_system` · `target_drafts` ·
     `wide_window_hours` · `claude_max_retries`)과
     `fingerprint.jev_models` 는 맞대기에서 보지 않습니다.

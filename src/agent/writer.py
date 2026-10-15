@@ -2,10 +2,10 @@
 
 흐름: Claude 가 도구 `submit_comment` 로 답합니다(재료에 연애 고민 · 짚을 장면이 있는지 두
 참거짓, 있으면 고민 한 줄과 댓글) → 하나라도 없다고 답하면 jev · 다시 쓰기 없이 그 이유로 건너뜀
-→ jev 가 초안 한 개에 `noul` 질문 세 개(영상 속 장면·말 언급 · 광고처럼 읽힘 · 영상 고민과
-이어짐)를 한 요청으로 답합니다 → 코드가 글자 수 · 링크 · 최근 내 댓글과의 반복을 셉니다. 떨어지면
-모든 이유를 붙여 같은 대화에서 한 번 다시 쓰고, 두 번째도 떨어지면 그 영상을 건너뛰고 이유를
-`SKIP` 으로 남깁니다.
+→ jev 가 초안 한 개에 `noul` 질문 다섯 개(영상 속 장면·말 언급 · 광고처럼 읽힘 · 영상 고민과
+이어짐 · 고민 한 줄이 연애 고민 · 연애사주 경험이 고민과 이어짐)를 한 요청으로 답합니다 → 코드가
+글자 수 · 링크 · 최근 내 댓글과의 반복을 셉니다. 떨어지면 모든 이유를 붙여 같은 대화에서 한 번
+다시 쓰고, 두 번째도 떨어지면 그 영상을 건너뛰고 이유를 `SKIP` 으로 남깁니다.
 Claude · jev 호출 오류는 다시 써도 고쳐지지 않으므로 다시 쓰지 않고 `ERROR` 와 `SKIP` 을 남깁니다.
 
 프롬프트 원문은 이 모듈 맨 위에만 둡니다 — Phase 8 PROCESS.md 가 옮겨 적습니다. 계약 '댓글 작성' 절.
@@ -80,12 +80,27 @@ CHECK_QUESTIONS: dict[str, str] = {
         "Does the text inside <draft_comment> respond to the concern written inside"
         " <video_concern>?"
     ),
+    "concern_is_love_worry": (
+        "Does the text inside <video_concern> describe a romantic-relationship worry that a"
+        " person in the material (someone in the video, the person whose story it is, or a"
+        " viewer commenting on that situation) is going through, rather than a summary of the"
+        " plot or topic or a wish to get a fortune reading? For a tarot or saju reading video,"
+        " the situation the reading answers (whether they will get in touch, getting back"
+        " together, a new relationship) counts as that worry."
+    ),
+    "saju_story_fits": (
+        "Does the text inside <draft_comment> share the writer's own experience of getting a"
+        " '연애사주' (love saju) reading when they had a similar worry, and does that experience"
+        " connect naturally to the concern written inside <video_concern>?"
+    ),
 }
 INVERTED_QUESTIONS = frozenset({"reads_like_ad"})  # '예' 가 나쁜 질문 — 통과 확률은 1 − P(예)
 CHECK_LABELS = {
     "mentions_scene": "영상 속 장면·말 언급",
     "reads_like_ad": "광고처럼 읽힘",
     "follows_concern": "영상 고민과 이어짐",
+    "concern_is_love_worry": "고민 한 줄이 연애 고민",
+    "saju_story_fits": "연애사주 경험이 고민과 이어짐",
 }
 _TOLERANCE = 1e-9  # 1 − P 의 부동소수 오차(1 − 0.9 = 0.0999…98)가 하한 경계를 넘지 않게 덮습니다
 REPEAT_MIN_CHARS = 12   # 공백·문장부호를 뺀 글자가 연속 이만큼 같으면 반복 — 한국어 한 마디 크기
