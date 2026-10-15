@@ -24,11 +24,7 @@
 
 ### E-024 · codebase — 저장소의 손편집 파일 읽기는 모두 `utf-8-sig`(BOM 허용)이고 이 관례는 코드에만 있다 — 새 읽기 `tests/live_check.py:445`(`--verdict`)는 `utf-8` 이라, 사람이 사람 칸을 고친 `result.json` 에 편집기가 BOM 을 붙이면 종료 2 "읽을 수 없음"이 난다
 - evidence: `grep -rn utf-8-sig src/` → `src/agent/config.py:322` · `src/agent/store.py:59` · `src/agent/env.py:25` · `src/agent/youtube.py:155`; `tests/live_check.py:445` `json.loads(Path(path).read_text(encoding="utf-8"))`; ship-report Quality review 3 · R4 (cycle 20261014-035728-adw/phase-6a-live-check-prepare)
-- first confirmed: 2026-10-14 · last confirmed: 2026-10-15
-
-### E-025 · codebase — `YouTubeError` 는 글자열 두 개(`call` · `reason`)만 든다(상태 코드 · 오류 이유 속성 없음) — 403 종류 구분은 글자열 같음 비교(`exc.reason == COMMENTS_DISABLED`)에 기대고, 200 모양 오류도 같은 예외라 받는 쪽이 오류 종류를 가르지 못한다
-- evidence: `src/agent/youtube.py:69-75`(`__init__(self, call, reason)`) · `:41` `COMMENTS_DISABLED = "HTTP 403 commentsDisabled"` · `:277` `if exc.reason == COMMENTS_DISABLED:`; 모양 오류가 `except YouTubeError: continue` 로 삼켜지는 자리는 ship-report R1(`tests/live_check.py:1026-1029`) (cycle 20261014-035728-adw/phase-6a-live-check-prepare · understand 후보 2)
-- first confirmed: 2026-10-14 · last confirmed: 2026-10-14
+- first confirmed: 2026-10-14 · last confirmed: 2026-10-16
 
 ### E-026 · reviewer — 헌법 9조 짝 테스트가 초록이어도 약속 문장은 그 테스트가 재는 것보다 넓을 수 있다 — 9조 첫 사례(Phase 1A)에서 빠진 짝은 0 이었지만 PARTIAL 이 7개였고, 짝이 초록인 계약 7절 "터미널에 가짜 줄이 그려지지 않습니다" 는 화면 폭 접힘까지 약속해 ship-check 가 사이클 안 줄이기가 아니라 사람 확인(R4)으로 올렸다
 - evidence: `.adw/ship-report.md:350-362` (Promise 정산 — MISSING 0 · PROVES L68 · L301 · L445 · PARTIAL 7, L445-446 짝은 입력 넷뿐이라 변이 l14 가 짝을 통과) · `:442-450` (R4) · `:477` (민감 확인 줄, confirmed 2026-10-14); 인터뷰가 `3a4a6e7` 로 문장을 짝이 재는 만큼으로 좁힘. E-009 부류의 9조 뒤 첫 목격 (cycle 20261014-035715-adw/phase-1a-parser-allow-rules)
@@ -80,7 +76,7 @@
 
 ### E-043 · reviewer — 받아들인 위험 줄이 코드 자리를 적어도 입력 종류를 재현 입력의 조건으로 좁히면, 다음 ship-check 는 같은 자리에서 더 넓은 입력을 찾아 사람 확인으로 다시 올린다 — 헌법 11조의 ship-check 규칙("same site … different input class is a new risk")대로다. 멈춤이 끝나려면 그 자리가 받는 입력 전체를 입력 종류로 적어야 한다
 - evidence: Phase 2 — 입력으로 적은 줄을 ship-check 가 같은 `except`(`src/agent/youtube.py:245`)에서 새 예외 꼴로 세 번 뚫었고, 자리로 다시 적은 뒤 다섯째 ship-check 는 새 멈춤이 없었다(옛 E-021, cycle 20261013-161159-adw/phase-2-watcher-detect). 6G — 🤖 브리핑(gate `20261015-153916-cycle-control.unconsumed.json`)이 적은 `skip_reason` 대가 줄(`fa66b56`)은 자리 `tests/live_check.py:1621` 를 이름 붙였지만 입력 종류가 "두 번 모두 코드 검사에서 떨어진" 경우뿐이었다. 같은 코드 트리의 다음 ship-check 가 "한 번만 반복 검사에서 떨어져도" 꼴을 찾아 `[sensitive: …]` 로 올렸고(journal 20261015-130935 ship-report.md:12 · :217), HC1 인터뷰가 "어느 한 번이라도 … 다른 시도가 무엇으로 떨어졌든" 으로 넓혀 다시 썼다(`92bf38f`) (cycle 20261015-130935-adw/phase-6g-live-check-redact)
-- first confirmed: 2026-10-14 · last confirmed: 2026-10-15
+- first confirmed: 2026-10-14 · last confirmed: 2026-10-16
 
 ### E-044 · gotcha — 레인 착지는 squash 없는 `merge --no-ff` 라(`.claude/skills/plan/scripts/finalize_step.py:1054`), 레인 끝 판에서만 지우거나 바꾼 내용도 앞 레인 커밋마다 남아 main 기록에 붙는다. 제출 때 main 이 공개되므로, 공개되면 안 되는 값은 그 값을 처음 더한 커밋에서부터 없어야 한다
 - evidence: 6D — 허브가 결과 파일의 연락처를 끝 판에서만 지웠고(`f5cef6a`), ship-check 06:13 이 BLOCKED 했다(앞 커밋 9개에 그대로 남음). 드리프트 인터뷰가 레인 기록을 다시 썼다(cycle 20261014-225050-adw/phase-6d-live-check-reapply). 6G — 질문 4 A ④ 는 옛 표본(`795989b` · `5ad1374`: 실제 은행 앞자리 꼴 계좌와 `gmail.com`, 더한 줄 9개)을 끝 트리에서만 바꿨다. 세 번째 ship-check 이 역사에서 그 표본을 찾아 사람 확인으로 올렸고(journal 20261015-130935 ship-report.md:257), 다시 쓰지 않고 트래커 6G 대가 줄로 남겼다 (cycle 20261015-130935-adw/phase-6g-live-check-redact)
@@ -122,7 +118,12 @@
 - evidence: 이번 `gate/20261016-010911-cycle-control.json` `{"action": "retry", "step": "smoke-file", "issued_by": "cyclechat"}` · retro-bundle Steps verify-run 시도 1 · ship-check `skipped`("control: 사람이 smoke-file 로 넘어감") · 인터뷰 커밋 `dd6670a` 은 트래커만(계획 밖 파일 1 = `plans/interview-marketing-agent.md`)이고 새 Trade-offs 세 줄이 코드 자리를 인용한다 — retro 가 손으로 대조해 모두 맞음(`src/agent/report.py:117` `_store_floor` · `src/agent/store.py:42-45` `_is_duplicate` · `src/agent/watcher.py:283` `invalid_item` · `src/agent/poster.py:226` `PAGE_MISMATCH`) (cycle 20261015-211359-adw/phase-7d-run-report-html). 같은 smoke-file 길: Phase 8 HC1 인터뷰 `2b4480c` 뒤(E-052 evidence). ↪ Move 길은 옛 E-030 의 목격: 1C `20261014-140655-cycle-control.json` · 1A verify-run · ship-check 시도 2 · 7G `20261016-002219-cycle-control.json`(verify-run $2.2207 · ship-check $21.6100 두 시도 합, journal 20261015-211343-adw-phase-7g-chrome-url-sample-gap summary.md)
 - first confirmed: 2026-10-14 · last confirmed: 2026-10-16
 
+### E-054 · gotcha — Phase 7A 부터 `YouTubeClient._call` 은 `_fetch` 에서 난 예외를 무엇이든(`except Exception`) `YouTubeError(call, "network <종류>: …")` 로 바꾼다 — 그래서 테스트 가짜가 `_fetch` 안에서 던지는 `AssertionError`(모르는 호출 · 소켓 금지 · 주소 가드)도 `ERROR` 한 줄이 되고, `YouTubeError` 를 건너뛰는 호출자나 `reason.startswith("network ")` 만 보는 테스트에서는 가드가 걸려도 스위트가 초록이다
+- evidence: `src/agent/youtube.py:354` `except Exception as exc:` → `:355` `raise YouTubeError(call, self._redact(f"network {type(exc).__name__}: {exc}")) from None`. 삼켜지는 자리 — `tests/test_live_check.py:1951` `raise AssertionError(f"모르는 호출입니다: {endpoint}")` · `:2008-2009` 소켓 금지 가드 → `tests/live_check.py:1513` · `:1526` `except YouTubeError:`; `tests/test_watcher_network.py:31` `raise AssertionError(f"Google 밖의 주소입니다: {url}")` → `:66` · `:93` `assertTrue(fields["reason"].startswith("network "), …)` (ship-check 감사 3 메모 6 → 스모크 S-113, cycle 20261015-213331-adw/phase-7a-watcher-network-fixes)
+- first confirmed: 2026-10-16 · last confirmed: 2026-10-16
+
 ## Retired (history — one line each, never deleted)
+- E-025 · codebase — `YouTubeError` 는 글자열 두 개(`call` · `reason`)만 든다(상태 코드 · 오류 이유 속성 없음) — 403 종류 구분은 글자열 같음 비교(`exc.reason == COMMENTS_DISABLED`)에 기대고, 200 모양 오류도 같은 예외라 받는 쪽이 오류 종류를 가르지 못한다 — retired 2026-10-16 (over cap; unconfirmed since 2026-10-14)
 - E-030 · tooling — 민감 확인 줄로 머지 앞에서 멈춘 사이클은 인터뷰가 트래커만 고치고 코드를 한 바이트도 바꾸지 않아도 허브가 verify-run 부터 다시 돌린다 — 같은 코드 트리에서 verify-run 과 ship-check 전체(감사 포함)가 한 번 더 돈다 — retired 2026-10-16 (7D · 8 에서 틀림: 확인 인터뷰가 `human_checks.py confirm` 뒤 cycle-control `retry step=smoke-file` 로 재개하면 verify-run · ship-check 를 다시 돌지 않음(7D `gate/20261016-010911-cycle-control.json` `"issued_by": "cyclechat"` · retro-bundle Steps ship-check `skipped` · verify-run 시도 1) — verify-run 부터 다시 도는 것은 허브 ↪ Move 길뿐; 두 길을 고친 사실로 E-053 에 다시 씀)
 - E-038 · tooling — 과제 안내 `docs/marketing-agent.pdf` 는 홈 체크아웃에 추적되지 않은 파일(`??`)로만 있어 레인 worktree 에는 없다 — 레인 안의 사이클(understand · plan · ship-check)은 과제 원문을 다시 읽지 못하고 트래커가 인용한 문장만 쓴다 — retired 2026-10-16 (근거 `??` 가 낡음: 이 페이즈 `be6895b` 가 `.gitignore:12` 에 `docs/marketing-agent.pdf` 를 더해 홈 체크아웃에서 무시 파일이 됨. 레인에 없다는 사실(레인 `ls docs/marketing-agent.pdf` → No such file, 2026-10-16)은 E-051 로 옮김)
 - E-015 · tooling — `smoke_file.py` 의 `verdict()` 는 verify-report **전체**에서 줄머리 `FAIL` 을 찾고 그것을 `PASS` 보다 먼저 본다 — `## Verdict` 가 PASS 여도 본문에 검사 출력 줄(`  FAIL labels: …`)이 있으면 "verify FAIL" 로 읽고, ship-report 의 스모크 후보를 one-pass 로 한 번 더 올린다 — retired 2026-10-16 (over cap; unconfirmed since 2026-10-14)

@@ -83,7 +83,7 @@
 - [x] Phase 7F — 명단 영상 크롬 리허설 (테스트 실행에서 버튼 직전까지) (plans/interview-marketing-agent.md#phase-7f)
 - [x] Phase 8 — 제출 문서 (README · PROCESS.md · 공개 정리) (plans/interview-marketing-agent.md#phase-8)
 - [ ] Phase 8A — 실제 실행 반영 (sample.log · 시연 링크 · 실제 숫자) (plans/interview-marketing-agent.md#phase-8a)
-- [~] Phase 7A — 탐지기 · 네트워크 오류 고침 (plans/interview-marketing-agent.md#phase-7a)
+- [x] Phase 7A — 탐지기 · 네트워크 오류 고침 (plans/interview-marketing-agent.md#phase-7a)
 - [x] Phase 7G — 크롬 주소 · 표본 간격 다지기 (이 컴퓨터 주소만 · 최소 표본 간격) (plans/interview-marketing-agent.md#phase-7g)
 - [ ] Phase 7B — jev 키가 없을 때 Claude 판단 (plans/interview-marketing-agent.md#phase-7b)
 - [x] Phase 7D — 결과 화면 data/report.html (plans/interview-marketing-agent.md#phase-7d)
