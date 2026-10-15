@@ -1717,6 +1717,16 @@ class LowestScoreTest(unittest.TestCase):
         self.assertEqual(
             lowest_question(self.five(mentions_scene=0.7, saju_story_fits=0.7)), "mentions_scene"
         )
+        # 키 차례가 CHECK_QUESTIONS 와 다른 동점 — five() 는 CHECK_QUESTIONS 차례로 넣어 `scores` 를
+        # 도는 구현도 위 표본을 통과하므로, saju_story_fits 를 먼저 넣은 사전으로 가릅니다
+        tie = {
+            "saju_story_fits": 0.7,
+            "mentions_scene": 0.7,
+            "reads_like_ad": 0.0,
+            "follows_concern": 1.0,
+            "concern_is_love_worry": 1.0,
+        }
+        self.assertEqual(lowest_question(tie), "mentions_scene")
         self.assertEqual(comparison_label("reads_like_ad"), "광고처럼 읽힘 아님")
         self.assertEqual(comparison_label("mentions_scene"), "영상 속 장면·말 언급")
         with self.assertRaises(ValueError):
