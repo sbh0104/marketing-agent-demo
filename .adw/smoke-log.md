@@ -1012,3 +1012,12 @@ other line is required on every item.
 - status: resolved
 - attempts: 0 · last failure: —
 - first seen: 2026-10-15 · last seen: 2026-10-15
+
+### S-NEW-1 — 결과 화면 테스트 빈칸 셋: 표시 글 일곱의 글자 고정 · 리허설 줄 reason 표시 글 · 보이지 않는 U+2028 두 자
+- source: cycle 20261015-211359-adw/phase-7d-run-report-html · tracker plans/interview-marketing-agent.md#phase-7d · deferred by ship-check
+- evidence: src/agent/report.py:26-35 의 표시 글 일곱(`NO_POST` "게시 기록 없음" · `NO_DRAFT` "댓글 안 씀" · `OTHER` "기타 — 로그 참고" · `RESERVED` · `FAILED` · `NOT_JUDGED` · `NOT_TIMED`)이 tests/test_report.py · tests/test_run.py 에 글자로 0번 — 테스트가 상수와만 비교해 글을 바꿔도 스위트 초록이고 계약 '결과 화면' 절만 낡음(이번엔 verify 의 V22 가 잡았지만 V22 는 스위트 밖); tests/test_report.py:95-98 `rehearsal()` 이 `reason=DRY_RUN` 을 박아 :590 의 모양 갖춘 리허설 줄 reason 에 표시 글이 없음(plan Test plan 은 표시 글을 약속); tests/test_report.py:517 · :524 의 날 U+2028 두 자는 편집기 · diff 에서 안 보임(.adw/ship-report.md § Test integrity)
+- direction: 테스트만 고침 — `test_listed_codes_get_labels` 처럼 표시 글(위 일곱과 `REHEARSED` · `POSTED` · `LOG_UNREADABLE`)을 계약의 글자 그대로 assertEqual 하는 표 하나 · `rehearsal()` 이 reason 을 받게 하고 :590 줄의 reason 을 `mark(...)` 으로 심어 화면에 없음을 단언 · :517 · :524 의 날 글자를 `" "` 이스케이프로; 코드 · 계약 변경 없음
+- touches: tests/test_report.py
+- status: open
+- attempts: 0 · last failure: —
+- first seen: 2026-10-16 · last seen: 2026-10-16
