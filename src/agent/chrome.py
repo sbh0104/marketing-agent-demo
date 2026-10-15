@@ -225,6 +225,12 @@ class YouTubePage:
         ):
             raise PageError(POST_BUTTON_MISSING, SUBMIT_BUTTON)
 
+    def clear_comment(self) -> None:
+        """입력 칸을 비웁니다(리허설의 끝) — 게시 버튼은 건드리지 않습니다. 칸이 없으면 그 원인으로 멈춥니다."""
+        if not self._present(COMMENT_INPUT, WAIT_MS):
+            raise PageError(COMMENT_BOX_MISSING, COMMENT_INPUT)
+        self._page.locator(COMMENT_INPUT).first.fill("")
+
     def submit(self) -> None:
         """게시 버튼을 누릅니다 — 기다림도 이동도 없이. 누르는 중의 예외는 그대로 올립니다."""
         button = self._page.locator(SUBMIT_BUTTON)
