@@ -1654,9 +1654,11 @@ PYTHONPATH=src python3 -m agent.run [--dry-run] [--once]
   | `duplicate_video` | 이미 처리한 영상 |
   | `not_in_allowlist` | 허용 목록 밖이라 게시하지 않음 |
   | `invalid_video` | 영상 주소를 읽을 수 없음 |
+  | `invalid_item` | 영상 정보를 읽을 수 없음 |
   | `dry_run` | 테스트 실행 — 저장만 |
   | `no_comment` | 댓글 없음 |
   | `config_rejected` | 설정 거절로 저장만 |
+  | `page_mismatch` | 열린 화면이 다른 영상이라 저장만 |
   | `unavailable` | 영상을 볼 수 없음 |
   | `재료에 장면 없음`으로 시작 | 작성 건너뜀 — 짚을 장면 없음 |
   | `재료에 연애 고민 없음`으로 시작 | 작성 건너뜀 — 연애 고민 없음 |

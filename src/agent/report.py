@@ -17,7 +17,7 @@ from pathlib import Path
 
 from agent.logbook import KST, Event
 from agent.models import VideoRecord
-from agent.poster import DRY_RUN, NO_COMMENT, WATCH_URL
+from agent.poster import DRY_RUN, NO_COMMENT, PAGE_MISMATCH, WATCH_URL
 from agent.trigger import views_per_hour
 from agent.writer import NO_CONCERN, NO_SCENE
 
@@ -41,9 +41,11 @@ REASON_LABELS: dict[str, str] = {
     "duplicate_video": "이미 처리한 영상",
     "not_in_allowlist": "허용 목록 밖이라 게시하지 않음",
     "invalid_video": "영상 주소를 읽을 수 없음",
+    "invalid_item": "영상 정보를 읽을 수 없음",
     DRY_RUN: "테스트 실행 — 저장만",
     NO_COMMENT: "댓글 없음",
     "config_rejected": "설정 거절로 저장만",
+    PAGE_MISMATCH: "열린 화면이 다른 영상이라 저장만",
     "unavailable": "영상을 볼 수 없음",
 }
 # 이유 머리말 → 이름표 — 이유 글이 이 머리말로 시작할 때, 앞에서부터 처음 맞는 것
