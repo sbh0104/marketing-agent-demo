@@ -701,3 +701,75 @@
 - source: adw/phase-6d-live-check-reapply
 - tag: plain
 - status: open
+
+### H-085 — 6F 실제 실행에서 `claude-sonnet-5-5` 가 강제된 `submit_comment` 도구로 답하고 `tool_result` 다시 쓰기 턴을 받아 주는지 본다(V3 는 SDK 쪽까지만 확인)
+- project: marketing-agent-demo
+- when: 2026-10-15 · plans/interview-marketing-agent.md#phase-6e
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-6e-comment-quality-fix
+- tag: plain
+- status: open
+
+### H-086 — 6F 실제 실행에서 jev 가 새 두 질문(`concern_is_love_worry` · `saju_story_fits`)을 채점기 `task_quality` 와 맞게 답하는지 본다
+- project: marketing-agent-demo
+- when: 2026-10-15 · plans/interview-marketing-agent.md#phase-6e
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-6e-comment-quality-fix
+- tag: plain
+- status: open
+
+### H-087 — `docs/marketing-agent.pdf` 4쪽 ④ · 7쪽과 계약 대조표 열한 문장을 대조한다. 측정으로는 10/11 이 그대로이고, ④-3 만 PDF 의 둥근 따옴표 “…” 가 표에서 홑따옴표 '…' 로 바뀌었으며 가운데가 "…" 로 줄었다(트래커 D-Q1 인용을 따름). 그대로 둘지 정한다
+- project: marketing-agent-demo
+- when: 2026-10-15 · plans/interview-marketing-agent.md#phase-6e
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-6e-comment-quality-fix
+- tag: plain
+- status: open
+
+### H-088 — Phase 6F 초안을 영상끼리 맞대어 읽고 아직 같은 두 문장 골격을 나누는지 본다. `src/agent/writer.py::_frame_pieces` 의 undecided 표본(6D 골격 쌍 `SKELETON_A` / `SKELETON_B`, 지금은 통과로 고정)의 색을 정한다
+- project: marketing-agent-demo
+- when: 2026-10-15 · plans/interview-marketing-agent.md#phase-6e
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-6e-comment-quality-fix
+- tag: plain
+- status: open
+
+### H-089 — Phase 6F 보고서에서 ⓒ(`frame_overlap`)를 그 골격 읽기와 함께 읽는다. ⓒ 하나만으로는 문장 틀 검사가 일하는지 알 수 없다
+- project: marketing-agent-demo
+- when: 2026-10-15 · plans/interview-marketing-agent.md#phase-6e
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-6e-comment-quality-fix
+- tag: plain
+- status: open
+
+### H-090 — Phase 7: 게시 댓글 20개 창(`RECENT_WINDOW`)이 찬 뒤 운영 로그에서 `이전 댓글과 문장 틀이 같습니다` 다시 쓰기와 그 때문에 생긴 SKIP 을 세고, `FRAME_MIN_CHARS`(6)를 그대로 둘지 정한다
+- project: marketing-agent-demo
+- when: 2026-10-15 · plans/interview-marketing-agent.md#phase-6e
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-6e-comment-quality-fix
+- tag: plain
+- status: open
+
+### H-091 — Phase 6F: 건너뜀 이유 · 창별 "정당한 건너뜀 n/m" 을 `result.json` 의 `skip_kind` · `skip_grade`(사람 칸 `skip_human` 먼저)로 세어 계약에 기록으로 적는다. 셀 때 두 가지를 감안한다 — `skip_grade` 가 오류로 null 인 영상의 빈 `skip_human` 은 동의가 아니다. 재료 채점은 `<video_title>` 도 장면 출처로 세지만 작성 규칙 3 은 제목 되풀이를 장면으로 치지 않으므로, 제목만 있는 영상은 '부당' 쪽으로 기운다
+- project: marketing-agent-demo
+- when: 2026-10-15 · plans/interview-marketing-agent.md#phase-6e
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-6e-comment-quality-fix
+- tag: plain
+- status: open
+
+### H-092 — Phase 6F: `tests/test_live_check_applied.py` 의 `todo_line` 을 6E 뒤 결과에 다시 쓸지 정한다. 다시 쓴다면 "작성기 답을 JSON 으로 못 읽은 초안"(이제는 도구 답을 못 읽은 초안)과 "이번 결과는 늘 할 일 있음" 문구를 고친다. 5문항 결과를 커밋할 때는 점수 이름 완전성 단언(지금은 3이름 결과에만, :1266)을 5이름으로 옮긴다
+- project: marketing-agent-demo
+- when: 2026-10-15 · plans/interview-marketing-agent.md#phase-6e
+- from: ship-report.md § Human checks — .adw/ship-report.md § Quality review
+- source: adw/phase-6e-comment-quality-fix
+- tag: plain
+- status: open
+
+### H-093 — `tests/test_task_table.py::table_problems` 의 undecided 표본 넷의 색을 정한다. 넷 모두 지금 통과하고, 답은 트래커 결정이다 — ① 모든 자리가 "—" 인 행의 막지 않음 칸에 닮은 대시(`-` · `–` · `−` · `ー`) ② 자리가 프롬프트 규칙뿐인 행의 막지 않음 칸 "—"(④-1 자막 이유를 지움) ③ jev 칸을 지워 프롬프트 규칙만 남은 행(④-3) ④ 코드 검사 칸의 `len` · `append`(`code_failures` 안의 이름이지만 검사가 아님)
+- project: marketing-agent-demo
+- when: 2026-10-15 · plans/interview-marketing-agent.md#phase-6e
+- from: ship-report.md § Human checks — .adw/verify-plan.md § Checks
+- source: adw/phase-6e-comment-quality-fix
+- tag: plain
+- status: open
