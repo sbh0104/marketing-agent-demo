@@ -4,7 +4,10 @@ from __future__ import annotations
 import http.client
 import json
 import os
+import ssl
 import tempfile
+import threading
+import time
 import unittest
 import urllib.error
 import urllib.parse
@@ -15,6 +18,7 @@ from pathlib import Path
 from typing import Any
 from unittest import mock
 
+from agent import youtube
 from agent.config import LimitsConfig
 from agent.youtube import (
     COMMENTS_DISABLED,
@@ -27,7 +31,7 @@ from agent.youtube import (
     YouTubeError,
     http_get,
 )
-from tests.loopback import RawServer, no_proxies, response
+from tests.loopback import NEGATIVE_CHUNK, RawServer, chunked, no_proxies, response
 
 NOW = datetime(2026, 10, 12, 12, 0, tzinfo=timezone.utc)
 DAY = timedelta(hours=24)
@@ -803,6 +807,117 @@ class HttpGetTest(unittest.TestCase):
         result = http_get(server.url + GET_PATH, 12.5)
         self.assertEqual(result, (204, b""))
         self.assert_request(server)
+
+    def assert_overrun(self, url: str) -> None:
+        """상한 1초 안에 TimeoutError("요청 전체가 1초 상한을 넘었습니다") 로 끝나는지 — 2.5초 안쪽."""
+        started = time.monotonic()
+        with self.assertRaises(TimeoutError) as caught:
+            http_get(url, 1.0)
+        elapsed = time.monotonic() - started
+        self.assertEqual(str(caught.exception), "요청 전체가 1초 상한을 넘었습니다")
+        self.assertLess(elapsed, 2.5)
+
+    def test_redirect_is_returned_not_followed(self) -> None:
+        # 트래커 7A ③(나) — 다섯 코드 모두 따라가지 않고 3xx 를 그대로 돌려줍니다
+        elsewhere = self.serve(lambda target: response(200, b'{"items": []}'))
+        location = f"Location: {elsewhere.url}/elsewhere"
+        for code in (301, 302, 303, 307, 308):
+            with self.subTest(code=code):
+                server = self.serve(
+                    lambda target, code=code: response(code, b"moved", headers=[location])
+                )
+                self.assertEqual(http_get(server.url + GET_PATH, 5.0), (code, b"moved"))
+        self.assertEqual(elsewhere.targets, [])
+        self.assertEqual(elsewhere.connections, 0)
+
+    def test_error_response_is_closed(self) -> None:
+        # R5 — 오류 응답(HTTPError)도 읽은 뒤 닫습니다
+        original = urllib.error.HTTPError.close
+        server = self.serve(lambda target: response(403, b"{}"))
+        with mock.patch.object(
+            urllib.error.HTTPError, "close", autospec=True, side_effect=original
+        ) as close:
+            self.assertEqual(http_get(server.url + GET_PATH, 5.0), (403, b"{}"))
+        self.assertTrue(close.called)
+
+    def test_truncated_error_body_keeps_its_status(self) -> None:
+        # R5 — 오류 상태의 본문을 읽다 실패해도 상태 코드는 남습니다
+        server = self.serve(lambda target: response(403, b'{"error": {', length=100))
+        self.assertEqual(http_get(server.url + GET_PATH, 5.0), (403, b""))
+
+    def test_negative_chunk_size_in_an_error_body_keeps_its_status(self) -> None:
+        server = self.serve(lambda target: chunked(403, NEGATIVE_CHUNK))
+        self.assertEqual(http_get(server.url + GET_PATH, 5.0), (403, b""))
+
+    def test_truncated_ok_body_is_an_error(self) -> None:
+        # 200 의 잘린 본문은 예전처럼 예외 — _call 이 network 오류 한 줄로 바꿉니다
+        server = self.serve(lambda target: response(200, b'{"items": [', length=100))
+        with self.assertRaises(http.client.IncompleteRead):
+            http_get(server.url + GET_PATH, 5.0)
+
+    def test_negative_chunk_size_in_an_ok_body_is_an_error(self) -> None:
+        server = self.serve(lambda target: chunked(200, NEGATIVE_CHUNK))
+        with self.assertRaises(Exception) as caught:
+            http_get(server.url + GET_PATH, 5.0)
+        self.assertNotIsInstance(caught.exception, TimeoutError)
+
+    def test_chunked_and_large_bodies_are_read_whole(self) -> None:
+        server = self.serve(lambda target: chunked(200, b"5\r\nhello\r\n0\r\n\r\n"))
+        self.assertEqual(http_get(server.url + GET_PATH, 5.0), (200, b"hello"))
+        large = b"x" * 200_000
+        server = self.serve(lambda target: response(200, large))
+        self.assertEqual(http_get(server.url + GET_PATH, 5.0), (200, large))
+
+    def test_drip_fed_headers_end_at_the_cap(self) -> None:
+        # urllib 의 timeout 은 읽기 한 번마다라 머리를 한 바이트씩 흘리면 막지 못합니다 (R5)
+        reply = response(200, b'{"items": []}', headers=["X-Pad: " + "p" * 240])
+        server = self.serve(lambda target: reply, drip_s=0.02, burst=0)
+        self.assert_overrun(server.url + GET_PATH)
+
+    def test_drip_fed_body_ends_at_the_cap(self) -> None:
+        body = b'{"items": []}' + b" " * 200
+        reply = response(200, body)
+        server = self.serve(lambda target: reply, drip_s=0.02, burst=len(reply) - len(body))
+        self.assert_overrun(server.url + GET_PATH)
+
+    def test_silent_server_frees_the_worker_at_the_cap(self) -> None:
+        # 답하지 않는 서버 — 부르는 쪽은 상한에, 일꾼 스레드는 읽기마다의 timeout 에 풀려납니다
+        server = self.serve(lambda target: None)
+        before = set(threading.enumerate())
+        with self.assertRaises(TimeoutError):
+            http_get(server.url + GET_PATH, 1.0)
+        workers = [
+            thread for thread in threading.enumerate()
+            if thread not in before and thread.name == "http_get"
+        ]
+        for worker in workers:
+            worker.join(timeout=1.5)
+        self.assertEqual([worker for worker in workers if worker.is_alive()], [])
+
+    def test_opener_is_urlopens_without_the_redirect_handler(self) -> None:
+        dropped = {
+            urllib.request.HTTPRedirectHandler,
+            urllib.request.FTPHandler,
+            urllib.request.FileHandler,
+            urllib.request.DataHandler,
+        }
+        proxy = {"https": "http://127.0.0.1:9"}
+        with mock.patch("urllib.request.getproxies", return_value=proxy):
+            ours = {type(handler) for handler in youtube._opener().handlers}
+            stock = {type(handler) for handler in urllib.request.build_opener().handlers}
+        self.assertEqual(ours, stock - dropped)
+        self.assertIn(urllib.request.ProxyHandler, ours)
+        self.assertIn(urllib.request.HTTPSHandler, ours)
+        self.assertEqual(youtube._TLS_CONTEXT.verify_mode, ssl.CERT_REQUIRED)
+        self.assertTrue(youtube._TLS_CONTEXT.check_hostname)
+
+    def test_https_goes_through_tls(self) -> None:
+        # 평문으로 먼저 말하는 서버 — https 는 TLS 를 거치므로 SSL 오류입니다
+        server = self.serve(lambda target: response(400), answer_first=True)
+        url = "https://" + server.url.removeprefix("http://") + GET_PATH
+        with self.assertRaises(urllib.error.URLError) as caught:
+            http_get(url, 5.0)
+        self.assertIsInstance(caught.exception.reason, ssl.SSLError)
 
 
 if __name__ == "__main__":
