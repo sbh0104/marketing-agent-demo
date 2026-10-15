@@ -130,12 +130,14 @@ class FakeJevAsk:
     """classifier.Ask 모양 — 판별 질문(matches_topic)과 자체 검사 질문을 가려 답합니다.
 
     classify[id] 는 그 영상의 판별 답(응답 또는 예외), 없으면 확신 있는 일치입니다. 자체 검사는
-    광고처럼 읽힘만 낮고 나머지는 높게 답합니다. 영상은 상태 글의 제목(ID 가 든)으로 알아봅니다.
+    광고처럼 읽힘만 reads_like_ad(처음 0.1, 낮음)로, 나머지는 높게 답합니다. 영상은 상태 글의
+    제목(ID 가 든)으로 알아봅니다.
     """
 
     def __init__(self) -> None:
         self.classify: dict[str, object] = {}
         self.calls: list[tuple[str, str | None]] = []
+        self.reads_like_ad = 0.1
 
     def __call__(self, model: str, state: str, questions: Mapping[str, object]) -> object:
         video_id = next((v for v in (A, B, C, D) if title_of(v) in state), None)
@@ -147,7 +149,7 @@ class FakeJevAsk:
             return answer
         self.calls.append(("check", video_id))
         nouls = {
-            name: SimpleNamespace(noul=0.1 if name == "reads_like_ad" else 0.9)
+            name: SimpleNamespace(noul=self.reads_like_ad if name == "reads_like_ad" else 0.9)
             for name in questions
         }
         return SimpleNamespace(answers=nouls)
@@ -1115,6 +1117,25 @@ class TestStages(RunCase):
                 )
                 self.assertEqual(len(self.claude.user_messages(A)), 1)
                 self.assertEqual(len(self.claude.user_messages(C)), 1 if verdict == "yes" else 0)
+
+    def test_self_check_asks_jev_and_its_failure_skips_post(self) -> None:
+        self.jev.reads_like_ad = 0.9  # 광고처럼 읽힌다고 답 — 하한 0.7 아래(1 − 0.9)
+        self.show(A, 2000, channel="UC1")
+        self.show(B, 2000, channel="UC2")
+        self.cycle(self.pipeline())
+        checks = [call for call in self.jev.calls if call[0] == "check"]
+        self.assertEqual(checks, [("check", A), ("check", A), ("check", B), ("check", B)])
+        failed = "자체 검사 미달 — 광고처럼 읽힘 0.90"
+        reason = f"검사 두 번 탈락 — 1차: {failed} / 2차: {failed}"
+        self.assertEqual(
+            self.lines(Event.SKIP),
+            [{"video": A, "reason": reason}, {"video": B, "reason": reason}],
+        )
+        self.assertEqual(self.lines(Event.COMMENT), [])
+        self.assertIsNone(self.record(A).comment)
+        self.assertIsNone(self.record(B).comment)
+        self.assertEqual(self.lines(Event.POST), [])
+        self.assertEqual(self.chrome.sessions, [])
 
     def test_top_comments_passed_to_writer_transcript_empty(self) -> None:
         self.api.comments[A] = ["답장 세 시간 장면 공감해요", "둘째 인기 댓글"]
