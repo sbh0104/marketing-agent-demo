@@ -3674,17 +3674,11 @@ class ContactRunTest(LiveCheckCase):
             draft["frame_overlap"] = 0
         live_check.mark_frame_overlaps(recount)
         self.assertEqual(recount, result["videos"])
-        # 원문 글로 센 수는 다릅니다 — 원문으로 세어 저장했다면 위 다시 세기가 빨강입니다
-        raw_videos = copy.deepcopy(result["videos"])
-        for video in raw_videos:
-            if video["video_id"] in raws:
-                video["drafts"][0]["untrusted"]["comment"] = raws[video["video_id"]]
-        live_check.mark_frame_overlaps(raw_videos)
-        raw_by_id = self.by_id({"videos": raw_videos})
-        self.assertNotEqual(
-            [raw_by_id[video_id]["drafts"][0]["frame_overlap"] for video_id in raws],
-            [videos[video_id]["drafts"][0]["frame_overlap"] for video_id in raws],
-        )
+        # 원문 글과 가린 글의 조각 묶음은 다릅니다
+        for video_id, raw in raws.items():
+            with self.subTest(video_id):
+                comment = videos[video_id]["drafts"][0]["untrusted"]["comment"]
+                self.assertNotEqual(live_check._frames(raw), live_check._frames(comment))
 
     def test_end_line_catches_broken_masking(self) -> None:
         self.add_video(

@@ -687,19 +687,29 @@ def render_summary(result: dict) -> str:
     return "\n".join(lines) + "\n"
 
 
-def _scrub(value: object, redactor: Callable[[str], str]) -> object:
-    """내보낼 값 전체를 훑어 키를 가리고 외톨이 서로게이트를 U+FFFD 로 바꿉니다."""
+def _scrub(value: object, redactor: Callable[[str], str], outside: bool = False) -> object:
+    """내보낼 값 전체를 훑어 키를 가리고 외톨이 서로게이트를 U+FFFD 로 바꿉니다.
+
+    `untrusted` 칸 안의 글(outside)은 키를 가린 다음 연락처 모양도 가립니다.
+    """
     if isinstance(value, str):
-        return re.sub(r"[\ud800-\udfff]", "�", redactor(value))
+        text = redactor(value)
+        if outside:
+            text = mask_contacts(text)
+        return re.sub(r"[\ud800-\udfff]", "�", text)
     if isinstance(value, Mapping):
-        return {_scrub(key, redactor): _scrub(item, redactor) for key, item in value.items()}
+        return {
+            _scrub(key, redactor): _scrub(item, redactor, outside or key == "untrusted")
+            for key, item in value.items()
+        }
     if isinstance(value, (list, tuple)):
-        return [_scrub(item, redactor) for item in value]
+        return [_scrub(item, redactor, outside) for item in value]
     return value
 
 
 def write_outputs(result: dict, out_dir: Path, redactor: Redactor) -> list[Path]:
     """result.json 과 summary.md 를 임시 파일 + os.replace 로 씁니다.
+    `untrusted` 칸의 글은 연락처 모양을 `<연락처>` 로 가립니다(`_scrub`).
 
     쓴 뒤 두 파일을 다시 읽어 키 조각이 보이면 둘 다 지우고 KeyLeak 을 냅니다.
     """
@@ -1466,8 +1476,8 @@ class _VideoRound:
             "error_cause": None,
             "drafts": [],
             "untrusted": {
-                "title": _clean(record.title, TITLE_LIMIT),
-                "description": _clean(record.description, DESCRIPTION_LIMIT),
+                "title": _kept(record.title, TITLE_LIMIT),
+                "description": _kept(record.description, DESCRIPTION_LIMIT),
                 "classification_reason": None,
                 "top_comments": [],
                 "skip_reason": None,
@@ -1511,7 +1521,7 @@ class _VideoRound:
         video["comments_disabled"] = fetched is None
         video["material"] = "top_comments" if comments else "title_description"
         video["top_comment_count"] = len(comments)
-        video["untrusted"]["top_comments"] = [_clean(text, ITEM_LIMIT) for text in comments]
+        video["untrusted"]["top_comments"] = [_kept(text, ITEM_LIMIT) for text in comments]
         self.written += 1
         recording = _Recording(self.claude, self.check)
         track.stage["claude"] = "write"
@@ -1601,7 +1611,12 @@ class _VideoRound:
                     ),
                     "frame_overlap": 0,  # 실행 끝에 mark_frame_overlaps 가 셉니다
                     "human": "",
-                    "untrusted": {"concern": concern, "comment": text, "code_failures": failures},
+                    # 결과에 남길 사본만 가립니다 — frame_overlap 이 결과 파일의 글로 다시 세어지게(검사 · 채점은 위에서 원문으로)
+                    "untrusted": {
+                        "concern": mask_contacts(concern),
+                        "comment": mask_contacts(text),
+                        "code_failures": failures,
+                    },
                 }
             )
             self.drafts += 1
@@ -1626,7 +1641,8 @@ def main(
     """`--verdict <파일>` 은 호출 없이 다시 세기, 인자가 없으면 실행입니다.
 
     실행의 종료 코드: 0 go · 1 stop · 2 시작 전 멈춤(인자 · 설정 · 키 · SDK · 키 모양 — 호출 0번,
-    파일 없음) · 3 결과 파일을 쓰지 못함 또는 키 조각이 보여 지움.
+    파일 없음) · 3 결과 파일을 쓰지 못함 또는 키 조각이 보여 지움 · 4 결과 두 파일은 썼으나 연락처
+    모양이 남음(두 파일은 남김 — 커밋하지 않음).
     """
     stdout = sys.stdout if stdout is None else stdout
     stderr = sys.stderr if stderr is None else stderr
@@ -1663,6 +1679,11 @@ def main(
     stdout.write(redactor(paths[1].read_text(encoding="utf-8")))
     print(redactor(f"결과: {paths[0]} · {paths[1]}"), file=stdout)
     print("키 검사: 결과 파일에 키 없음", file=stdout)
+    places = contact_places(paths)
+    if places:
+        print(f"개인 정보 검사: 결과 파일에 연락처 모양 {places}곳 — 커밋하지 마세요", file=stdout)
+        return 4
+    print("개인 정보 검사: 결과 파일에 연락처 모양 없음", file=stdout)
     return 0 if result["verdict"] == "6B: go" else 1
 
 
