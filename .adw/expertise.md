@@ -6,10 +6,6 @@
 - evidence: 이번 ⑷ 13개(`.env.example` · `.gitignore` · `config.yaml` · `src/agent/store.py` · `src/agent/scheduler.py` · `tests/test_gitignore.py` …)는 모두 `1baaf13` 앞 커밋(첫 implement `63fab05`…`bce162f`, 07:08 복구 plan 의 `9a4b6c5` · `2262eca` · `56eec24`)의 파일이고, 11:09 에 다시 쓴 plan.md:402-473 의 `Files:` 줄은 HC1 고침 10개만 이름 붙인다 — verify-run V18 이 `git diff --name-only 1baaf13 7e39c3a` = 정확히 그 10개로 초록 (cycle 20261013-062542-adw/phase-1-foundation-contracts)
 - first confirmed: 2026-10-13 · last confirmed: 2026-10-15
 
-### E-003 · gotcha — `verify-run` 부터 다시(control retry)는 옛 verify-plan 을 그대로 쓴다 — 그 사이 인터뷰가 트래커만 커밋해도 범위 끝을 `HEAD` 로 둔 검사는 빨개진다
-- evidence: 14:28 retry 본 패스에서 V18(`git diff --name-only 1baaf13 HEAD` = 10개)이 HC1-2 트래커 커밋 `a35981b` 때문에 11줄로 빨강; 범위를 verify-plan 이 잰 `7e39c3a` 로 고정하고 "그 뒤는 트래커 하나만"을 단언하자 초록, 음성 대조 3개는 그대로 빨강 (verify-report.md Fixes applied 1). `.adw/verify.sh` 는 git 이 무시해(`.adw/.gitignore:23`) 이 고침엔 커밋 SHA 가 없다 (cycle 20261013-062542-adw/phase-1-foundation-contracts)
-- first confirmed: 2026-10-13 · last confirmed: 2026-10-14
-
 ### E-004 · tooling — 이 기계의 셸 `grep` 은 GNU grep 이 아니라 ugrep 7.8.4 를 부르는 셸 함수다 — GNU grep 의 동작(NUL 이 든 파일의 `binary file matches` 등)을 재는 시험은 `/usr/bin/grep` 을 경로로 불러야 같은 것을 잰다
 - evidence: ship-report.md:320 (R5); `type grep` → "grep is a function", `/usr/bin/grep` 따로 있음 (cycle 20261013-062542-adw/phase-1-foundation-contracts)
 - first confirmed: 2026-10-13 · last confirmed: 2026-10-14
@@ -30,10 +26,6 @@
 - evidence: Phase 1 summary flagged ②④ · Coverage ①(R3 · R6 가 두 번째 ship-check 에 돌아와 understand 부터 다시); Phase 4 ship-report R4 · R5 → Human checks 2 — 트래커 Phase 2 · 7 절 `간격|spacing` 검색 → 없음, 넘긴 일은 `.adw/plan.md:573-588` 과 계약 '트리거 판정' 절에만 (cycle 20261013-161358-adw/phase-4-trigger-timing)
 - first confirmed: 2026-10-13 · last confirmed: 2026-10-14
 
-### E-011 · tooling — `retro_collect.py` 의 `_tokens` 는 `Files:` 줄 경로의 양끝에서 `.` 를 벗긴다 — 점으로 시작하는 파일은 plan 이 `Files:` 에 적어도 "계획 밖 파일" · T4 경보 ⑷ 에 늘 들어간다(`.env.example` → `env.example`, `.gitignore` → 점이 없어져 경로로 안 보고 버림)
-- evidence: `.claude/skills/plan/scripts/retro_collect.py:437` `tok = tok.strip("`,;.…").lstrip("+")`. `python3 -I` 로 `declared_paths(plan.md)` → `'env.example'` 있음 · `'.env.example'` 없음, `_tokens('Files: .gitignore, .env.example')` → `{'env.example'}`. 이 사이클 plan.md:495 `Files: requirements.txt, .env.example, docs/research/jev.md, docs/contracts.md` 인데 번들 ⑷ = 1 — `.env.example` (cycle 20261013-161343-adw/phase-3-classifier-topic). Phase 1 의 ⑷ 13 에 든 `.env.example` · `.gitignore` 도 같은 벗김을 거쳤다(그 사이클의 원인 설명은 E-002)
-- first confirmed: 2026-10-13 · last confirmed: 2026-10-13
-
 ### E-013 · codebase — `docs/contracts.md:5-6` 머리 문단은 `src/agent/` 모듈을 하나씩 열거하는데, 모듈을 더한 페이즈가 그 목록을 고치지 않는다 — main 에는 `trigger.py`(Phase 4)가 빠졌고 이 브랜치는 `classifier.py` 도 빠뜨렸다
 - evidence: `git show main:docs/contracts.md` 5-6행 = `config.py` · `models.py` · `store.py` · `guard.py` · `logbook.py` · `scheduler.py` 뿐인데 `git ls-tree --name-only main src/agent/` 에 `trigger.py` 가 있음; 이 브랜치 ship-report R5 → S-017 (`classifier.py`) (cycle 20261013-161343-adw/phase-3-classifier-topic; 첫 목격 20261013-161358-adw/phase-4-trigger-timing)
 - first confirmed: 2026-10-13 · last confirmed: 2026-10-14
@@ -44,19 +36,7 @@
 
 ### E-017 · hazard — 작성기 링크 검사 `_link_char`(src/agent/writer.py:115-124)는 유니코드 이름에 `_SEPARATOR_NAMES`(`DOT` · `FULL STOP` 등)가 든 글자만 점으로 남기고 나머지 기호는 버리며, `_LINK_RE` 의 끝은 `[a-z]{2,}` 다 — 점 닮은꼴(U+2027 `‧` · U+2022 · U+2219 · U+00B0) · 키릴 끝 · U+202E 뒤집기로 쓴 주소는 코드 검사를 지나고 jev 광고 질문만 남는다. E-005 와 같은 "열거한 꼴" 부류가 Phase 1 밖에서 처음 목격된 것
 - evidence: ship-report R1 — `bit‧ly/3xYzAb` 가 `bitly/3xyzab` 로 읽혀 통과(감사 재현); `## Human checks` 3번째 줄 — 어디까지 막을지는 사람 결정(보이지 않는 글자를 다 막으면 U+200D 이모지 잇기도 막힘). 실제 게시는 허용 목록뿐(`src/agent/guard.py:94`) (cycle 20261013-161439-adw/phase-5-writer-comment)
-- first confirmed: 2026-10-13 · last confirmed: 2026-10-13
-
-### E-018 · tooling — 이 기계에는 `playwright` 도 `pip-audit` 도 설치돼 있지 않다 — 브라우저 층 시험은 가짜 객체로만 돌고, `requirements.txt` 를 바꾼 사이클의 의존성 감사는 미측정이라 ship 판정이 ⚠️ READY WITH RISKS 위로 올라가지 못한다
-- evidence: ship-report.md:142 `python3 -c "import playwright"` → rc 1 `ModuleNotFoundError: No module named 'playwright'`; ship-report.md:172,229 `command -v pip-audit` → exit 1, `import pip_audit` → `ModuleNotFoundError` — "이 미측정 하나만으로도 판정은 ⚠️ 위로 올라갈 수 없습니다" (cycle 20261013-163932-adw/phase-6-poster-chrome)
-- first confirmed: 2026-10-13 · last confirmed: 2026-10-13
-
-### E-019 · hazard — Phase 6 의 크롬 프로필 점검(`src/agent/chrome.py:70-85` 기본 폴더 목록 + `_same_or_inside`)도 E-005 처럼 열거한 꼴로 막는다 — `posixpath.normcase` 는 대소문자를 접지 않아 대소문자 무구분 파일 시스템(macOS APFS · WSL `/mnt/c`)의 다른 철자가 통과하고, 목록에 없는 Chrome Beta · Dev · Canary · Edge 기본 폴더도 통과한다
-- evidence: ship-report.md:326-332 (R5, WSL 실측) — `/mnt/c/Windows/System32` → 거절, `/mnt/c/WINDOWS/System32` · `/mnt/c/windows/fonts` · `…/.config/google-chrome-beta` → ACCEPT; verify-plan 의 Property-based N/A "새 파서 없음(E-005)" 이 이 빈틈을 가렸다(ship-report.md:277) (cycle 20261013-163932-adw/phase-6-poster-chrome)
-- first confirmed: 2026-10-13 · last confirmed: 2026-10-13
-
-### E-020 · codebase — `tests/test_chrome.py` · `tests/test_poster.py` 의 가짜 Playwright 객체는 기다리지도 시간 초과를 내지도 않고 CDP 연결 끊김을 흉내 내지 못한다 — 실제 `is_enabled()`(기본 30초) · `click(timeout=3000)` 의 자동 대기와 크롬 재시작 뒤 낡은 연결(`TargetClosedError`)은 스위트가 재지 못한다
-- evidence: ship-report.md:258-261 (Test integrity — 가짜 객체가 실제 API 와 맞는지), :194 (노트 1), :311-319 (R3 감사 데모 `attempt 0..2: raw Closed: Target page, context or browser has been closed (connects so far=1)`) (cycle 20261013-163932-adw/phase-6-poster-chrome)
-- first confirmed: 2026-10-13 · last confirmed: 2026-10-13
+- first confirmed: 2026-10-13 · last confirmed: 2026-10-15
 
 ### E-021 · reviewer — 받아들인 위험을 재현한 **입력**으로 적으면 다음 ship-check 가 같은 코드 자리에서 다음 입력을 찾아 다시 멈춘다 — 자리(함수 · `except` 줄)로 적자 멈춤이 끝났다
 - evidence: Phase 2 ship-check 5회 $69.9469(사이클 $103.6405 중, retro-bundle Steps) — 정지 셋(R11 깨진 리다이렉트 `Location` 의 `ValueError` · `UnicodeError` → R11′ `ftp://%00/` 의 `TypeError` · 3.10 `OverflowError` → B1 음수 chunk 크기 `ValueError`)이 모두 `YouTubeClient._call` 의 좁은 `except (OSError, http.client.HTTPException)`(`src/agent/youtube.py:245`, 트리 `abe85c5` 실측)을 빠져나간 새 예외 꼴이었다. 입력 목록을 고쳐 쓰다 덮개가 빠지기도 했다(`e265dbf` 가 `3d0ae81` 의 "`ValueError` 도 잡는다"를 지워 B1 이 주인 없이 남음). 트래커 `0d50c02` 가 셋째 예외를 "`_call` 에서 `self._fetch` 가 낸 예외는 무엇이든"으로 다시 적은 뒤, 다섯째 ship-check 는 새 정지 없이 READY WITH RISKS 였다(plans/interview-marketing-agent.md Phase 2 Decisions 2026-10-14 줄 · Trade-offs accepted 셋째 줄). 같은 동학의 앞 목격: E-005(Phase 1 — 열거한 꼴 목록을 ship-check 네 번이 매번 뚫음) · E-019(Phase 6) (cycle 20261013-161159-adw/phase-2-watcher-detect)
@@ -114,15 +94,44 @@
 - evidence: `python3 -I -c "import typesafe_sdk"` · `python3 -I -c "import anthropic"` → 둘 다 `ModuleNotFoundError` (이 retro 실측, 2026-10-14); `docs/live-check/result.json` `run_at 2026-10-14T04:28:16.180435+00:00` · `calls {'claude': 23, 'jev': 72, 'youtube': 17}` · `models` 두 이름 `accepted`; `tests/live_check.py:72` `from tests.jev_accuracy import PASS_CORRECT, REPO_CONFIG, judge_examples, tally`. E-012 · E-016 을 잇는다 (cycle 20261014-112322-adw/phase-6b-live-check-apply)
 - first confirmed: 2026-10-14 · last confirmed: 2026-10-15
 
-### E-035 · codebase — 실행기 테스트의 가짜 Claude(`tests/test_live_check.py` `FakeClaude.create`)는 `system` 글이 `GRADE_SYSTEM` · `TOPIC_SYSTEM` 과 같은지로 호출 종류를 가리고, 둘 다 아니면 오류 없이 `write`(작성)로 센다 — 실행기에 새 system 글로 Claude 를 부르는 호출을 더하는 페이즈가 가짜에 갈래를 더하지 않으면 그 호출은 작성 큐의 답을 받는다. 최악 호출 수를 글자로 잠근 `test_default_limits_fit_under_ceilings` 도 함께 고쳐야 한다
-- evidence: `tests/test_live_check.py:1417-1426` (`system is None` → probe · `== live_check.GRADE_SYSTEM` → grade · `== live_check.TOPIC_SYSTEM` → topic · `else` → write) · `:2044-2051` (`self.assertEqual(worst, {"jev": 114, "claude": 103, "youtube": 35})`). 6C 는 영상 판별 채점(`TOPIC_SYSTEM`)을 더하면서 `topic` 갈래와 큐를 넣었고, 그 결과 최악 Claude 수가 63 → 103 이 됐다. understand 시점의 근거는 notes.md Expertise check 후보 2 · 3(`:1091-1126` · `:1669-1695`, claude 63/70)이다 (cycle 20261014-172227-adw/phase-6c-live-check-grader-fix)
-- first confirmed: 2026-10-14 · last confirmed: 2026-10-15
-
 ### E-036 · gotcha — 레인 착지는 squash 없는 `merge --no-ff` 라(`.claude/skills/plan/scripts/finalize_step.py:1054`), 레인 끝 판에서만 지운 내용은 앞 레인 커밋마다 남아 main 기록에 붙는다(제출 때 공개) — 실행기는 영상마다 `untrusted.description` 을 `_clean` · 길이 자르기만 하고 결과 파일에 쓰므로(`tests/live_check.py:1380`), 사람이 커밋한 `docs/live-check/result.json` 에 채널 주인 연락처가 그대로 들어갈 수 있다
 - evidence: 6D 결과의 영상 셋(`jO2wSna2Xi8` · `ZC74ENMS1nE` · `N0RyQJG9vdI`) 설명 글에 이메일 3 · 후원 계좌 · 예금주 실명. 허브 🤖 가 끝 판만 지움(`f5cef6a`, gate `20261015-055623-cycle-control.json` "지우고 출하") → ship-check 06:13 BLOCKED(앞 커밋 9개에 그대로) → 드리프트 인터뷰 2 가 레인 기록을 다시 씀(`d9cd05b→6626629` …, 트래커 6D 2026-10-15 질문 1 A) → 세 번째 ship-check 이 레인 커밋 11개 모두 이메일 · 계좌 모양 0. main 의 6B 결과(판 1, 설명 글 17개)는 같은 모양 검사로 0. 실행기 쪽 가림의 주인은 Phase 6G (cycle 20261014-225050-adw/phase-6d-live-check-reapply)
 - first confirmed: 2026-10-15 · last confirmed: 2026-10-15
 
+### E-037 · codebase — 실행기 테스트의 가짜 Claude(`tests/test_live_check.py` `FakeClaude.create`)는 `system` 글이 `GRADE_SYSTEM` · `TOPIC_SYSTEM` · `SKIP_GRADE_SYSTEM` 중 무엇과 같은지로 호출 종류를 가리고, 셋 다 아니면 오류 없이 `write`(작성)로 센다 — 실행기에 새 system 글로 Claude 를 부르는 호출을 더하는 페이즈가 가짜에 갈래를 더하지 않으면 그 호출은 작성 큐의 답을 받는다. 최악 호출 수를 글자로 잠근 `test_default_limits_fit_under_ceilings` 도 함께 본다
+- evidence: `tests/test_live_check.py:1583-1594`(`system is None` → probe · `GRADE_SYSTEM` → grade · `TOPIC_SYSTEM` → topic · `SKIP_GRADE_SYSTEM` → skip_grade · `else` → write) · `:2229`(`{"jev": 114, "claude": 103, "youtube": 35}`, 6E 에서 그대로). 6C 가 `topic` 갈래를, 6E 가 `skip_grade` 갈래를 더했다 — 6E understand 가 옛 E-035 로 이 자리를 짚었고 plan-repairs R1 의 가짜 로그 `['topic', 'write', 'write', 'grade', 'skip_grade']` 가 새 갈래가 도는 것을 보였다 (cycle 20261014-172227-adw/phase-6c-live-check-grader-fix · 20261015-091934-adw/phase-6e-comment-quality-fix)
+- first confirmed: 2026-10-14 · last confirmed: 2026-10-15
+
+### E-038 · tooling — 과제 안내 `docs/marketing-agent.pdf` 는 홈 체크아웃에 추적되지 않은 파일(`??`)로만 있어 레인 worktree 에는 없다 — 레인 안의 사이클(understand · plan · ship-check)은 과제 원문을 다시 읽지 못하고 트래커가 인용한 문장만 쓴다
+- evidence: 레인에서 `ls docs/marketing-agent.pdf` → `No such file or directory`; `git -C /home/sbh/project/marketing-agent-demo status --short --ignored docs/marketing-agent.pdf` → `?? docs/marketing-agent.pdf`(무시 아님 · 추적 아님). 6E notes.md Expertise check 후보 3. 그래서 ship-report Human checks 3번째 줄은 계약 대조표의 ④-3 이 PDF 의 둥근 따옴표 “…” 대신 트래커 인용의 '…' 와 줄임을 따랐는지를 사람에게 넘겼다 (cycle 20261015-091934-adw/phase-6e-comment-quality-fix)
+- first confirmed: 2026-10-15 · last confirmed: 2026-10-15
+
+### E-039 · codebase — 실행기의 재료 채점(`SKIP_GRADE_SYSTEM`)과 작성 규칙의 '장면' 은 뜻이 다르다 — 재료 채점의 `material_has_scene` 은 `<video_title>` 도 장면 출처로 세지만, 작성 규칙 3 은 제목을 되풀이하는 것을 장면으로 치지 않는다. 제목만 있는 영상의 스스로 건너뜀('재료에 장면 없음')은 재료 채점에서 '부당' 쪽으로 기운다
+- evidence: `tests/live_check.py:189-190`(`material_has_scene — … <video_title> · <video_description> · <top_comments> 안에 실제로 있습니까?`) · `src/agent/writer.py:33`(규칙 3 "장면 · 말은 설명이나 인기 댓글이 전하는 영상 속 장면 · 말뿐이고, 제목을 되풀이하는 것은 장면이 아닙니다"). ship-report Risks 4 · Human checks 7번째 줄(6F 가 "정당한 건너뜀 n/m" 을 셀 때 감안) (cycle 20261015-091934-adw/phase-6e-comment-quality-fix)
+- first confirmed: 2026-10-15 · last confirmed: 2026-10-15
+
+### E-040 · hazard — 작성 프롬프트 규칙 2 가 과제 문구 "비슷한 고민이 있었을 때" 를 그대로 담는다 — Claude 가 두 영상의 댓글에 이 문구를 베끼면 반복 검사(`REPEAT_MIN_CHARS = 12`)와 문장 틀 검사(`FRAME_MIN_CHARS = 6`)가 함께 걸려 다시 쓰기, 또는 '검사 두 번 탈락' `SKIP` 이 된다. 진짜 모델로는 재현 안 됨
+- evidence: `src/agent/writer.py:32`(규칙 2 원문) · `:106` · `:112`. ship-report Risks 2 의 검사 출력 `이전 댓글과 겹칩니다: 비슷한고민이있었을때연애사주` 와 문장 틀 조각 `비슷한고민이`. 6F 의 SKIP 이유를 읽을 때 · Phase 7 이 `writer.py` 를 고칠 때 볼 자리 (cycle 20261015-091934-adw/phase-6e-comment-quality-fix)
+- first confirmed: 2026-10-15 · last confirmed: 2026-10-15
+
+### E-041 · reviewer — plan 이 등록한 변이(`tests/mutants.py`)는 새 판정의 경계(비교 연산 `<` ↔ `<=` · 범위 끝 한 글자)를 비틀지 않고, ship-check 의 변이 점검이 거기서 살아남은 변이를 찾아 테스트만 고치는 스모크 항목으로 보낸다 — 두 페이즈 연속. 착지와 스윕 사이에 다른 페이즈가 그 경계를 잘못 고치면 그 사이클의 스위트는 초록이다
+- evidence: 6C — Guard B 첫 행 `target 2, min 0` 으로 `<=` 변이 M8a 생존 → R3 · S-077, 분모 변이 M23 생존 → R4 · S-078(6C summary.md Coverage decisions). 6E — verify-run V5 `mutants new: 8 run · caught 8` · V6 `47/47` 인데 ship-check 가 `_frame_pieces` 의 '연애사주' 빼기 앞 끝 · 뒤 끝과 `skip_human` 값 변이 생존을 재현 → S-093 · S-094(ship-report.md:173-176). 가드 매트릭스 행 규칙은 `.claude/skills/plan/SKILL.md:128`(변이 행만 `unmeasured` 허용) (cycle 20261014-172227-adw/phase-6c-live-check-grader-fix · 20261015-091934-adw/phase-6e-comment-quality-fix)
+- first confirmed: 2026-10-15 · last confirmed: 2026-10-15
+
+### E-042 · gotcha — [stop:red-unbucketable · 6g] ship-check BLOCKED 이고 통이 그 고침을 못 받는다 — 이 페이즈는 제 브랜치에서 아래 Blockers 를 범위로 다시 돈다
+- blocker: **`예금주` 줄의 이름이 남는데, 끝 줄은 "없음"이라고 찍습니다.** 후원 안내 속 예금주 실명이 공개 저장소에 들어갈 수 있습니다.
+- blocker: 6F 실제 실행: 어떤 영상 설명에 `후원 3333-00-1234567 예금주는 가나다입니다` 가 있습니다.
+- blocker: 실행기가 결과 사본을 만듦(`_kept`): 계좌번호는 `<연락처>` 가 됩니다. `예금주` 줄은 `예금주는` 까지만 이름 자리로 읽혀 가려지고, 결과는 `<연락처> 가나다입니다` 입니다.
+- evidence: .adw/journal/20261015-123731-stop-6g · 6g · end|6g|2026-10-15T12:37:30+0900
+- first confirmed: 2026-10-15 · last confirmed: 2026-10-15
+
 ## Retired (history — one line each, never deleted)
+- E-003 · gotcha — `verify-run` 부터 다시(control retry)는 옛 verify-plan 을 그대로 쓴다 — 그 사이 인터뷰가 트래커만 커밋해도 범위 끝을 `HEAD` 로 둔 검사는 빨개진다 — retired 2026-10-15 (over cap; unconfirmed since 2026-10-14)
+- E-035 · codebase — 실행기 테스트의 가짜 Claude(`tests/test_live_check.py` `FakeClaude.create`)는 `system` 글이 `GRADE_SYSTEM` · `TOPIC_SYSTEM` 과 같은지로 호출 종류를 가리고, 둘 다 아니면 오류 없이 `write`(작성)로 센다 — 실행기에 새 system 글로 Claude 를 부르는 호출을 더하는 페이즈가 가짜에 갈래를 더하지 않으면 그 호출은 작성 큐의 답을 받는다. 최악 호출 수를 글자로 잠근 `test_default_limits_fit_under_ceilings` 도 함께 고쳐야 한다 — retired 2026-10-15 (6E 가 세 번째 갈래(`SKIP_GRADE_SYSTEM` → `skip_grade`, `tests/test_live_check.py:1591`)를 더해 "둘 다 아니면" 과 인용 줄(:1417-1426)이 코드와 어긋남 — 같은 사실을 고친 줄로 E-037 에 다시 씀)
+- E-011 · tooling — `retro_collect.py` 의 `_tokens` 는 `Files:` 줄 경로의 양끝에서 `.` 를 벗긴다 — 점으로 시작하는 파일은 plan 이 `Files:` 에 적어도 "계획 밖 파일" · T4 경보 ⑷ 에 늘 들어간다(`.env.example` → `env.example`, `.gitignore` → 점이 없어져 경로로 안 보고 버림) — retired 2026-10-15 (over cap; unconfirmed since 2026-10-13)
+- E-018 · tooling — 이 기계에는 `playwright` 도 `pip-audit` 도 설치돼 있지 않다 — 브라우저 층 시험은 가짜 객체로만 돌고, `requirements.txt` 를 바꾼 사이클의 의존성 감사는 미측정이라 ship 판정이 ⚠️ READY WITH RISKS 위로 올라가지 못한다 — retired 2026-10-15 (over cap; unconfirmed since 2026-10-13)
+- E-019 · hazard — Phase 6 의 크롬 프로필 점검(`src/agent/chrome.py:70-85` 기본 폴더 목록 + `_same_or_inside`)도 E-005 처럼 열거한 꼴로 막는다 — `posixpath.normcase` 는 대소문자를 접지 않아 대소문자 무구분 파일 시스템(macOS APFS · WSL `/mnt/c`)의 다른 철자가 통과하고, 목록에 없는 Chrome Beta · Dev · Canary · Edge 기본 폴더도 통과한다 — retired 2026-10-15 (over cap; unconfirmed since 2026-10-13)
+- E-020 · codebase — `tests/test_chrome.py` · `tests/test_poster.py` 의 가짜 Playwright 객체는 기다리지도 시간 초과를 내지도 않고 CDP 연결 끊김을 흉내 내지 못한다 — 실제 `is_enabled()`(기본 30초) · `click(timeout=3000)` 의 자동 대기와 크롬 재시작 뒤 낡은 연결(`TargetClosedError`)은 스위트가 재지 못한다 — retired 2026-10-15 (over cap; unconfirmed since 2026-10-13)
 - E-008 · codebase — `VideoRecord` 는 일반(`frozen` 아님) dataclass 이고 `__post_init__` 에서만 검증한다 — 생성 뒤 필드 대입은 검증을 건너뛰고, `view_history` 검증(`_items`)은 원소 타입만 볼 뿐 시각 순서 · 중복 · 시간대 종류를 보지 않는다 — retired 2026-10-15 (over cap; unconfirmed since 2026-10-13)
 - E-012 · tooling — 이 기계에는 `typesafe_sdk` 도 `pip-audit` 도 없고 `TYPESAFE_API_KEY` 도 없다 — 판별 테스트는 `tests/test_classifier.py` 의 가짜 SDK 로만 돌고, 정확도 러너 `python3 -m tests.jev_accuracy` 와 의존성 감사는 아직 한 번도 돌지 않았다 — retired 2026-10-14 (contradicted by `docs/live-check/result.json` — 사람이 6A 실행기로 진짜 jev 를 불렀다(`run_at 2026-10-14T04:28:16Z` · `calls` jev 72 · Claude 23 · YouTube 17; 예시 판정은 `tests/live_check.py:72` 가 들여오는 `tests.jev_accuracy.judge_examples`) — 정확도 러너는 돌았다. 이 기계의 SDK 없음은 E-033 로, `pip-audit` 없음은 E-018 로 남는다 (cycle 20261014-112322-adw/phase-6b-live-check-apply))
 - E-016 · tooling — 이 기계에는 `anthropic` 도 없다 — 댓글 작성기 테스트는 `tests/test_writer.py` 의 가짜 Claude 로만 돌고, `anthropic_client()` · 모델 id `claude-sonnet-5-5` · 통과 하한 0.7 은 실제 API 로 한 번도 돌지 않았다 (jev 쪽은 E-012) — retired 2026-10-14 (contradicted by `docs/live-check/result.json` `models` — `claude-sonnet-5-5` · `claude-haiku-5-5` 둘 다 `accepted`, 작성 sonnet · 채점 haiku 로 진짜 Claude API 를 불렀다. 이 기계의 `anthropic` 없음은 E-033 로 남는다 (cycle 20261014-112322-adw/phase-6b-live-check-apply))
