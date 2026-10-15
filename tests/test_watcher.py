@@ -231,6 +231,30 @@ def skip(video: str, reason: str, call: str, **extra: str) -> tuple[Event, Field
     return Event.SKIP, fields
 
 
+TOKEN_REASON = "HTTP 200 nextPageToken 이 영문자 · 숫자 · _ · - 가 아닙니다"
+
+
+def token_error() -> tuple[Event, Fields]:
+    return Event.ERROR, {"where": "search.list", "reason": TOKEN_REASON, "keyword": "연애"}
+
+
+# 트래커 7A ① "[A-Za-z0-9_-]+ 일 때만 받고" 밖의 글자 쪽지 — 앞뒤 공백 · 끝 줄바꿈 · . = + / ·
+# 전각 · 켈빈 기호 K · 아랍-인도 숫자 · 외톨이 서로게이트
+RED_PAGE_TOKENS = (
+    " CAUQAA",
+    "CAUQAA ",
+    "CAUQAA\n",
+    "CAU.QAA",
+    "CAUQAA=",
+    "CAU+QAA",
+    "CAU/QAA",
+    "ＣＡＵＱＡＡ",
+    "KAUQAA",
+    "CAUQ١",
+    "\ud800",
+)
+
+
 class DetectTest(WatcherCase):
     def test_new_video_is_stored_with_its_first_view_sample(self) -> None:
         self.api.pages[("연애", None)] = search_page([A])
@@ -447,6 +471,7 @@ class PaginationTest(WatcherCase):
         self.assertEqual(report, CycleReport(1, (A,), 1, 0, False, False))
 
     def test_non_string_next_page_token_ends_the_keyword_s042(self) -> None:
+        # 글자가 아닌 쪽지도 "그 밖의 비어 있지 않은 값" — 다음 페이지 없이 검색 오류 한 줄 (트래커 7A ①)
         page = search_page([A])
         page["nextPageToken"] = 5
         self.api.pages[("연애", None)] = page
@@ -455,8 +480,32 @@ class PaginationTest(WatcherCase):
         self.api.videos[B] = video_item(B, 1300)
         report = self.run_cycle()
         self.assertEqual(self.api.searches(), [("연애", None)])
-        self.assertEqual(self.events(), [detect(A), views(A, 1200)])
-        self.assertEqual(report, CycleReport(1, (A,), 1, 0, False, False))
+        self.assertEqual(self.events(), [token_error()])
+        self.assertEqual(report, CycleReport(1, (), 0, 0, False, True))
+
+    def test_page_token_with_allowed_letters_fetches_the_next_page(self) -> None:
+        for token in ("CAUQAA", "caiqaa", "aZ09_-"):
+            with self.subTest(token=token):
+                self.reset(token)
+                self.api.pages[("연애", None)] = search_page([A], token)
+                self.api.pages[("연애", token)] = search_page([B])
+                self.api.videos[A] = video_item(A, 1200)
+                self.api.videos[B] = video_item(B, 1300)
+                report = self.run_cycle()
+                self.assertEqual(self.api.searches(), [("연애", None), ("연애", token)])
+                self.assertEqual(self.event_names(), [Event.DETECT, Event.VIEWS] * 2)
+                self.assertEqual(report, CycleReport(2, (A, B), 2, 0, False, False))
+
+    def test_page_token_outside_the_allowed_letters_is_an_error(self) -> None:
+        for n, token in enumerate(RED_PAGE_TOKENS):
+            with self.subTest(token=token):
+                self.reset(f"red-{n}")
+                self.api.pages[("연애", None)] = search_page([A], token)
+                self.api.videos[A] = video_item(A, 1200)
+                report = self.run_cycle()
+                self.assertEqual(self.api.searches(), [("연애", None)])
+                self.assertEqual(self.events(), [token_error()])
+                self.assertEqual(report, CycleReport(1, (), 0, 0, False, True))
 
     def test_pages_stop_at_the_page_cap(self) -> None:
         self.reset("endless", endless=True)
@@ -662,6 +711,36 @@ class ApiErrorTest(WatcherCase):
             )
             self.assertEqual(self.counts(K), [1000])
             self.assertEqual(report, CycleReport(1, (), 0, 0, False, True))
+
+    def test_broken_page_token_is_an_error_and_views_are_still_tracked(self) -> None:
+        # Phase 2 ship-report R1 — 외톨이 서로게이트 쪽지가 다음 페이지 주소에서
+        # UnicodeEncodeError 로 주기를 깨뜨렸습니다. 이제 그 페이지는 검색 오류이고 추적은 돕니다.
+        broken = "\ud800"
+        with self.subTest("first page"):
+            self.reset("first page")
+            self.seed(K)
+            self.api.pages[("연애", None)] = search_page([A], broken)
+            self.api.videos[A] = video_item(A, 1200)
+            self.api.videos[K] = video_item(K, 1100)
+            report = self.run_cycle()
+            self.assertEqual(self.events(), [token_error(), views(K, 1100, prev=1000)])
+            self.assertEqual(report, CycleReport(1, (), 1, 0, False, True))
+            self.assertEqual(self.api.video_batches(), [[K]])
+        with self.subTest("next page"):
+            self.reset("next page")
+            self.seed(K)
+            self.api.pages[("연애", None)] = search_page([A], "P1")
+            self.api.pages[("연애", "P1")] = search_page([B], broken)
+            self.api.videos[A] = video_item(A, 1200)
+            self.api.videos[B] = video_item(B, 1300)
+            self.api.videos[K] = video_item(K, 1100)
+            report = self.run_cycle()
+            self.assertEqual(
+                self.events(),
+                [token_error(), detect(A), views(A, 1200), views(K, 1100, prev=1000)],
+            )
+            self.assertEqual(report, CycleReport(2, (A,), 2, 0, False, True))
+            self.assertEqual(self.api.video_batches(), [[A, K]])
 
 
 def bad_item(**changes: object) -> dict[str, object]:
