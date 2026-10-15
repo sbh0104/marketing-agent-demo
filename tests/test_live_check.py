@@ -675,6 +675,19 @@ class ContactMaskTest(unittest.TestCase):
                 self.assertEqual(live_check.mask_contacts(text), masked)
                 self.assertEqual(live_check.count_contacts(masked), 0)
 
+    def test_match_view_keeps_positions(self) -> None:
+        # 맞춤은 한 글자를 한 글자로 — 바꾸기는 원문에 하므로 둘레의 글자(너비 없는 글자도)가 그대로 남습니다
+        for char in VIEW_SPACES + VIEW_ZERO_WIDTH + VIEW_DASHES:
+            with self.subTest(char=f"U+{ord(char):04X}"):
+                text = f"앞{char}010{char}0000{char}1234{char}뒤"
+                self.assertEqual(live_check.count_contacts(text), 1)
+                self.assertEqual(live_check.mask_contacts(text), f"앞{char}<연락처>{char}뒤")
+
+    def test_angle_at_masked_after_clean(self) -> None:
+        # _clean 이 `<` `>` 를 전각으로 바꾼 뒤에도 <at> 꼴을 찾습니다
+        kept = live_check._kept("문의 abc<at>example.com", live_check.ITEM_LIMIT, NO_KEYS)
+        self.assertEqual(kept, "문의 <연락처>")
+
     def test_masked_text_counts_zero(self) -> None:
         samples = (*CONTACT_RED, *(text for text, _ in CONTACT_IN_CONTEXT), *CONTACT_GREEN)
         for sample in samples:
@@ -1523,6 +1536,10 @@ SLOW_SPACING = (
     "+82" + " " * 150 + "10" + " " * 150 + "0000" + " " * 150,
 )
 CONTACT_TIME_LIMIT = 1.0  # 초 — 한 번 부르는 데의 상한(_GAP 의 느려짐 입력)
+# 찾기 전 맞춤 표본(트래커 6G 질문 5 A ⓐ) — 글자는 실행기의 맞춤 표와 따로 테스트가 적습니다
+VIEW_SPACES = (" ", "　", " ", " ")
+VIEW_ZERO_WIDTH = ("​", "‌", "‍", "⁠", "﻿")
+VIEW_DASHES = ("ㅡ", "─", "━", "ー", "ｰ", "﹘", "﹣")  # ㅡ ─ ━ ー ｰ ﹘ ﹣
 CONTACT_RED = (
     "fake.owner@example.com", "abc (at) example.com", "abc [at] example [dot] com",
     "abc@example . com", "abc @ example.com", "ABC@EXAMPLE.COM", "abc＠example.com",
@@ -1535,6 +1552,10 @@ CONTACT_RED = (
     "000-000-123456", "0000-00-1234567", "000-0000-1234-56", "000000123456", "000–000–123456",
     "예금주: 가나다", "예금주 가나다", "예금주：가나다", "예금주\n가나다", "예금주명: 가나다", "예금주 - 가나다",
     "예금주 ㅣ 가나다", "예금주 | 가나다",
+    *(f"010{c}0000{c}1234" for c in VIEW_SPACES + VIEW_ZERO_WIDTH + VIEW_DASHES),
+    "０１０　００００　１２３４", "010—0000—1234", "010-​0000-​1234", "010 ㅡ 0000 ㅡ 1234", "000ㅡ000ㅡ123456",
+    "abc{at}example.com", "abc<at>example.com", "abc { at } example.com", "ABC{AT}EXAMPLE.COM",
+    "abc {at} example {dot} com", "abc <at> example <dot> com",
 )
 # 앞뒤 글과 함께 볼 표본 — (원문, 가린 뒤)
 CONTACT_IN_CONTEXT = (
@@ -1543,11 +1564,22 @@ CONTACT_IN_CONTEXT = (
     ("카카오뱅크/0000-00-1234567/가나다", "카카오뱅크/<연락처>/가나다"),
     ("[예금주] 가나다", "[<연락처>"),
     ("예금주 (가나다)", "<연락처>)"),
+    ("HP010-0000-1234", "HP<연락처>"),
+    ("hp010.0000.1234", "hp<연락처>"),
+    ("Tel02-000-1234", "Tel<연락처>"),
+    ("HP010 - 0000 - 1234", "HP<연락처>"),
+    ("Thanks @user. Love it", "<연락처> it"),
+    # 아래 셋은 맞춤 전에도 가려지던 꼴 — 가로줄 닮은 글자는 숫자 사이에서만 하이픈으로 봅니다
+    ("계좌ㅡ000-000-123456", "계좌ㅡ<연락처>"),
+    ("후원ㅡ000000123456", "후원ㅡ<연락처>"),
+    ("계좌 ㅡ000-000-123456", "계좌 ㅡ<연락처>"),
 )
 CONTACT_GREEN = (
     "https://smartstore.example/shop/products/10293847561", "2026-10-14", "2026-10-14 14:00",
     "2026-10-14T14:09:02.882902+00:00", "14:09:02", SHA_LIKE, "Q1234567890", "조회수 1,234,567회",
     "0.9876543210123", "받는 분: 가나다",
+    "abc@example", "1588-0000", "000 000 123456", "abc 골뱅이 example 닷컴", "카카오뱅크/000000123456",
+    "HP01000001234",
 )
 TOPIC_TEXT = (
     "당신은 유튜브 영상이 연애를 주제로 하는지 채점합니다.\n"
