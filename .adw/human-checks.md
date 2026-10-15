@@ -861,3 +861,99 @@
 - source: adw/smoke-sweep-s093
 - tag: plain
 - status: open
+
+### H-105 — 실행 중 대기 동안 고친 설정(명단에서 뺀 영상 · `test_run: true` · 깨진 파일)이 한 주기 늦게 게시에 닿는 것을 받아들일지, 고칠지 정하기 — 그 한 주기 동안 방금 명단에서 뺀 영상에도 실제 게시가 날 수 있고, 지금 바로 멈추는 길은 Ctrl-C 뒤 `--dry-run` 으로 다시 켜기뿐(docs/contracts.md '실행 진입점 — `run.py` (Phase 7)' 절 '고친 설정이 닿는 때'). 명단이 본인 채널뿐이고 채널 대기가 24시간이라 실제로 닿는 경우는 좁음
+- project: marketing-agent-demo
+- when: 2026-10-15 · plans/interview-marketing-agent.md#phase-7
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-7-pipeline-rules
+- tag: plain
+- status: open
+
+### H-106 — 윈도우에서 `python -m agent.run` 을 두 번 켜, 둘째가 종료 코드 3 과 "이미 실행 중입니다 — …agent.lock …" 으로 끝나는지 보기(msvcrt 잠금 분기는 이 리눅스 스위트가 돌리지 못함)
+- project: marketing-agent-demo
+- when: 2026-10-15 · plans/interview-marketing-agent.md#phase-7
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-7-pipeline-rules
+- tag: plain
+- status: open
+
+### H-107 — `src/agent/config.py::_flag` 의 undecided 표본 색 정하기 — `test_run: no`(지금 거짓으로 읽힘)와 같은 YAML 1.1 낱말 `yes` · `on`(참) · `off` · `NO`(거짓). 트래커 질문 9 A 는 "참 · 거짓만" 이라고만 하고 이 낱말들을 말하지 않음
+- project: marketing-agent-demo
+- when: 2026-10-15 · plans/interview-marketing-agent.md#phase-7
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-7-pipeline-rules
+- tag: plain
+- status: open
+
+### H-108 — `src/agent/run.py::parse_args` 의 undecided 표본 여섯 색 정하기 — `--dry`(지금 `--dry-run` 으로 읽힘, 안전한 쪽) · `--Dry-Run` · `--dryrun` · `--dry_run` · `—dry-run` · `--test-run`(이 다섯은 사용법 오류로 종료 2)
+- project: marketing-agent-demo
+- when: 2026-10-15 · plans/interview-marketing-agent.md#phase-7
+- from: ship-report.md § Human checks — .adw/verify-plan.md § Checks
+- source: adw/phase-7-pipeline-rules
+- tag: plain
+- status: open
+
+### H-109 — `src/agent/config.py::_check_keys` 의 undecided 표본 다섯 색 정하기 — `test-run` · `Test_run` · `testrun` · `dry_run` · `ｔｅｓｔ_run`(모두 "알 수 없는 설정입니다" 로 거절 — 첫 읽기면 종료 2, 다시 읽기면 거절이라 게시는 `config_rejected` 테스트 저장)
+- project: marketing-agent-demo
+- when: 2026-10-15 · plans/interview-marketing-agent.md#phase-7
+- from: ship-report.md § Human checks — .adw/verify-plan.md § Checks
+- source: adw/phase-7-pipeline-rules
+- tag: plain
+- status: open
+
+### H-110 — 실제 호출 실행기(`tests/live_check.py`)와 에이전트가 `data/quota.json` 을 함께 쓰는데 실행기는 `RunLock` 을 쥐지 않음 — 함께 돌면 서로의 예약을 덮어써(벤치 실측 6건 중 5건 잃음) 검색 · 단위 상한을 덜 셈. 받아들일지, 주인 페이즈를 정할지
+- project: marketing-agent-demo
+- when: 2026-10-15 · plans/interview-marketing-agent.md#phase-7
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-7-pipeline-rules
+- tag: plain
+- status: open
+
+### H-111 — Phase 7G 가 크롬 주소(`chrome_debug_url`)를 이 컴퓨터(루프백)로만 받게 한다(H-061) — 그 전까지는 아무 주소나 받음
+- project: marketing-agent-demo
+- when: 2026-10-15 · plans/interview-marketing-agent.md#phase-7
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-7-pipeline-rules
+- tag: plain
+- status: open
+
+### H-112 — Phase 7G 가 최소 표본 간격을 정한다(H-009 의 남은 몫 — 재시작 직후 몇 초 사이 두 표본이 큰 속도로 읽히는 일)
+- project: marketing-agent-demo
+- when: 2026-10-15 · plans/interview-marketing-agent.md#phase-7
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-7-pipeline-rules
+- tag: plain
+- status: open
+
+### H-113 — H-023 — 진짜 키로 첫 `--once` 와 녹화의 첫 실제 게시를 본인 허용 목록 테스트 영상에서만 보기(Phase 8A 사람 실행): 이대로 사람 몫으로 받아들일지, 주인을 정할지
+- project: marketing-agent-demo
+- when: 2026-10-15 · plans/interview-marketing-agent.md#phase-7
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-7-pipeline-rules
+- tag: plain
+- status: open
+
+### H-114 — H-035 — 실제 `YOUTUBE_API_KEY` 로 첫 주기의 `DETECT` · `VIEWS` 줄과 `data/quota.json` 보기(Phase 8A 사람 실행): 이대로 받아들일지, 주인을 정할지
+- project: marketing-agent-demo
+- when: 2026-10-15 · plans/interview-marketing-agent.md#phase-7
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-7-pipeline-rules
+- tag: plain
+- status: open
+
+### H-115 — H-055 — 첫 실제 게시 때 shorts 영상도 하나 게시해 크롬 `page.url` 꼬리 보기(Phase 8A 사람 실행): 이대로 받아들일지, 주인을 정할지
+- project: marketing-agent-demo
+- when: 2026-10-15 · plans/interview-marketing-agent.md#phase-7
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-7-pipeline-rules
+- tag: plain
+- status: open
+
+### H-116 — H-090 — 게시 댓글 20개 창이 찬 뒤 운영 로그의 문장 틀 다시 쓰기 보기(실제 게시가 하루 1개라 마감 안에 차지 않음): 이대로 받아들일지, 주인을 정할지
+- project: marketing-agent-demo
+- when: 2026-10-15 · plans/interview-marketing-agent.md#phase-7
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-7-pipeline-rules
+- tag: plain
+- status: open
