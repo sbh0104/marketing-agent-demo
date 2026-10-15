@@ -705,6 +705,48 @@ class ContactMaskTest(unittest.TestCase):
             with self.subTest(text=text[:12], limit=limit):
                 self.assertEqual(live_check._kept(text, limit), live_check._clean(text, limit))
 
+    def test_scrub_masks_every_untrusted_field(self) -> None:
+        result = healthy_result()
+        first = result["videos"][0]
+        first["untrusted"].update(
+            title=f"제목 {FAKE_EMAIL}",
+            description=f"설명 {FAKE_ACCOUNT} {FAKE_HOLDER}",
+            classification_reason=f"판별 이유 {FAKE_PHONE}",
+            skip_reason=f"건너뛴 이유 {FAKE_EMAIL}",
+            top_comments=[f"댓글 {FAKE_PHONE}"],
+        )
+        first["drafts"][0]["untrusted"].update(
+            concern=f"고민 {FAKE_PHONE}",
+            comment=f"초안 {FAKE_EMAIL}",
+            code_failures=[f"검사 {FAKE_ACCOUNT}"],
+        )
+        result["accuracy"]["ko"][0]["untrusted"]["reason"] = f"예시 이유 {FAKE_PHONE}"
+        result["fingerprint"]["jev_models"] = ["jev 010-0000-1234"]
+        with tempfile.TemporaryDirectory() as folder:
+            paths = live_check.write_outputs(result, Path(folder), live_check.Redactor({}))
+            data = json.loads(paths[0].read_text(encoding="utf-8"))
+            for text in strings(data, under_untrusted=True):
+                with self.subTest(text=text):
+                    self.assertEqual(live_check.count_contacts(text), 0)
+            video, draft = data["videos"][0], data["videos"][0]["drafts"][0]
+            fields = {
+                "title": video["untrusted"]["title"],
+                "description": video["untrusted"]["description"],
+                "classification_reason": video["untrusted"]["classification_reason"],
+                "skip_reason": video["untrusted"]["skip_reason"],
+                "top_comments": video["untrusted"]["top_comments"][0],
+                "concern": draft["untrusted"]["concern"],
+                "comment": draft["untrusted"]["comment"],
+                "code_failures": draft["untrusted"]["code_failures"][0],
+                "accuracy.reason": data["accuracy"]["ko"][0]["untrusted"]["reason"],
+            }
+            for name, text in fields.items():
+                with self.subTest(field=name):
+                    self.assertIn("<연락처>", text)
+            # untrusted 밖의 jev_models 는 가리지 않고 끝 줄이 셉니다 — 그 한 곳만 남습니다
+            self.assertEqual(data["fingerprint"]["jev_models"], ["jev 010-0000-1234"])
+            self.assertEqual(live_check.contact_places(paths), 1)
+
     def test_file_texts_reads_json_strings_not_numbers(self) -> None:
         raw = "후원\r\n110-000-123456"
         data = {
@@ -1660,6 +1702,7 @@ class FakeClaude:
         self.log = log
         self.calls: list[tuple[str, dict]] = []
         self.probe_status: dict[str, int] = {}
+        self.probe_text = "네"
         self.writes: list[object] = []
         self.grades: list[object] = []
         self.topics: list[object] = []
@@ -1681,7 +1724,7 @@ class FakeClaude:
             status = self.probe_status.get(kwargs["model"])
             if status is not None:
                 raise FakeApiError(f"model: {kwargs['model']}", status)
-            return text_response("네")
+            return text_response(self.probe_text)
         queue = {"write": self.writes, "grade": self.grades, "topic": self.topics}[kind]
         if queue:
             answer = queue.pop(0)
@@ -1774,6 +1817,15 @@ def strings(node: object, *, under_untrusted: bool, inside: bool = False) -> lis
     return found
 
 
+def without_untrusted(node: object) -> object:
+    """`untrusted` 칸을 뺀 사본 — 가림이 그 밖의 칸(숫자 · 시각 · 영상 ID)을 바꾸지 않았는지 맞댈 때 씁니다."""
+    if isinstance(node, dict):
+        return {key: without_untrusted(value) for key, value in node.items() if key != "untrusted"}
+    if isinstance(node, list):
+        return [without_untrusted(item) for item in node]
+    return node
+
+
 class LiveCheckCase(unittest.TestCase):
     """실행 경로 시험의 공통 준비 — 임시 폴더, 막아 둔 소켓, 가짜 jev · Claude · YouTube 전송.
 
@@ -1822,8 +1874,9 @@ class LiveCheckCase(unittest.TestCase):
         on_topic: bool = True,
         name: str | None = None,
         description: str | None = None,
+        ident: str | None = None,
     ) -> str:
-        video_id = vid(number)
+        video_id = vid(number) if ident is None else ident
         name = title(number, on_topic) if name is None else name
         hours = 5 if window == "operation" else 30
         self.world.pages.setdefault((keyword, window), []).append(video_id)
@@ -1856,7 +1909,7 @@ class LiveCheckCase(unittest.TestCase):
         """main 을 가짜와 임시 폴더로 돌려 (종료 코드, 화면, 오류 화면, 결과 또는 None) 을 돌려줍니다.
 
         결과 파일이 있으면 판정 줄이 요약 첫 줄 · 화면 첫 줄 · result.verdict 에서 같고, 파일만으로
-        다시 세어도 같으며, 종료 코드가 판정을 따르는지 매번 봅니다(G1 실행 칸).
+        다시 세어도 같으며, 종료 코드가 판정을 따르는지(연락처 모양이 남으면 4) 매번 봅니다(G1 실행 칸).
         """
         stdout, stderr = io.StringIO(), io.StringIO()
         options: dict[str, object] = {
@@ -1881,7 +1934,8 @@ class LiveCheckCase(unittest.TestCase):
             self.assertEqual(summary.split("\n")[0], result["verdict"])
             self.assertEqual(out.split("\n")[0], result["verdict"])
             self.assertEqual(live_check.verdict_line(result), result["verdict"])
-            self.assertEqual(code, 0 if result["verdict"] == "6B: go" else 1)
+            places = live_check.contact_places([path, self.out / live_check.SUMMARY_NAME])
+            self.assertEqual(code, 4 if places else 0 if result["verdict"] == "6B: go" else 1)
         return code, out, err, result
 
     def verdict_flag(self) -> tuple[int, str, str]:
@@ -3377,7 +3431,10 @@ class ResultShapeTest(LiveCheckCase):
         result_path = self.out / live_check.RESULT_NAME
         summary_path = self.out / live_check.SUMMARY_NAME
         self.assertEqual(
-            out, summary + f"결과: {result_path} · {summary_path}\n키 검사: 결과 파일에 키 없음\n"
+            out,
+            summary
+            + f"결과: {result_path} · {summary_path}\n키 검사: 결과 파일에 키 없음\n"
+            + "개인 정보 검사: 결과 파일에 연락처 모양 없음\n",
         )
 
     def test_claude_answer_text_never_stored(self) -> None:
@@ -3448,7 +3505,10 @@ class ResultShapeTest(LiveCheckCase):
                 self.assertEqual(result["verdict"], verdict)
                 summary = (self.out / live_check.SUMMARY_NAME).read_text(encoding="utf-8")
                 self.assertEqual(out.split("\n")[0], summary.split("\n")[0])
-                self.assertEqual(out.split("\n")[-2], "키 검사: 결과 파일에 키 없음")
+                self.assertEqual(out.split("\n")[-3], "키 검사: 결과 파일에 키 없음")
+                self.assertEqual(
+                    out.split("\n")[-2], "개인 정보 검사: 결과 파일에 연락처 모양 없음"
+                )
                 recount_out, recount_err = io.StringIO(), io.StringIO()
                 recount = live_check.main(
                     ["--verdict", str(self.out / live_check.RESULT_NAME)],
@@ -3471,6 +3531,180 @@ class ResultShapeTest(LiveCheckCase):
                 error_entry("youtube", "comments", "YouTubeError", 403, vid(2)),
             ],
         )
+
+
+class ContactRunTest(LiveCheckCase):
+    """결과 파일의 연락처 가림 — 쓰는 순간에만 가리고(재료는 원문), 끝 줄이 두 파일 전체를 셉니다.
+
+    트래커 Phase 6G — 가짜 YouTube 로 실행기를 돌려 결과 두 파일 · 끝 줄 · 종료 코드를 봅니다.
+    """
+
+    def test_every_outside_field_marked(self) -> None:
+        patched = {
+            "JEV_MODEL": f"jev-1.13.0 {FAKE_EMAIL}",
+            "AUTHOR": f"작성자표식 {FAKE_PHONE}",
+            "AUTHOR_CHANNEL": f"UCauthor표식 {FAKE_ACCOUNT}",
+            "VIDEO_CHANNEL": f"UC채널표식 {FAKE_PHONE}",
+        }
+        with contextlib.ExitStack() as stack:
+            for name, value in patched.items():
+                stack.enter_context(mock.patch(f"{__name__}.{name}", value))
+            self.build()
+            self.add_video(
+                "연애",
+                "operation",
+                6,
+                2500,
+                ident=FAKE_ID,
+                name=f"연애 고민 제목표식 {FAKE_EMAIL}",
+                description=f"설명표식 문의 {FAKE_PHONE} 후원 {FAKE_ACCOUNT} {FAKE_HOLDER}",
+            )
+            self.world.comments[FAKE_ID] = [f"댓글표식 {FAKE_PHONE}", f"댓글표식 메일 {FAKE_EMAIL}"]
+            self.claude.probe_text = f"네 {FAKE_EMAIL}"
+            self.claude.writes = [
+                writer_reply(concern=f"{CONCERN} {FAKE_PHONE}", comment=f"{COMMENT} {FAKE_EMAIL}")
+            ]
+            self.claude.grades = [text_response(f"채점 {FAKE_EMAIL}", f"stop {FAKE_PHONE}")] * 3
+            self.claude.topics = [text_response(f"주제 {FAKE_ACCOUNT}")] * 5
+            code, out, err, result = self.run_main()
+        # (a) untrusted 안의 글에는 연락처 모양이 없고, 심은 영상의 칸마다 표시 글이 있습니다
+        for text in strings(result, under_untrusted=True):
+            with self.subTest(inside=text[:40]):
+                self.assertEqual(live_check.count_contacts(text), 0)
+        planted = self.by_id(result)[FAKE_ID]["untrusted"]
+        self.assertIn("<연락처>", planted["title"])
+        self.assertIn("<연락처>", planted["description"])
+        self.assertEqual(len(planted["top_comments"]), 2)
+        for comment in planted["top_comments"]:
+            self.assertIn("<연락처>", comment)
+        # (b) untrusted 밖에서 연락처 모양인 글은 영상 ID 와 jev 모델 이름뿐입니다(가리지 않음)
+        self.assertEqual(
+            sorted(
+                text
+                for text in strings(result, under_untrusted=False)
+                if live_check.count_contacts(text)
+            ),
+            sorted([FAKE_ID, f"jev-1.13.0 {FAKE_EMAIL}"]),
+        )
+        # (c) 끝 줄은 키 검사 줄 다음이고 곳 수만 알리며 종료 코드는 4 입니다
+        self.assertEqual(code, 4)
+        self.assertEqual(out.split("\n")[-3], "키 검사: 결과 파일에 키 없음")
+        self.assertEqual(
+            out.split("\n")[-2], "개인 정보 검사: 결과 파일에 연락처 모양 2곳 — 커밋하지 마세요"
+        )
+        # (d) 두 파일은 남고, 작성자 · 채널 값은 어느 파일에도 없습니다
+        for name in (live_check.RESULT_NAME, live_check.SUMMARY_NAME):
+            path = self.out / name
+            self.assertTrue(path.exists(), name)
+            saved = path.read_text(encoding="utf-8")
+            for key in ("AUTHOR", "AUTHOR_CHANNEL", "VIDEO_CHANNEL"):
+                self.assertNotIn(patched[key], saved, f"{name}: {key}")
+                self.assertNotIn(patched[key].split(" ")[0], saved, f"{name}: {key}")
+        # (e) 화면에는 연락처 값이 나오지 않습니다
+        for value in (FAKE_EMAIL, FAKE_PHONE, FAKE_ACCOUNT, "가나다", FAKE_ID):
+            self.assertNotIn(value, out + err, value)
+        # (f) Claude · jev 에 보낸 재료는 가리지 않은 원문입니다
+        self.assertTrue(any(FAKE_EMAIL in state for _, _, state, _ in self.jev_kinds("video")))
+        topics = [call["messages"][0]["content"] for call in self.calls_of("topic")]
+        self.assertTrue(any(FAKE_ACCOUNT in content for content in topics))
+        writes = [call["messages"][0]["content"] for call in self.calls_of("write")]
+        self.assertTrue(
+            any(
+                FAKE_ACCOUNT in content
+                and FAKE_HOLDER in content
+                and f"댓글표식 {FAKE_PHONE}" in content
+                for content in writes
+            )
+        )
+        grades = [call["messages"][0]["content"] for call in self.calls_of("grade")]
+        self.assertTrue(any(FAKE_PHONE in content for content in grades))
+        self.assertTrue(any(FAKE_EMAIL in state for _, _, state, _ in self.jev_kinds("check")))
+
+    def test_untrusted_contacts_masked_numbers_kept(self) -> None:
+        twins = {
+            "planted": (
+                f"설명표식 문의 {FAKE_EMAIL} 후원 {FAKE_ACCOUNT} {FAKE_HOLDER}",
+                [f"댓글표식 {FAKE_PHONE}"],
+            ),
+            "plain": ("설명표식 문의 메일 후원 계좌", ["댓글표식 전화"]),
+        }
+        runs: dict[str, tuple[int, str, dict, int]] = {}
+        for label, (description, comments) in twins.items():
+            self.build()
+            self.add_video("연애", "operation", 6, 2500, description=description)
+            self.world.comments[vid(6)] = comments
+            code, out, err, result = self.run_main()
+            paths = [self.out / live_check.RESULT_NAME, self.out / live_check.SUMMARY_NAME]
+            runs[label] = (code, out, result, live_check.contact_places(paths))
+        planted, plain = runs["planted"][2], runs["plain"][2]
+        # 가림은 untrusted 안의 글만 바꿉니다 — 숫자 · 시각 · 영상 ID 칸은 원문 쌍둥이 실행과 같습니다
+        self.assertEqual(without_untrusted(planted), without_untrusted(plain))
+        mine, theirs = self.by_id(planted)[vid(6)], self.by_id(plain)[vid(6)]
+        self.assertEqual(set(mine["untrusted"]), set(theirs["untrusted"]))
+        self.assertEqual(
+            len(mine["untrusted"]["top_comments"]), len(theirs["untrusted"]["top_comments"])
+        )
+        self.assertIn("<연락처>", mine["untrusted"]["description"])
+        self.assertIn("<연락처>", mine["untrusted"]["top_comments"][0])
+        self.assertEqual(runs["planted"][3], 0)
+        for label, (code, out, result, _) in runs.items():
+            with self.subTest(label):
+                self.assertEqual(code, 0 if result["verdict"] == "6B: go" else 1)
+                self.assertEqual(
+                    out.split("\n")[-2], "개인 정보 검사: 결과 파일에 연락처 모양 없음"
+                )
+
+    def test_frame_overlap_recounts_from_masked_drafts(self) -> None:
+        raws = {
+            vid(1): f"{DRAFT_POOL[0]} 문의 {FAKE_PHONE}",
+            vid(2): f"{DRAFT_POOL[1]} 문의 {FAKE_ACCOUNT}",
+        }
+        self.claude.writes = [writer_reply(comment=text) for text in raws.values()]
+        code, out, err, result = self.run_main()
+        videos = self.by_id(result)
+        for video_id in raws:
+            with self.subTest(video_id):
+                comment = videos[video_id]["drafts"][0]["untrusted"]["comment"]
+                self.assertIn("<연락처>", comment)
+                self.assertNotIn(FAKE_PHONE, comment)
+                self.assertNotIn(FAKE_ACCOUNT, comment)
+        # 결과 파일만으로 다시 세어도 같은 수입니다(트래커 6C — 6D 의 다시 세기)
+        recount = copy.deepcopy(result["videos"])
+        for draft in (draft for video in recount for draft in video["drafts"] if draft["parsed"]):
+            draft["frame_overlap"] = 0
+        live_check.mark_frame_overlaps(recount)
+        self.assertEqual(recount, result["videos"])
+        # 원문 글로 센 수는 다릅니다 — 원문으로 세어 저장했다면 위 다시 세기가 빨강입니다
+        raw_videos = copy.deepcopy(result["videos"])
+        for video in raw_videos:
+            if video["video_id"] in raws:
+                video["drafts"][0]["untrusted"]["comment"] = raws[video["video_id"]]
+        live_check.mark_frame_overlaps(raw_videos)
+        raw_by_id = self.by_id({"videos": raw_videos})
+        self.assertNotEqual(
+            [raw_by_id[video_id]["drafts"][0]["frame_overlap"] for video_id in raws],
+            [videos[video_id]["drafts"][0]["frame_overlap"] for video_id in raws],
+        )
+
+    def test_end_line_catches_broken_masking(self) -> None:
+        self.add_video(
+            "연애",
+            "operation",
+            6,
+            2500,
+            description=f"설명표식 문의 {FAKE_PHONE} 후원 {FAKE_ACCOUNT} {FAKE_HOLDER}",
+        )
+        with mock.patch.object(live_check, "mask_contacts", lambda text: text):
+            code, out, err, result = self.run_main()
+        self.assertEqual(code, 4)
+        self.assertEqual(out.split("\n")[-3], "키 검사: 결과 파일에 키 없음")
+        self.assertEqual(
+            out.split("\n")[-2], "개인 정보 검사: 결과 파일에 연락처 모양 3곳 — 커밋하지 마세요"
+        )
+        for name in (live_check.RESULT_NAME, live_check.SUMMARY_NAME):
+            self.assertTrue((self.out / name).exists(), name)
+        for value in (FAKE_PHONE, FAKE_ACCOUNT, FAKE_HOLDER, "가나다"):
+            self.assertNotIn(value, out + err, value)
 
 
 class GraderBoundaryTest(unittest.TestCase):
