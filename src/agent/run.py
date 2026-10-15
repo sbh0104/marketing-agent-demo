@@ -28,9 +28,10 @@ from agent.classifier import Ask, classify, is_error_hold, sdk_ask
 from agent.config import Config, ConfigError, load_config
 from agent.env import EnvError, require_secret
 from agent.guard import allowed_video_ids, decide_post
-from agent.logbook import Event, Logbook
+from agent.logbook import Event, Logbook, read_log
 from agent.models import Judgement, Verdict, VideoRecord
 from agent.poster import CommentPage, PageError, post_video
+from agent.report import render_report, write_report
 from agent.scheduler import run_loop
 from agent.store import Store, StoreError
 from agent.trigger import judge_trigger, views_per_hour
@@ -52,6 +53,7 @@ STORE_PATH = Path("data/videos.json")
 QUOTA_PATH = Path("data/quota.json")
 LOCK_PATH = Path("data/agent.lock")
 LOG_PATH = Path("logs/agent.log")
+REPORT_PATH = Path("data/report.html")
 SECRET_NAMES = ("YOUTUBE_API_KEY", "TYPESAFE_API_KEY", "ANTHROPIC_API_KEY")
 ALLOWLISTED = "allowlisted"          # TRIGGER reason of a listed video
 CONFIG_REJECTED = "config_rejected"  # POST reason of a listed video while the config is rejected
@@ -59,6 +61,7 @@ CHROME_WITHHELD = "chrome_withheld"  # PageError reason of the opener handed to 
 REASON_MAX = 200
 STAGE_CLASSIFY, STAGE_TRIGGER = "run.classify", "run.trigger"
 STAGE_WRITE, STAGE_POST = "run.write", "run.post"
+REPORT_WHERE = "report"  # 결과 화면의 ERROR where=
 # module, pip package — checked before secrets
 SDK_MODULES = (("typesafe_sdk", "typesafe-sdk"), ("anthropic", "anthropic"))
 EXIT_OK, EXIT_SETUP, EXIT_LOCKED, EXIT_INTERRUPTED = 0, 2, 3, 130
@@ -282,10 +285,28 @@ class Pipeline:
             errors=errors,
             mode="test" if test_run or rejected else "live",
         )
+        self._report()
 
     def on_error(self, where: str, exc: Exception) -> None:
         """run_loop 의 on_error 자리 — 예외 자신의 종류와 메시지만 씁니다(R6)."""
         self._logbook.write(Event.ERROR, where=where, reason=short_reason(exc))
+
+    def _report(self) -> None:
+        """결과 화면을 다시 씁니다 — 저장소와 로그를 읽기만 합니다. 로그를 못 읽으면 ERROR 한 줄 뒤
+        저장소 칸만, 화면을 못 쓰면 ERROR 한 줄로 사이클을 마칩니다."""
+        try:
+            try:
+                events = read_log(self._logbook.path)
+            except (OSError, ValueError) as exc:  # 로그가 깨져도 저장소 칸은 그립니다
+                self._logbook.write(Event.ERROR, where=REPORT_WHERE, reason=short_reason(exc))
+                events = None
+            generated_at = events[-1][0] if events else self._clock()
+            write_report(
+                self._repo_root / REPORT_PATH,
+                render_report(self._store.records(), events, generated_at=generated_at),
+            )
+        except Exception as exc:  # 화면 실패는 사이클을 멈추지 않습니다 — BaseException 은 그대로
+            self._logbook.write(Event.ERROR, where=REPORT_WHERE, reason=short_reason(exc))
 
     def _process(
         self,
