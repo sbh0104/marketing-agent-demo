@@ -230,7 +230,7 @@ class FakeSession:
 
 
 class FakeChrome:
-    """Services.chrome 자리 — 받은 debug_url 과 만든 세션, 눌린 submit 을 적습니다.
+    """Services.chrome 자리 — 받은 debug_url 과 만든 세션, 눌린 submit, 지운 탭 주소를 적습니다.
 
     unreachable 이 n 이면 처음 n 번의 new_page 가 chrome_unreachable 로 멈춥니다.
     close_error 가 있으면 세션의 close 가 (센 뒤) 그 예외를 냅니다.
@@ -240,6 +240,7 @@ class FakeChrome:
         self.sessions: list[FakeSession] = []
         self.submits: list[str] = []
         self.typed: list[str] = []
+        self.cleared: list[str] = []
         self.unreachable = 0
         self.close_error: BaseException | None = None
 
@@ -975,6 +976,19 @@ class TestRunMode(RunCase):
                 self.cycle(self.pipeline(dry_run=dry_run))
                 self.assertEqual(self.chrome.submits, [])
                 self.assertEqual(self.lines(Event.POST, mode="live"), [])
+
+    def test_dry_run_once_rehearses_listed_video_cleanly(self) -> None:
+        # H-117 (Phase 7F 가 넘김) — 리허설 줄에 detail(clear_failed …)이 없고, 포스터 ERROR · 누름이 없습니다
+        self.show(A, 2000)
+        self.assertEqual(self.run_agent("--dry-run", "--once"), 0)
+        (post,) = self.lines(Event.POST, video=A)
+        self.assertEqual(
+            (post["mode"], post["result"], post["reason"]), ("test", "rehearsed", "dry_run")
+        )
+        self.assertNotIn("detail", post)
+        self.assertEqual(self.lines(Event.ERROR, where="poster"), [])
+        self.assertEqual(self.chrome.cleared, [watch(A)])
+        self.assertEqual(self.chrome.submits, [])
 
 
 class TestOperatingRules(RunCase):
