@@ -55,12 +55,23 @@ GO_LINE = "6B: go"
 AFTER_FIX_RUN_AT = "2026-10-15T08:42:22.401654+00:00"
 AFTER_FIX_LINE = "6B: stop — 작성 막힘(SKIP 8/13)"
 # 트래커 Phase 6D 드리프트 인터뷰 질문 1 A 가 '고치기 전'(6E 전) 기록으로 반영했던 실행 — 이제 반영하지 않고, 결과
-# 파일은 트리에 없습니다.
+# 파일은 이 트리에 없습니다(커밋 a2b2f2f 의 docs/live-check/result.json). 과제 품질 세 칸은 그 결과의 운영 창
+# 셈이고 6D 가 계약 '댓글 작성' 절에 적은 기록과 같습니다 — 6D 는 운영 창 하나뿐인 실행이라 실행 전체 셈이기도 합니다
 BEFORE_FIX_RUN_AT = "2026-10-14T14:09:02.882902+00:00"
 BEFORE_FIX_LINE = "6B: stop — 작성 막힘(SKIP 5/7)"
+BEFORE_FIX_TASKS: dict[str, dict[str, int] | None] = {
+    "operation": {"love": 4, "saju": 4, "tasks": 11, "framed": 10, "drafts": 11},
+    "widened": None,
+}
+NO_CONCERN = "no_concern"  # 재료에 연애 고민 없음 — 6E 뒤 작성기가 초안 없이 건너뛸 수 있는 이유 낱말
 WINDOW_LABELS = {"operation": "운영 창", "widened": "넓힌 창"}
 ANSWERS = ("ok", "bad")
 TASK_CELLS = ("concern_is_love_worry", "saju_story_fits")
+TASK_PHRASES = (
+    ("love", "tasks", "ⓐ 고민 한 줄이 연애 고민"),
+    ("saju", "tasks", "ⓑ 연애사주 경험이 고민과 이어짐"),
+    ("framed", "drafts", f"ⓒ 다른 영상 초안과 겹치는 {live_check.FRAME_CHARS}글자 조각이 있는 초안"),
+)
 SKIP_HUMAN = ("정당", "부당")
 SKIP_GRADE_CELL = {"no_scene": "material_has_scene", "no_concern": "material_has_love_worry"}
 CHECKS_FAILED = "checks_failed"  # 실행기가 검사 두 번 탈락 영상의 skip_kind 에 적는 낱말
@@ -655,6 +666,66 @@ def skip_lines(result: dict) -> list[str]:
     return lines
 
 
+def _share(counts: Mapping[str, int] | None, top: str, bottom: str) -> str:
+    return "실행 없음" if counts is None else f"{counts[top]}/{counts[bottom]}"
+
+
+def _size(counts: Mapping[str, int] | None) -> str:
+    return "실행 없음" if counts is None else str(counts["drafts"])
+
+
+def _after(result: dict, window: str) -> dict[str, int] | None:
+    return task_counts(result, window) if window in result["windows"] else None
+
+
+def _gated(result: dict, window: str) -> str:
+    """재료에 연애 고민이 없다고 보고 초안 없이 건너뛴 영상 수 — 정해진 칸 `skip_kind` 와 `parsed` 만 읽습니다."""
+    if window not in result["windows"]:
+        return "실행 없음"
+    return str(
+        sum(
+            1
+            for video in _window_videos(result, window)
+            if _skip_kind(video) == NO_CONCERN
+            and not any(draft["parsed"] is True for draft in video["drafts"])
+        )
+    )
+
+
+def before_after_lines(result: dict) -> list[str]:
+    """과제 품질 전후 — 창마다 6E 전(Phase 6D 의 실행, 고정값) → 6E 뒤(이 결과의 셈) 세 칸(트래커 Phase 6F
+    전후 숫자)."""
+    return [
+        f"과제 품질 전후 {label}: "
+        + " · ".join(
+            f"{phrase} {_share(BEFORE_FIX_TASKS[window], top, bottom)}"
+            f" → {_share(_after(result, window), top, bottom)}"
+            for top, bottom, phrase in TASK_PHRASES
+        )
+        for window, label in WINDOW_LABELS.items()
+    ]
+
+
+def before_after_notes(result: dict) -> list[str]:
+    sizes = " · ".join(
+        f"{label} {_size(BEFORE_FIX_TASKS[w])} → {_size(_after(result, w))}"
+        for w, label in WINDOW_LABELS.items()
+    )
+    gates = " · ".join(f"{label} {_gated(result, w)}" for w, label in WINDOW_LABELS.items())
+    return [
+        f"초안 수는 {sizes} 라 전후 차이는 표본 안의 우연일 수 있습니다 — 두 실행의 창 비율이 달라"
+        " ⓐ · ⓑ 는 창마다 따로 견줍니다",
+        "ⓒ 는 초안마다 실행 전체의 다른 영상 초안과 겹친 조각을 센 칸(`frame_overlap`)이라 창 줄의 ⓒ 는"
+        " 그 셈을 창으로 나눈 것입니다 — 6D 는 운영 창 하나뿐인 실행이라 실행 전체로 견주면"
+        f" {_share(BEFORE_FIX_TASKS['operation'], 'framed', 'drafts')}"
+        f" → {_share(task_counts(result, None), 'framed', 'drafts')} 입니다(6F 는 연락처 모양을 가린"
+        " 글로, 6D 는 가리기 전 글로 셌습니다 — Phase 6G)",
+        f"재료에 연애 고민이 없다고 보고 초안 없이 건너뛴 영상은 {gates} 이고, 이 영상들은 ⓐ · ⓑ · ⓒ"
+        " 의 분모 밖입니다 — ⓐ 와 같은 것(고민이 연애 고민인지)을 보고 거른 것이라 ⓐ 의 전후 차이에는"
+        " 이 거름이 섞여 있을 수 있습니다",
+    ]
+
+
 def mark_text(value: object, path: str = "") -> object:
     """글 칸마다 표식을 심은 복사본 — 모든 글 잎은 `MRK·<경로>` 가 됩니다.
 
@@ -697,6 +768,7 @@ def record_heads() -> list[str]:
             f"과제 품질 {label}:",
             f"인기 댓글 {label}:",
             f"정당한 건너뜀 {label}:",
+            f"과제 품질 전후 {label}:",
         ]
     heads.append("모델 이름:")
     return heads
@@ -766,6 +838,7 @@ class ContractHeadTest(unittest.TestCase):
             *draft_lines(result),
             *task_lines(result),
             *skip_lines(result),
+            *before_after_lines(result),
             model_line(result),
         ]
         for line in lines:
@@ -970,6 +1043,8 @@ class MeasuredDriftTest(unittest.TestCase):
             lowering_lines,
             task_lines,
             skip_lines,
+            before_after_lines,
+            before_after_notes,
         )
         for render in renders:
             with self.subTest(render=render.__name__):
@@ -994,7 +1069,14 @@ class MeasuredDriftTest(unittest.TestCase):
                 video["untrusted"]["skip_reason"] = (
                     names[swap.get(video["skip_kind"], "no_scene")] + " — 1차: 표식"
                 )
-        for render in (skip_lines, draft_lines, task_lines, check_floor_line):
+        for render in (
+            skip_lines,
+            draft_lines,
+            task_lines,
+            check_floor_line,
+            before_after_lines,
+            before_after_notes,
+        ):
             with self.subTest(render=render.__name__):
                 self.assertEqual(render(tampered), render(self.result))
         self.assertEqual(recount(tampered), recount(self.result))
