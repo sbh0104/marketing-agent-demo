@@ -11,6 +11,7 @@ from agent.models import (
     VIDEO_ID_RE,
     CommentDraft,
     Judgement,
+    Memory,
     PostAttempt,
     Verdict,
     VideoRecord,
@@ -166,6 +167,97 @@ class ValidationTest(unittest.TestCase):
     def test_video_id_pattern(self) -> None:
         self.assertIsNotNone(VIDEO_ID_RE.fullmatch("abc_DEF-123"))
         self.assertIsNone(VIDEO_ID_RE.fullmatch("abc_DEF-1234"))
+
+
+class MemoryTest(unittest.TestCase):
+    """기억 칸 — 작성 · 게시가 멈춘 까닭(계약 3절, Phase 7C)."""
+
+    FIELDS = {"reason", "stage", "at", "tries", "top_comments"}
+
+    def good(self) -> dict[str, object]:
+        return {
+            "reason": "재료에 장면 없음",
+            "stage": "run.write",
+            "at": T0,
+            "tries": 1,
+            "top_comments": 2,
+        }
+
+    def test_memory_round_trips(self) -> None:
+        memory = Memory("재료에 장면 없음", "run.write", T0, 1, 2)
+        record = minimal_record(memory=memory)
+        data = record.to_dict()
+        self.assertEqual(set(data["memory"]), self.FIELDS)
+        loaded = VideoRecord.from_dict(json.loads(json.dumps(data, ensure_ascii=False)))
+        self.assertEqual(loaded, record)
+        self.assertEqual(loaded.memory, memory)
+        self.assertEqual(
+            data["memory"],
+            {
+                "reason": "재료에 장면 없음",
+                "stage": "run.write",
+                "at": "2026-10-12T03:00:00+00:00",
+                "tries": 1,
+                "top_comments": 2,
+            },
+        )
+
+    def test_record_without_memory_key_still_loads(self) -> None:
+        data = minimal_record().to_dict()
+        self.assertIn("memory", data)
+        self.assertIsNone(data["memory"])
+        del data["memory"]
+        self.assertIsNone(VideoRecord.from_dict(data).memory)
+        self.assertEqual(VideoRecord.from_dict(data), minimal_record())
+
+    def test_memory_is_the_only_added_record_key(self) -> None:
+        # 되돌리기 고정 — memory 를 떼면 옛 from_dict 가 받는 키만 남습니다(옛 키 목록은 base 에서 잰 값)
+        base = {
+            "attempts",
+            "channel_id",
+            "classification",
+            "comment",
+            "description",
+            "detected_at",
+            "keyword",
+            "published_at",
+            "title",
+            "trigger",
+            "video_id",
+            "view_history",
+        }
+        self.assertEqual(set(minimal_record().to_dict()) - {"memory"}, base)
+
+    def test_memory_rejects_bad_values(self) -> None:
+        naive = datetime(2026, 10, 12, 3, 0)
+        bad = {
+            "empty reason": ({"reason": ""}, {"reason": ""}),
+            "empty stage": ({"stage": ""}, {"stage": ""}),
+            "naive at": ({"at": naive}, {"at": naive.isoformat()}),
+            "tries -1": ({"tries": -1}, {"tries": -1}),
+            "tries bool": ({"tries": True}, {"tries": True}),
+            "top_comments text": ({"top_comments": "1"}, {"top_comments": "1"}),
+        }
+        for label, (direct, stored) in bad.items():
+            with self.subTest(label):
+                with self.assertRaises(ValueError):
+                    Memory(**{**self.good(), **direct})
+                data = minimal_record(memory=Memory(**self.good())).to_dict()
+                data["memory"].update(stored)
+                with self.assertRaises(ValueError):
+                    VideoRecord.from_dict(data)
+        keys = {
+            "unknown key": lambda memory: memory.update(extra=1),
+            "missing key": lambda memory: memory.pop("tries"),
+        }
+        for label, edit in keys.items():
+            with self.subTest(label):
+                data = minimal_record(memory=Memory(**self.good())).to_dict()
+                edit(data["memory"])
+                with self.assertRaises(ValueError):
+                    Memory.from_dict(data["memory"])
+                with self.assertRaises(ValueError):
+                    VideoRecord.from_dict(data)
 
 
 class VerdictTest(unittest.TestCase):

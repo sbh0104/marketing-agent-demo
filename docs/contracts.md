@@ -155,8 +155,14 @@ Phase 2–7 의 모든 단계가 기대는 계약입니다. 설정 읽기, 영�
 | `trigger` | `Judgement` 또는 없음 | 트리거 판정 (Phase 4) |
 | `comment` | `CommentDraft(concern, text, at, self_check)` 또는 없음 | 작성한 댓글 (Phase 5) |
 | `attempts` | `PostAttempt(at, mode, result, reason, screenshot)` 목록 | 게시 시도 — 저장소만 바꿈 |
+| `memory` | `Memory(reason, stage, at, tries, top_comments)` 또는 없음 | 기억 칸 — 작성 · 게시가 멈춘 까닭 (Phase 7C, '실행 진입점' 절의 기억) |
 
 - `Judgement(verdict, reason, at)` 의 `verdict` 는 `Verdict` 값 `yes` · `no` · `hold`.
+- `Memory(reason, stage, at, tries, top_comments)` 는 실행 흐름이 적는 기억 칸입니다('실행 진입점' 절의 기억). `reason` 은 작성기 건너뜀의 머리말(`재료에 장면 없음` ·
+  `재료에 연애 고민 없음` · `검사 두 번 탈락` · `claude 호출 실패` · `jev 검사 호출 실패` · `jev 검사 응답 이상`)이나 이유 코드(`comments_disabled` · `stage_error`),
+  `stage` 는 멈춘 단계(`run.classify` · `run.trigger` · `run.write` · `run.post`), `at` 은 멈춘 시각, `tries` 는 작성기를 부른 횟수,
+  `top_comments` 는 마지막으로 작성기를 부를 때 넘긴 비어 있지 않은 인기 댓글 수입니다(둘 다 0 이상 정수).
+  다섯 키 모두 필수이고, `memory` 키가 없는 옛 기록은 `None` 으로 읽습니다. Phase 7C 가 영상 기록에 더한 키는 `memory` 하나입니다.
 - **게시 시도 결과 상태:**
 
   | mode | result | 뜻 |
@@ -212,6 +218,7 @@ Phase 2–7 의 모든 단계가 기대는 계약입니다. 설정 읽기, 영�
       "description": "",
       "detected_at": "2026-10-12T03:00:00+00:00",
       "keyword": "썸",
+      "memory": null,
       "published_at": "2026-10-11T23:00:00+00:00",
       "title": "연락 텀 때문에 불안한 썸",
       "trigger": {
