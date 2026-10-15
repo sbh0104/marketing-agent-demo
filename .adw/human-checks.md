@@ -1021,3 +1021,27 @@
 - source: adw/phase-6f-live-check-reapply-after-fix
 - tag: plain
 - status: open
+
+### H-125 — Phase 8: README 에 한 줄 — 크롬 주소는 이 컴퓨터만 받으므로, 기본(NAT) 네트워크의 WSL 은 `.wslconfig` 에 `networkingMode=mirrored` 를 켜야 `localhost` 가 윈도우 크롬에 닿는다(트래커 Phase 8 1031행 · 8A 1078행이 같은 일을 적음)
+- project: marketing-agent-demo
+- when: 2026-10-16 · plans/interview-marketing-agent.md#phase-7g
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-7g-chrome-url-sample-gap
+- tag: plain
+- status: open
+
+### H-126 — Phase 8A: README 에 한 줄 — 터미널 프록시 설정(`http_proxy` · `all_proxy`)이 있는 컴퓨터는 `no_proxy` 에 `localhost,127.0.0.1,[::1]` 을 넣는다. 없으면 연결 찾기가 이 컴퓨터를 떠나 `chrome_unreachable` 이 되고, 악의적인 프록시면 다른 브라우저에 붙는다(트래커 Phase 8A 1078행)
+- project: marketing-agent-demo
+- when: 2026-10-16 · plans/interview-marketing-agent.md#phase-7g
+- from: ship-report.md § Human checks — plans/interview-marketing-agent.md § Phase 7G Decisions (HC1 질문 2 A)
+- source: adw/phase-7g-chrome-url-sample-gap
+- tag: plain
+- status: open
+
+### H-127 — Phase 8A 녹화의 두 실행(`--once --dry-run` 뒤 몇 분 안에 `--once`)에서 `logs/` 를 본다. 둘째 실행의 `TRIGGER` 줄 `per_hour` 가 업로드 0 짝이나 10분 넘게 앞선 기록과의 짝으로 재졌는지 확인한다. 20초 사이 1회가 시간당 180 같은 값이면 7G 가 착지하지 않은 트리로 돈 것이다. 같은 줄의 `VIEWS … delta` 와 숫자가 어긋나는 것은 정상이다(Risks 7). 실제 `agent.run` 프로세스는 바깥 서비스가 필요해 이 사이클에서 돌리지 못했다
+- project: marketing-agent-demo
+- when: 2026-10-16 · plans/interview-marketing-agent.md#phase-7g
+- from: ship-report.md § Human checks — .adw/verify-plan.md § Coverage decisions
+- source: adw/phase-7g-chrome-url-sample-gap
+- tag: plain
+- status: open
