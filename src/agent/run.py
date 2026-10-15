@@ -494,7 +494,7 @@ def run_agent(
         return EXIT_SETUP
     try:
         store = Store(root / STORE_PATH)
-    except StoreError as exc:
+    except (StoreError, OSError) as exc:
         logbook.write(Event.ERROR, where="store", reason=short_reason(exc))
         return EXIT_SETUP
     watcher = Watcher(store, logbook, services.youtube, clock)
@@ -551,7 +551,7 @@ def main(
         with RunLock(lock_path):
             try:
                 services = connect_real(root, env)
-            except (EnvError, QuotaError, ImportError, ValueError) as exc:
+            except (EnvError, QuotaError, ImportError, ValueError, OSError) as exc:
                 print(f"에이전트를 시작할 수 없습니다 — {short_reason(exc)}", file=sys.stderr)
                 return EXIT_SETUP
             return run_agent(

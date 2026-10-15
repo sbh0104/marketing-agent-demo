@@ -286,6 +286,15 @@ def watch(video_id: str) -> str:
     return f"https://www.youtube.com/watch?v={video_id}"
 
 
+def unreadable_reason(path: Path) -> str:
+    """폴더를 파일로 읽을 때 나는 OSError 의 short_reason — 종류는 운영체제마다 다릅니다."""
+    try:
+        path.read_text(encoding="utf-8-sig")
+    except OSError as exc:
+        return run.short_reason(exc)
+    raise AssertionError(f"폴더가 파일로 읽혔습니다: {path}")
+
+
 # 단계 함수 이름(agent.run 의 이름) → 울타리 줄의 where
 STAGES = (
     ("classify", "run.classify"),
@@ -572,6 +581,78 @@ class TestEntry(RunCase):
                 self.assertEqual(code, 2)
                 self.assertIn(f"MissingSdkError: {package} 가 설치되지 않았습니다", stderr.getvalue())
                 self.assertFalse(self.log_path.exists())
+
+    def main_with_services(self) -> tuple[int, str]:
+        """main 을 가짜 서비스로 돌립니다 — 종료 코드와 stderr(화면 출력은 버림)."""
+        stderr = io.StringIO()
+        with (
+            mock.patch.object(run, "connect_real", return_value=self.services),
+            contextlib.redirect_stdout(io.StringIO()),
+            contextlib.redirect_stderr(stderr),
+        ):
+            code = run.main(["--once"], root=self.root, environ=KEYS)
+        return code, stderr.getvalue()
+
+    def main_with_ledger(self) -> tuple[int, str]:
+        """main 을 진짜 connect_real(SDK 있음 · Claude 가짜)로 돌립니다 — 쿼터 장부를 정말 엽니다."""
+        real = run.connect_real
+        stderr = io.StringIO()
+        with (
+            mock.patch.object(
+                run,
+                "connect_real",
+                side_effect=lambda root, env: real(root, env, lambda name: object()),
+            ),
+            mock.patch.object(run, "anthropic_client", return_value=self.claude),
+            mock.patch.dict(os.environ),
+            contextlib.redirect_stderr(stderr),
+        ):
+            code = run.main(["--once"], root=self.root, environ=KEYS)
+        return code, stderr.getvalue()
+
+    def test_corrupt_store_exits_2_with_store_line(self) -> None:
+        store = self.root / "data" / "videos.json"
+        store.parent.mkdir(parents=True)
+        store.write_text("{깨진 저장소", encoding="utf-8")
+        code, stderr = self.main_with_services()
+        self.assertEqual(code, 2)
+        self.assertEqual([event for event, _ in self.events()], [Event.ERROR])
+        (fields,) = self.lines(Event.ERROR, where="store")
+        self.assertTrue(
+            fields["reason"].startswith("StoreError: 저장소 파일이 올바른 JSON 이 아닙니다"), fields
+        )
+        self.assertNotIn("Traceback", stderr)
+
+    def test_unreadable_store_exits_2_with_store_line(self) -> None:
+        store = self.root / "data" / "videos.json"
+        store.mkdir(parents=True)  # 폴더라 파일로 읽을 수 없음(OSError)
+        expected = unreadable_reason(store)
+        code, stderr = self.main_with_services()
+        self.assertEqual(code, 2)
+        self.assertEqual([event for event, _ in self.events()], [Event.ERROR])
+        self.assertEqual(self.lines(Event.ERROR), [{"where": "store", "reason": expected}])
+        self.assertNotIn("Traceback", stderr)
+
+    def test_untrusted_quota_ledger_exits_2(self) -> None:
+        ledger = self.root / "data" / "quota.json"
+        ledger.parent.mkdir(parents=True)
+        ledger.write_text('{"calls": [], "schema_version": 99}', encoding="utf-8")
+        code, stderr = self.main_with_ledger()
+        self.assertEqual(code, 2)
+        self.assertIn(
+            "에이전트를 시작할 수 없습니다 — QuotaError: 쿼터 기록 파일을 믿을 수 없습니다", stderr
+        )
+        self.assertNotIn("Traceback", stderr)
+        self.assertFalse(self.log_path.exists())
+
+    def test_unreadable_quota_ledger_exits_2(self) -> None:
+        ledger = self.root / "data" / "quota.json"
+        ledger.mkdir(parents=True)  # 폴더라 파일로 읽을 수 없음(OSError)
+        expected = unreadable_reason(ledger)
+        code, stderr = self.main_with_ledger()
+        self.assertEqual(code, 2)
+        self.assertEqual(stderr, f"에이전트를 시작할 수 없습니다 — {expected}\n")
+        self.assertFalse(self.log_path.exists())
 
     def test_echo_never_raises_on_unencodable_text(self) -> None:
         console = io.TextIOWrapper(io.BytesIO(), encoding="cp949")
