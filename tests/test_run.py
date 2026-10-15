@@ -180,7 +180,7 @@ class WriterClaude:
 
 
 class FakeTab:
-    """CommentPage 가짜 — 연 주소를 url 로 돌려주고 submit 을 셉니다."""
+    """CommentPage 가짜 — 연 주소를 url 로 돌려주고 submit · clear_comment 를 셉니다."""
 
     def __init__(self, chrome: FakeChrome) -> None:
         self._chrome = chrome
@@ -192,6 +192,9 @@ class FakeTab:
 
     def prepare_comment(self, text: str) -> None:
         self._chrome.typed.append(text)
+
+    def clear_comment(self) -> None:
+        self._chrome.cleared.append(self.url)
 
     def submit(self) -> None:
         self._chrome.submits.append(self.url)
