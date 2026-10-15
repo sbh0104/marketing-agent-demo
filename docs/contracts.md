@@ -1602,6 +1602,71 @@ PYTHONPATH=src python3 -m agent.run [--dry-run] [--once]
   `run-lock-ignored` · `watcher-allowlist-untracked` · `trigger-first-sample-ignored` · `trigger-first-sample-age-zero` ·
   `config-test-run-any-value` · `writer-status-ignored` · `run-sdk-check-skipped` · `run-echo-strict` · `run-reason-str-unguarded`.
 
+## 결과 화면 — `report.py` (Phase 7D)
+
+- **언제 · 어디.** 사이클마다 `CYCLE` 줄을 쓴 바로 뒤에 `data/report.html` 한 장을 다시 씁니다. 서버 없는 정적 HTML 이라
+  브라우저로 열고, 다음 사이클의 결과는 새로고침으로 봅니다. `data/` 가 git 무시라 이 화면도 커밋 대상 밖입니다.
+- **입력.** 화면의 입력은 저장소 기록(`Store.records()`)과 `read_log` 로 읽은 `logs/agent.log`(7절) 둘뿐입니다.
+  화면은 이 둘을 읽기만 하고 판단 · 게시 · 저장소를 바꾸지 않습니다. 같은 기록과 같은 로그면 같은 화면입니다 —
+  `만든 시각` 은 마지막 로그 줄(그 사이클의 `CYCLE` 줄)의 시각이고, 로그를 읽지 못했을 때는 그때의 시계입니다.
+- **모양.** 표 하나에 저장소의 모든 기록을 한 줄씩, `detected_at` 이 늦은 차례(같으면 `video_id` 역순)로 보입니다.
+  칸은 영상(제목 링크와 ID) · 판별(`verdict · reason`) · 판단한 쪽 · 타이밍(`verdict · reason` 과 시간당 조회수, 명단 영상의
+  이유는 `allowlisted`) · 고민 한 줄 · 댓글 · 게시 결과(결과 배지와 그 시각, 이유 배지)입니다.
+  영상 설명 · 인기 댓글 · 채널 · 검색어 · 자체 검사 이유는 화면에 싣지 않습니다.
+- **판단한 쪽.** 그 영상의 마지막 `CLASSIFY` 줄의 `judge=`, 그 줄에 없으면 그 줄 앞 마지막 `START` 줄의 `judge=` 입니다.
+  둘 다 없거나(Phase 7B 전의 줄) 저장된 판별이 없는 영상(오류 보류)이면 빈칸입니다.
+- **늦은 로그 줄.** 그 영상(`video=`)의 `SKIP` · `ERROR` · `POST … mode=test result=rehearsed` 줄 가운데 저장소의 마지막 결과
+  (댓글 시각과 마지막 시도 시각 중 늦은 쪽)와 같은 초이거나 그보다 늦은 줄입니다 — 로그 시각이 초 단위라 같은 초는 늦은 쪽으로 셉니다.
+  댓글도 시도도 없으면 그 영상의 그런 줄 모두입니다. 그보다 이른 줄은 이유로 쓰지 않습니다.
+- **결과 배지.** 늦은 로그 줄 가운데 파일에서 마지막 줄이 리허설 `POST` 이면 "리허설 — 게시 버튼 앞에서 멈춤" 입니다.
+  아니면 저장소의 마지막 시도로 정합니다 — `live/posted` "게시됨" · `live/reserved` "게시 결과 모름 — 로그 참고" ·
+  `live/failed` "게시 실패 — 로그 참고" · `test/saved` 는 그 시도 `reason` 의 이름표(아래 표)입니다.
+  시도도 리허설도 없으면 댓글이 있을 때 "게시 기록 없음", 없을 때 "댓글 안 씀" 입니다.
+  결과 배지 아래에는 그 결과의 시각(시도의 `at`, 리허설 줄의 시각)을 KST 초로 적습니다 — 지난 사이클의 결과일 수 있습니다.
+- **이유 배지.** 늦은 로그 줄 가운데 파일에서 마지막 줄이 `SKIP` 이면 그 `reason=` 의 이름표, `ERROR` 이면 그 `where=` 의 이름표입니다.
+  마지막 줄이 리허설이거나 늦은 줄이 없으면 이유 배지는 없습니다.
+- **이름표.** 이유 글이 아래 코드와 정확히 같거나 아래 머리말로 시작하면 그 이름표이고, 아니면 "기타 — 로그 참고" 입니다.
+  `where=` 는 아래 단계와 정확히 같을 때 그 이름표이고, 아니면 "기타 — 로그 참고" 입니다.
+  로그 줄의 글(`reason=` · `where=` · `detail=` · `page_url=` · `screenshot=` 등)은 화면에 한 글자도 옮기지 않습니다.
+  새 건너뜀 · 오류 이유를 더하는 페이즈가 이 표에 한 줄을 더합니다.
+
+  | 코드 · 머리말 | 이름표 |
+  |---|---|
+  | `channel_cooldown` | 같은 채널 대기 중 |
+  | `daily_cap` | 하루 상한에 닿음 |
+  | `duplicate_video` | 이미 처리한 영상 |
+  | `not_in_allowlist` | 허용 목록 밖이라 게시하지 않음 |
+  | `invalid_video` | 영상 주소를 읽을 수 없음 |
+  | `dry_run` | 테스트 실행 — 저장만 |
+  | `no_comment` | 댓글 없음 |
+  | `config_rejected` | 설정 거절로 저장만 |
+  | `unavailable` | 영상을 볼 수 없음 |
+  | `재료에 장면 없음`으로 시작 | 작성 건너뜀 — 짚을 장면 없음 |
+  | `재료에 연애 고민 없음`으로 시작 | 작성 건너뜀 — 연애 고민 없음 |
+  | `검사 두 번 탈락`으로 시작 | 검사 두 번 탈락 |
+  | `claude 호출 실패`로 시작 | AI 호출 오류 (Claude) |
+  | `jev 검사 호출 실패`로 시작 | AI 호출 오류 (jev 검사) |
+  | `jev 검사 응답 이상`으로 시작 | AI 응답 이상 (jev 검사) |
+
+  | `where=` | 이름표 |
+  |---|---|
+  | `classify` · `run.classify` | 판별 단계 오류 |
+  | `run.trigger` | 타이밍 단계 오류 |
+  | `commentThreads.list` | 인기 댓글을 받지 못함 |
+  | `writer.claude` | AI 호출 오류 (Claude) |
+  | `writer.jev` | AI 호출 오류 (jev 검사) |
+  | `run.write` | 작성 단계 오류 |
+  | `poster` · `run.post` | 게시 단계 오류 |
+- **바깥 글.** 제목 · 판별 이유 · 타이밍 이유 · 고민 · 댓글 · 판단한 쪽은 `html.escape`(따옴표 포함)를 거친 글자로 들어가고, 줄 경계는 `<br>` 입니다.
+  영상 링크는 코드가 영상 ID 로 만든 `https://www.youtube.com/watch?v=<ID>` 뿐이고, 바깥 주소 · 리허설 캡처 경로는 넣지 않습니다.
+  외부 스크립트 · 글꼴 · 스타일 파일을 불러오지 않습니다.
+- **쓰기.** `data/` 를 만들고 `data/report.html.tmp` 에 UTF-8 로 쓴 뒤 `os.replace` 로 바꿔 끼웁니다(저장소 `save` 와 같은 길).
+- **실패.** 로그를 읽지 못하면(`OSError` · `ValueError`) `ERROR where=report reason=<예외 종류>: <메시지>` 한 줄을 쓰고, 이유 배지를 모두
+  "로그를 읽지 못함" 으로, 리허설 · 판단한 쪽을 비운 채 저장소 칸으로 화면을 씁니다. 화면을 만들거나 쓰다 난 그 밖의 `Exception` 도
+  `ERROR where=report` 한 줄로 남기고 사이클은 그대로 끝납니다. `KeyboardInterrupt` 같은 `BaseException` 은 그대로 올라갑니다.
+- **음성 대조.** `python3 -m tests.mutants <이름>` — `report-late-filter-off` · `report-raw-reason` · `report-unescaped` ·
+  `report-prefix-anywhere` · `run-report-fence-narrow` · `run-report-log-degrade-silent`.
+
 ## 공개용 사본 — `tests/public_copy.py` (Phase 8)
 
 공개는 이 저장소가 아니라, 비공개 개발 하네스의 경로를 모든 커밋에서 지운 사본으로 합니다(트래커 Phase 8). 사본을 만들고 push 하는 일은 사람이 합니다.
