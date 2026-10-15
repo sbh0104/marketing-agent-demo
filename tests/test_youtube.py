@@ -305,6 +305,16 @@ class LedgerTest(YouTubeCase):
             ],
         )
 
+    def test_prune_boundary_at_48_hours(self) -> None:
+        # 쓰기 한 번 뒤 딱 48시간 된 항목은 지워지고 48시간에서 1초 모자란 항목은 남습니다 (계약 '쓸 때 48시간이 지난 항목은 지움')
+        keep = timedelta(hours=48)
+        entries = searches(1, NOW - keep) + searches(1, NOW - keep + SECOND)
+        client = self.client(FakeFetch(), entries)
+        client.search("연애", WINDOW_START, None, NOW, limits(90))
+        stored = [entry["at"] for entry in self.stored()]
+        self.assertNotIn("2026-10-10T12:00:00+00:00", stored)
+        self.assertIn("2026-10-10T12:00:01+00:00", stored)
+
     def test_fast_clock_writes_keep_real_entries_rn3(self) -> None:
         # 10시간 앞선 시계의 쓰기가 실제 검색 기록을 지우면 고친 시계에서 상한을 넘겨 허락합니다 (R-N3)
         fast = NOW + timedelta(hours=10)
@@ -839,13 +849,13 @@ class HttpGetTest(unittest.TestCase):
         self.assert_request(server)
 
     def assert_overrun(self, url: str) -> None:
-        """상한 1초 안에 TimeoutError("요청 전체가 1초 상한을 넘었습니다") 로 끝나는지 — 2.5초 안쪽."""
+        """상한 1초 안에 TimeoutError("요청 전체가 1초 상한을 넘었습니다") 로 끝나는지 — 1.8초 안쪽."""
         started = time.monotonic()
         with self.assertRaises(TimeoutError) as caught:
             http_get(url, 1.0)
         elapsed = time.monotonic() - started
         self.assertEqual(str(caught.exception), "요청 전체가 1초 상한을 넘었습니다")
-        self.assertLess(elapsed, 2.5)
+        self.assertLess(elapsed, 1.8)
 
     def test_redirect_is_returned_not_followed(self) -> None:
         # 트래커 7A ③(나) — 다섯 코드 모두 따라가지 않고 3xx 를 그대로 돌려줍니다
@@ -920,9 +930,20 @@ class HttpGetTest(unittest.TestCase):
             thread for thread in threading.enumerate()
             if thread not in before and thread.name == "http_get"
         ]
+        self.assertNotEqual(workers, [], "새 http_get 일꾼 스레드를 하나도 보지 못했습니다")
         for worker in workers:
             worker.join(timeout=1.5)
         self.assertEqual([worker for worker in workers if worker.is_alive()], [])
+
+    def test_each_read_gets_the_timeout_value(self) -> None:
+        # 일꾼의 opener 는 http_get 이 받은 timeout 값을 읽기마다의 timeout 으로 그대로 받습니다
+        original = urllib.request.OpenerDirector.open
+        server = self.serve(lambda target: response(200, b'{"items": []}'))
+        with mock.patch.object(
+            urllib.request.OpenerDirector, "open", autospec=True, side_effect=original
+        ) as spy:
+            self.assertEqual(http_get(server.url + GET_PATH, 12.5), (200, b'{"items": []}'))
+        self.assertEqual([call.kwargs.get("timeout") for call in spy.call_args_list], [12.5])
 
     def test_opener_is_urlopens_without_the_redirect_handler(self) -> None:
         dropped = {
