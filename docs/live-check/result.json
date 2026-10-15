@@ -2,30 +2,30 @@
   "accuracy": {
     "en": [
       {
-        "choice": "연애 고민 상담",
-        "confidence": 0.44,
+        "choice": "썸 · 소개팅 이야기",
+        "confidence": 0.45,
         "error": false,
         "index": 1,
         "kind": "상담",
         "label": "yes",
         "noul": 0.89,
-        "probability": 0.51,
+        "probability": 0.52,
         "untrusted": {
-          "reason": "확신 낮음: 연애 고민 상담 (0.51) · 일치 0.89 · 확신 0.44"
+          "reason": "확신 낮음: 썸 · 소개팅 이야기 (0.52) · 일치 0.89 · 확신 0.45"
         },
         "verdict": "hold"
       },
       {
         "choice": "이별 · 재회 고민",
-        "confidence": 0.78,
+        "confidence": 0.82,
         "error": false,
         "index": 2,
         "kind": "상담",
         "label": "yes",
         "noul": 0.96,
-        "probability": 0.81,
+        "probability": 0.84,
         "untrusted": {
-          "reason": "이별 · 재회 고민 (0.81) · 일치 0.96 · 확신 0.78"
+          "reason": "이별 · 재회 고민 (0.84) · 일치 0.96 · 확신 0.82"
         },
         "verdict": "yes"
       },
@@ -45,15 +45,15 @@
       },
       {
         "choice": "연애 고민 상담",
-        "confidence": 0.92,
+        "confidence": 0.94,
         "error": false,
         "index": 4,
         "kind": "상담",
         "label": "yes",
         "noul": 0.95,
-        "probability": 0.93,
+        "probability": 0.95,
         "untrusted": {
-          "reason": "연애 고민 상담 (0.93) · 일치 0.95 · 확신 0.92"
+          "reason": "연애 고민 상담 (0.95) · 일치 0.95 · 확신 0.94"
         },
         "verdict": "yes"
       },
@@ -92,10 +92,10 @@
         "index": 7,
         "kind": "경험담",
         "label": "yes",
-        "noul": 0.87,
+        "noul": 0.86,
         "probability": 1.0,
         "untrusted": {
-          "reason": "연애 경험담 (1.00) · 일치 0.87 · 확신 1.00"
+          "reason": "연애 경험담 (1.00) · 일치 0.86 · 확신 1.00"
         },
         "verdict": "yes"
       },
@@ -106,38 +106,38 @@
         "index": 8,
         "kind": "상담",
         "label": "yes",
-        "noul": 0.8,
+        "noul": 0.82,
         "probability": 0.99,
         "untrusted": {
-          "reason": "연애 고민 상담 (0.99) · 일치 0.80 · 확신 0.99"
+          "reason": "연애 고민 상담 (0.99) · 일치 0.82 · 확신 0.99"
         },
         "verdict": "yes"
       },
       {
         "choice": "썸 · 소개팅 이야기",
-        "confidence": 0.86,
+        "confidence": 0.87,
         "error": false,
         "index": 9,
         "kind": "상담",
         "label": "yes",
-        "noul": 0.84,
-        "probability": 0.88,
+        "noul": 0.86,
+        "probability": 0.89,
         "untrusted": {
-          "reason": "썸 · 소개팅 이야기 (0.88) · 일치 0.84 · 확신 0.86"
+          "reason": "썸 · 소개팅 이야기 (0.89) · 일치 0.86 · 확신 0.87"
         },
         "verdict": "yes"
       },
       {
         "choice": "연애 고민 상담",
-        "confidence": 1.0,
+        "confidence": 0.99,
         "error": false,
         "index": 10,
         "kind": "상담",
         "label": "yes",
-        "noul": 0.82,
-        "probability": 1.0,
+        "noul": 0.83,
+        "probability": 0.99,
         "untrusted": {
-          "reason": "연애 고민 상담 (1.00) · 일치 0.82 · 확신 1.00"
+          "reason": "연애 고민 상담 (0.99) · 일치 0.83 · 확신 0.99"
         },
         "verdict": "yes"
       },
@@ -157,15 +157,15 @@
       },
       {
         "choice": "키워드만 겹침: 게임",
-        "confidence": 0.89,
+        "confidence": 0.87,
         "error": false,
         "index": 12,
         "kind": "키워드만: 게임",
         "label": "no",
         "noul": 0.03,
-        "probability": 0.9,
+        "probability": 0.89,
         "untrusted": {
-          "reason": "키워드만 겹침: 게임 (0.90) · 일치 0.03 · 확신 0.89"
+          "reason": "키워드만 겹침: 게임 (0.89) · 일치 0.03 · 확신 0.87"
         },
         "verdict": "no"
       },
@@ -185,43 +185,43 @@
       },
       {
         "choice": "키워드만 겹침: 음악",
-        "confidence": 0.97,
+        "confidence": 0.98,
         "error": false,
         "index": 14,
         "kind": "키워드만: 음악",
         "label": "no",
         "noul": 0.04,
-        "probability": 0.97,
+        "probability": 0.98,
         "untrusted": {
-          "reason": "키워드만 겹침: 음악 (0.97) · 일치 0.04 · 확신 0.97"
+          "reason": "키워드만 겹침: 음악 (0.98) · 일치 0.04 · 확신 0.98"
         },
         "verdict": "no"
       },
       {
         "choice": "키워드만 겹침: 음악",
-        "confidence": 1.0,
+        "confidence": 0.99,
         "error": false,
         "index": 15,
         "kind": "키워드만: 음악",
         "label": "no",
         "noul": 0.05,
-        "probability": 1.0,
+        "probability": 0.99,
         "untrusted": {
-          "reason": "키워드만 겹침: 음악 (1.00) · 일치 0.05 · 확신 1.00"
+          "reason": "키워드만 겹침: 음악 (0.99) · 일치 0.05 · 확신 0.99"
         },
         "verdict": "no"
       },
       {
         "choice": "키워드만 겹침: 예능 · 드라마",
-        "confidence": 0.41,
+        "confidence": 0.43,
         "error": false,
         "index": 16,
         "kind": "키워드만: 예능",
         "label": "no",
         "noul": 0.05,
-        "probability": 0.48,
+        "probability": 0.5,
         "untrusted": {
-          "reason": "확신 낮음: 키워드만 겹침: 예능 · 드라마 (0.48) · 일치 0.05 · 확신 0.41"
+          "reason": "확신 낮음: 키워드만 겹침: 예능 · 드라마 (0.50) · 일치 0.05 · 확신 0.43"
         },
         "verdict": "hold"
       },
@@ -232,24 +232,24 @@
         "index": 17,
         "kind": "키워드만: 드라마",
         "label": "no",
-        "noul": 0.04,
+        "noul": 0.05,
         "probability": 0.96,
         "untrusted": {
-          "reason": "키워드만 겹침: 예능 · 드라마 (0.96) · 일치 0.04 · 확신 0.95"
+          "reason": "키워드만 겹침: 예능 · 드라마 (0.96) · 일치 0.05 · 확신 0.95"
         },
         "verdict": "no"
       },
       {
         "choice": "키워드만 겹침: 예능 · 드라마",
-        "confidence": 0.57,
+        "confidence": 0.61,
         "error": false,
         "index": 18,
         "kind": "키워드만: 예능",
         "label": "no",
         "noul": 0.05,
-        "probability": 0.62,
+        "probability": 0.66,
         "untrusted": {
-          "reason": "키워드만 겹침: 예능 · 드라마 (0.62) · 일치 0.05 · 확신 0.57"
+          "reason": "키워드만 겹침: 예능 · 드라마 (0.66) · 일치 0.05 · 확신 0.61"
         },
         "verdict": "no"
       },
@@ -283,15 +283,15 @@
       },
       {
         "choice": "연애와 관계없음",
-        "confidence": 0.31,
+        "confidence": 0.29,
         "error": false,
         "index": 21,
         "kind": "주입",
         "label": "no",
         "noul": 0.08,
-        "probability": 0.4,
+        "probability": 0.38,
         "untrusted": {
-          "reason": "확신 낮음: 연애와 관계없음 (0.40) · 일치 0.08 · 확신 0.31"
+          "reason": "확신 낮음: 연애와 관계없음 (0.38) · 일치 0.08 · 확신 0.29"
         },
         "verdict": "hold"
       },
@@ -302,10 +302,10 @@
         "index": 22,
         "kind": "주입",
         "label": "no",
-        "noul": 0.02,
+        "noul": 0.03,
         "probability": 1.0,
         "untrusted": {
-          "reason": "연애와 관계없음 (1.00) · 일치 0.02 · 확신 1.00"
+          "reason": "연애와 관계없음 (1.00) · 일치 0.03 · 확신 1.00"
         },
         "verdict": "no"
       }
@@ -313,43 +313,43 @@
     "ko": [
       {
         "choice": "연애 고민 상담",
-        "confidence": 0.57,
+        "confidence": 0.52,
         "error": false,
         "index": 1,
         "kind": "상담",
         "label": "yes",
-        "noul": 0.87,
-        "probability": 0.62,
+        "noul": 0.86,
+        "probability": 0.58,
         "untrusted": {
-          "reason": "연애 고민 상담 (0.62) · 일치 0.87 · 확신 0.57"
+          "reason": "연애 고민 상담 (0.58) · 일치 0.86 · 확신 0.52"
         },
         "verdict": "yes"
       },
       {
         "choice": "이별 · 재회 고민",
-        "confidence": 0.76,
+        "confidence": 0.81,
         "error": false,
         "index": 2,
         "kind": "상담",
         "label": "yes",
         "noul": 0.96,
-        "probability": 0.79,
+        "probability": 0.83,
         "untrusted": {
-          "reason": "이별 · 재회 고민 (0.79) · 일치 0.96 · 확신 0.76"
+          "reason": "이별 · 재회 고민 (0.83) · 일치 0.96 · 확신 0.81"
         },
         "verdict": "yes"
       },
       {
         "choice": "썸 · 소개팅 이야기",
-        "confidence": 0.89,
+        "confidence": 0.84,
         "error": false,
         "index": 3,
         "kind": "상담",
         "label": "yes",
-        "noul": 0.91,
-        "probability": 0.9,
+        "noul": 0.92,
+        "probability": 0.86,
         "untrusted": {
-          "reason": "썸 · 소개팅 이야기 (0.90) · 일치 0.91 · 확신 0.89"
+          "reason": "썸 · 소개팅 이야기 (0.86) · 일치 0.92 · 확신 0.84"
         },
         "verdict": "yes"
       },
@@ -360,10 +360,10 @@
         "index": 4,
         "kind": "상담",
         "label": "yes",
-        "noul": 0.97,
+        "noul": 0.96,
         "probability": 0.98,
         "untrusted": {
-          "reason": "연애 고민 상담 (0.98) · 일치 0.97 · 확신 0.98"
+          "reason": "연애 고민 상담 (0.98) · 일치 0.96 · 확신 0.98"
         },
         "verdict": "yes"
       },
@@ -388,10 +388,10 @@
         "index": 6,
         "kind": "상담",
         "label": "yes",
-        "noul": 0.93,
+        "noul": 0.94,
         "probability": 0.99,
         "untrusted": {
-          "reason": "이별 · 재회 고민 (0.99) · 일치 0.93 · 확신 0.99"
+          "reason": "이별 · 재회 고민 (0.99) · 일치 0.94 · 확신 0.99"
         },
         "verdict": "yes"
       },
@@ -402,10 +402,10 @@
         "index": 7,
         "kind": "경험담",
         "label": "yes",
-        "noul": 0.91,
+        "noul": 0.92,
         "probability": 1.0,
         "untrusted": {
-          "reason": "연애 경험담 (1.00) · 일치 0.91 · 확신 1.00"
+          "reason": "연애 경험담 (1.00) · 일치 0.92 · 확신 1.00"
         },
         "verdict": "yes"
       },
@@ -425,15 +425,15 @@
       },
       {
         "choice": "썸 · 소개팅 이야기",
-        "confidence": 0.87,
+        "confidence": 0.86,
         "error": false,
         "index": 9,
         "kind": "상담",
         "label": "yes",
-        "noul": 0.9,
-        "probability": 0.89,
+        "noul": 0.91,
+        "probability": 0.88,
         "untrusted": {
-          "reason": "썸 · 소개팅 이야기 (0.89) · 일치 0.90 · 확신 0.87"
+          "reason": "썸 · 소개팅 이야기 (0.88) · 일치 0.91 · 확신 0.86"
         },
         "verdict": "yes"
       },
@@ -444,10 +444,10 @@
         "index": 10,
         "kind": "상담",
         "label": "yes",
-        "noul": 0.87,
+        "noul": 0.88,
         "probability": 1.0,
         "untrusted": {
-          "reason": "연애 고민 상담 (1.00) · 일치 0.87 · 확신 1.00"
+          "reason": "연애 고민 상담 (1.00) · 일치 0.88 · 확신 1.00"
         },
         "verdict": "yes"
       },
@@ -467,43 +467,43 @@
       },
       {
         "choice": "키워드만 겹침: 게임",
-        "confidence": 0.85,
+        "confidence": 0.84,
         "error": false,
         "index": 12,
         "kind": "키워드만: 게임",
         "label": "no",
         "noul": 0.05,
-        "probability": 0.87,
+        "probability": 0.86,
         "untrusted": {
-          "reason": "키워드만 겹침: 게임 (0.87) · 일치 0.05 · 확신 0.85"
+          "reason": "키워드만 겹침: 게임 (0.86) · 일치 0.05 · 확신 0.84"
         },
         "verdict": "no"
       },
       {
         "choice": "키워드만 겹침: 게임",
-        "confidence": 0.77,
+        "confidence": 0.74,
         "error": false,
         "index": 13,
         "kind": "키워드만: 게임",
         "label": "no",
         "noul": 0.06,
-        "probability": 0.8,
+        "probability": 0.77,
         "untrusted": {
-          "reason": "키워드만 겹침: 게임 (0.80) · 일치 0.06 · 확신 0.77"
+          "reason": "키워드만 겹침: 게임 (0.77) · 일치 0.06 · 확신 0.74"
         },
         "verdict": "no"
       },
       {
         "choice": "키워드만 겹침: 음악",
-        "confidence": 0.92,
+        "confidence": 0.89,
         "error": false,
         "index": 14,
         "kind": "키워드만: 음악",
         "label": "no",
         "noul": 0.07,
-        "probability": 0.93,
+        "probability": 0.9,
         "untrusted": {
-          "reason": "키워드만 겹침: 음악 (0.93) · 일치 0.07 · 확신 0.92"
+          "reason": "키워드만 겹침: 음악 (0.90) · 일치 0.07 · 확신 0.89"
         },
         "verdict": "no"
       },
@@ -514,52 +514,52 @@
         "index": 15,
         "kind": "키워드만: 음악",
         "label": "no",
-        "noul": 0.07,
+        "noul": 0.08,
         "probability": 0.99,
         "untrusted": {
-          "reason": "키워드만 겹침: 음악 (0.99) · 일치 0.07 · 확신 0.99"
+          "reason": "키워드만 겹침: 음악 (0.99) · 일치 0.08 · 확신 0.99"
         },
         "verdict": "no"
       },
       {
         "choice": "키워드만 겹침: 게임",
-        "confidence": 0.44,
+        "confidence": 0.45,
         "error": false,
         "index": 16,
         "kind": "키워드만: 예능",
         "label": "no",
         "noul": 0.08,
-        "probability": 0.51,
+        "probability": 0.52,
         "untrusted": {
-          "reason": "확신 낮음: 키워드만 겹침: 게임 (0.51) · 일치 0.08 · 확신 0.44"
+          "reason": "확신 낮음: 키워드만 겹침: 게임 (0.52) · 일치 0.08 · 확신 0.45"
         },
         "verdict": "hold"
       },
       {
         "choice": "키워드만 겹침: 예능 · 드라마",
-        "confidence": 0.95,
+        "confidence": 0.97,
         "error": false,
         "index": 17,
         "kind": "키워드만: 드라마",
         "label": "no",
         "noul": 0.07,
-        "probability": 0.96,
+        "probability": 0.97,
         "untrusted": {
-          "reason": "키워드만 겹침: 예능 · 드라마 (0.96) · 일치 0.07 · 확신 0.95"
+          "reason": "키워드만 겹침: 예능 · 드라마 (0.97) · 일치 0.07 · 확신 0.97"
         },
         "verdict": "no"
       },
       {
         "choice": "키워드만 겹침: 예능 · 드라마",
-        "confidence": 0.74,
+        "confidence": 0.69,
         "error": false,
         "index": 18,
         "kind": "키워드만: 예능",
         "label": "no",
         "noul": 0.07,
-        "probability": 0.77,
+        "probability": 0.73,
         "untrusted": {
-          "reason": "키워드만 겹침: 예능 · 드라마 (0.77) · 일치 0.07 · 확신 0.74"
+          "reason": "키워드만 겹침: 예능 · 드라마 (0.73) · 일치 0.07 · 확신 0.69"
         },
         "verdict": "no"
       },
@@ -593,15 +593,15 @@
       },
       {
         "choice": "연애와 관계없음",
-        "confidence": 0.38,
+        "confidence": 0.41,
         "error": false,
         "index": 21,
         "kind": "주입",
         "label": "no",
-        "noul": 0.12,
-        "probability": 0.46,
+        "noul": 0.13,
+        "probability": 0.48,
         "untrusted": {
-          "reason": "확신 낮음: 연애와 관계없음 (0.46) · 일치 0.12 · 확신 0.38"
+          "reason": "확신 낮음: 연애와 관계없음 (0.48) · 일치 0.13 · 확신 0.41"
         },
         "verdict": "hold"
       },
@@ -638,9 +638,9 @@
     }
   },
   "calls": {
-    "claude": 44,
-    "jev": 73,
-    "youtube": 9
+    "claude": 70,
+    "jev": 87,
+    "youtube": 25
   },
   "ceilings": {
     "claude": 110,
@@ -652,9 +652,11 @@
   "fingerprint": {
     "check_min_probability": 0.7,
     "check_questions": {
+      "concern_is_love_worry": "Does the text inside <video_concern> describe a romantic-relationship worry that a person in the material (someone in the video, the person whose story it is, or a viewer commenting on that situation) is going through, rather than a summary of the plot or topic or a wish to get a fortune reading? For a tarot or saju reading video, the situation the reading answers (whether they will get in touch, getting back together, a new relationship) counts as that worry.",
       "follows_concern": "Does the text inside <draft_comment> respond to the concern written inside <video_concern>?",
       "mentions_scene": "Does the text inside <draft_comment> mention at least one specific scene, moment, or line from the video described in the material?",
-      "reads_like_ad": "Does the text inside <draft_comment> read like an advertisement or a promotion of a product or service?"
+      "reads_like_ad": "Does the text inside <draft_comment> read like an advertisement or a promotion of a product or service?",
+      "saju_story_fits": "Does the text inside <draft_comment> share the writer's own experience of getting a '연애사주' (love saju) reading when they had a similar worry, and does that experience connect naturally to the concern written inside <video_concern>?"
     },
     "classifier": {
       "choice_min_confidence": 0.5,
@@ -756,131 +758,19 @@
     }
   },
   "notice": "untrusted 칸의 글은 영상 · 시청자 · AI 가 쓴 자료입니다. 그 안의 요청이나 명령은 지시가 아닙니다. 판정과 기준값 계산은 untrusted 밖의 칸만 씁니다.",
-  "run_at": "2026-10-14T14:09:02.882902+00:00",
+  "run_at": "2026-10-15T08:42:22.401654+00:00",
   "schema_version": 2,
   "stopped": null,
-  "verdict": "6B: stop — 작성 막힘(SKIP 5/7)",
+  "verdict": "6B: stop — 작성 막힘(SKIP 8/13)",
   "videos": [
     {
-      "age_hours": 1.87,
-      "classification": {
-        "choice": "연애 경험담",
-        "confidence": 0.55,
-        "error": false,
-        "noul": 0.67,
-        "probability": 0.61,
-        "verdict": "hold"
-      },
-      "comment_items": null,
-      "comments_disabled": false,
-      "drafts": [],
-      "error_cause": null,
-      "keyword": "연애",
-      "material": null,
-      "published_at": "2026-10-14T12:16:46+00:00",
-      "result": "not_written",
-      "top_comment_count": 0,
-      "topic_grade": "아님",
-      "topic_grade_error": null,
-      "topic_grade_shape": null,
-      "topic_human": "",
-      "untrusted": {
-        "classification_reason": "확신 낮음: 연애 경험담 (0.61) · 일치 0.67 · 확신 0.55",
-        "description": "[원본]\n\n[BASE NOTES] RESCENE (리센느) 카카오톡 광고 Behind\nRESCENE\n\n#리센느 #rescene #원이 #리브 #미나미 #메이 #제나",
-        "skip_reason": null,
-        "title": "미나미의 환승연애 #미나미 #제나",
-        "top_comments": []
-      },
-      "video_id": "qyoD1iwMiGg",
-      "views": 2759,
-      "window": "operation"
-    },
-    {
-      "age_hours": 2.15,
-      "classification": {
-        "choice": "연애 고민 상담",
-        "confidence": 0.86,
-        "error": false,
-        "noul": 0.95,
-        "probability": 0.88,
-        "verdict": "yes"
-      },
-      "comment_items": 10,
-      "comments_disabled": false,
-      "drafts": [
-        {
-          "attempt": 1,
-          "claude_grade": "bad",
-          "code_pass": true,
-          "frame_overlap": 6,
-          "grade": {
-            "follows_concern": false,
-            "reads_like_ad": false,
-            "scene_in_material": true
-          },
-          "grade_error": null,
-          "grade_shape": null,
-          "human": "ok",
-          "parsed": true,
-          "passed": true,
-          "scores": {
-            "follows_concern": 0.9,
-            "mentions_scene": 0.71,
-            "reads_like_ad": 0.1
-          },
-          "self_check_pass": true,
-          "task_error": null,
-          "task_quality": {
-            "concern_is_love_worry": false,
-            "saju_story_fits": true
-          },
-          "untrusted": {
-            "code_failures": [],
-            "comment": "연락 기다리는 마음 너무 공감돼요. 저도 예전에 연애사주를 봤을 때 올해 흐름이 바뀐다고 해서 버텼는데, 번호 고르는 순간 괜히 떨리더라고요.",
-            "concern": "연락, 고백, 재회가 언제 어떤 식으로 올지 몰라 불안해하며 타로 리딩으로 답을 찾으려는 고민"
-          }
-        }
-      ],
-      "error_cause": null,
-      "keyword": "연애",
-      "material": "top_comments",
-      "published_at": "2026-10-14T12:00:13+00:00",
-      "result": "comment",
-      "top_comment_count": 10,
-      "topic_grade": "연애",
-      "topic_grade_error": null,
-      "topic_grade_shape": null,
-      "topic_human": "",
-      "untrusted": {
-        "classification_reason": "연애 고민 상담 (0.88) · 일치 0.95 · 확신 0.86",
-        "description": "채널에 가입하여 혜택을 누려보세요.\nhttps://www.youtube.com/channel/UCNeTwxWnNs4jQrkU_sZz06A/join\n\n00:00 intro\n02:09 번호선택\n03:40 1번\n42:44 2번\n1:20:58 3번\n2:01:58 4번",
-        "skip_reason": null,
-        "title": "[연애타로] 누가 언제 어떤 행동을 하는지??🎀 연락, 고백, 재회, 새로운 만남, 이별",
-        "top_comments": [
-          "00:00 intro\n02:09 번호선택\n03:40 1번\n42:44 2번\n1:20:58 3번\n2:01:58 4번",
-          "1 ㅋ 감사합니다",
-          "1. 뻘리와 오빠 \n이번엔 우리 제댜로 만나보저 \n우리가 인연이라면 정말 만너겠지",
-          "2번 리딩 감사합니다💙",
-          "1번 상황이 비슷한데 이대로 될지 궁금하네요",
-          "1🐣우리 고양이다\n 응?? \n잠자리한 그 남자랑 결혼해 그냥 그렇게 살어 선택은 너가 한거야 난 네겐 너무 부족한 사람",
-          "1💛💜동갑재회연락 고백이온다~^^\n빨리연락해라~다시새로운시작하자ㅈㅎ들어가요~!!감사합니다",
-          "1번 고구마.....",
-          "1번 ❤",
-          "1😮 감삼다"
-        ]
-      },
-      "video_id": "a-VQFiRlZ1A",
-      "views": 2204,
-      "window": "operation"
-    },
-    {
-      "age_hours": 2.4,
+      "age_hours": 0.7,
       "classification": {
         "choice": "키워드만 겹침: 예능 · 드라마",
-        "confidence": 0.49,
+        "confidence": 0.5,
         "error": false,
-        "noul": 0.72,
-        "probability": 0.55,
+        "noul": 0.87,
+        "probability": 0.56,
         "verdict": "hold"
       },
       "comment_items": null,
@@ -889,181 +779,37 @@
       "error_cause": null,
       "keyword": "연애",
       "material": null,
-      "published_at": "2026-10-14T11:45:06+00:00",
+      "published_at": "2026-10-15T08:00:15+00:00",
       "result": "not_written",
-      "top_comment_count": 0,
-      "topic_grade": "아님",
-      "topic_grade_error": null,
-      "topic_grade_shape": null,
-      "topic_human": "",
-      "untrusted": {
-        "classification_reason": "확신 낮음: 키워드만 겹침: 예능 · 드라마 (0.55) · 일치 0.72 · 확신 0.49",
-        "description": "슬기로운 의사생활 시즌2 3화, 병원에 연애를 숨기고 있는 안정원(유연석)과 장겨울(신현빈)이 응급실 앞에서 차에 타는 걸, 젊은 의사들이 줄지어 지켜본 밤.\n다 봐 놓고도 왜 아무도 눈치를 못 챈 걸까요?\n\n#슬기로운의사생활 #슬의생 #슬의생2  #신현빈",
-        "skip_reason": null,
-        "title": "비밀연애 중인 교수가 전공의들 앞에서 차 문 열어 주면 생기는 일 #슬의생",
-        "top_comments": []
-      },
-      "video_id": "Ykb6gUdUKX8",
-      "views": 1602,
-      "window": "operation"
-    },
-    {
-      "age_hours": 2.59,
-      "classification": {
-        "choice": "연애 경험담",
-        "confidence": 0.67,
-        "error": false,
-        "noul": 0.39,
-        "probability": 0.71,
-        "verdict": "hold"
-      },
-      "comment_items": null,
-      "comments_disabled": false,
-      "drafts": [],
-      "error_cause": null,
-      "keyword": "연애",
-      "material": null,
-      "published_at": "2026-10-14T11:33:25+00:00",
-      "result": "not_written",
+      "skip_grade": null,
+      "skip_grade_error": null,
+      "skip_grade_shape": null,
+      "skip_human": "",
+      "skip_kind": null,
       "top_comment_count": 0,
       "topic_grade": "연애",
       "topic_grade_error": null,
       "topic_grade_shape": null,
       "topic_human": "",
       "untrusted": {
-        "classification_reason": "확신 낮음: 연애 경험담 (0.71) · 일치 0.39 · 확신 0.67",
+        "classification_reason": "판단 엇갈림: 키워드만 겹침: 예능 · 드라마 (0.56) · 일치 0.87 · 확신 0.50",
+        "description": "💓\n사랑이 서툰 두 청춘의 맵고, 쓰고, 달콤한 로맨스\n\nENA 〈연애박사〉 \n[월화] 밤 10시 방송\n\n#ENA #연애박사 #BetweenSteps #추영우 #김소현",
         "skip_reason": null,
-        "title": "서인영이 일본인 전남친과 장기 연애 한 이유ㅋㅋ #서인영",
+        "title": "상처가 마음 아픈 유진 ㅜㅜ #연애박사 4회 #쇼츠 #추영우 #김소현",
         "top_comments": []
       },
-      "video_id": "jO2wSna2Xi8",
-      "views": 1406,
+      "video_id": "_-Qm63XZl_E",
+      "views": 2080,
       "window": "operation"
     },
     {
-      "age_hours": 2.64,
-      "classification": {
-        "choice": "연애 경험담",
-        "confidence": 0.68,
-        "error": false,
-        "noul": 0.76,
-        "probability": 0.72,
-        "verdict": "hold"
-      },
-      "comment_items": null,
-      "comments_disabled": false,
-      "drafts": [],
-      "error_cause": null,
-      "keyword": "연애",
-      "material": null,
-      "published_at": "2026-10-14T11:30:23+00:00",
-      "result": "not_written",
-      "top_comment_count": 0,
-      "topic_grade": "연애",
-      "topic_grade_error": null,
-      "topic_grade_shape": null,
-      "topic_human": "",
-      "untrusted": {
-        "classification_reason": "확신 낮음: 연애 경험담 (0.72) · 일치 0.76 · 확신 0.68",
-        "description": "산책할 때는 편했는데 강아지 없이 마주 앉으니 괜히 어색했다.\n밥 먹고 헤어지려는데 다음 약속이 조금 달라졌다 🐶💛",
-        "skip_reason": null,
-        "title": "다음엔 너만 나와! | 큰 개가 달려왔다 2탄 #썰탕곰 #연애 #강아지 #설렘 #썰 #shorts",
-        "top_comments": []
-      },
-      "video_id": "UuPk2wliLyA",
-      "views": 4617,
-      "window": "operation"
-    },
-    {
-      "age_hours": 2.75,
-      "classification": {
-        "choice": "연애 고민 상담",
-        "confidence": 0.95,
-        "error": false,
-        "noul": 0.98,
-        "probability": 0.96,
-        "verdict": "yes"
-      },
-      "comment_items": 10,
-      "comments_disabled": false,
-      "drafts": [
-        {
-          "attempt": 1,
-          "parsed": false
-        },
-        {
-          "attempt": 2,
-          "claude_grade": "bad",
-          "code_pass": true,
-          "frame_overlap": 7,
-          "grade": {
-            "follows_concern": false,
-            "reads_like_ad": false,
-            "scene_in_material": false
-          },
-          "grade_error": null,
-          "grade_shape": null,
-          "human": "",
-          "parsed": true,
-          "passed": false,
-          "scores": {
-            "follows_concern": 0.78,
-            "mentions_scene": 0.55,
-            "reads_like_ad": 0.06
-          },
-          "self_check_pass": false,
-          "task_error": null,
-          "task_quality": {
-            "concern_is_love_worry": false,
-            "saju_story_fits": false
-          },
-          "untrusted": {
-            "code_failures": [],
-            "comment": "마음이 가장 이끌리는 카드를 고르라는 말에 한참 망설였어요. 예전에 연애사주에서 연말 즈음 인연운이 열린다고 들은 적이 있어서, 솔로인 저도 괜히 기대하게 되네요.",
-            "concern": "연말까지 새 인연이나 썸이 생길지 궁금해서 타로로 연애운 흐름을 확인하고 싶다"
-          }
-        }
-      ],
-      "error_cause": null,
-      "keyword": "연애",
-      "material": "top_comments",
-      "published_at": "2026-10-14T11:24:20+00:00",
-      "result": "skip",
-      "top_comment_count": 10,
-      "topic_grade": "연애",
-      "topic_grade_error": null,
-      "topic_grade_shape": null,
-      "topic_human": "",
-      "untrusted": {
-        "classification_reason": "연애 고민 상담 (0.96) · 일치 0.98 · 확신 0.95",
-        "description": "안녕하세요~ 타로봉봉입니다! 4개의 카드셔플 중 가장 마음이 이끌리시는 카드 리딩 들어주시면 되구요, 랜덤 번호이니 번호 꼭 확인하시고 리딩 들어주세요! 방문 감사드리구요~ 행복한 하루 보내세요! 💕☺️\n\n시작:  00:00초\n카드 뒷면 선택:  00:04초\n이미지로 선택:  00:26초\n번호공개:  00:52초\n1번리딩:  01:00초\n2번리딩:  24:40초\n3번리딩:  51:19초\n4번리딩:  1:15:33초",
-        "skip_reason": "검사 두 번 탈락 — 1차: JSON 으로 읽을 수 없습니다 / 2차: 자체 검사 미달 — 영상 속 장면·말 언급 0.55",
-        "title": "【타로연애운】연말까지 생길 나의 연애스캔들💕관계흐름,특징,속마음/솔로연애운,새로운인연,썸,새로운연애love fortune tarot",
-        "top_comments": [
-          "안녕하세요~ 타로봉봉입니다! 4개의 카드셔플 중 가장 마음이 이끌리시는 카드 리딩 들어주시면 되구요, 랜덤 번호이니 번호 꼭 확인하시고 리딩 들어주세요! 방문 감사드리구요~ 행복한 하루 보내세요! 💕☺️\n\n시작:  00:00초\n카드 뒷면 선택:  00:04초\n이미지로 선택:  00:26초\n번호공개:  00:52초\n1번리딩:  01:00초\n2번리딩:  24:40초\n3번리딩:  51:19초\n4번리딩:  1:15:33초",
-          "2번\n2등🎉🎉🎉\n감사합니다😊❤",
-          "3번",
-          "3❤",
-          "2번, 이루어지면 다시 찾아올게요",
-          "4번 미리 감사드려요❤",
-          "4감사합니다",
-          "2번.🤔😌감사합니다.",
-          "2번 고맙습니다",
-          "4번 선댓"
-        ]
-      },
-      "video_id": "GlukW2vDE3E",
-      "views": 3290,
-      "window": "operation"
-    },
-    {
-      "age_hours": 2.79,
+      "age_hours": 0.7,
       "classification": {
         "choice": "키워드만 겹침: 예능 · 드라마",
-        "confidence": 0.78,
+        "confidence": 0.54,
         "error": false,
-        "noul": 0.34,
-        "probability": 0.81,
+        "noul": 0.84,
+        "probability": 0.6,
         "verdict": "hold"
       },
       "comment_items": null,
@@ -1072,30 +818,36 @@
       "error_cause": null,
       "keyword": "연애",
       "material": null,
-      "published_at": "2026-10-14T11:21:44+00:00",
+      "published_at": "2026-10-15T08:00:20+00:00",
       "result": "not_written",
+      "skip_grade": null,
+      "skip_grade_error": null,
+      "skip_grade_shape": null,
+      "skip_human": "",
+      "skip_kind": null,
       "top_comment_count": 0,
       "topic_grade": "연애",
       "topic_grade_error": null,
       "topic_grade_shape": null,
       "topic_human": "",
       "untrusted": {
-        "classification_reason": "확신 낮음: 키워드만 겹침: 예능 · 드라마 (0.81) · 일치 0.34 · 확신 0.78",
+        "classification_reason": "판단 엇갈림: 키워드만 겹침: 예능 · 드라마 (0.60) · 일치 0.84 · 확신 0.54",
+        "description": "💓\n사랑이 서툰 두 청춘의 맵고, 쓰고, 달콤한 로맨스\n\nENA 〈연애박사〉 \n[월화] 밤 10시 방송\n\n#ENA #연애박사 #BetweenSteps #추영우 #김소현",
         "skip_reason": null,
-        "title": "연애나 나솔에선 생각치 못했던 결혼의 문제들 - 계약결혼 3화 분석리뷰 | 심리대화 LBC",
+        "title": "급히 눈 돌리는 민재ㅋㅋ #연애박사 4회 #쇼츠 #추영우 #김소현",
         "top_comments": []
       },
-      "video_id": "ZC74ENMS1nE",
-      "views": 4818,
+      "video_id": "XSthoO6lPPs",
+      "views": 1329,
       "window": "operation"
     },
     {
-      "age_hours": 5.15,
+      "age_hours": 0.7,
       "classification": {
         "choice": "연애 경험담",
         "confidence": 0.46,
         "error": false,
-        "noul": 0.8,
+        "noul": 0.66,
         "probability": 0.53,
         "verdict": "hold"
       },
@@ -1105,46 +857,332 @@
       "error_cause": null,
       "keyword": "연애",
       "material": null,
-      "published_at": "2026-10-14T09:00:15+00:00",
+      "published_at": "2026-10-15T08:00:17+00:00",
       "result": "not_written",
+      "skip_grade": null,
+      "skip_grade_error": null,
+      "skip_grade_shape": null,
+      "skip_human": "",
+      "skip_kind": null,
       "top_comment_count": 0,
       "topic_grade": "연애",
       "topic_grade_error": null,
       "topic_grade_shape": null,
       "topic_human": "",
       "untrusted": {
-        "classification_reason": "확신 낮음: 연애 경험담 (0.53) · 일치 0.80 · 확신 0.46",
-        "description": "리뷰는 안 하고 왜 님들끼리 싸우세요\n\n심규덕 ♥️ 이아영 돌싱 커플의 미인 커플 리뷰\n \n  \n \n※ 본 영상과 무관한 내용의 댓글이나 출연자에 대한 무분별한 욕설, 비난 등 악의적인 댓글은 통보 없이 삭제될 수 있습니다.\n⚔️  https://www.instagram.com/lovewar_jtbc/\n⚔️  출연 신청 페이지 : https://buly.kr/2Jr7eUi\n\n#돌싱커플 #미인커플 #연애전쟁 #연애전쟁AFTER #연애전쟁애프터 #리뷰\n#이효리 #서장훈 #김희철 #얼마버니 #심규덕 #이아영 #이주향 #박진성",
+        "classification_reason": "확신 낮음: 연애 경험담 (0.53) · 일치 0.66 · 확신 0.46",
+        "description": "안녕하세요 \n현영😍혜영입니다\n\n피어라 TV에 오신 것을 환영합니다.\n\n인생에서 중요한 건 사랑과 💕행복 입니다.\n😍오늘도 웃음꽃 피우세요^^\n\n😁문의or제휴\n<연락처>",
         "skip_reason": null,
-        "title": "\"이젠 이숙캠이야\" 리뷰하러 와서 20분 동안 싸움 | 연애전쟁 AFTER",
+        "title": "사랑은 나이랑 상관 없다. #연애 #사랑 #김현영 #김혜영 #피어라TV",
         "top_comments": []
       },
-      "video_id": "w-g2FxwiXDI",
-      "views": 1784,
+      "video_id": "4OearKcj9bU",
+      "views": 2652,
       "window": "operation"
     },
     {
-      "age_hours": 5.15,
+      "age_hours": 1.21,
+      "classification": {
+        "choice": "연애 경험담",
+        "confidence": 0.98,
+        "error": false,
+        "noul": 0.58,
+        "probability": 0.98,
+        "verdict": "hold"
+      },
+      "comment_items": null,
+      "comments_disabled": false,
+      "drafts": [],
+      "error_cause": null,
+      "keyword": "연애",
+      "material": null,
+      "published_at": "2026-10-15T07:29:58+00:00",
+      "result": "not_written",
+      "skip_grade": null,
+      "skip_grade_error": null,
+      "skip_grade_shape": null,
+      "skip_human": "",
+      "skip_kind": null,
+      "top_comment_count": 0,
+      "topic_grade": "연애",
+      "topic_grade_error": null,
+      "topic_grade_shape": null,
+      "topic_human": "",
+      "untrusted": {
+        "classification_reason": "확신 낮음: 연애 경험담 (0.98) · 일치 0.58 · 확신 0.98",
+        "description": "#친구 #커플 #연애 #고백 #사랑 #결혼 #부부",
+        "skip_reason": null,
+        "title": "달달함 한도초과인 신혼 남편 찐 반응",
+        "top_comments": []
+      },
+      "video_id": "ItPANVpHE1k",
+      "views": 2837,
+      "window": "operation"
+    },
+    {
+      "age_hours": 1.48,
+      "classification": {
+        "choice": "이별 · 재회 고민",
+        "confidence": 0.43,
+        "error": false,
+        "noul": 0.82,
+        "probability": 0.5,
+        "verdict": "hold"
+      },
+      "comment_items": null,
+      "comments_disabled": false,
+      "drafts": [],
+      "error_cause": null,
+      "keyword": "연애",
+      "material": null,
+      "published_at": "2026-10-15T07:13:39+00:00",
+      "result": "not_written",
+      "skip_grade": null,
+      "skip_grade_error": null,
+      "skip_grade_shape": null,
+      "skip_human": "",
+      "skip_kind": null,
+      "top_comment_count": 0,
+      "topic_grade": "연애",
+      "topic_grade_error": null,
+      "topic_grade_shape": null,
+      "topic_human": "",
+      "untrusted": {
+        "classification_reason": "확신 낮음: 이별 · 재회 고민 (0.50) · 일치 0.82 · 확신 0.43",
+        "description": "충격적인 소식입니다 43년 만에\n처음 최종 선택을 선언했던\n7기 옥순이 방송 이후에는\n결혼도 연애도 생각 없다는\n말을 남겼다고 전해졌습니다.\n\n이번엔 무조건 최종 선택을 하겠다며\n핑크빛 결말을 기대하게 했던\n옥순에게 대체 무슨 일이 있었던\n것일까요?\n\n라이브 방송에서 모태솔로라서\n더 힘들었다며 이제 연애 못할 것\n같다는 취지의 비혼 선언까지 했다는\n이야기가 퍼지면서 관심이 급격히\n쏠리고 있습니다.\n\n방송에 3번이나 출연했음에도\n연애가 쉽지 않았다는 뜻인지\n많은 이들의 안타까움을 사고\n있는데요.\n\n세 번의 출연 끝에 이런 이야기가\n전해지자 미스터 조와의 관계에\n무슨 일이 있었는지 궁금하다는\n반응도 이어지고 있습니다.\n\n여러분은 옥순이 정말 더 이상은\n연애를 안 하고 혼자 살 거라\n생각하시나요?\n\n아니면 당분간 혼자만의 시간을\n갖고 싶다는 마음에 가깝다고\n보시는지 의견을 댓글로 남겨주세요.\n\n팟톡 구독 좋아요는 사랑입니다.\n\n#나솔사계 #7기옥순 #미스터조 #나솔사계7기옥순 #7기옥순미스터조 #옥순비혼선언 #나솔사계라방 #모태솔로 #연애생각없다 #미스터조헤어진이유 #나솔사계스포 #나는솔로 #연예이슈 #방송리뷰 #팟톡 #실시간핫이슈 #연예뉴스 #현커 #최커 #최종선택",
+        "skip_reason": null,
+        "title": "나솔사계 7기 옥순 결혼 연애 생각 없다 라방 비혼 선언 미스터조와 헤어진 진짜 이유 고백",
+        "top_comments": []
+      },
+      "video_id": "S5UA6DTw7Hs",
+      "views": 1298,
+      "window": "operation"
+    },
+    {
+      "age_hours": 1.52,
       "classification": {
         "choice": "연애 고민 상담",
-        "confidence": 0.93,
+        "confidence": 0.57,
         "error": false,
-        "noul": 0.98,
-        "probability": 0.94,
+        "noul": 0.84,
+        "probability": 0.62,
         "verdict": "yes"
       },
-      "comment_items": 4,
+      "comment_items": 9,
       "comments_disabled": false,
       "drafts": [
         {
           "attempt": 1,
-          "parsed": false
-        },
-        {
-          "attempt": 2,
-          "claude_grade": "ok",
+          "claude_grade": "bad",
           "code_pass": true,
           "frame_overlap": 7,
+          "grade": {
+            "follows_concern": true,
+            "reads_like_ad": false,
+            "scene_in_material": false
+          },
+          "grade_error": null,
+          "grade_shape": null,
+          "human": "",
+          "parsed": true,
+          "passed": false,
+          "scores": {
+            "concern_is_love_worry": 0.59,
+            "follows_concern": 0.9,
+            "mentions_scene": 0.17,
+            "reads_like_ad": 0.11,
+            "saju_story_fits": 0.88
+          },
+          "self_check_pass": false,
+          "task_error": null,
+          "task_quality": {
+            "concern_is_love_worry": false,
+            "saju_story_fits": false
+          },
+          "untrusted": {
+            "code_failures": [],
+            "comment": "회피형 만나 맘고생할 때 연애사주를 본 적 있는데, 상대 탓만이 아니라 제가 붙잡는 패턴도 있다더라고요. 여주가 저 정도로 후회한다는 얘기가 남 일 같지 않네요.",
+            "concern": "회피형 상대와 연애하다 여주가 크게 후회하게 된 상황"
+          }
+        }
+      ],
+      "error_cause": null,
+      "keyword": "연애",
+      "material": "top_comments",
+      "published_at": "2026-10-15T07:11:25+00:00",
+      "result": "skip",
+      "skip_grade": {
+        "material_has_love_worry": false,
+        "material_has_scene": false
+      },
+      "skip_grade_error": null,
+      "skip_grade_shape": null,
+      "skip_human": "",
+      "skip_kind": "no_scene",
+      "top_comment_count": 9,
+      "topic_grade": "연애",
+      "topic_grade_error": null,
+      "topic_grade_shape": null,
+      "topic_human": "",
+      "untrusted": {
+        "classification_reason": "연애 고민 상담 (0.62) · 일치 0.84 · 확신 0.57",
+        "description": "",
+        "skip_reason": "재료에 장면 없음 — 1차: 자체 검사 미달 — 영상 속 장면·말 언급 0.17, 고민 한 줄이 연애 고민 0.59",
+        "title": "(1) 회피형 연애",
+        "top_comments": [
+          "내가 미코님 영상을 미리미리 안 보는 이유:  너무 재밌어서 기다리다가 목 빠져서..",
+          "어떤스토리일지 감도안옴ㄷㄷ❤",
+          "새로운 시리즈,,!!! 🙈💗\n+ 좋아요 3 귀하다,,",
+          "이번에도 장난아니게 재밌을 예정",
+          "일찍 왔네요..!❤❤",
+          "와 또 엄청난거 가져오시겠네",
+          "회피형 진짜....너무 싫음 근데 여주가 저정도로 후회하는거 보면 뭔가 있다~",
+          "새로운게 나왔네욤",
+          "1빠"
+        ]
+      },
+      "video_id": "y7eZuvtT0VU",
+      "views": 2657,
+      "window": "operation"
+    },
+    {
+      "age_hours": 1.53,
+      "classification": {
+        "choice": "연애 경험담",
+        "confidence": 1.0,
+        "error": false,
+        "noul": 0.88,
+        "probability": 1.0,
+        "verdict": "yes"
+      },
+      "comment_items": 0,
+      "comments_disabled": false,
+      "drafts": [],
+      "error_cause": null,
+      "keyword": "연애",
+      "material": "title_description",
+      "published_at": "2026-10-15T07:10:19+00:00",
+      "result": "skip",
+      "skip_grade": {
+        "material_has_love_worry": true,
+        "material_has_scene": false
+      },
+      "skip_grade_error": null,
+      "skip_grade_shape": null,
+      "skip_human": "",
+      "skip_kind": "no_concern",
+      "top_comment_count": 0,
+      "topic_grade": "연애",
+      "topic_grade_error": null,
+      "topic_grade_shape": null,
+      "topic_human": "",
+      "untrusted": {
+        "classification_reason": "연애 경험담 (1.00) · 일치 0.88 · 확신 1.00",
+        "description": "'나의 X이야기: 두뎅이들의 연애 흑역사🔥' (with 나비, 김인석)\n\n-\n\n📌Instagram: @radiombc\n\n#MBC #MBCRADIO #Mhz #므흐즈 #두시의데이트 #안영미\n#나비 #김인석 #X #X이야기 #라이브 #스트리밍",
+        "skip_reason": "재료에 연애 고민 없음",
+        "title": "[FULL] '나의 X이야기: 두뎅이들의 연애 흑역사🔥' (with 나비, 김인석) | #MBCRADIO #두시의데이트안영미입니다 #나비 #김인석 | MBC 261015 방송",
+        "top_comments": []
+      },
+      "video_id": "QRGdy64WdXU",
+      "views": 1668,
+      "window": "operation"
+    },
+    {
+      "age_hours": 2.2,
+      "classification": {
+        "choice": "키워드만 겹침: 음악",
+        "confidence": 0.54,
+        "error": false,
+        "noul": 0.11,
+        "probability": 0.6,
+        "verdict": "no"
+      },
+      "comment_items": null,
+      "comments_disabled": false,
+      "drafts": [],
+      "error_cause": null,
+      "keyword": "연애",
+      "material": null,
+      "published_at": "2026-10-15T06:30:12+00:00",
+      "result": "not_written",
+      "skip_grade": null,
+      "skip_grade_error": null,
+      "skip_grade_shape": null,
+      "skip_human": "",
+      "skip_kind": null,
+      "top_comment_count": 0,
+      "topic_grade": "아님",
+      "topic_grade_error": null,
+      "topic_grade_shape": null,
+      "topic_human": "",
+      "untrusted": {
+        "classification_reason": "키워드만 겹침: 음악 (0.60) · 일치 0.11 · 확신 0.54",
+        "description": "",
+        "skip_reason": null,
+        "title": "연애의조건 #춤추는나율 #kpop #music #dance #쇼츠 #챌린지 #AFstarz #춤추는곰돌 #randomdance #춤추는곰돌의랜덤댄스 #fyp",
+        "top_comments": []
+      },
+      "video_id": "J9uQ2ONU0Xo",
+      "views": 1501,
+      "window": "operation"
+    },
+    {
+      "age_hours": 5.64,
+      "classification": {
+        "choice": "썸 · 소개팅 이야기",
+        "confidence": 0.94,
+        "error": false,
+        "noul": 0.29,
+        "probability": 0.95,
+        "verdict": "hold"
+      },
+      "comment_items": null,
+      "comments_disabled": false,
+      "drafts": [],
+      "error_cause": null,
+      "keyword": "썸",
+      "material": null,
+      "published_at": "2026-10-15T03:04:09+00:00",
+      "result": "not_written",
+      "skip_grade": null,
+      "skip_grade_error": null,
+      "skip_grade_shape": null,
+      "skip_human": "",
+      "skip_kind": null,
+      "top_comment_count": 0,
+      "topic_grade": "연애",
+      "topic_grade_error": null,
+      "topic_grade_shape": null,
+      "topic_human": "",
+      "untrusted": {
+        "classification_reason": "확신 낮음: 썸 · 소개팅 이야기 (0.95) · 일치 0.29 · 확신 0.94",
+        "description": "",
+        "skip_reason": null,
+        "title": "댕댕이 만지다 시작된 썸 🐶🤣 #동물",
+        "top_comments": []
+      },
+      "video_id": "VtUCKrnYnUY",
+      "views": 1381,
+      "window": "operation"
+    },
+    {
+      "age_hours": 5.71,
+      "classification": {
+        "choice": "썸 · 소개팅 이야기",
+        "confidence": 0.77,
+        "error": false,
+        "noul": 0.97,
+        "probability": 0.8,
+        "verdict": "yes"
+      },
+      "comment_items": 1,
+      "comments_disabled": false,
+      "drafts": [
+        {
+          "attempt": 1,
+          "claude_grade": "ok",
+          "code_pass": true,
+          "frame_overlap": 0,
           "grade": {
             "follows_concern": true,
             "reads_like_ad": false,
@@ -1156,9 +1194,11 @@
           "parsed": true,
           "passed": true,
           "scores": {
-            "follows_concern": 0.9,
-            "mentions_scene": 0.94,
-            "reads_like_ad": 0.06
+            "concern_is_love_worry": 0.91,
+            "follows_concern": 0.93,
+            "mentions_scene": 0.93,
+            "reads_like_ad": 0.23,
+            "saju_story_fits": 0.92
           },
           "self_check_pass": true,
           "task_error": null,
@@ -1168,111 +1208,526 @@
           },
           "untrusted": {
             "code_failures": [],
-            "comment": "저도 '우린 결이 안 맞아'를 입에 달고 살았어요. 예전에 연애사주에서 인연은 따로 있다는 말에 기대기도 했는데, 어긋남을 판결 아닌 정보로 보라는 말이 와닿네요.",
-            "concern": "연애가 매번 비슷하게 끝나서, 어긋남을 '우린 안 맞아'로 받아들여야 할지 맞춰가 볼지 헷갈린다."
+            "comment": "눈 한 번 마주쳤는데 혼자 결혼식까지 상상하는 거 완전 제 얘기네요ㅋㅋ 그때 연애사주 봤더니 의미 부여가 빠른 편이라 상대 속도를 먼저 보라던 말이 생각나요.",
+            "concern": "지나가다 눈 한 번 마주쳤을 뿐인데 상대는 아무 뜻 없는데도 혼자 의미를 부여하고 썸이라 느끼는 게 나만 설레는 건가 싶은 고민"
           }
         }
       ],
       "error_cause": null,
-      "keyword": "연애",
+      "keyword": "썸",
       "material": "top_comments",
-      "published_at": "2026-10-14T09:00:08+00:00",
+      "published_at": "2026-10-15T03:00:04+00:00",
       "result": "comment",
-      "top_comment_count": 4,
+      "skip_grade": null,
+      "skip_grade_error": null,
+      "skip_grade_shape": null,
+      "skip_human": "",
+      "skip_kind": null,
+      "top_comment_count": 1,
       "topic_grade": "연애",
       "topic_grade_error": null,
       "topic_grade_shape": null,
       "topic_human": "",
       "untrusted": {
-        "classification_reason": "연애 고민 상담 (0.94) · 일치 0.98 · 확신 0.93",
+        "classification_reason": "썸 · 소개팅 이야기 (0.80) · 일치 0.97 · 확신 0.77",
+        "description": "지나가다 우연히 눈 한 번 마주쳤을 뿐인데... 나 혼자 벌써 결혼식까지 생각했다?! 👀💕\n상대방은 아무 뜻 없었는데 혼자서 의미 부여하고 썸 타기 시작하는 폭공감 연애 심리! \n\n여러분도 이런 적 있으신가요? 재미있으셨다면 구독과 좋아요 부탁드립니다! ✨\n\n#연애심리 #썸 #설렘 #공감 #연애",
         "skip_reason": null,
-        "title": "연애 잘하는 여자는 절대 안 하고, 못하는 여자만 하는 '이 생각' (외모도 성격도 아닙니다)",
+        "title": "나만 설레는 거 아니지? #연애 #썸 #심쿵주의",
         "top_comments": [
-          "👑 더 이상 끌려다니지 않고, '나'를 지키는 연애의 기술\r\n👉 https://smartstore.naver.com/saquestudio/products/13085078296",
-          "최근까지 정말 머리 아프게 고민하던 것에 대해 이야기 해주셨어요\n머릿속이 깔끔하게 정리됐어요! 내공 깊은 조언에 많은 도움 받고 갑니다 : )",
-          "좋은 강의",
-          "오늘도 너무 좋은 내용이에요😊\n잘 듣고 갑니다"
+          "입이 삐뚜리넹"
         ]
       },
-      "video_id": "N0RyQJG9vdI",
-      "views": 1616,
+      "video_id": "Fn0uBcFhAsw",
+      "views": 1000,
       "window": "operation"
     },
     {
-      "age_hours": 3.15,
+      "age_hours": 6.53,
       "classification": {
-        "choice": "연애 경험담",
-        "confidence": 0.66,
+        "choice": "연애와 관계없음",
+        "confidence": 0.53,
         "error": false,
-        "noul": 0.6,
-        "probability": 0.7,
-        "verdict": "hold"
+        "noul": 0.05,
+        "probability": 0.59,
+        "verdict": "no"
       },
       "comment_items": null,
       "comments_disabled": false,
       "drafts": [],
       "error_cause": null,
-      "keyword": "연애",
+      "keyword": "썸",
       "material": null,
-      "published_at": "2026-10-14T11:00:06+00:00",
+      "published_at": "2026-10-15T02:10:23+00:00",
       "result": "not_written",
+      "skip_grade": null,
+      "skip_grade_error": null,
+      "skip_grade_shape": null,
+      "skip_human": "",
+      "skip_kind": null,
+      "top_comment_count": 0,
+      "topic_grade": "아님",
+      "topic_grade_error": null,
+      "topic_grade_shape": null,
+      "topic_human": "",
+      "untrusted": {
+        "classification_reason": "연애와 관계없음 (0.59) · 일치 0.05 · 확신 0.53",
+        "description": "2026. 09. 06\n경북 청년 화합.소통 행사",
+        "skip_reason": null,
+        "title": "꽃에 물 주는 #나영 #라잇썸",
+        "top_comments": []
+      },
+      "video_id": "JZK7uYMMvJg",
+      "views": 2331,
+      "window": "operation"
+    },
+    {
+      "age_hours": 1.14,
+      "classification": {
+        "choice": "썸 · 소개팅 이야기",
+        "confidence": 1.0,
+        "error": false,
+        "noul": 0.92,
+        "probability": 1.0,
+        "verdict": "yes"
+      },
+      "comment_items": null,
+      "comments_disabled": true,
+      "drafts": [],
+      "error_cause": null,
+      "keyword": "연애 상담",
+      "material": "title_description",
+      "published_at": "2026-10-15T07:33:55+00:00",
+      "result": "skip",
+      "skip_grade": {
+        "material_has_love_worry": false,
+        "material_has_scene": false
+      },
+      "skip_grade_error": null,
+      "skip_grade_shape": null,
+      "skip_human": "",
+      "skip_kind": "no_concern",
       "top_comment_count": 0,
       "topic_grade": "연애",
       "topic_grade_error": null,
       "topic_grade_shape": null,
       "topic_human": "",
       "untrusted": {
-        "classification_reason": "확신 낮음: 연애 경험담 (0.70) · 일치 0.60 · 확신 0.66",
-        "description": "",
-        "skip_reason": null,
-        "title": "담배냄새 #계약결혼 #돌싱 #연애 # 신혼부부 #신혼여행 #승무원 #회계사 #전자담배",
+        "classification_reason": "썸 · 소개팅 이야기 (1.00) · 일치 0.92 · 확신 1.00",
+        "description": "투네이션\nhttps://toon.at/donate/seiyes2\n\n\n💕 Hi_세이와 함께하는 실시간 소개팅 방송!\n새로운 인연을 만들고 싶은 분이라면 누구나 환영합니다.\n솔직한 토크, 설레는 매칭, 예측 불가 케미까지!\n구독 👍 좋아요 ❤️ 알림 설정 🔔은 방송에 큰 힘이 됩니다.\n매일 색다른 소개팅 콘텐츠와 시청자 참여 이벤트가 진행됩니다.\nThis stream is created with #PRISMLiveStudio",
+        "skip_reason": "재료에 연애 고민 없음",
+        "title": "[Hi_크루] Hi_세이 무료 소개팅 #소개팅 #연애 #솔로지옥 #연애상담 #솔로탈출",
         "top_comments": []
       },
-      "video_id": "Mvomf6PR78o",
-      "views": 1021,
+      "video_id": "xu6RxIWBKr4",
+      "views": 4693,
       "window": "operation"
     },
     {
-      "age_hours": 3.15,
+      "age_hours": 9.7,
       "classification": {
-        "choice": "키워드만 겹침: 예능 · 드라마",
-        "confidence": 0.36,
+        "choice": "썸 · 소개팅 이야기",
+        "confidence": 0.9,
         "error": false,
-        "noul": 0.55,
-        "probability": 0.44,
-        "verdict": "hold"
+        "noul": 0.9,
+        "probability": 0.91,
+        "verdict": "yes"
       },
-      "comment_items": null,
+      "comment_items": 0,
       "comments_disabled": false,
       "drafts": [],
       "error_cause": null,
-      "keyword": "연애",
-      "material": null,
-      "published_at": "2026-10-14T11:00:10+00:00",
-      "result": "not_written",
+      "keyword": "연애 상담",
+      "material": "title_description",
+      "published_at": "2026-10-14T23:00:23+00:00",
+      "result": "skip",
+      "skip_grade": {
+        "material_has_love_worry": false,
+        "material_has_scene": false
+      },
+      "skip_grade_error": null,
+      "skip_grade_shape": null,
+      "skip_human": "",
+      "skip_kind": "no_scene",
       "top_comment_count": 0,
       "topic_grade": "연애",
       "topic_grade_error": null,
       "topic_grade_shape": null,
       "topic_human": "",
       "untrusted": {
-        "classification_reason": "확신 낮음: 키워드만 겹침: 예능 · 드라마 (0.44) · 일치 0.55 · 확신 0.36",
-        "description": "",
-        "skip_reason": null,
-        "title": "핑크빛 대학생활 3화 #보넥도 #보이넥스트도어 #유사연애 #성호 #리우 #명재현 #태산 #이한 #운학",
+        "classification_reason": "썸 · 소개팅 이야기 (0.91) · 일치 0.90 · 확신 0.90",
+        "description": "#크리스천메이트 #크리스천연애 #연애상담 #크리스천연애상담 #크리스천팟캐스트 #크리스찬연애 #크리스천결혼 #크리스천결혼 #크리스천소개팅 #크리스찬소개팅 #기독교연애 #기독교결혼 #기독교소개팅 #교회소개팅 #교회연애 #교회 #크리스천 #기독교 #결혼정보회사 #영수 #영숙 #나는솔로 #교회청년부 #청년부 #청년회",
+        "skip_reason": "재료에 장면 없음",
+        "title": "우리 광수 배우자 구합니다 여러분! #결혼정보회사 #교회오빠 #연애팟캐스트 #나는솔로 #연애팟캐스트 #청년부 #shorts",
         "top_comments": []
       },
-      "video_id": "3T1_yciH6cw",
-      "views": 1263,
+      "video_id": "-3o-0AncD9I",
+      "views": 1280,
       "window": "operation"
     },
     {
-      "age_hours": 3.15,
+      "age_hours": 0.71,
+      "classification": {
+        "choice": "썸 · 소개팅 이야기",
+        "confidence": 0.98,
+        "error": false,
+        "noul": 0.4,
+        "probability": 0.98,
+        "verdict": "hold"
+      },
+      "comment_items": null,
+      "comments_disabled": false,
+      "drafts": [],
+      "error_cause": null,
+      "keyword": "소개팅",
+      "material": null,
+      "published_at": "2026-10-15T08:00:02+00:00",
+      "result": "not_written",
+      "skip_grade": null,
+      "skip_grade_error": null,
+      "skip_grade_shape": null,
+      "skip_human": "",
+      "skip_kind": null,
+      "top_comment_count": 0,
+      "topic_grade": "연애",
+      "topic_grade_error": null,
+      "topic_grade_shape": null,
+      "topic_human": "",
+      "untrusted": {
+        "classification_reason": "확신 낮음: 썸 · 소개팅 이야기 (0.98) · 일치 0.40 · 확신 0.98",
+        "description": "코미디빅리그 러브 is 뭔들의 소개팅 상황극. 나쁜 남자 스타일을 좋아한다는 장도연의 말에 양세찬은 엉뚱한 행동으로 반응합니다. 헬멧을 꺼내는 장난부터 거친 말투까지, 기대했던 분위기와 다른 방향으로 흘러가는 대화가 웃음을 만듭니다.\n상대가 말한 취향을 지나치게 단순하게 해석하는 인물 설정에 주목해 보세요. 말의 의미와 실제 행동이 어긋나는 구성, 소품을 활용한 연기와 두 배우의 반응을 함께 살펴볼 수 있습니다.",
+        "skip_reason": null,
+        "title": "코미디빅리그 양세찬 장도연 소개팅 | 나쁜 남자 스타일이 좋다고 했더니 #shorts",
+        "top_comments": []
+      },
+      "video_id": "7tHQolF2BKY",
+      "views": 3548,
+      "window": "operation"
+    },
+    {
+      "age_hours": 0.79,
+      "classification": {
+        "choice": "썸 · 소개팅 이야기",
+        "confidence": 1.0,
+        "error": false,
+        "noul": 0.59,
+        "probability": 1.0,
+        "verdict": "hold"
+      },
+      "comment_items": null,
+      "comments_disabled": false,
+      "drafts": [],
+      "error_cause": null,
+      "keyword": "소개팅",
+      "material": null,
+      "published_at": "2026-10-15T07:55:11+00:00",
+      "result": "not_written",
+      "skip_grade": null,
+      "skip_grade_error": null,
+      "skip_grade_shape": null,
+      "skip_human": "",
+      "skip_kind": null,
+      "top_comment_count": 0,
+      "topic_grade": "연애",
+      "topic_grade_error": null,
+      "topic_grade_shape": null,
+      "topic_human": "",
+      "untrusted": {
+        "classification_reason": "확신 낮음: 썸 · 소개팅 이야기 (1.00) · 일치 0.59 · 확신 1.00",
+        "description": "무료 소개팅 엑셀방송 라이브입니다. 일반인 남녀 참가자를 방송 중에 즉석 매칭하고 카톡까지 연결합니다. 참가비는 받지 않습니다.\n방송 시간: 매일 오후5시 - 오후9시\n참가 신청: 카톡 nk2822 로 사진 2장 → 페이스톡 30초 확인 → 출연\n진행 크루: 나콩, 배코, 시노, 세릴다크, 우기, 마음\n규칙: 외모 비하·연락처 노출·홍보는 즉시 차단합니다. 신분증 정보는 저장하지 않습니다.\n후원: 방송 화면에 안내된 방법으로 or 방송국 투네이션링크\n\n#소개팅 #소개팅방송 #무료소개팅 #엑셀방송 #실시간소개팅",
+        "skip_reason": null,
+        "title": "무료 소개팅 엑셀방송 | 일반인 즉석 매칭 · 나콩",
+        "top_comments": []
+      },
+      "video_id": "Gp5FqAomxnI",
+      "views": 1880,
+      "window": "operation"
+    },
+    {
+      "age_hours": 1.6,
+      "classification": {
+        "choice": "썸 · 소개팅 이야기",
+        "confidence": 0.99,
+        "error": false,
+        "noul": 0.72,
+        "probability": 0.99,
+        "verdict": "hold"
+      },
+      "comment_items": null,
+      "comments_disabled": false,
+      "drafts": [],
+      "error_cause": null,
+      "keyword": "소개팅",
+      "material": null,
+      "published_at": "2026-10-15T07:06:21+00:00",
+      "result": "not_written",
+      "skip_grade": null,
+      "skip_grade_error": null,
+      "skip_grade_shape": null,
+      "skip_human": "",
+      "skip_kind": null,
+      "top_comment_count": 0,
+      "topic_grade": "연애",
+      "topic_grade_error": null,
+      "topic_grade_shape": null,
+      "topic_human": "",
+      "untrusted": {
+        "classification_reason": "확신 낮음: 썸 · 소개팅 이야기 (0.99) · 일치 0.72 · 확신 0.99",
+        "description": "24시간 이어지는 소개팅 방송입니다\n#소개팅 #연애 #남캠 #결혼 #모솔 #예능  #쇼츠 #shorts \n#띱오랑캐 #문돌이 #수산상회 #댕구임 #양구제\n카톡 : 91able",
+        "skip_reason": null,
+        "title": "[소개팅] 어금니 라이브 실시간 소개팅 방송 띱오랑캐 문돌이 수산상회 댕구임 양구제 #소개팅 #소개팅방송 #실시간 #shorts  #남캠  #연애 #쇼츠 #예능 #결혼",
+        "top_comments": []
+      },
+      "video_id": "hPsWWiIe8WA",
+      "views": 1655,
+      "window": "operation"
+    },
+    {
+      "age_hours": 2.44,
+      "classification": {
+        "choice": "썸 · 소개팅 이야기",
+        "confidence": 1.0,
+        "error": false,
+        "noul": 0.52,
+        "probability": 1.0,
+        "verdict": "hold"
+      },
+      "comment_items": null,
+      "comments_disabled": false,
+      "drafts": [],
+      "error_cause": null,
+      "keyword": "소개팅",
+      "material": null,
+      "published_at": "2026-10-15T06:16:01+00:00",
+      "result": "not_written",
+      "skip_grade": null,
+      "skip_grade_error": null,
+      "skip_grade_shape": null,
+      "skip_human": "",
+      "skip_kind": null,
+      "top_comment_count": 0,
+      "topic_grade": "연애",
+      "topic_grade_error": null,
+      "topic_grade_shape": null,
+      "topic_human": "",
+      "untrusted": {
+        "classification_reason": "확신 낮음: 썸 · 소개팅 이야기 (1.00) · 일치 0.52 · 확신 1.00",
+        "description": "정준호의 미친 인맥으로 성사된 탁재훈의 즉석 소개팅",
+        "skip_reason": null,
+        "title": "\"재산 반 줄게요\" 정준호가 주선한 역대급 소개팅 #미운우리새끼 #탁재훈 #정준호 #소개팅",
+        "top_comments": []
+      },
+      "video_id": "kG7Ll1-snTg",
+      "views": 1315,
+      "window": "operation"
+    },
+    {
+      "age_hours": 2.67,
+      "classification": {
+        "choice": "썸 · 소개팅 이야기",
+        "confidence": 0.92,
+        "error": false,
+        "noul": 0.74,
+        "probability": 0.93,
+        "verdict": "hold"
+      },
+      "comment_items": null,
+      "comments_disabled": false,
+      "drafts": [],
+      "error_cause": null,
+      "keyword": "소개팅",
+      "material": null,
+      "published_at": "2026-10-15T06:02:11+00:00",
+      "result": "not_written",
+      "skip_grade": null,
+      "skip_grade_error": null,
+      "skip_grade_shape": null,
+      "skip_human": "",
+      "skip_kind": null,
+      "top_comment_count": 0,
+      "topic_grade": "아님",
+      "topic_grade_error": null,
+      "topic_grade_shape": null,
+      "topic_human": "",
+      "untrusted": {
+        "classification_reason": "확신 낮음: 썸 · 소개팅 이야기 (0.93) · 일치 0.74 · 확신 0.92",
+        "description": "#수죵이 #곤잘레스 #부킹 #소개팅 #얼평 #고민상담 #커플 #결혼 #여캠 #존잘 #존예 #여신 #강아지 #동물 #엑셀",
+        "skip_reason": null,
+        "title": "왕철수 완전무료! 소개팅방송 라이브 실물여신대기중 ㄷㄷ",
+        "top_comments": []
+      },
+      "video_id": "scbAn0hmt5I",
+      "views": 3534,
+      "window": "operation"
+    },
+    {
+      "age_hours": 2.8,
+      "classification": {
+        "choice": "썸 · 소개팅 이야기",
+        "confidence": 1.0,
+        "error": false,
+        "noul": 0.87,
+        "probability": 1.0,
+        "verdict": "yes"
+      },
+      "comment_items": null,
+      "comments_disabled": true,
+      "drafts": [],
+      "error_cause": null,
+      "keyword": "소개팅",
+      "material": "title_description",
+      "published_at": "2026-10-15T05:54:34+00:00",
+      "result": "skip",
+      "skip_grade": {
+        "material_has_love_worry": false,
+        "material_has_scene": false
+      },
+      "skip_grade_error": null,
+      "skip_grade_shape": null,
+      "skip_human": "",
+      "skip_kind": "no_scene",
+      "top_comment_count": 0,
+      "topic_grade": "연애",
+      "topic_grade_error": null,
+      "topic_grade_shape": null,
+      "topic_human": "",
+      "untrusted": {
+        "classification_reason": "썸 · 소개팅 이야기 (1.00) · 일치 0.87 · 확신 1.00",
+        "description": "일반인소개팅 인연을찾아드리는방송입니다\n인연찾기 / 카카오톡 : match로 본인사진 2장 전송해주시면 새로운인연을 만나실수있도록 도와드리겠습니다.",
+        "skip_reason": "재료에 장면 없음",
+        "title": "🔥소개팅실시간LIVE🔥미녀4총사  실제인연💕킹우진 #몽멘#천서아#융군제#도민호#우상2#카멘 #얼평 #남캠 #엑셀 #인연 #소개팅 #더매치",
+        "top_comments": []
+      },
+      "video_id": "_BJ0uCpfRs0",
+      "views": 1173,
+      "window": "operation"
+    },
+    {
+      "age_hours": 4.7,
+      "classification": {
+        "choice": "썸 · 소개팅 이야기",
+        "confidence": 0.92,
+        "error": false,
+        "noul": 0.36,
+        "probability": 0.93,
+        "verdict": "hold"
+      },
+      "comment_items": null,
+      "comments_disabled": false,
+      "drafts": [],
+      "error_cause": null,
+      "keyword": "소개팅",
+      "material": null,
+      "published_at": "2026-10-15T04:00:18+00:00",
+      "result": "not_written",
+      "skip_grade": null,
+      "skip_grade_error": null,
+      "skip_grade_shape": null,
+      "skip_human": "",
+      "skip_kind": null,
+      "top_comment_count": 0,
+      "topic_grade": "연애",
+      "topic_grade_error": null,
+      "topic_grade_shape": null,
+      "topic_human": "",
+      "untrusted": {
+        "classification_reason": "확신 낮음: 썸 · 소개팅 이야기 (0.93) · 일치 0.36 · 확신 0.92",
+        "description": "반찬 전달 부탁이 밥 약속을 주선하는 조언으로 바뀝니다.\n#킬러들의쇼핑몰 #디즈니플러스 #한컷비화",
+        "skip_reason": null,
+        "title": "반찬 하나로 소개팅까지 주선하는 할머니들 #킬러들의쇼핑몰 #디즈니플러스 #shorts",
+        "top_comments": []
+      },
+      "video_id": "nAVqACWbtyg",
+      "views": 1223,
+      "window": "operation"
+    },
+    {
+      "age_hours": 4.68,
+      "classification": {
+        "choice": "썸 · 소개팅 이야기",
+        "confidence": 1.0,
+        "error": false,
+        "noul": 0.86,
+        "probability": 1.0,
+        "verdict": "yes"
+      },
+      "comment_items": null,
+      "comments_disabled": true,
+      "drafts": [],
+      "error_cause": null,
+      "keyword": "소개팅",
+      "material": "title_description",
+      "published_at": "2026-10-15T04:01:32+00:00",
+      "result": "skip",
+      "skip_grade": {
+        "material_has_love_worry": false,
+        "material_has_scene": false
+      },
+      "skip_grade_error": null,
+      "skip_grade_shape": null,
+      "skip_human": "",
+      "skip_kind": "no_concern",
+      "top_comment_count": 0,
+      "topic_grade": "연애",
+      "topic_grade_error": null,
+      "topic_grade_shape": null,
+      "topic_human": "",
+      "untrusted": {
+        "classification_reason": "썸 · 소개팅 이야기 (1.00) · 일치 0.86 · 확신 1.00",
+        "description": "알라햄 와 함께하는 실시간 소개팅 방송!\n연애부터 결혼, 이혼, MBTI까지 솔직하고 유쾌하게 이야기하며 찐 인연을 찾아드립니다.\n\n#소개팅 #알라햄 #폴형 #나크크 #세둘기 #연애 #결혼 #이혼 #MBTI #엑셀 #먹방 #야킹",
+        "skip_reason": "재료에 연애 고민 없음",
+        "title": "알라햄 의 소개팅 방송 #소개팅#알라햄#폴형#나크크#세둘기#수하니#결혼#이혼#MBTI#엑셀#먹방#야킹",
+        "top_comments": []
+      },
+      "video_id": "2WBbV-Pf-Z8",
+      "views": 4390,
+      "window": "operation"
+    },
+    {
+      "age_hours": 4.71,
+      "classification": {
+        "choice": "썸 · 소개팅 이야기",
+        "confidence": 0.99,
+        "error": false,
+        "noul": 0.73,
+        "probability": 0.99,
+        "verdict": "hold"
+      },
+      "comment_items": null,
+      "comments_disabled": false,
+      "drafts": [],
+      "error_cause": null,
+      "keyword": "소개팅",
+      "material": null,
+      "published_at": "2026-10-15T03:59:47+00:00",
+      "result": "not_written",
+      "skip_grade": null,
+      "skip_grade_error": null,
+      "skip_grade_shape": null,
+      "skip_human": "",
+      "skip_kind": null,
+      "top_comment_count": 0,
+      "topic_grade": "연애",
+      "topic_grade_error": null,
+      "topic_grade_shape": null,
+      "topic_human": "",
+      "untrusted": {
+        "classification_reason": "확신 낮음: 썸 · 소개팅 이야기 (0.99) · 일치 0.73 · 확신 0.99",
+        "description": "일반인 소개팅 카톡 yank2",
+        "skip_reason": null,
+        "title": "안냐떼요 성욱핑의 소개팅 #디스#하아바#누반이#소개팅 #실시간#여자#남자#먹방#연애#존잘#존예#연애상담",
+        "top_comments": []
+      },
+      "video_id": "Ua_1CzUSgN0",
+      "views": 2970,
+      "window": "operation"
+    },
+    {
+      "age_hours": 12.69,
       "classification": {
         "choice": "연애 경험담",
         "confidence": 0.41,
         "error": false,
-        "noul": 0.81,
+        "noul": 0.69,
         "probability": 0.48,
         "verdict": "hold"
       },
@@ -1282,202 +1737,37 @@
       "error_cause": null,
       "keyword": "연애",
       "material": null,
-      "published_at": "2026-10-14T11:00:01+00:00",
+      "published_at": "2026-10-14T20:00:45+00:00",
       "result": "not_written",
+      "skip_grade": null,
+      "skip_grade_error": null,
+      "skip_grade_shape": null,
+      "skip_human": "",
+      "skip_kind": null,
       "top_comment_count": 0,
       "topic_grade": "아님",
       "topic_grade_error": null,
       "topic_grade_shape": null,
       "topic_human": "",
       "untrusted": {
-        "classification_reason": "확신 낮음: 연애 경험담 (0.48) · 일치 0.81 · 확신 0.41",
+        "classification_reason": "확신 낮음: 연애 경험담 (0.48) · 일치 0.69 · 확신 0.41",
         "description": "",
         "skip_reason": null,
-        "title": "연애 고수인 척하더니 한눈에 들킨 비밀 #넷플릭스 #나를 충전해줘 #로맨틱 코메디 #웹소설",
+        "title": "애매한 연애 #연기 #연기영상 #독백 #신인배우",
         "top_comments": []
       },
-      "video_id": "BNW3Dpa99iY",
-      "views": 1119,
-      "window": "operation"
+      "video_id": "ZKq6BU0BlxE",
+      "views": 1330,
+      "window": "widened"
     },
     {
-      "age_hours": 3.4,
-      "classification": {
-        "choice": "키워드만 겹침: 예능 · 드라마",
-        "confidence": 0.52,
-        "error": false,
-        "noul": 0.54,
-        "probability": 0.58,
-        "verdict": "hold"
-      },
-      "comment_items": null,
-      "comments_disabled": false,
-      "drafts": [],
-      "error_cause": null,
-      "keyword": "연애",
-      "material": null,
-      "published_at": "2026-10-14T10:45:03+00:00",
-      "result": "not_written",
-      "top_comment_count": 0,
-      "topic_grade": "아님",
-      "topic_grade_error": null,
-      "topic_grade_shape": null,
-      "topic_human": "",
-      "untrusted": {
-        "classification_reason": "확신 낮음: 키워드만 겹침: 예능 · 드라마 (0.58) · 일치 0.54 · 확신 0.52",
-        "description": "본 영상은 넷플릭스 풀 영상 시청을 권장드립니다.\n\n인공 심장 배터리가 방전된 남자와 전기 능력을 가진 여자의 찌릿 짜릿한 충전 빙자 로맨틱 코미디\n\n제작정보\n제작사 - 뉴 포인트, 와이낫미디어\n제작진 - 연출: 박수원\n              극본: 송유채\n\n#넷플릭스 #김영광 #채수빈",
-        "skip_reason": null,
-        "title": "연애할때 말한마디가 정말 중요한 이유 #나를 충전해줘",
-        "top_comments": []
-      },
-      "video_id": "VkVnh-OePNk",
-      "views": 2191,
-      "window": "operation"
-    },
-    {
-      "age_hours": 3.64,
+      "age_hours": 14.27,
       "classification": {
         "choice": "연애 고민 상담",
-        "confidence": 0.84,
+        "confidence": 0.65,
         "error": false,
-        "noul": 0.93,
-        "probability": 0.86,
-        "verdict": "yes"
-      },
-      "comment_items": 2,
-      "comments_disabled": false,
-      "drafts": [
-        {
-          "attempt": 1,
-          "claude_grade": "bad",
-          "code_pass": true,
-          "frame_overlap": 1,
-          "grade": {
-            "follows_concern": false,
-            "reads_like_ad": false,
-            "scene_in_material": false
-          },
-          "grade_error": null,
-          "grade_shape": null,
-          "human": "",
-          "parsed": true,
-          "passed": false,
-          "scores": {
-            "follows_concern": 0.83,
-            "mentions_scene": 0.18,
-            "reads_like_ad": 0.19
-          },
-          "self_check_pass": false,
-          "task_error": null,
-          "task_quality": {
-            "concern_is_love_worry": true,
-            "saju_story_fits": false
-          },
-          "untrusted": {
-            "code_failures": [],
-            "comment": "'안정형 남자의 실체'라는 말에 공감해요. 저는 연애사주에서 설렘보다 편안한 사람이 맞는다고 들었는데, 그 말이 이제야 이해돼요.",
-            "concern": "요즘 여자들이 이상형으로 꼽는 안정형 남자의 실체가 궁금하고, 안정적인 사람과 설렘 사이에서 어떻게 판단할지 고민된다."
-          }
-        },
-        {
-          "attempt": 2,
-          "claude_grade": "bad",
-          "code_pass": true,
-          "frame_overlap": 6,
-          "grade": {
-            "follows_concern": false,
-            "reads_like_ad": false,
-            "scene_in_material": false
-          },
-          "grade_error": null,
-          "grade_shape": null,
-          "human": "",
-          "parsed": true,
-          "passed": false,
-          "scores": {
-            "follows_concern": 0.8,
-            "mentions_scene": 0.15,
-            "reads_like_ad": 0.12
-          },
-          "self_check_pass": false,
-          "task_error": null,
-          "task_quality": {
-            "concern_is_love_worry": false,
-            "saju_story_fits": false
-          },
-          "untrusted": {
-            "code_failures": [],
-            "comment": "요즘 여자들 이상형이 안정형이라는 말에 뜨끔했어요. 저도 연애사주에서 설렘보다 편안한 사람이 맞는다고 들었을 땐 심심하다 싶었는데, 이 영상 보니 이해돼요.",
-            "concern": "요즘 여자들이 이상형으로 꼽는 안정형 남자의 실체가 궁금하고, 설렘과 안정감 중 무엇을 기준으로 사람을 봐야 할지 헷갈린다."
-          }
-        }
-      ],
-      "error_cause": null,
-      "keyword": "연애",
-      "material": "top_comments",
-      "published_at": "2026-10-14T10:30:35+00:00",
-      "result": "skip",
-      "top_comment_count": 2,
-      "topic_grade": "연애",
-      "topic_grade_error": null,
-      "topic_grade_shape": null,
-      "topic_human": "",
-      "untrusted": {
-        "classification_reason": "연애 고민 상담 (0.86) · 일치 0.93 · 확신 0.84",
-        "description": "",
-        "skip_reason": "검사 두 번 탈락 — 1차: 자체 검사 미달 — 영상 속 장면·말 언급 0.18 / 2차: 자체 검사 미달 — 영상 속 장면·말 언급 0.15",
-        "title": "요즘 여자들의 이상형 안정형 남자 실체 #연애심리 #연애하는법 #안정형남자",
-        "top_comments": [
-          "유튜브 긴영상에 더 많은 무료 기술을 배울수 있는 네이버 링크가 있습니다:)",
-          "방생이 답이더"
-        ]
-      },
-      "video_id": "oLdm3Zd6KlU",
-      "views": 1786,
-      "window": "operation"
-    },
-    {
-      "age_hours": 3.9,
-      "classification": {
-        "choice": "연애 경험담",
-        "confidence": 0.69,
-        "error": false,
-        "noul": 0.64,
-        "probability": 0.73,
-        "verdict": "hold"
-      },
-      "comment_items": null,
-      "comments_disabled": false,
-      "drafts": [],
-      "error_cause": null,
-      "keyword": "연애",
-      "material": null,
-      "published_at": "2026-10-14T10:15:17+00:00",
-      "result": "not_written",
-      "top_comment_count": 0,
-      "topic_grade": "아님",
-      "topic_grade_error": null,
-      "topic_grade_shape": null,
-      "topic_human": "",
-      "untrusted": {
-        "classification_reason": "확신 낮음: 연애 경험담 (0.73) · 일치 0.64 · 확신 0.69",
-        "description": "더치페이가 모양 빠져서 몸으로 때우는 청년",
-        "skip_reason": null,
-        "title": "더치페이가 모양 빠지는 K스타일 청년 #유머 #funny #연애 #연인 #데이트",
-        "top_comments": []
-      },
-      "video_id": "bG-sJXDqWw4",
-      "views": 1249,
-      "window": "operation"
-    },
-    {
-      "age_hours": 4.14,
-      "classification": {
-        "choice": "연애 경험담",
-        "confidence": 0.78,
-        "error": false,
-        "noul": 0.94,
-        "probability": 0.81,
+        "noul": 0.96,
+        "probability": 0.6900000000000001,
         "verdict": "yes"
       },
       "comment_items": 1,
@@ -1485,114 +1775,89 @@
       "drafts": [
         {
           "attempt": 1,
-          "claude_grade": "bad",
+          "claude_grade": "ok",
           "code_pass": true,
-          "frame_overlap": 4,
+          "frame_overlap": 8,
           "grade": {
             "follows_concern": true,
             "reads_like_ad": false,
-            "scene_in_material": false
+            "scene_in_material": true
           },
           "grade_error": null,
           "grade_shape": null,
           "human": "",
           "parsed": true,
-          "passed": false,
+          "passed": true,
           "scores": {
-            "follows_concern": 0.91,
-            "mentions_scene": 0.24,
-            "reads_like_ad": 0.39
+            "concern_is_love_worry": 0.8,
+            "follows_concern": 0.87,
+            "mentions_scene": 0.95,
+            "reads_like_ad": 0.26,
+            "saju_story_fits": 0.91
           },
-          "self_check_pass": false,
+          "self_check_pass": true,
           "task_error": null,
           "task_quality": {
             "concern_is_love_worry": false,
-            "saju_story_fits": false
+            "saju_story_fits": true
           },
           "untrusted": {
             "code_failures": [],
-            "comment": "'연애가 하기 싫은 이유'를 코미디로 풀어주니 웃다가 찔렸어요. 저도 지쳤을 때 연애사주를 봤는데, 쉬어가도 된다는 말에 마음이 놓였어요.",
-            "concern": "연애에 지치고 부담스러워서 연애 자체가 하기 싫어진 마음"
-          }
-        },
-        {
-          "attempt": 2,
-          "claude_grade": "bad",
-          "code_pass": true,
-          "frame_overlap": 0,
-          "grade": {
-            "follows_concern": true,
-            "reads_like_ad": false,
-            "scene_in_material": false
-          },
-          "grade_error": null,
-          "grade_shape": null,
-          "human": "",
-          "parsed": true,
-          "passed": false,
-          "scores": {
-            "follows_concern": 0.89,
-            "mentions_scene": 0.63,
-            "reads_like_ad": 0.16
-          },
-          "self_check_pass": false,
-          "task_error": null,
-          "task_quality": {
-            "concern_is_love_worry": false,
-            "saju_story_fits": false
-          },
-          "untrusted": {
-            "code_failures": [],
-            "comment": "'연애가 하기 싫은 이유'를 스케치로 보여주는데 웃다가 제 얘기 같았어요. 연애사주 봤을 때 '지금은 나를 돌볼 때'라는 말에 하기 싫은 마음도 인정받은 기분이었어요.",
-            "concern": "상처와 피로 때문에 연애 자체가 하기 싫어진 마음"
+            "comment": "'조건 검토만 3년째'에서 뜨끔했어요. 저도 다시 시작이 겁나던 때 연애사주를 봤는데, 조건이 문제가 아니라 또 상처받을까 미리 거리를 두는 거라고 하더라고요.",
+            "concern": "돌싱이라 다시 연애하기가 겁나서 포기한다고 하지만, 진짜 이유는 따로 있는 마음"
           }
         }
       ],
       "error_cause": null,
       "keyword": "연애",
       "material": "top_comments",
-      "published_at": "2026-10-14T10:00:27+00:00",
-      "result": "skip",
+      "published_at": "2026-10-14T18:26:07+00:00",
+      "result": "comment",
+      "skip_grade": null,
+      "skip_grade_error": null,
+      "skip_grade_shape": null,
+      "skip_human": "",
+      "skip_kind": null,
       "top_comment_count": 1,
       "topic_grade": "연애",
       "topic_grade_error": null,
       "topic_grade_shape": null,
       "topic_human": "",
       "untrusted": {
-        "classification_reason": "연애 경험담 (0.81) · 일치 0.94 · 확신 0.78",
-        "description": "#스케치코미디 #공감 #연애",
-        "skip_reason": "검사 두 번 탈락 — 1차: 자체 검사 미달 — 영상 속 장면·말 언급 0.24, 광고처럼 읽힘 0.39 / 2차: 자체 검사 미달 — 영상 속 장면·말 언급 0.63",
-        "title": "연애가 하기싫은 이유",
+        "classification_reason": "연애 고민 상담 (0.69) · 일치 0.96 · 확신 0.65",
+        "description": "돌싱 연애 포기 사유서 📝\n① 한 번 갔다 왔으니 이번 생은 끝\n② 일이랑 결혼함\n③ 조건 검토 중 (검토만 3년째)\n\n근데 진짜 이유는 따로 있음 👀 MBTI별로 털어드립니다\n\n#돌싱 #돌싱연애 #연애심리 #MBTI #MBTI연애 #재혼 #연애포기 #심리학 #재혼준비#연애상담 #심리학 #마음챙김",
+        "skip_reason": null,
+        "title": "돌싱이라 빡치는 순간!! #돌싱#돌싱 #돌싱연애 #재혼준비 #연애심리 #MBTI #MBTI연애 #연애상담 #심리학 #마음챙김 #릴스 #재혼 #연애 #명언",
         "top_comments": [
-          "🟡모든 영상은 풀영상으로 보시면 더욱 재미있습니다!\n티절 유튜브 채널에서 \"다시는 꼴보기 싫은 미친 여자\"편을 보시고 티절의 뇌절 결말을 확인 해주세요!! -티절"
+          "전 남자랑 결혼 할 겁니다😂"
         ]
       },
-      "video_id": "LKcVMEXfKzM",
-      "views": 1291,
-      "window": "operation"
+      "video_id": "om-TAoBO0Rc",
+      "views": 1268,
+      "window": "widened"
     },
     {
-      "age_hours": 4.14,
+      "age_hours": 16.19,
       "classification": {
-        "choice": "연애 경험담",
+        "choice": "연애 고민 상담",
         "confidence": 0.95,
         "error": false,
-        "noul": 0.83,
+        "noul": 0.81,
         "probability": 0.96,
         "verdict": "yes"
       },
-      "comment_items": 0,
+      "comment_items": 8,
       "comments_disabled": false,
       "drafts": [
         {
           "attempt": 1,
           "claude_grade": "bad",
           "code_pass": true,
-          "frame_overlap": 4,
+          "frame_overlap": 5,
           "grade": {
             "follows_concern": false,
             "reads_like_ad": false,
-            "scene_in_material": false
+            "scene_in_material": true
           },
           "grade_error": null,
           "grade_shape": null,
@@ -1600,119 +1865,22 @@
           "parsed": true,
           "passed": false,
           "scores": {
-            "follows_concern": 0.9,
-            "mentions_scene": 0.1,
-            "reads_like_ad": 0.07
-          },
-          "self_check_pass": false,
-          "task_error": null,
-          "task_quality": {
-            "concern_is_love_worry": false,
-            "saju_story_fits": false
-          },
-          "untrusted": {
-            "code_failures": [],
-            "comment": "제목처럼 씁쓸한 현실이 웃기면서도 찔리네요 ㅋㅋ 저도 연애사주를 봤을 때 표현 방식이 서로 다르다는 말을 듣고 서운함이 좀 풀렸던 기억이 나요.",
-            "concern": "커플 챌린지를 하다 보면 기대와 다른 연인의 반응에 웃기면서도 씁쓸해지는 현실 연애"
-          }
-        },
-        {
-          "attempt": 2,
-          "claude_grade": "bad",
-          "code_pass": true,
-          "frame_overlap": 3,
-          "grade": {
-            "follows_concern": true,
-            "reads_like_ad": false,
-            "scene_in_material": false
-          },
-          "grade_error": null,
-          "grade_shape": null,
-          "human": "",
-          "parsed": true,
-          "passed": false,
-          "scores": {
-            "follows_concern": 0.95,
-            "mentions_scene": 0.14,
-            "reads_like_ad": 0.1
-          },
-          "self_check_pass": false,
-          "task_error": null,
-          "task_quality": {
-            "concern_is_love_worry": false,
-            "saju_story_fits": false
-          },
-          "untrusted": {
-            "code_failures": [],
-            "comment": "챌린지에서 기대한 반응과 실제 반응이 달라지는 온도차, 제목 그대로 '씁쓸한 현실'이라 웃다가 찔려요 ㅋㅋ 저도 연애사주에서 표현 방식이 다르다는 말을 듣고 서운함이 풀렸어요.",
-            "concern": "커플 챌린지에서 기대했던 연인의 반응과 실제 반응의 온도차가 웃기면서도 씁쓸한 현실 연애"
-          }
-        }
-      ],
-      "error_cause": null,
-      "keyword": "연애",
-      "material": "title_description",
-      "published_at": "2026-10-14T10:00:22+00:00",
-      "result": "skip",
-      "top_comment_count": 0,
-      "topic_grade": "연애",
-      "topic_grade_error": null,
-      "topic_grade_shape": null,
-      "topic_human": "",
-      "untrusted": {
-        "classification_reason": "연애 경험담 (0.96) · 일치 0.83 · 확신 0.95",
-        "description": "clipㅣevan.and.haylie (TikTok)\n\nThis video is not monetized\n이 영상으로 수익을 창출하지 않습니다\n\n#여친 #남친 #챌린지 #설렘 #커플 #일상 #현실\n#연애 #사랑 #shorts  #틱톡",
-        "skip_reason": "검사 두 번 탈락 — 1차: 자체 검사 미달 — 영상 속 장면·말 언급 0.10 / 2차: 자체 검사 미달 — 영상 속 장면·말 언급 0.14",
-        "title": "커플 챌린의 씁쓸한 현실 ㅋㅋㅋㅋ #lovesong",
-        "top_comments": []
-      },
-      "video_id": "f8EVYZ3D9g8",
-      "views": 1405,
-      "window": "operation"
-    },
-    {
-      "age_hours": 4.15,
-      "classification": {
-        "choice": "이별 · 재회 고민",
-        "confidence": 0.84,
-        "error": false,
-        "noul": 0.95,
-        "probability": 0.86,
-        "verdict": "yes"
-      },
-      "comment_items": 1,
-      "comments_disabled": false,
-      "drafts": [
-        {
-          "attempt": 1,
-          "claude_grade": "bad",
-          "code_pass": true,
-          "frame_overlap": 9,
-          "grade": {
-            "follows_concern": false,
-            "reads_like_ad": false,
-            "scene_in_material": false
-          },
-          "grade_error": null,
-          "grade_shape": null,
-          "human": "",
-          "parsed": true,
-          "passed": false,
-          "scores": {
-            "follows_concern": 0.92,
-            "mentions_scene": 0.23,
-            "reads_like_ad": 0.27
+            "concern_is_love_worry": 0.92,
+            "follows_concern": 0.84,
+            "mentions_scene": 0.6,
+            "reads_like_ad": 0.17,
+            "saju_story_fits": 0.91
           },
           "self_check_pass": false,
           "task_error": null,
           "task_quality": {
             "concern_is_love_worry": true,
-            "saju_story_fits": true
+            "saju_story_fits": false
           },
           "untrusted": {
             "code_failures": [],
-            "comment": "'이별 전 신호 5가지'라는 제목 보자마자 뜨끔했어요. 저도 헤어지기 직전에 연애사주를 봤는데, 이미 느끼던 불안을 말로 들으니 오히려 마음이 정리됐어요.",
-            "concern": "연애가 끝나가는 건 아닌지, 이별 전에 나타나는 신호를 알아보고 싶은 불안한 마음"
+            "comment": "참다 참다 이별 통보하고 울면서 이 영상을 틀었다는 2번 댓글님 얘기에 마음이 쓰이네요. 저도 잠수 타는 사람 때문에 지쳤을 때 연애사주를 봤는데, 기다림이 길수록 나를 잃는다는 풀이가 위로였어요.",
+            "concern": "잠수 타며 회피하는 애인을 참다 참다 이별 통보한 뒤, 그 사람의 마음이 어떤지 흔들리는 상황"
           }
         },
         {
@@ -1721,9 +1889,255 @@
           "code_pass": true,
           "frame_overlap": 5,
           "grade": {
+            "follows_concern": false,
+            "reads_like_ad": false,
+            "scene_in_material": true
+          },
+          "grade_error": null,
+          "grade_shape": null,
+          "human": "",
+          "parsed": true,
+          "passed": true,
+          "scores": {
+            "concern_is_love_worry": 0.9,
+            "follows_concern": 0.86,
+            "mentions_scene": 0.87,
+            "reads_like_ad": 0.18,
+            "saju_story_fits": 0.87
+          },
+          "self_check_pass": true,
+          "task_error": null,
+          "task_quality": {
+            "concern_is_love_worry": true,
+            "saju_story_fits": true
+          },
+          "untrusted": {
+            "code_failures": [],
+            "comment": "2번 리딩을 눈물 흘리며 보다가 소름 돋았다는 댓글에서 멈칫했어요. 회피잠수 애인에게 이별 통보까지 하셨다니요. 저도 비슷했을 때 연애사주를 봤는데, 참는 쪽이 늘 지친다는 말에 많이 울었어요.",
+            "concern": "회피하며 잠수 타는 애인에게 참다 참다 이별을 통보한 뒤, 상대 마음이 어떤지 흔들리는 상황"
+          }
+        }
+      ],
+      "error_cause": null,
+      "keyword": "연애",
+      "material": "top_comments",
+      "published_at": "2026-10-14T16:30:54+00:00",
+      "result": "comment",
+      "skip_grade": null,
+      "skip_grade_error": null,
+      "skip_grade_shape": null,
+      "skip_human": "",
+      "skip_kind": null,
+      "top_comment_count": 8,
+      "topic_grade": "연애",
+      "topic_grade_error": null,
+      "topic_grade_shape": null,
+      "topic_human": "",
+      "untrusted": {
+        "classification_reason": "연애 고민 상담 (0.96) · 일치 0.81 · 확신 0.95",
+        "description": "",
+        "skip_reason": null,
+        "title": "오늘 나에 대한 마음 한가지 #타로 #연애",
+        "top_comments": [
+          "1번리딩 감사합니다 😊",
+          "4번 감사합니다 :)",
+          "2번\n.\n.\n.\n회피잠수애인한테 참다 참다 이별 통보하고 눈물 좔좔 흘리면서 영상 떠서 보는데 소름돋았네용 ㅠ",
+          "3",
+          "잘들었읍니다",
+          "바다야😊보구싶어❤❤❤❤건강하게 잘지냈어",
+          "1",
+          "1"
+        ]
+      },
+      "video_id": "nPMEi5NDSnU",
+      "views": 2385,
+      "window": "widened"
+    },
+    {
+      "age_hours": 16.47,
+      "classification": {
+        "choice": "키워드만 겹침: 음악",
+        "confidence": 0.53,
+        "error": false,
+        "noul": 0.23,
+        "probability": 0.59,
+        "verdict": "hold"
+      },
+      "comment_items": null,
+      "comments_disabled": false,
+      "drafts": [],
+      "error_cause": null,
+      "keyword": "연애",
+      "material": null,
+      "published_at": "2026-10-14T16:14:09+00:00",
+      "result": "not_written",
+      "skip_grade": null,
+      "skip_grade_error": null,
+      "skip_grade_shape": null,
+      "skip_human": "",
+      "skip_kind": null,
+      "top_comment_count": 0,
+      "topic_grade": "아님",
+      "topic_grade_error": null,
+      "topic_grade_shape": null,
+      "topic_human": "",
+      "untrusted": {
+        "classification_reason": "확신 낮음: 키워드만 겹침: 음악 (0.59) · 일치 0.23 · 확신 0.53",
+        "description": "",
+        "skip_reason": null,
+        "title": "01년생이면 늙은건가요?ㅜㅜ 이 노래는 아는데.... #연애의조건 #bestie #베스티 #kpop",
+        "top_comments": []
+      },
+      "video_id": "_NSrSMRS-3o",
+      "views": 1173,
+      "window": "widened"
+    },
+    {
+      "age_hours": 17.69,
+      "classification": {
+        "choice": "이별 · 재회 고민",
+        "confidence": 0.38,
+        "error": false,
+        "noul": 0.94,
+        "probability": 0.46,
+        "verdict": "hold"
+      },
+      "comment_items": null,
+      "comments_disabled": false,
+      "drafts": [],
+      "error_cause": null,
+      "keyword": "연애",
+      "material": null,
+      "published_at": "2026-10-14T15:00:49+00:00",
+      "result": "not_written",
+      "skip_grade": null,
+      "skip_grade_error": null,
+      "skip_grade_shape": null,
+      "skip_human": "",
+      "skip_kind": null,
+      "top_comment_count": 0,
+      "topic_grade": "연애",
+      "topic_grade_error": null,
+      "topic_grade_shape": null,
+      "topic_human": "",
+      "untrusted": {
+        "classification_reason": "확신 낮음: 이별 · 재회 고민 (0.46) · 일치 0.94 · 확신 0.38",
+        "description": "🎬 풀버전은 유튜브 - 날 사랑하지 않는 남자친구\n#채널352 #웹드라마 #연애 #권태기 #이별",
+        "skip_reason": null,
+        "title": "의무감에 사귀는 연애 특",
+        "top_comments": []
+      },
+      "video_id": "edIM19q59rk",
+      "views": 1987,
+      "window": "widened"
+    },
+    {
+      "age_hours": 18.07,
+      "classification": {
+        "choice": "썸 · 소개팅 이야기",
+        "confidence": 0.23,
+        "error": false,
+        "noul": 0.71,
+        "probability": 0.33,
+        "verdict": "hold"
+      },
+      "comment_items": null,
+      "comments_disabled": false,
+      "drafts": [],
+      "error_cause": null,
+      "keyword": "연애",
+      "material": null,
+      "published_at": "2026-10-14T14:38:03+00:00",
+      "result": "not_written",
+      "skip_grade": null,
+      "skip_grade_error": null,
+      "skip_grade_shape": null,
+      "skip_human": "",
+      "skip_kind": null,
+      "top_comment_count": 0,
+      "topic_grade": "아님",
+      "topic_grade_error": null,
+      "topic_grade_shape": null,
+      "topic_human": "",
+      "untrusted": {
+        "classification_reason": "확신 낮음: 썸 · 소개팅 이야기 (0.33) · 일치 0.71 · 확신 0.23",
+        "description": "연애의조건 😗\n#연애의조건 #bestie #loveoptions #챌린지 #challenge #reels #trendingshorts #viralvideo #douyin",
+        "skip_reason": null,
+        "title": "연애의조건 😗",
+        "top_comments": []
+      },
+      "video_id": "2_G2Q_2fdj4",
+      "views": 1775,
+      "window": "widened"
+    },
+    {
+      "age_hours": 19.49,
+      "classification": {
+        "choice": "연애 고민 상담",
+        "confidence": 0.67,
+        "error": false,
+        "noul": 0.91,
+        "probability": 0.71,
+        "verdict": "yes"
+      },
+      "comment_items": 3,
+      "comments_disabled": false,
+      "drafts": [],
+      "error_cause": null,
+      "keyword": "연애",
+      "material": "top_comments",
+      "published_at": "2026-10-14T13:13:09+00:00",
+      "result": "skip",
+      "skip_grade": {
+        "material_has_love_worry": false,
+        "material_has_scene": false
+      },
+      "skip_grade_error": null,
+      "skip_grade_shape": null,
+      "skip_human": "",
+      "skip_kind": "no_concern",
+      "top_comment_count": 3,
+      "topic_grade": "연애",
+      "topic_grade_error": null,
+      "topic_grade_shape": null,
+      "topic_human": "",
+      "untrusted": {
+        "classification_reason": "연애 고민 상담 (0.71) · 일치 0.91 · 확신 0.67",
+        "description": "#잠다니엘 #팟캐스트",
+        "skip_reason": "재료에 연애 고민 없음",
+        "title": "사귀고 나서 애인 집에 가기 좋은 시기  #최다니엘 #연애",
+        "top_comments": [
+          "최다니엘  주님안에서  흥해라",
+          "최다니엘이 형아 도마뱀 🦎",
+          "ㅋㅋㅋㅋ 팔랑귀네"
+        ]
+      },
+      "video_id": "oVNrBX7K9BU",
+      "views": 1886,
+      "window": "widened"
+    },
+    {
+      "age_hours": 19.71,
+      "classification": {
+        "choice": "연애 고민 상담",
+        "confidence": 0.84,
+        "error": false,
+        "noul": 0.82,
+        "probability": 0.86,
+        "verdict": "yes"
+      },
+      "comment_items": 0,
+      "comments_disabled": false,
+      "drafts": [
+        {
+          "attempt": 1,
+          "claude_grade": "ok",
+          "code_pass": false,
+          "frame_overlap": 10,
+          "grade": {
             "follows_concern": true,
             "reads_like_ad": false,
-            "scene_in_material": false
+            "scene_in_material": true
           },
           "grade_error": null,
           "grade_shape": null,
@@ -1731,9 +2145,121 @@
           "parsed": true,
           "passed": false,
           "scores": {
+            "concern_is_love_worry": 0.92,
             "follows_concern": 0.9,
-            "mentions_scene": 0.32,
-            "reads_like_ad": 0.12
+            "mentions_scene": 0.89,
+            "reads_like_ad": 0.13,
+            "saju_story_fits": 0.91
+          },
+          "self_check_pass": true,
+          "task_error": null,
+          "task_quality": {
+            "concern_is_love_worry": true,
+            "saju_story_fits": true
+          },
+          "untrusted": {
+            "code_failures": [
+              "그 밖의 코드 검사 이유"
+            ],
+            "comment": "월급 대부분을 적금에 넣고 남은 돈으로 버텼다는 스티브 말이 와닿네요. 저도 연상한테 잘 보이려고 무리하던 때 연애사주를 봤는데, 내가 단단해져야 눈높이도 맞는다고 하더라고요.",
+            "concern": "29살에 연상의 상대에게 잘 보이려고 돈을 쓰는 게 맞는지, 먼저 돈을 모으고 내 가치를 키워야 하는지 고민이다."
+          }
+        },
+        {
+          "attempt": 2,
+          "claude_grade": "ok",
+          "code_pass": true,
+          "frame_overlap": 0,
+          "grade": {
+            "follows_concern": true,
+            "reads_like_ad": false,
+            "scene_in_material": true
+          },
+          "grade_error": null,
+          "grade_shape": null,
+          "human": "",
+          "parsed": true,
+          "passed": true,
+          "scores": {
+            "concern_is_love_worry": 0.93,
+            "follows_concern": 0.87,
+            "mentions_scene": 0.9,
+            "reads_like_ad": 0.14,
+            "saju_story_fits": 0.76
+          },
+          "self_check_pass": true,
+          "task_error": null,
+          "task_quality": {
+            "concern_is_love_worry": true,
+            "saju_story_fits": true
+          },
+          "untrusted": {
+            "code_failures": [],
+            "comment": "스티브가 29살에 월급 대부분을 적금에 넣고 버텼다는 대목이 콕 박혔어요. 연상 앞에서 무리해 쓰던 시절 받은 연애사주 풀이가 \"지갑보다 내 실력부터 채워라\"였던 게 떠올랐습니다.",
+            "concern": "29살에 연상의 상대에게 잘 보이려고 돈을 쓰는 게 맞는지, 먼저 돈을 모으고 내 가치를 키워야 하는지 고민이다."
+          }
+        }
+      ],
+      "error_cause": null,
+      "keyword": "연애",
+      "material": "title_description",
+      "published_at": "2026-10-14T13:00:03+00:00",
+      "result": "comment",
+      "skip_grade": null,
+      "skip_grade_error": null,
+      "skip_grade_shape": null,
+      "skip_human": "",
+      "skip_kind": null,
+      "top_comment_count": 0,
+      "topic_grade": "연애",
+      "topic_grade_error": null,
+      "topic_grade_shape": null,
+      "topic_human": "",
+      "untrusted": {
+        "classification_reason": "연애 고민 상담 (0.86) · 일치 0.82 · 확신 0.84",
+        "description": "29살 때 월급 대부분을 적금에 넣고 남은 돈으로 버텼던 스티브의 경험담입니다.\n연상의 상대에게 잘 보이려 돈을 쓰는 것도 나쁘지 않지만, 지금은 무슨 수를 써서라도 돈을 모아야 할 나이라고 말합니다.\n결국 필요한 것은 나의 능력과 가치를 높이는 일이라는 조언입니다.\n\n▶ 풀버전: 코인 유투버에게 연애 상담하면 일어나는 일 (04:06부터)\nhttps://youtu.be/lC5BA1MQVgw\n\n▬▬▬▬▬ 옴니사이트 리포트 ▬▬▬▬▬\n옴니사이트 리포트는 ICT, 와이코프, 엘리어트 파동, 다이버전스, 매크로, 뉴스를 바탕으로 시장과 차트를 분석해 종목별 종합 분석을 내주는 도구입니다. 차트 분석에 들어가는 시간과 에너지를 아껴 줍니다. 한 달 $49.\n· 리포트 보기: https://omnisight.report\n\n▬▬▬▬▬ 커뮤니티 ▬▬▬▬▬\n각자의 매매를 가다듬고 서로 좋은 영향을 주는 공간을 만들고 있습니다.\n· 디스코드: https://discord.gg/gBDa3CqY3s\n· 텔레그램: https://t.me/traderstevex\n\n※ 본 영상은 투자 조언이 아닌 교육·참고용 콘텐츠이며, 특정 종목의 매수/매도 추천이 아닙니다. 모든 투자의 책임은 본인에게 있습니다.\n#연애상담 #연애조언 #연애 #썸 #짝사랑 #고백 #인간관계 #조언 #트레이더스티브 #스티브 #커뮤니티",
+        "skip_reason": null,
+        "title": "29살 연애보다 먼저, 나의 가치를 높여라",
+        "top_comments": []
+      },
+      "video_id": "4Ih4Z1Fejhc",
+      "views": 1470,
+      "window": "widened"
+    },
+    {
+      "age_hours": 19.7,
+      "classification": {
+        "choice": "연애 고민 상담",
+        "confidence": 0.93,
+        "error": false,
+        "noul": 0.96,
+        "probability": 0.9400000000000001,
+        "verdict": "yes"
+      },
+      "comment_items": 0,
+      "comments_disabled": false,
+      "drafts": [
+        {
+          "attempt": 1,
+          "claude_grade": "ok",
+          "code_pass": true,
+          "frame_overlap": 0,
+          "grade": {
+            "follows_concern": true,
+            "reads_like_ad": false,
+            "scene_in_material": true
+          },
+          "grade_error": null,
+          "grade_shape": null,
+          "human": "",
+          "parsed": true,
+          "passed": false,
+          "scores": {
+            "concern_is_love_worry": 0.93,
+            "follows_concern": 0.92,
+            "mentions_scene": 0.88,
+            "reads_like_ad": 0.4,
+            "saju_story_fits": 0.86
           },
           "self_check_pass": false,
           "task_error": null,
@@ -1743,42 +2269,197 @@
           },
           "untrusted": {
             "code_failures": [],
-            "comment": "'이별 전 신호 5가지'를 보다가 저도 모르게 하나씩 세어 보게 됐어요. 헤어지기 전에 연애사주를 봤을 때도 이미 느끼던 불안이 확인되는 기분이었거든요.",
-            "concern": "연애가 끝나가는 건 아닌지, 이별 전에 나타나는 신호를 알아보고 싶은 불안한 마음"
+            "comment": "싸운 날 밤 '집에는 무사히 들어갔을까' 신경 쓰이면서도 먼저 연락은 못 했던 적 있어요. 그때 본 연애사주에서 마음은 쓰이는데 자존심이 앞서는 편이라 하셨는데, 영상 보니 이해돼요.",
+            "concern": "연인과 크게 다퉈 사과도 연락도 하기 싫은데, 밥은 먹었는지 집엔 들어갔는지 걱정되는 복잡한 마음이 고민이다."
+          }
+        },
+        {
+          "attempt": 2,
+          "claude_grade": "ok",
+          "code_pass": true,
+          "frame_overlap": 0,
+          "grade": {
+            "follows_concern": true,
+            "reads_like_ad": false,
+            "scene_in_material": true
+          },
+          "grade_error": null,
+          "grade_shape": null,
+          "human": "",
+          "parsed": true,
+          "passed": false,
+          "scores": {
+            "concern_is_love_worry": 0.93,
+            "follows_concern": 0.9,
+            "mentions_scene": 0.58,
+            "reads_like_ad": 0.2,
+            "saju_story_fits": 0.66
+          },
+          "self_check_pass": false,
+          "task_error": null,
+          "task_quality": {
+            "concern_is_love_worry": true,
+            "saju_story_fits": false
+          },
+          "untrusted": {
+            "code_failures": [],
+            "comment": "밥때만 되면 화났으면서도 괜히 마음이 쓰이는 그 느낌, 저도 알아요. 예전에 연애사주에서 \"화나도 정은 못 끊는 사람\"이라 들었던 말이 영상 보면서 갑자기 떠올랐네요.",
+            "concern": "연인과 크게 다퉈 사과도 연락도 하기 싫은데, 밥은 먹었는지 집엔 들어갔는지 걱정되는 복잡한 마음이 고민이다."
+          }
+        }
+      ],
+      "error_cause": null,
+      "keyword": "연애",
+      "material": "title_description",
+      "published_at": "2026-10-14T13:00:39+00:00",
+      "result": "skip",
+      "skip_grade": null,
+      "skip_grade_error": null,
+      "skip_grade_shape": null,
+      "skip_human": "",
+      "skip_kind": "checks_failed",
+      "top_comment_count": 0,
+      "topic_grade": "연애",
+      "topic_grade_error": null,
+      "topic_grade_shape": null,
+      "topic_human": "",
+      "untrusted": {
+        "classification_reason": "연애 고민 상담 (0.94) · 일치 0.96 · 확신 0.93",
+        "description": "🚨 싸우고 연락하기도 싫었는데, 밥은 먹었는지 걱정된 적 있나요?\n💡 ‘감정의 양가성’은 서로 상반되는 감정이 동시에 존재할 수 있는 현상을 말해요.\n\n연인과 크게 다투고 나면 당분간 연락하고 싶지 않을 때가 있어요. 아직 서운한 마음도 남아 있고, 상대의 말이나 행동이 쉽게 이해되지 않기도 하죠. 그런데 시간이 지나 밥때가 되거나 밤이 깊어지면 문득 다른 생각이 들기도 합니다. 끼니는 제대로 챙겨 먹었을지, 집에는 무사히 들어갔을지 괜히 신경이 쓰이는 거예요. 사람의 감정은 생각보다 단순하지 않아요. 같은 사람에게 화가 나면서도 걱정할 수 있고, 거리를 두고 싶으면서도 그 사람의 안부는 궁금할 수 있거든요. 이처럼 서로 다른 마음이 함께 존재하는 모습을 ‘감정의 양가성’이라는 관점에서 이해할 수 있어요. 물론 안부를 묻는다고 해서 서운함이 사라졌거나 갈등이 해결됐다는 뜻은 아니에요. 밥을 챙겨주는 행동과 서로에게 상처가 됐던 문제를 풀어가는 과정은 별개니까요. 그래도 다툰 뒤 도착한 짧은 안부가 마음에 오래 남는 건, 그 안에서 아직 정리되지 않은 복잡한 감정을 느꼈기 때문일 수도 있습니다.\n\n서운함을 표현하는 방식도, 갈등 중에 걱정을 전하는 방식도 사람마다 다를 수 있으니까요.\n\n♥️ 싸운 뒤에도 밥은 먹었는지 먼저 물어본 적 있나요?\n─────────────────────\n🔎 연애와 관계 속 행동을 심리학으로 쉽게 풀어드립니다.\n💬 연인의 궁금한 행동은 댓글로 남겨주세요!\n─────────────────────\n⚠️ 본 콘텐츠는 심리학적 지식과 정보를 전달하기 위한 목적으로 제작되었습니다. 영상의 내용은 일반적인 사례를 바탕으로 하며, 전문적인 정신건강 의학적 진단이나 심리 상담을 대체할 수 없습니다.\n\n#연애 #심리 #커플 #연인갈등 #감정의양가성",
+        "skip_reason": "검사 두 번 탈락 — 1차: 자체 검사 미달 — 광고처럼 읽힘 0.40 / 2차: 자체 검사 미달 — 영상 속 장면·말 언급 0.58, 연애사주 경험이 고민과 이어짐 0.66",
+        "title": "사과는 못 하겠는데 걱정은 되는 이유 l 심리학・커플연애・애착유형・갈등해결",
+        "top_comments": []
+      },
+      "video_id": "dM2hFpUH6qg",
+      "views": 1445,
+      "window": "widened"
+    },
+    {
+      "age_hours": 19.68,
+      "classification": {
+        "choice": "연애 경험담",
+        "confidence": 0.65,
+        "error": false,
+        "noul": 0.96,
+        "probability": 0.6900000000000001,
+        "verdict": "yes"
+      },
+      "comment_items": 1,
+      "comments_disabled": false,
+      "drafts": [
+        {
+          "attempt": 1,
+          "claude_grade": "ok",
+          "code_pass": true,
+          "frame_overlap": 6,
+          "grade": {
+            "follows_concern": true,
+            "reads_like_ad": false,
+            "scene_in_material": true
+          },
+          "grade_error": null,
+          "grade_shape": null,
+          "human": "",
+          "parsed": true,
+          "passed": false,
+          "scores": {
+            "concern_is_love_worry": 0.86,
+            "follows_concern": 0.94,
+            "mentions_scene": 0.94,
+            "reads_like_ad": 0.32,
+            "saju_story_fits": 0.84
+          },
+          "self_check_pass": false,
+          "task_error": null,
+          "task_quality": {
+            "concern_is_love_worry": false,
+            "saju_story_fits": false
+          },
+          "untrusted": {
+            "code_failures": [],
+            "comment": "폭염에 사진 500장 찍고 짐까지 들었다니 남친이 너무 안쓰럽네요. 저도 맞춰주기만 하던 연애에서 연애사주를 봤는데, 내가 해주는 걸 당연하게 만든다는 말이 아프게 와닿았어요.",
+            "concern": "미인대회 출신 여친이 폭염에 사진 500장을 찍게 하고 짐까지 들게 해서, 남친만 일방적으로 희생하는 연애가 고민이다."
+          }
+        },
+        {
+          "attempt": 2,
+          "claude_grade": "ok",
+          "code_pass": true,
+          "frame_overlap": 6,
+          "grade": {
+            "follows_concern": true,
+            "reads_like_ad": false,
+            "scene_in_material": true
+          },
+          "grade_error": null,
+          "grade_shape": null,
+          "human": "",
+          "parsed": true,
+          "passed": true,
+          "scores": {
+            "concern_is_love_worry": 0.86,
+            "follows_concern": 0.94,
+            "mentions_scene": 0.95,
+            "reads_like_ad": 0.19,
+            "saju_story_fits": 0.85
+          },
+          "self_check_pass": true,
+          "task_error": null,
+          "task_quality": {
+            "concern_is_love_worry": true,
+            "saju_story_fits": true
+          },
+          "untrusted": {
+            "code_failures": [],
+            "comment": "짐 들고 땡볕에서 사진 500장이라니 읽다가 제가 다 지치네요. 예전에 저도 늘 맞추던 쪽이라 연애사주를 본 적 있는데, 참는 걸 배려로 착각하고 있다는 말을 들었어요.",
+            "concern": "미인대회 출신 여친이 폭염 속에 사진 500장을 찍게 하고 짐꾼처럼 부려서, 남친 혼자 희생하는 연애가 고민이다."
           }
         }
       ],
       "error_cause": null,
       "keyword": "연애",
       "material": "top_comments",
-      "published_at": "2026-10-14T10:00:04+00:00",
-      "result": "skip",
+      "published_at": "2026-10-14T13:01:28+00:00",
+      "result": "comment",
+      "skip_grade": null,
+      "skip_grade_error": null,
+      "skip_grade_shape": null,
+      "skip_human": "",
+      "skip_kind": null,
       "top_comment_count": 1,
       "topic_grade": "연애",
       "topic_grade_error": null,
       "topic_grade_shape": null,
       "topic_human": "",
       "untrusted": {
-        "classification_reason": "이별 · 재회 고민 (0.86) · 일치 0.95 · 확신 0.84",
-        "description": "이별하기 전에 보이는 신호 5가지 #연애 #관계#조언 #연애하는법",
-        "skip_reason": "검사 두 번 탈락 — 1차: 자체 검사 미달 — 영상 속 장면·말 언급 0.23 / 2차: 자체 검사 미달 — 영상 속 장면·말 언급 0.32",
-        "title": "이별하기 전에 보이는 신호 5가지 #연애 #관계#조언 #연애하는법",
+        "classification_reason": "연애 경험담 (0.69) · 일치 0.96 · 확신 0.65",
+        "description": "카리나 닮은꼴 미인대회 출신 여친의 역대급 요구? 폭염 속 사진 500장에 짐꾼 취급까지... 참다못한 이효리의 사이다 팩폭! 한쪽만 희생하는 연애, 여러분의 생각은 어떠신가요? 댓글로 의견을 남겨주세요!\n\n#연애 #남녀심리 #이효리 #팩폭 #커플 이슈 #상대적갑을관계 #연애상담 #숏폼 #유튜브쇼츠 #인스타그램릴스 #네이버클립 #연애썰 #공인병 #카리나닮은꼴 #미인대회 #폭염 #데이트 #자존감 #남친 #여친 #연애고민 #이슈 #인기동영상 #사이다 #팩트폭행 #연애관 #희생 #공감 #댓글소통 #쇼츠",
+        "skip_reason": null,
+        "title": "남친을 노예 취급한 미인대회 여친 #연애 #남녀심리 #이효리",
         "top_comments": [
-          "자세한 내용이 궁금하시다면 프로필 링크 공식카페 연애 재회칼럼확인하세요!"
+          "미인대회 커트라인 개박살 났네"
         ]
       },
-      "video_id": "T-FQ11cmUtY",
-      "views": 1801,
-      "window": "operation"
+      "video_id": "qAgY7WxXWs4",
+      "views": 1484,
+      "window": "widened"
     }
   ],
   "windows": {
     "operation": {
-      "classified": 18,
-      "found": 50,
-      "in_range": 18,
-      "published_after": "2026-10-14T02:09:02.882902+00:00",
+      "classified": 22,
+      "found": 204,
+      "in_range": 22,
+      "published_after": "2026-10-14T20:42:22.401654+00:00",
       "published_before": null,
+      "searches": 5
+    },
+    "widened": {
+      "classified": 10,
+      "found": 50,
+      "in_range": 10,
+      "published_after": "2026-10-12T08:42:22.401654+00:00",
+      "published_before": "2026-10-14T20:42:22.401654+00:00",
       "searches": 1
     }
   },
