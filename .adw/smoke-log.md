@@ -1036,7 +1036,7 @@ other line is required on every item.
 - evidence: src/agent/config.py:124 `_LOOPBACK_URL` 의 `127\.0\.0\.1` 을 `127.0.0.1`(점 이스케이프 없음)로 바꿔도 전체 스위트 887개 `OK`(ship-check 감사 5 손 변이 M13, 임시 복사본) — 그 판본은 `http://127-0-0-1:9222` · `http://127x0y0z1:9222`(DNS 로 찾는 다른 호스트 이름)를 받음(HEAD 는 둘 다 거절, 메모리 확인); tests/test_config.py:908 `LoopbackUrlTest.RED` 에 점을 다른 글자로 바꾼 표본이 없음
 - direction: `LoopbackUrlTest.RED` 에 `"http://127-0-0-1:9222"` 를 더하고 한 줄 주석으로 닮은 꼴 종류(점 바꿈 → 다른 호스트 이름)와 색의 근거(트래커 Phase 7G 질문 2 A "다른 호스트 이름")를 적는다 — 코드 · 계약 변경 없음. (2026-10-16 7G 출하 전 사람 확인 인터뷰 · 슬롯 7g HC1 질문 1 A 로 보탬) 같은 `RED` 묶음에 사람이 빨강으로 정한 일곱도 더한다 — `"https://localhost:9222"` · `"http://LOCALHOST:9222"` · `"http://127.0.0.2:9222"` · `"http://localhost"` · `"http://ｌｏｃａｌｈｏｓｔ:9222"`(전각) · `"http://localhost:123456"` · `"http://localhost:9222//"`, 줄마다 주석에 꼴 종류와 근거(트래커 Phase 7G Decisions 의 "HC1 질문 1 A" 줄 — 꼴마다 이유가 적혀 있음). 이 일곱은 ship-check 손 변이 `http://` → `https?://` · `[0-9]{1,5}` → `[0-9]+` · `/?` → `/*`(셋 다 887 `OK` 로 살아남음, `.adw/ship-report.md` Test integrity 표)를 잡는다 — 더한 뒤 각 변이가 빨강인지 임시 복사본에서 확인한다
 - touches: tests/test_config.py
-- status: open
+- status: resolved
 - attempts: 0 · last failure: —
 - first seen: 2026-10-15 · last seen: 2026-10-15
 
@@ -1045,7 +1045,7 @@ other line is required on every item.
 - evidence: src/agent/trigger.py:52 `_first_pair` 의 `newest` 고르는 열쇠를 `(sample.count, _utc(sample.at))` 로 바꿔도 전체 스위트 887개 `OK`(ship-check 직접 변이, 임시 복사본) — 7G 전에는 이 줄이 같은 시각 기록끼리만 닿았지만 이제 10분 안 기록끼리도 닿는다. 기록 `(1h, 1500), (1h05m, 1450)` 에서 HEAD 는 views_per_hour 1338.46(업로드 0 ↔ 최신 1450), 변이는 1500.0(건너뛴 기록을 최신으로 씀). docs/contracts.md:1148 "건너뛴 기록(최신보다 10분 안)은 판정 어디에도 쓰지 않습니다" 의 짝 테스트(`test_decrease_is_seen_on_the_measured_pair_only` · `test_skips_near_sample_and_uses_latest_far_enough`)는 10분 넘게 앞선 기록이 있는 길만 봄
 - direction: tests/test_trigger.py `TestMinimumGap` 에 테스트 하나 — `video((1 * H, 1500), (1 * H + 5 * M, 1450))` 이 업로드 0 과 최신(1450)으로 재짐: `views_per_hour == 1450 * 60 / 65`, 같은 짝으로 `judge_trigger` 의 경계(`min_views_per_hour` 1338 에서 yes, 1339 에서 `too_slow`). 같은 손으로 `TestFirstSample` docstring(tests/test_trigger.py:315 "시각이 다른 기록이 하나면 …")을 "최신보다 10분 이상 앞선 기록이 없으면 …" 으로 넓힌다 — 코드 · 계약 변경 없음
 - touches: tests/test_trigger.py
-- status: open
+- status: resolved
 - attempts: 0 · last failure: —
 - first seen: 2026-10-15 · last seen: 2026-10-15
 
@@ -1054,6 +1054,6 @@ other line is required on every item.
 - evidence: src/agent/config.py:124 `_LOOPBACK_URL` 의 `[0-9]{1,5}` 를 `\d{1,5}` 로 바꿔도 전체 스위트 887개 `OK (skipped=3)`(ship-check 2회차 감사 5 와 이 단계가 따로 확인, `.git` 없는 임시 복사본 — 건너뜀 3은 그 탓) — 그 판본은 `http://localhost:９２２２` · `http://127.0.0.1:٩٢٢٢` 를 받음(HEAD 는 둘 다 거절, 메모리 확인). 받은 주소는 파이썬 `urlsplit` 의 `.port` 가 `ValueError`, WHATWG `new URL` 이 `ERR_INVALID_URL` 이라 설정 읽기만 지나고 준비 도구 rc 2 · 게시마다 연결 실패로 늦게 터짐. tests/test_config.py:908 `LoopbackUrlTest.RED` 에 ASCII 가 아닌 숫자 포트 표본이 없고, `S-103` 의 표본 여덟은 이 변이를 잡지 못함(그중 전각은 호스트 `ｌｏｃａｌｈｏｓｔ` 뿐)
 - direction: `LoopbackUrlTest.RED` 에 `"http://localhost:９２２２"`(포트 숫자만 전각)를 더하고 한 줄 주석으로 꼴 종류(포트 숫자의 전각 닮은 꼴 — 두 해석기 모두 포트로 읽지 못함)와 색의 근거(트래커 Phase 7G Decisions "HC1 질문 1 A" 의 `https` 줄 "받아도 게시 때 `chrome_unreachable`" · `:123456` 줄 "계약 2절 숫자 1–5자리")를 적는다 — 코드 · 계약 변경 없음. `S-103` 과 같은 묶음이라 한 스윕에서 함께 넣어도 된다. 더한 뒤 `\d{1,5}` 변이가 빨강인지 임시 복사본에서 확인한다
 - touches: tests/test_config.py
-- status: open
+- status: resolved
 - attempts: 0 · last failure: —
 - first seen: 2026-10-16 · last seen: 2026-10-16
