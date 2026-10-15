@@ -989,3 +989,35 @@
 - source: adw/phase-7f-chrome-rehearsal
 - tag: plain
 - status: open
+
+### H-121 — 착지 전에 정한다: `d2d8942` 가 커밋한 `docs/live-check/result.json` 의 `videos[].untrusted.description`(영상 6 · 14 · 15 · 18 · 21 · 29)에 채널 주인의 메신저 연락처(카카오톡 아이디 넷 · 텔레그램 링크 · 디스코드 초대 · `@` 아이디)가 있다 — 6G 연락처 모양 밖이라 검사는 0. 공개 저장소 역사에 그대로 둘지, 레인 기록을 가린 글로 다시 쓸지(트래커 6F Q9 의 길)
+- project: marketing-agent-demo
+- when: 2026-10-16 · plans/interview-marketing-agent.md#phase-6f
+- from: ship-report.md § Human checks — .adw/ship-report.md § Risks
+- source: adw/phase-6f-live-check-reapply-after-fix
+- tag: sensitive: sensitive area · confirmed 2026-10-16
+- status: confirmed
+
+### H-122 — 트래커에서 `claude_answer` 의 색 미정 표본 "grade ok · task_quality None"(과제 채점 오류)의 색을 정한다 — 그 답이 계약 C:1028 '과제 칸 오류 … 통과선은 이 숫자로 움직이지 않습니다' 를 좁힐지도 정한다
+- project: marketing-agent-demo
+- when: 2026-10-16 · plans/interview-marketing-agent.md#phase-6f
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-6f-live-check-reapply-after-fix
+- tag: plain
+- status: open
+
+### H-123 — ⓐ 의 전후 차이 가운데 '재료에 연애 고민 없음' 거름이 얼마를 설명하는지는 재지 않았다 — PROCESS.md 가 ⓐ 의 오름을 개선이라 불러도 되는지 사람이 읽고 정한다
+- project: marketing-agent-demo
+- when: 2026-10-16 · plans/interview-marketing-agent.md#phase-6f
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-6f-live-check-reapply-after-fix
+- tag: plain
+- status: open
+
+### H-124 — 제출 공개 전에 커밋 author · committer 메일(레인 17개와 main 역사 전체)을 그대로 공개할지 정한다
+- project: marketing-agent-demo
+- when: 2026-10-16 · plans/interview-marketing-agent.md#phase-6f
+- from: ship-report.md § Human checks — .adw/ship-report.md § Risks
+- source: adw/phase-6f-live-check-reapply-after-fix
+- tag: plain
+- status: open
