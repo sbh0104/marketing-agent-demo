@@ -1221,3 +1221,19 @@
 - source: adw/phase-7d-run-report-html
 - tag: plain
 - status: open
+
+### H-150 — 7A 가 main 에 착지한 뒤, 저장소를 공개하기 전에 이 컴퓨터에서 실제 키로 `--once` 한 번 — `search.list` · `videos.list` 가 새 opener 로 200 을 받고 `logs/agent.log` 에 `unknown url type` · SSL 오류가 없으며, 운영자 프록시가 있으면 그대로 먹히는지, 그리고 로그에 키 · 프록시 비밀번호가 없는지 본다
+- project: marketing-agent-demo
+- when: 2026-10-16 · plans/interview-marketing-agent.md#phase-7a
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-7a-watcher-network-fixes
+- tag: plain
+- status: open
+
+### H-151 — `python3 -m unittest tests.test_youtube tests.test_watcher_network` 를 Windows 와 macOS 에서 한 번씩 돌린다 — 소켓 시간 제한과 `Event.wait` 중 Ctrl+C 는 Linux 에서만 쟀다
+- project: marketing-agent-demo
+- when: 2026-10-16 · plans/interview-marketing-agent.md#phase-7a
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-7a-watcher-network-fixes
+- tag: plain
+- status: open
