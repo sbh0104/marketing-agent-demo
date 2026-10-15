@@ -25,9 +25,12 @@ class LoopbackFetch:
     def __init__(self, servers: Mapping[str, RawServer], cap: float | None = None) -> None:
         self.servers = servers
         self.cap = cap
+        # 주소 가드가 걸린 기록 — _call 이 AssertionError 를 YouTubeError 로 삼키므로 시험 끝에 봅니다
+        self.guard_hits: list[str] = []
 
     def __call__(self, url: str, timeout: float) -> tuple[int, bytes]:
         if not url.startswith(ORIGIN):
+            self.guard_hits.append(f"Google 밖의 주소입니다: {url}")
             raise AssertionError(f"Google 밖의 주소입니다: {url}")
         endpoint = urllib.parse.urlsplit(url).path.rsplit("/", 1)[-1]
         target = self.servers[endpoint].url + url[len(ORIGIN):]
@@ -42,6 +45,12 @@ class WatcherNetworkTest(WatcherCase):
     def setUp(self) -> None:
         super().setUp()
         no_proxies(self)
+        self.addCleanup(self.assert_no_guard_hits)
+
+    def assert_no_guard_hits(self) -> None:
+        """시험 끝의 self.api 가 LoopbackFetch 면 그 주소 가드가 한 번도 걸리지 않았어야 합니다."""
+        if isinstance(self.api, LoopbackFetch):
+            self.assertEqual(self.api.guard_hits, [])
 
     def serve(self, reply: bytes | None, **kw: float) -> RawServer:
         server = RawServer(lambda target: reply, **kw)

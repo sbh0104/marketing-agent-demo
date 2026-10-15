@@ -1916,10 +1916,12 @@ class World:
 
     검색은 (검색어, 창)으로, 영상 정보는 ID 로, 인기 댓글은 영상마다 준비한 글 목록으로 답합니다.
     답 자리에 (상태, 본문)을 두면 그대로, URL 을 받는 함수를 두면 그 결과를 씁니다.
+    모르는 호출은 guard_hits 에 적고 AssertionError — _call 이 YouTubeError 로 삼켜도 시험 끝에 잡힙니다.
     """
 
-    def __init__(self, log: list[tuple[str, str]]) -> None:
+    def __init__(self, log: list[tuple[str, str]], guard_hits: list[str]) -> None:
         self.log = log
+        self.guard_hits = guard_hits
         self.urls: list[str] = []
         self.pages: dict[tuple[str, str], list[str]] = {}
         self.items: dict[str, dict] = {}
@@ -1948,6 +1950,7 @@ class World:
             if isinstance(answer, list):
                 answer = ok({"items": [thread(text) for text in answer]})
         else:
+            self.guard_hits.append(f"모르는 호출입니다: {endpoint}")
             raise AssertionError(f"모르는 호출입니다: {endpoint}")
         return answer(url) if callable(answer) else answer
 
@@ -2004,9 +2007,17 @@ class LiveCheckCase(unittest.TestCase):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         self.tmp = Path(tmp.name)
+        # 모르는 호출 · 소켓 금지 가드가 걸린 기록 — _call 이 AssertionError 를 삼키므로 시험 끝에 봅니다
+        self.guard_hits: list[str] = []
+        self.addCleanup(self.assert_no_guard_hits)
+
+        def no_network(*args: object, **kwargs: object) -> None:
+            self.guard_hits.append(NO_NETWORK)
+            raise AssertionError(NO_NETWORK)
+
         for patcher in (
-            mock.patch.object(socket.socket, "connect", side_effect=AssertionError(NO_NETWORK)),
-            mock.patch.object(socket, "create_connection", side_effect=AssertionError(NO_NETWORK)),
+            mock.patch.object(socket.socket, "connect", side_effect=no_network),
+            mock.patch.object(socket, "create_connection", side_effect=no_network),
         ):
             patcher.start()
             self.addCleanup(patcher.stop)
@@ -2014,13 +2025,17 @@ class LiveCheckCase(unittest.TestCase):
         self.builds = 0
         self.build()
 
+    def assert_no_guard_hits(self) -> None:
+        """World 의 모르는 호출 가드와 소켓 금지 가드는 한 번도 걸리지 않았어야 합니다."""
+        self.assertEqual(self.guard_hits, [])
+
     def build(self) -> None:
         """새 가짜들과 새 쿼터 장부 · 결과 폴더 — 한 시험 안에서 실행을 여러 번 할 때 씁니다."""
         self.builds += 1
         self.log: list[tuple[str, str]] = []
         self.jev = FakeJev(self.log)
         self.claude = FakeClaude(self.log)
-        self.world = World(self.log)
+        self.world = World(self.log, self.guard_hits)
         self.connected: list[live_check.Keys] = []
         self.quota = self.tmp / f"data-{self.builds}" / "quota.json"
         self.out = self.tmp / f"out-{self.builds}"
