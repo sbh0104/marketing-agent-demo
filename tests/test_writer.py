@@ -26,10 +26,12 @@ from agent.writer import (
     CHECK_LABELS,
     CHECK_QUESTIONS,
     CLAUDE_TIMEOUT_S,
+    FRAME_MIN_CHARS,
     MAX_TOKENS,
     NO_CONCERN,
     NO_SCENE,
     REPEAT_MIN_CHARS,
+    REQUIRED_WORD,
     REWRITE_PROMPT,
     SYSTEM_PROMPT,
     USER_INSTRUCTION,
@@ -41,6 +43,7 @@ from agent.writer import (
     read_reply,
     repeated_run,
     self_check_failure,
+    shared_frame,
     write_comment,
 )
 
@@ -71,6 +74,25 @@ PASSING = {
     "saju_story_fits": 0.75,
 }
 CLASSIFIED = Judgement(Verdict.YES, "연애 고민 상담 (0.91)", NOW)
+# 6D 의 같은 두 문장 뼈대 한 쌍 — 문장 틀 검사가 잡지 못하는 꼴. docs/live-check/result.json 의
+# 6D 영상 a-VQFiRlZ1A · f8EVYZ3D9g8 첫 초안 그대로입니다
+SKELETON_A = (
+    "연락 기다리는 마음 너무 공감돼요. 저도 예전에 연애사주를 봤을 때 올해 흐름이 바뀐다고 해서"
+    " 버텼는데, 번호 고르는 순간 괜히 떨리더라고요."
+)
+SKELETON_B = (
+    "제목처럼 씁쓸한 현실이 웃기면서도 찔리네요 ㅋㅋ 저도 연애사주를 봤을 때 표현 방식이 서로"
+    " 다르다는 말을 듣고 서운함이 좀 풀렸던 기억이 나요."
+)
+# 문장 틀 표본 — 1문장 끝과 2문장 첫머리(`뜨끔했어요. 저도`)가 같고 내용은 다른 두 댓글
+FRAME_RECENT = (
+    "고백 장면 보고 너무 뜨끔했어요. 저도 고백을 미루다 놓친 적이 있어서 연애사주 볼 때 들은"
+    " 타이밍 얘기가 오래 남았어요."
+)
+FRAMED = (
+    "답장 늦는 장면에 뜨끔했어요. 저도 연락 텀이 길던 시절에 연애사주에서 서로 속도가 다르다는"
+    " 풀이를 들었어요."
+)
 
 
 def video(classification: Judgement | None = CLASSIFIED) -> VideoRecord:
@@ -257,8 +279,70 @@ class CheckTest(unittest.TestCase):
                 "이전 댓글과 겹칩니다: "
                 "저도연락텀때문에불안했던적이있어요연애사주에서서로표현방식이다르다는얘기를듣고"
                 "마음이놓였어요",
+                "이전 댓글과 문장 틀이 같습니다: 저도연락텀때",
             ],
         )
+
+    def test_frame_piece_shared_with_recent_comment_fails(self) -> None:
+        self.assertEqual((FRAME_MIN_CHARS, REQUIRED_WORD), (6, "연애사주"))
+        self.assertIsNone(repeated_run(FRAMED, [FRAME_RECENT], REPEAT_MIN_CHARS))
+        # 1문장 끝 + 2문장 첫머리 6글자 — 댓글 차례 · 글 앞쪽의 첫 조각
+        self.assertEqual(shared_frame(FRAMED, [FRAME_RECENT]), "뜨끔했어요저")
+        self.assertEqual(shared_frame(FRAMED, [PREV, FRAME_RECENT]), "뜨끔했어요저")
+        self.assertEqual(
+            code_failures(FRAMED, [FRAME_RECENT], CONFIG),
+            ["이전 댓글과 문장 틀이 같습니다: 뜨끔했어요저"],
+        )
+
+    def test_required_word_pieces_are_not_frames(self) -> None:
+        # 트래커 6D 드리프트 인터뷰 질문 3 A ③ — 과제가 넣으라는 낱말이 든 조각은 틀로 세지 않습니다
+        recent = "친구 얘기 듣다가 연애사주에서 본 말이 생각났어요"
+        samples = {
+            "연애사주만": ("어제 영상 보고 연애사주를 다시 떠올렸어요", recent),
+            "띄어 쓴 연애 사주": ("어제 영상 보고 연애 사주를 다시 떠올렸어요", recent),
+            "가운뎃점 연애·사주": ("어제 영상 보고 연애·사주를 다시 떠올렸어요", recent),
+            "보이지 않는 글자": ("어제 영상 보고 연애​사주를 다시 떠올렸어요", recent),
+            "연애사주를 봤을 때": (
+                "저도 예전에 연애사주를 봤을 때 올해 흐름이 바뀐다고 했어요",
+                "그때 친구랑 연애사주를 봤을 때 표현 방식이 다르다고 들었어요",
+            ),
+        }
+        for label, (text, other) in samples.items():
+            with self.subTest(label):
+                self.assertIsNone(shared_frame(text, [other]))
+                self.assertIsNone(shared_frame(other, [text]))
+
+    def test_sibling_word_pieces_are_frames(self) -> None:
+        samples = {
+            "연애 없는 사주를 봤을 때 서로": (
+                "저도 예전에 사주를 봤을 때 서로 맞는다고 했어요",
+                "그때 친구랑 사주를 봤을 때 서로 다르다고 들었어요",
+                "사주를봤을때",
+            ),
+            "연애운을 봤을 때 서로": (
+                "저도 예전에 연애운을 봤을 때 서로 맞는다고 했어요",
+                "그때 친구랑 연애운을 봤을 때 서로 다르다고 들었어요",
+                "연애운을봤을",
+            ),
+        }
+        for label, (text, other, piece) in samples.items():
+            with self.subTest(label):
+                self.assertEqual(shared_frame(text, [other]), piece)
+                self.assertEqual(shared_frame(other, [text]), piece)
+
+    def test_five_letter_overlap_is_not_a_frame(self) -> None:
+        first = "고백하던 장면이 공감했어요. 저도 그런 적 있어서 연애사주 볼 때 들은 말이 떠올랐어요"
+        second = "마지막 대사에 공감했어요 그래서 예전에 연애사주에서 서로 다르다는 풀이가 생각났어요"
+        self.assertIsNone(shared_frame(first, [second]))
+        self.assertIsNone(shared_frame(second, [first]))
+
+    def test_six_d_skeleton_pair_is_not_caught(self) -> None:
+        # 계약 '댓글 작성' 절 문장 틀 — '연애사주' 에 걸친 조각과 6글자보다 짧은 이음으로만 겹치는
+        # 두 문장 뼈대는 지나갑니다(그 몫은 프롬프트 규칙 6). 색은 사람이 정합니다(undecided)
+        self.assertIsNone(shared_frame(SKELETON_A, [SKELETON_B]))
+        self.assertIsNone(shared_frame(SKELETON_B, [SKELETON_A]))
+        self.assertEqual(code_failures(SKELETON_A, [SKELETON_B], CONFIG), [])
+        self.assertEqual(code_failures(SKELETON_B, [SKELETON_A], CONFIG), [])
 
     def test_repeated_sentence_inside_new_comment_is_found(self) -> None:
         previous = ["완전 공감해요.", "저도 연락 텀 때문에 불안했던 적 있어요."]
@@ -758,6 +842,19 @@ class WriteCommentTest(unittest.TestCase):
         self.assertEqual(result.draft.text, GOOD2)
         self.assertTrue(self.rewrite_reason(claude).startswith("링크·주소 모양이 들어 있습니다:"))
         self.assertEqual(len(jev.calls), 2)
+
+    def test_frame_failure_rewrites(self) -> None:
+        # 고정 댓글 셋은 서로 · 문장 틀 표본과도 같은 문장 틀 조각이 없습니다
+        for first, second in itertools.permutations((GOOD, GOOD2, PREV, FRAME_RECENT), 2):
+            with self.subTest(first=first[:10], second=second[:10]):
+                self.assertIsNone(shared_frame(first, [second]))
+        claude = FakeClaude([reply(CONCERN, FRAMED), reply(CONCERN, GOOD)])
+        jev = FakeJev([PASSING, PASSING])
+        result = self.write(claude, jev, previous=[FRAME_RECENT])
+        self.assertEqual((len(claude.calls), len(jev.calls), result.draft.text), (2, 2, GOOD))
+        reason = self.rewrite_reason(claude)
+        self.assertTrue(reason.startswith("이전 댓글과 문장 틀이 같습니다:"), reason)
+        self.assertEqual(reason, "이전 댓글과 문장 틀이 같습니다: 뜨끔했어요저")
 
     def test_jev_and_code_failures_are_reported_together(self) -> None:
         long_text = GOOD + " " + "고마워요" * 10

@@ -39,6 +39,7 @@ from agent.writer import (
     TOP_COMMENTS_MAX,
     code_failures,
     repeated_run,
+    shared_frame,
 )
 from agent.youtube import MAX_IDS_PER_CALL, PAGE_SIZE, QuotaLedger, YouTubeClient
 from tests import live_check
@@ -2725,6 +2726,13 @@ class VideoRoundTest(LiveCheckCase):
         for first, second in itertools.permutations(texts, 2):
             with self.subTest(first=first[:10], second=second[:10]):
                 self.assertIsNone(repeated_run(first, [second], REPEAT_MIN_CHARS))
+
+    def test_fixture_drafts_share_no_frame(self) -> None:
+        # 앞서 통과한 초안과 문장 틀이 같으면 작성기의 코드 검사가 떨어뜨립니다 — 기본 답끼리는 없어야
+        # 다른 시험이 문장 틀 때문에 다시 쓰지 않습니다
+        for first, second in itertools.permutations((*DRAFT_POOL, COMMENT), 2):
+            with self.subTest(first=first[:10], second=second[:10]):
+                self.assertIsNone(shared_frame(first, [second]))
 
     def test_only_passed_drafts_become_previous(self) -> None:
         self.jev.checks = [PASSING, FAILING, FAILING, PASSING]
