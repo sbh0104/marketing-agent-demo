@@ -930,9 +930,20 @@ class HttpGetTest(unittest.TestCase):
             thread for thread in threading.enumerate()
             if thread not in before and thread.name == "http_get"
         ]
+        self.assertNotEqual(workers, [], "새 http_get 일꾼 스레드를 하나도 보지 못했습니다")
         for worker in workers:
             worker.join(timeout=1.5)
         self.assertEqual([worker for worker in workers if worker.is_alive()], [])
+
+    def test_each_read_gets_the_timeout_value(self) -> None:
+        # 일꾼의 opener 는 http_get 이 받은 timeout 값을 읽기마다의 timeout 으로 그대로 받습니다
+        original = urllib.request.OpenerDirector.open
+        server = self.serve(lambda target: response(200, b'{"items": []}'))
+        with mock.patch.object(
+            urllib.request.OpenerDirector, "open", autospec=True, side_effect=original
+        ) as spy:
+            self.assertEqual(http_get(server.url + GET_PATH, 12.5), (200, b'{"items": []}'))
+        self.assertEqual([call.kwargs.get("timeout") for call in spy.call_args_list], [12.5])
 
     def test_opener_is_urlopens_without_the_redirect_handler(self) -> None:
         dropped = {
