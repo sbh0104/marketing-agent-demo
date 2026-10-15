@@ -1,4 +1,4 @@
-"""트리거 판정 테스트 — 세 조건, 판단 보류, 경계, 순서, 음수 속도 없음, 첫 표본 판정."""
+"""트리거 판정 테스트 — 세 조건, 판단 보류, 경계, 순서, 음수 속도 없음, 첫 표본 판정, 최소 표본 간격."""
 from __future__ import annotations
 
 import copy
@@ -190,14 +190,12 @@ class SpeedTests(unittest.TestCase):
         self.assertEqual(judged(record, AT, at_699), ("yes", "views_per_hour"))
         self.assertEqual(judged(record, AT, at_701), ("no", "too_slow"))
 
-    def test_short_gap_after_restart_is_measured_as_is(self) -> None:
+    def test_short_gap_after_restart_skips_to_earlier_sample(self) -> None:
+        # 20초 사이 1회(시간당 180)가 아니라 30분 20초 앞의 기록과 잽니다 — 1회 ÷ 30분 20초
         last = 2 * H + 30 * M + 20 * S
         record = video((2 * H, 1200), (2 * H + 30 * M, 1200), (last, 1201))
-        at_180 = dataclasses.replace(DEFAULTS, min_views_per_hour=180.0)
-        at_181 = dataclasses.replace(DEFAULTS, min_views_per_hour=181.0)
-        self.assertEqual(judged(record, last), ("yes", "views_per_hour"))
-        self.assertEqual(judged(record, last, at_180), ("yes", "views_per_hour"))
-        self.assertEqual(judged(record, last, at_181), ("no", "too_slow"))
+        self.assertEqual(judged(record, last), ("no", "too_slow"))
+        self.assertEqual(views_per_hour(record), 3600 / 1820)
 
     def test_rate_never_negative_over_generated_pairs(self) -> None:
         counts = (0, 1, 999, 1000, 1450, 5000, 5001)
@@ -365,6 +363,8 @@ class TestFirstSample(unittest.TestCase):
             video(*GOOD),
             video((1 * H, 1000), (2 * H, 1100), (2 * H + 30 * M, 1450)),
             video((2 * H + 30 * M, 1450), (2 * H, 1200)),
+            video((1 * H - 20 * S, 1180), (1 * H, 1200)),
+            video((2 * H, 1200), (2 * H + 25 * M, 1500), (2 * H + 30 * M, 1450)),
         )
         for record in records:
             with self.subTest(record=record.view_history):
@@ -434,6 +434,75 @@ class TestJudgementStability(unittest.TestCase):
         record = video(*samples)
         self.assertEqual(judged(record, 3 * H), ("no", "too_slow"))
         self.assertEqual(views_per_hour(record), 100.0)
+
+
+class TestMinimumGap(unittest.TestCase):
+    """최소 표본 간격 10분 — 최신보다 10분 이상 앞선 가장 늦은 기록과 잽니다(트래커 Phase 7G 질문 1 A · 2 A)."""
+
+    def test_gap_of_exactly_ten_minutes_is_used(self) -> None:
+        record = video((50 * M, 1200), (1 * H, 1250))
+        at_300 = dataclasses.replace(DEFAULTS, min_views_per_hour=300.0)
+        at_301 = dataclasses.replace(DEFAULTS, min_views_per_hour=301.0)
+        self.assertEqual(views_per_hour(record), 300.0)
+        self.assertEqual(judged(record, 1 * H, at_300), ("yes", "views_per_hour"))
+        self.assertEqual(judged(record, 1 * H, at_301), ("no", "too_slow"))
+
+    def test_gap_one_second_short_skips_to_upload_zero(self) -> None:
+        record = video((50 * M + S, 1200), (1 * H, 1250))
+        at_1250 = dataclasses.replace(DEFAULTS, min_views_per_hour=1250.0)
+        at_1251 = dataclasses.replace(DEFAULTS, min_views_per_hour=1251.0)
+        self.assertEqual(views_per_hour(record), 1250.0)
+        self.assertEqual(judged(record, 1 * H, at_1250), ("yes", "views_per_hour"))
+        self.assertEqual(judged(record, 1 * H, at_1251), ("no", "too_slow"))
+
+    def test_restart_with_no_far_sample_uses_upload_zero(self) -> None:
+        record = video((1 * H - 20 * S, 1180), (1 * H, 1200))
+        at_1200 = dataclasses.replace(DEFAULTS, min_views_per_hour=1200.0)
+        at_1201 = dataclasses.replace(DEFAULTS, min_views_per_hour=1201.0)
+        self.assertEqual(views_per_hour(record), 1200.0)
+        self.assertEqual(judged(record, 1 * H, at_1200), ("yes", "views_per_hour"))
+        self.assertEqual(judged(record, 1 * H, at_1201), ("no", "too_slow"))
+
+    def test_skips_near_sample_and_uses_latest_far_enough(self) -> None:
+        record = video(
+            (1 * H, 1000), (2 * H, 1100), (2 * H + 25 * M, 1400), (2 * H + 30 * M, 1450)
+        )
+        at_700 = dataclasses.replace(DEFAULTS, min_views_per_hour=700.0)
+        at_701 = dataclasses.replace(DEFAULTS, min_views_per_hour=701.0)
+        self.assertEqual(views_per_hour(record), 700.0)
+        self.assertEqual(judged(record, AT, at_700), ("yes", "views_per_hour"))
+        self.assertEqual(judged(record, AT, at_701), ("no", "too_slow"))
+
+    def test_decrease_is_seen_on_the_measured_pair_only(self) -> None:
+        with self.subTest("skipped_higher"):
+            record = video((2 * H, 1200), (2 * H + 25 * M, 1500), (2 * H + 30 * M, 1450))
+            self.assertEqual(judged(record, AT), ("yes", "views_per_hour"))
+            self.assertEqual(views_per_hour(record), 500.0)
+        with self.subTest("measured_lower"):
+            record = video((2 * H, 1500), (2 * H + 25 * M, 1400), (2 * H + 30 * M, 1450))
+            self.assertEqual(judged(record, AT), ("hold", "views_decreased"))
+            self.assertIsNone(views_per_hour(record))
+
+    def test_upload_zero_side_has_no_gap(self) -> None:
+        record = video((1 * M, 1100))
+        self.assertEqual(judged(record, 1 * M), ("yes", "views_per_hour"))
+        self.assertEqual(views_per_hour(record), 66000.0)
+
+    def test_gap_is_measured_by_instant_across_time_zones(self) -> None:
+        with self.subTest("exact"):
+            rec = video()
+            rec.view_history = [
+                ViewSample(T0 + 50 * M, 1200),
+                ViewSample(datetime(2026, 10, 12, 13, 0, tzinfo=KST), 1250),  # T0 + 1시간
+            ]
+            self.assertEqual(views_per_hour(rec), 300.0)
+        with self.subTest("one_second_short"):
+            rec = video()
+            rec.view_history = [
+                ViewSample(datetime(2026, 10, 12, 12, 50, 1, tzinfo=KST), 1200),
+                ViewSample(T0 + 1 * H, 1250),
+            ]
+            self.assertEqual(views_per_hour(rec), 1250.0)
 
 
 class _NewYork(tzinfo):
@@ -507,6 +576,20 @@ class InstantTests(unittest.TestCase):
         now = datetime(2026, 3, 8, 3, 30, tzinfo=NY)
         config = dataclasses.replace(DEFAULTS, max_age_hours=3.0)
         self.assertEqual(self.judged_at(record, now, config), ("yes", "views_per_hour"))
+
+    def test_spring_skip_gap_is_the_real_five_minutes(self) -> None:
+        # 벽시계로는 65분이지만 실제 간격은 5분 — 건너뛰고 업로드 0 과 잽니다(1250회 ÷ 2시간)
+        record = ny_video(
+            datetime(2026, 3, 8, 0, 0, tzinfo=NY),
+            (datetime(2026, 3, 8, 1, 55, tzinfo=NY), 1200),
+            (datetime(2026, 3, 8, 3, 0, tzinfo=NY), 1250),
+        )
+        now = datetime(2026, 3, 8, 3, 0, tzinfo=NY)
+        at_625 = dataclasses.replace(DEFAULTS, min_views_per_hour=625.0)
+        at_626 = dataclasses.replace(DEFAULTS, min_views_per_hour=626.0)
+        self.assertEqual(views_per_hour(record), 625.0)
+        self.assertEqual(self.judged_at(record, now, at_625), ("yes", "views_per_hour"))
+        self.assertEqual(self.judged_at(record, now, at_626), ("no", "too_slow"))
 
     def test_fall_publish_before_now_is_not_future(self) -> None:
         record = ny_video(
