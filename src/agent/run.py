@@ -27,7 +27,7 @@ from agent.chrome import ChromeSession
 from agent.classifier import Ask, classify, is_error_hold, sdk_ask
 from agent.config import Config, ConfigError, load_config
 from agent.env import EnvError, require_secret
-from agent.guard import allowed_video_ids
+from agent.guard import allowed_video_ids, decide_post
 from agent.logbook import Event, Logbook
 from agent.models import Judgement, Verdict, VideoRecord
 from agent.poster import CommentPage, PageError, post_video
@@ -418,6 +418,9 @@ class Pipeline:
         """댓글이 있으면 게시 단계로 — 명단 영상에만 게시마다 새 크롬 연결을 넘기고 끝나면 놓습니다."""
         if record.comment is None:
             return
+        if rejected:
+            self._save_rejected(record, config, allowed)
+            return
         if record.video_id not in allowed:
             post_video(
                 record,
@@ -444,6 +447,28 @@ class Pipeline:
             )
         finally:
             session.close()
+
+    def _save_rejected(self, record: VideoRecord, config: Config, allowed: frozenset[str]) -> None:
+        """설정이 거절된 동안의 게시 — post_video 없이 계약 6절 1 · 2 · 4 를 크롬 없이 따라 테스트 저장.
+
+        명단 영상의 이유는 config_rejected(사람이 켠 dry_run 과 갈림), 명단 밖은 가드의 이유 그대로입니다.
+        """
+        now = self._clock()
+        decision = decide_post(record.video_id, config.allowed_videos, True)
+        if decision.video_id is None:
+            self._logbook.write(Event.SKIP, video=record.video_id, reason=decision.reason)
+            return
+        reason = CONFIG_REJECTED if decision.video_id in allowed else decision.reason
+        check = self._store.check_post(
+            decision.video_id, record.channel_id, now, config.limits, live=False
+        )
+        if not check.allowed:
+            self._logbook.write(Event.SKIP, video=decision.video_id, reason=check.reason)
+            return
+        self._store.save_test(decision.video_id, now, reason)
+        self._logbook.write(
+            Event.POST, video=decision.video_id, mode="test", result="saved", reason=reason
+        )
 
 
 def run_agent(

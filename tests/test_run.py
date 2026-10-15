@@ -1108,5 +1108,133 @@ class TestStages(RunCase):
         self.assertEqual(self.record(D), old)
 
 
+class TestConfigRejected(RunCase):
+    """run_loop 를 그대로 돌립니다 — 좋은 설정을 읽은 뒤 run_loop 전에 고장 난 파일을 써서
+    첫 다시 읽기가 거절합니다. 가짜 sleep 이 대기마다 on_wait[n] 을 부릅니다(n 번째 대기).
+    명단 영상 A 는 첫 사이클에 실제로 게시됩니다."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.show(A, 2000, channel="UC1")
+        self.waits = 0
+        self.on_wait: dict[int, object] = {}
+        self.posted_via: list[tuple[int, str, object]] = []  # (사이클, 영상, dry_run)
+
+    def sleep(self, seconds: float) -> None:
+        self.waits += 1
+        self.clock.sleep(seconds)
+        hook = self.on_wait.get(self.waits)
+        if hook is not None:
+            hook()
+
+    def spy_post(self) -> object:
+        """agent.run.post_video 를 부른 사이클 · 영상 · dry_run 을 적고 진짜를 부릅니다."""
+        real = run.post_video
+
+        def post(record: object, **kwargs: object) -> object:
+            self.posted_via.append((self.waits + 1, record.video_id, kwargs["dry_run"]))
+            return real(record, **kwargs)
+
+        return mock.patch.object(run, "post_video", side_effect=post)
+
+    def start(self, broken: str, cycles: int, *, dry_run: bool = False) -> None:
+        initial = self.load()
+        self.write_config(broken)
+        pipeline = self.pipeline(dry_run=dry_run)
+        with self.spy_post():
+            self.loop(pipeline, initial, cycles, self.sleep)
+
+    def modes(self) -> list[str]:
+        return [fields["mode"] for fields in self.lines(Event.CYCLE)]
+
+    def test_rejected_reload_saves_allowlisted_as_config_rejected_without_chrome(self) -> None:
+        # H-056 · Phase 1A R5 재현 — B 를 명단에서 빼고 같은 저장에 오타 하나
+        for dry_run in (False, True):
+            with self.subTest(dry_run=dry_run):
+                self.setUp()
+                broken = config_text(allowed=(A,), daily_max_comments=999999)
+                sessions_before: list[int] = []
+
+                def appear() -> None:
+                    sessions_before.append(len(self.chrome.sessions))
+                    self.show(B, 2000, channel="UC2")
+
+                self.on_wait[1] = appear
+                self.start(broken, 2, dry_run=dry_run)
+                (error,) = self.lines(Event.ERROR, where="config")
+                self.assertIn("86400 이하여야 합니다: limits.daily_max_comments", error["reason"])
+                self.assertEqual(
+                    self.lines(Event.POST, video=B),
+                    [{"video": B, "mode": "test", "result": "saved", "reason": "config_rejected"}],
+                )
+                self.assertEqual(len(self.chrome.sessions), sessions_before[0])
+                self.assertEqual([entry for entry in self.posted_via if entry[0] == 2], [])
+                attempts = self.record(B).attempts
+                self.assertEqual(
+                    [(a.mode, a.result, a.reason) for a in attempts],
+                    [("test", "saved", "config_rejected")],
+                )
+                self.assertEqual(self.modes(), ["test" if dry_run else "live", "test"])
+
+    def test_rejected_out_of_list_keeps_guard_reason(self) -> None:
+        def appear() -> None:
+            self.show(C, 2000, channel="UC3")
+            self.find(C)
+
+        self.on_wait[1] = appear
+        self.start(config_text(daily_max_comments=999999), 2)
+        self.assertEqual(
+            self.lines(Event.POST, video=C),
+            [{"video": C, "mode": "test", "result": "saved", "reason": "not_in_allowlist"}],
+        )
+        self.assertEqual([entry for entry in self.posted_via if entry[0] == 2], [])
+        self.assertEqual(len(self.chrome.sessions), 1)  # 첫 사이클의 A 뿐
+
+    def test_each_rejection_writes_config_error(self) -> None:
+        self.write_config(allowed=(A, B, D))
+        self.on_wait[1] = lambda: self.show(B, 2000, channel="UC2")
+        self.on_wait[2] = lambda: self.show(D, 2000, channel="UC4")
+        self.start(config_text(allowed=(A, B, D), daily_max_comments=999999), 3)
+        errors = self.lines(Event.ERROR, where="config")
+        self.assertEqual(len(errors), 2)
+        for fields in errors:
+            self.assertIn("86400 이하여야 합니다: limits.daily_max_comments", fields["reason"])
+        self.assertEqual(self.modes(), ["live", "test", "test"])
+        saved = self.lines(Event.POST, mode="test")
+        self.assertEqual(
+            [(fields["video"], fields["reason"]) for fields in saved],
+            [(B, "config_rejected"), (D, "config_rejected")],
+        )
+
+    def test_accepted_reload_restores_live_next_cycle(self) -> None:
+        def fix() -> None:
+            self.show(B, 2000, channel="UC2")
+            self.write_config()
+
+        self.on_wait[1] = fix
+        self.start(config_text(daily_max_comments=999999), 3)
+        self.assertEqual(len(self.lines(Event.ERROR, where="config")), 1)
+        self.assertEqual(self.modes(), ["live", "test", "live"])
+        self.assertEqual(self.posted_live(), [A, B])
+        self.assertEqual(self.chrome.submits, [watch(A), watch(B)])
+        attempts = self.record(B).attempts
+        self.assertEqual(
+            [(a.mode, a.result, a.reason) for a in attempts],
+            [("test", "saved", "config_rejected"), ("live", "posted", "allowlisted")],
+        )
+
+    def test_edit_during_wait_reaches_posting_one_cycle_later(self) -> None:
+        initial = self.load()
+        self.on_wait[1] = lambda: self.write_config(test_run=True)
+        pipeline = self.pipeline()
+        with self.spy_post():
+            self.loop(pipeline, initial, 3, self.sleep)
+        self.assertEqual(
+            [(cycle, dry_run) for cycle, video_id, dry_run in self.posted_via if video_id == A],
+            [(1, False), (2, False), (3, True)],
+        )
+        self.assertEqual(self.modes(), ["live", "live", "test"])
+
+
 if __name__ == "__main__":
     unittest.main()
