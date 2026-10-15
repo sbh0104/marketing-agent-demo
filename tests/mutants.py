@@ -78,6 +78,42 @@ MUTANTS: dict[str, tuple[str, str, str, str]] = {
         "if not decision.live:",
         "if False:",
     ),
+    "poster-dry-run-skips-rehearsal": (
+        "agent.poster",
+        "tests.test_poster",
+        "if decision.reason == DRY_RUN:",
+        "if False:",
+    ),
+    "poster-rehearse-not-allowlisted": (
+        "agent.poster",
+        "tests.test_poster",
+        "if decision.reason == DRY_RUN:",
+        "if True:",
+    ),
+    "poster-rehearsal-clicks": (
+        "agent.poster",
+        "tests.test_poster",
+        "page.clear_comment()",
+        "page.submit()\n        page.clear_comment()",
+    ),
+    "poster-rehearsal-keeps-text": (
+        "agent.poster",
+        "tests.test_poster",
+        "page.clear_comment()",
+        "None",
+    ),
+    "poster-rehearsal-no-recheck": (
+        "agent.poster",
+        "tests.test_poster",
+        "recheck = decide_post(shown_url, config.allowed_videos, dry_run)",
+        "recheck = decision",
+    ),
+    "poster-rehearsal-no-page-mismatch": (
+        "agent.poster",
+        "tests.test_poster",
+        "elif recheck.video_id != video_id:",
+        "elif False:",
+    ),
     "chrome-allow-default-profile": (
         "agent.chrome",
         "tests.test_chrome",
@@ -89,6 +125,12 @@ MUTANTS: dict[str, tuple[str, str, str, str]] = {
         "tests.test_chrome",
         "if _same_or_inside(path, repo) and not _same_or_inside(path, repo / PROFILE_DIR_NAME):",
         "if False:",
+    ),
+    "chrome-clear-keeps-text": (
+        "agent.chrome",
+        "tests.test_chrome",
+        'self._page.locator(COMMENT_INPUT).first.fill("")',
+        "None",
     ),
     "guard-allow-all": (
         "agent.guard",
