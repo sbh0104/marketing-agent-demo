@@ -1028,7 +1028,7 @@ Open questions
 ---
 
 ## Phase 8 — 제출 문서 (README · PROCESS.md · 공개 정리)
-- Status: Not started
+- Status: Done
 - Slug: submission-docs
 - After: Phase 7
 - Goal: 처음 보는 사람이 README만 보고 10분 안에 테스트 모드를 실행하게 하고, 제작 노트를 채우고, 저장소를 공개해도 되는 상태로 만든다. 실제 실행이 필요한 일(`logs/sample.log` · 시연 링크 · 실제 숫자)은 Phase 8A 가 한다 (2026-10-15 나눔). 공개는 이 저장소가 아니라 비공개 하네스를 지난 기록째 걷어낸 공개용 사본으로 한다 — 이 페이즈는 그 사본을 만드는 스크립트와 검사를 두고, 돌리고 push 하는 일은 8A 착지 뒤 사람이 한다 (2026-10-15 Phase 8 인터뷰 · 슬롯 f8ab734e).

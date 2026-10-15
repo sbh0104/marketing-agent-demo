@@ -10,10 +10,6 @@
 - evidence: Phase 1 — 계약 2절 "비교와 셈에만"(R4) · 7절 문단(R5) (journal 20261013-062542-adw-phase-1-foundation-contracts summary flagged ②③); Phase 4 — '트리거 판정' 절 세 문장 R1/Q2 → Human checks 1 (E-007) (cycle 20261013-161358-adw/phase-4-trigger-timing)
 - first confirmed: 2026-10-13 · last confirmed: 2026-10-16
 
-### E-015 · tooling — `smoke_file.py` 의 `verdict()` 는 verify-report **전체**에서 줄머리 `FAIL` 을 찾고 그것을 `PASS` 보다 먼저 본다 — `## Verdict` 가 PASS 여도 본문에 검사 출력 줄(`  FAIL labels: …`)이 있으면 "verify FAIL" 로 읽고, ship-report 의 스모크 후보를 one-pass 로 한 번 더 올린다
-- evidence: `.claude/skills/plan/scripts/smoke_file.py:73-76` (`V_FAIL.search(text)` 를 리포트 전체에), 패턴 `.claude/skills/plan/scripts/retro_collect.py:109` `^[^\w]*\**\s*FAIL\b` (re.M). `python3 -I` 로 이 사이클 verify-report 를 읽으면 `verdict(전체)` = FAIL · `verdict(section_body(…, "Verdict"))` = PASS · 첫 일치 62행 `  FAIL labels: check_probability_above_o…`(V4 음성 대조 출력). 결과: 스텝 note "ship READY · verify FAIL · 5 candidate(s)", 홈 `.adw/smoke-log.md` 에 같은 다섯 고침이 두 번 열림 — S-019~S-023(`deferred by ship-check`) = S-024~S-028(`filed by smoke-file (one-pass)`) (cycle 20261013-161439-adw/phase-5-writer-comment)
-- first confirmed: 2026-10-13 · last confirmed: 2026-10-14
-
 ### E-017 · hazard — 작성기 링크 검사 `_link_char`(src/agent/writer.py:115-124)는 유니코드 이름에 `_SEPARATOR_NAMES`(`DOT` · `FULL STOP` 등)가 든 글자만 점으로 남기고 나머지 기호는 버리며, `_LINK_RE` 의 끝은 `[a-z]{2,}` 다 — 점 닮은꼴(U+2027 `‧` · U+2022 · U+2219 · U+00B0) · 키릴 끝 · U+202E 뒤집기로 쓴 주소는 코드 검사를 지나고 jev 광고 질문만 남는다. E-005 와 같은 "열거한 꼴" 부류가 Phase 1 밖에서 처음 목격된 것
 - evidence: ship-report R1 — `bit‧ly/3xYzAb` 가 `bitly/3xyzab` 로 읽혀 통과(감사 재현); `## Human checks` 3번째 줄 — 어디까지 막을지는 사람 결정(보이지 않는 글자를 다 막으면 U+200D 이모지 잇기도 막힘). 실제 게시는 허용 목록뿐(`src/agent/guard.py:94`) (cycle 20261013-161439-adw/phase-5-writer-comment)
 - first confirmed: 2026-10-13 · last confirmed: 2026-10-15
@@ -74,10 +70,6 @@
 - evidence: `tests/test_live_check.py:1583-1594`(`system is None` → probe · `GRADE_SYSTEM` → grade · `TOPIC_SYSTEM` → topic · `SKIP_GRADE_SYSTEM` → skip_grade · `else` → write) · `:2229`(`{"jev": 114, "claude": 103, "youtube": 35}`, 6E 에서 그대로). 6C 가 `topic` 갈래를, 6E 가 `skip_grade` 갈래를 더했다 — 6E understand 가 옛 E-035 로 이 자리를 짚었고 plan-repairs R1 의 가짜 로그 `['topic', 'write', 'write', 'grade', 'skip_grade']` 가 새 갈래가 도는 것을 보였다 (cycle 20261014-172227-adw/phase-6c-live-check-grader-fix · 20261015-091934-adw/phase-6e-comment-quality-fix)
 - first confirmed: 2026-10-14 · last confirmed: 2026-10-15
 
-### E-038 · tooling — 과제 안내 `docs/marketing-agent.pdf` 는 홈 체크아웃에 추적되지 않은 파일(`??`)로만 있어 레인 worktree 에는 없다 — 레인 안의 사이클(understand · plan · ship-check)은 과제 원문을 다시 읽지 못하고 트래커가 인용한 문장만 쓴다
-- evidence: 레인에서 `ls docs/marketing-agent.pdf` → `No such file or directory`; `git -C <홈 체크아웃> status --short --ignored docs/marketing-agent.pdf` → `?? docs/marketing-agent.pdf`(무시 아님 · 추적 아님). 6E notes.md Expertise check 후보 3. 그래서 ship-report Human checks 3번째 줄은 계약 대조표의 ④-3 이 PDF 의 둥근 따옴표 “…” 대신 트래커 인용의 '…' 와 줄임을 따랐는지를 사람에게 넘겼다 (cycle 20261015-091934-adw/phase-6e-comment-quality-fix)
-- first confirmed: 2026-10-15 · last confirmed: 2026-10-15
-
 ### E-039 · codebase — 실행기의 재료 채점(`SKIP_GRADE_SYSTEM`)과 작성 규칙의 '장면' 은 뜻이 다르다 — 재료 채점의 `material_has_scene` 은 `<video_title>` 도 장면 출처로 세지만, 작성 규칙 3 은 제목을 되풀이하는 것을 장면으로 치지 않는다. 제목만 있는 영상의 스스로 건너뜀('재료에 장면 없음')은 재료 채점에서 '부당' 쪽으로 기운다
 - evidence: `tests/live_check.py:189-190`(`material_has_scene — … <video_title> · <video_description> · <top_comments> 안에 실제로 있습니까?`) · `src/agent/writer.py:33`(규칙 3 "장면 · 말은 설명이나 인기 댓글이 전하는 영상 속 장면 · 말뿐이고, 제목을 되풀이하는 것은 장면이 아닙니다"). ship-report Risks 4 · Human checks 7번째 줄(6F 가 "정당한 건너뜀 n/m" 을 셀 때 감안) (cycle 20261015-091934-adw/phase-6e-comment-quality-fix)
 - first confirmed: 2026-10-15 · last confirmed: 2026-10-15
@@ -104,7 +96,7 @@
 
 ### E-046 · reviewer — plan 이 등록한 음성 대조는 새 판정 규칙의 줄은 비틀지만, 모듈을 잇는 진입점의 연결 줄(단계 호출 하나 · 울타리 뒤 저장 · 시작 거절 예외 묶음 · 출력 연결)은 비틀지 않는다. 그래서 그 줄을 망가뜨려도 스위트가 초록이다. ship-check 의 변이 점검이 거기서 살아남은 변이를 찾아, 테스트만 고치는 스모크 항목으로 보낸다. E-041(새 판정의 경계)과 같은 부류를 세 페이즈 연속(6C · 6E · 7) 본 것이다. 다른 점은 줄의 종류뿐이다
 - evidence: 계획의 음성 대조 16개(`e27e7e3`)는 모두 빨강이다. 그런데 ship-check 가 `src/agent/run.py:266`(자체 검사 연결 `jev_self_check(self._services.ask, …)`) · `:331`(울타리 뒤 판별 `self._store.put`) · `:137`(이유 200자 · 공백 접기) · `:559`(main 의 `echo_stream` 연결) · `:492-496` · `:551`(시작 거절 묶음)에서 변이가 사는 것을 재현했다 → S-100 · S-101 · S-102(ship-report.md:187-190). 같은 자리들은 가드 매트릭스에도 행이 없었다(ship-report.md:220-224) (cycle 20261015-154340-adw/phase-7-pipeline-rules)
-- first confirmed: 2026-10-15 · last confirmed: 2026-10-15
+- first confirmed: 2026-10-15 · last confirmed: 2026-10-16
 
 ### E-047 · codebase — `decide_post` 는 허용 목록 검사를 지난 영상에만 `dry_run` 이유를 준다(목록 밖은 그보다 먼저 `not_in_allowlist`) — 그래서 `live=False` · `dry_run` 이 곧 "테스트 실행의 명단 영상" 이고 7F 리허설 갈래가 이것으로 나뉜다. 한편 테스트 쪽 중복 판정 `_is_duplicate(live=False)` 는 모드와 결과를 가리지 않고 시도가 하나라도 있으면 참이다(`COUNTED_RESULTS` 는 `posted` · `reserved` 만 센다) — 리허설이 시도를 하나라도 저장하면 같은 영상의 다음 리허설은 `SKIP duplicate_video` 가 된다
 - evidence: `src/agent/guard.py:94-98` · `src/agent/store.py:27` · `:42-45`(트리 `bd90bf0`). ship-report R5 — 7F 전 테스트 실행의 `("test","saved","dry_run")` 시도나 `config_rejected` 시도가 있는 영상은 리허설되지 않음. verify-run V10 — 리허설은 저장소 파일을 한 바이트도 바꾸지 않아 같은 영상을 다시 리허설하고 보통 실행도 게시함 (cycle 20261015-182947-adw/phase-7f-chrome-rehearsal)
@@ -122,7 +114,17 @@
 - evidence: `trigger.py:58-60` `return _latest_pair(record.view_history) or _first_pair(record)` · `:76` `pair = _measured_pair(record)`(judge_trigger) · `:98` 같은 줄(views_per_hour) · `run.py:337-338` `rule = judge_trigger(…)` 다음 `per_hour = views_per_hour(record)`; `watcher.py:290-291` `views = record.view_history[-1].count` · `prev = record.view_history[-2].count`; ship-report Risks 7(`VIEWS … delta=1` 옆 `TRIGGER … per_hour=576`) · V7 무작위 기록 2,008개에서 판정 · 속도 어긋남 0 (cycle 20261015-211343-adw/phase-7g-chrome-url-sample-gap)
 - first confirmed: 2026-10-16 · last confirmed: 2026-10-16
 
+### E-052 · tooling — `autonomy: full`(`gates: auto`)에서 계획 관문은 plan.md 를 읽지 않고 자동 승인한다 — plan 이 쓴 "🚨 … Hold gate-plan; do not auto-approve" 나 "Deferred to a human: … before implement" 줄은 기계 효력이 없어, 그 결정은 implement · verify 를 다 쓴 뒤 ship-check 의 민감 확인 줄(머지 전 정지)로만 사람에게 돌아온다
+- evidence: `.claude/skills/plan/scripts/cycle_driver.py:712-716` — 스텝이 `AUTONOMY_AUTO_GATES` 이고 `gates == "auto"` 면 plan.md 검사 없이 `decide(…, "approve", source="autonomy-full")`. 이번 plan.md:49 "Hold gate-plan; do not auto-approve" · :774 "Deferred to a human: accept or reword the 🚨 tracker narrowing before implement" 인데 `gate/20261015-231753-plan-decision.json` 이 `"source": "autonomy-full"` → ship-report R15 · Human checks 민감 줄 1 → 00:41 머지 전 정지 → HC1 인터뷰 `2b4480c` → cycle-control `retry step=smoke-file` (cycle 20261015-211335-adw/phase-8-submission-docs). 앞 목격: 7G — plan.md:527-528 `Deferred to a human:` 두 줄이 첫 ship-check 를 민감 확인 정지로 만들고 같은 트리에서 verify-run · ship-check 를 다시 돌림 (journal 20261015-211343-adw-phase-7g-chrome-url-sample-gap summary.md Coverage)
+- first confirmed: 2026-10-16 · last confirmed: 2026-10-16
+
+### E-051 · tooling — 레인 worktree 에는 홈 체크아웃에만 있는 추적 안 되는 파일 셋이 없다 — `.adw/harness-paths` · 지난 `.adw/journal/` 폴더 · 과제 안내 `docs/marketing-agent.pdf`(이제 무시 파일). 레인에서 도는 `tests/public_copy.py` 는 상수 `HARNESS_PATHS` 여덟만 보고(목록 파일 줄은 `--source` 에 그 파일이 있을 때만 더함), 저널 숫자(사이클 수 · 기계 시간)는 레인에서 잴 수 없으며, 레인의 사이클은 과제 원문 대신 트래커가 인용한 문장만 쓴다
+- evidence: 레인에서 `git ls-files .adw/harness-paths` → 출력 없음 · `ls .adw/harness-paths` → No such file or directory · `ls .adw/journal` → 이 사이클 폴더 1개(홈 체크아웃은 71개 — notes.md Expertise check 후보 ①③) · `ls docs/marketing-agent.pdf` → No such file or directory(`.gitignore:12`, `be6895b`; 앞 사실 E-038 — 6E 가 PDF 의 둥근 따옴표 대신 트래커 인용을 따랐는지 사람에게 넘김). `tests/public_copy.py:30` 주석 "harness-paths 는 git 이 추적하지 않아 복제본에서 읽을 수 없습니다" · :173-174 상수 먼저 + 목록 줄, `tests/test_public_copy.py:229-232` 가 그 합침을 잠금. 그래서 8A 가 레인에서 돌릴 `--scan-only`(ship-report Human checks)는 홈 목록에만 더한 경로를 못 본다 — 오늘 홈 목록은 상수 여덟과 같음(verify N2 `True ()`) (cycle 20261015-211335-adw/phase-8-submission-docs)
+- first confirmed: 2026-10-16 · last confirmed: 2026-10-16
+
 ## Retired (history — one line each, never deleted)
+- E-038 · tooling — 과제 안내 `docs/marketing-agent.pdf` 는 홈 체크아웃에 추적되지 않은 파일(`??`)로만 있어 레인 worktree 에는 없다 — 레인 안의 사이클(understand · plan · ship-check)은 과제 원문을 다시 읽지 못하고 트래커가 인용한 문장만 쓴다 — retired 2026-10-16 (근거 `??` 가 낡음: 이 페이즈 `be6895b` 가 `.gitignore:12` 에 `docs/marketing-agent.pdf` 를 더해 홈 체크아웃에서 무시 파일이 됨. 레인에 없다는 사실(레인 `ls docs/marketing-agent.pdf` → No such file, 2026-10-16)은 E-051 로 옮김)
+- E-015 · tooling — `smoke_file.py` 의 `verdict()` 는 verify-report **전체**에서 줄머리 `FAIL` 을 찾고 그것을 `PASS` 보다 먼저 본다 — `## Verdict` 가 PASS 여도 본문에 검사 출력 줄(`  FAIL labels: …`)이 있으면 "verify FAIL" 로 읽고, ship-report 의 스모크 후보를 one-pass 로 한 번 더 올린다 — retired 2026-10-16 (over cap; unconfirmed since 2026-10-14)
 - E-013 · codebase — `docs/contracts.md:5-6` 머리 문단은 `src/agent/` 모듈을 하나씩 열거하는데, 모듈을 더한 페이즈가 그 목록을 고치지 않는다 — main 에는 `trigger.py`(Phase 4)가 빠졌고 이 브랜치는 `classifier.py` 도 빠뜨렸다 — retired 2026-10-16 (over cap; unconfirmed since 2026-10-14)
 - E-010 · reviewer — 페이즈가 하류 페이즈에 넘긴 일과 주인 없이 받아들인 위험이 `plan.md` · 계약에만 남고 트래커의 하류 페이즈 절에는 오르지 않는다 — ship-check 가 두 페이즈 연속 "트래커 Phase 2 · 7 절에 주인 줄 적기"를 사람 확인으로 올렸고, Phase 1 에서는 주인 없이 받아들인 위험이 다음 ship-check 에 돌아왔다 — retired 2026-10-16 (over cap; unconfirmed since 2026-10-14)
 - E-006 · tooling — [stop:unknown · 1] 정지 부류 표에 "ship-check sensitive human checks — confirm in the interview before merge" 행이 없다 — 민감 확인 줄로 머지 전에 멈춘 ship-check 는 부류 `unknown` 으로 남는다 — retired 2026-10-15 (over cap; unconfirmed since 2026-10-14)
