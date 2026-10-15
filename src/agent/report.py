@@ -115,11 +115,18 @@ def where_label(where: str) -> str:
 
 
 def _store_floor(record: VideoRecord) -> datetime | None:
-    """저장소의 마지막 결과 — 댓글 시각과 마지막 시도 시각 중 늦은 쪽을 초로 내린 것, 없으면 None.
+    """저장소의 마지막 결과 — 판별 · 타이밍 · 댓글 · 마지막 시도 시각 가운데 가장 늦은 것을 초로 내린 것, 없으면 None.
 
-    로그 시각이 초 단위라 같은 초의 줄은 늦은 쪽으로 셉니다.
+    로그 시각이 초 단위라 같은 초의 줄은 늦은 쪽으로 셉니다. 타이밍은 새 표본마다 다시 판정해 그 시각이
+    그 영상을 마지막으로 다룬 때입니다. 판별 칸이 빈 영상(판별 보류)은 타이밍 시각을 세지 않습니다 — 보류
+    때도 같은 주기에 타이밍이 판정되어 그 시각이 판별 오류 줄보다 몇 밀리초 늦기 때문입니다.
     """
     times = []
+    if record.classification is not None:
+        times.append(record.classification.at)
+    # 판별 칸이 빈 영상(판별 보류)은 타이밍 시각을 세지 않습니다 — 같은 주기의 판별 오류 줄을 남깁니다
+    if record.classification is not None and record.trigger is not None:
+        times.append(record.trigger.at)
     if record.comment is not None:
         times.append(record.comment.at)
     if record.attempts:
