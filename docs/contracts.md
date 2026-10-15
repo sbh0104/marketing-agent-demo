@@ -844,8 +844,12 @@ watcher = Watcher(Store(Path("data/videos.json")), logbook, client, clock)
    저장 영상(`records()` 순)을 50개씩 `videos.list`(`part=snippet,statistics`)로 묻습니다. 영상
    정보는 검색 결과가 아니라 `videos.list` 에서 씁니다 — 검색 제목은 HTML 이스케이프되고 설명은
    잘려 있습니다.
-5. 새 영상은 `view_history=[ViewSample(now, 조회수)]` 로 저장하고 `DETECT` 다음 `VIEWS` 를
-   남깁니다. `keyword` 는 처음 찾은 검색어입니다.
+5. 새 영상은 `DETECT` 다음 `VIEWS` 를 남긴 뒤 `view_history=[ViewSample(now, 조회수)]` 로 저장하고,
+   아는 영상(6번)도 `VIEWS` 를 남긴 뒤 저장합니다 — 줄이 먼저, 저장은 그다음입니다. 저장이 실패하면
+   예외가 탐지기 밖으로 나가지만(9절) 그 주기 로그에 줄은 이미 있고, 다음 주기는 메모리가 그 영상을
+   알므로 `DETECT` 없이 표본만 더해 저장합니다(그 사이 에이전트를 다시 켜면 새 영상으로 한 번 더
+   `DETECT`). 로그 쓰기가 실패하면 저장 전에 멈추므로 그 영상은 저장소에 없고, 다음에 찾을 때 새
+   영상으로 `DETECT` 를 남깁니다. `keyword` 는 처음 찾은 검색어입니다.
 6. 아는 영상은 `get` 사본에 표본 하나를 덧붙여 `put` 합니다 — 제목 등은 처음 본 값 그대로이고
    `attempts` 는 건드리지 않습니다. 로그는 `VIEWS … prev=<이전 조회수> delta=<차이>` 입니다.
 

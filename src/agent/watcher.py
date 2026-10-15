@@ -14,6 +14,7 @@
 - 밖에서 온 글자의 외톨이 서로게이트는 U+FFFD 로 바꿉니다(HC1-2 R3). 영상 ID · 조회수 ·
   올린 시각은 허용한 모양(fullmatch)만 받고, 그 밖의 항목은 `SKIP` 으로 건너뜁니다.
 - 저장소 쓰기 오류는 잡지 않고 run_loop 까지 올라갑니다 (계약 9절).
+- 줄이 먼저, 저장은 그다음 — 저장이 실패해도 그 영상의 `DETECT` · `VIEWS` 는 이미 로그에 있습니다.
 """
 from __future__ import annotations
 
@@ -297,7 +298,6 @@ class Watcher:
                 detail=_clean(str(exc)),
             )
             return
-        self._store.put(record)
         tally.sampled += 1
         views = record.view_history[-1].count
         prev = record.view_history[-2].count if len(record.view_history) > 1 else None
@@ -319,6 +319,8 @@ class Watcher:
             prev=prev,
             delta=views - prev if prev is not None else None,
         )
+        # 줄이 먼저, 저장은 그다음 — 저장이 실패해도 찾았다는 줄은 남습니다 (계약 '탐지 · 조회수 추적' 절)
+        self._store.put(record)
 
     def _hold(self, exc: QuotaExhausted, **extra: object) -> None:
         self._logbook.write(Event.QUOTA, used=exc.used, limit=exc.limit, call=exc.call, counter=exc.counter, **extra)

@@ -410,6 +410,12 @@ MUTANTS: dict[str, tuple[str, str, str, str]] = {
         "isinstance(token, str) and _PAGE_TOKEN_RE.fullmatch(token)",
         "isinstance(token, str)",
     ),
+    "watcher-put-before-lines": (
+        "agent.watcher",
+        "tests.test_watcher",
+        "tally.sampled += 1",
+        "self._store.put(record)\n        tally.sampled += 1",
+    ),
     "writer-hardcoded-model": (
         "agent.writer",
         "tests.test_writer",
