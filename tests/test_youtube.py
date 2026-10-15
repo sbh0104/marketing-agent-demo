@@ -305,6 +305,16 @@ class LedgerTest(YouTubeCase):
             ],
         )
 
+    def test_prune_boundary_at_48_hours(self) -> None:
+        # 쓰기 한 번 뒤 딱 48시간 된 항목은 지워지고 48시간에서 1초 모자란 항목은 남습니다 (계약 '쓸 때 48시간이 지난 항목은 지움')
+        keep = timedelta(hours=48)
+        entries = searches(1, NOW - keep) + searches(1, NOW - keep + SECOND)
+        client = self.client(FakeFetch(), entries)
+        client.search("연애", WINDOW_START, None, NOW, limits(90))
+        stored = [entry["at"] for entry in self.stored()]
+        self.assertNotIn("2026-10-10T12:00:00+00:00", stored)
+        self.assertIn("2026-10-10T12:00:01+00:00", stored)
+
     def test_fast_clock_writes_keep_real_entries_rn3(self) -> None:
         # 10시간 앞선 시계의 쓰기가 실제 검색 기록을 지우면 고친 시계에서 상한을 넘겨 허락합니다 (R-N3)
         fast = NOW + timedelta(hours=10)
