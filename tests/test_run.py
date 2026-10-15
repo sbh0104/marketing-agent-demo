@@ -31,7 +31,7 @@ from agent.report import render_report
 from agent.scheduler import run_loop
 from agent.store import Store
 from agent.watcher import Watcher
-from agent.writer import TOP_COMMENTS_MAX
+from agent.writer import SHAPE_INSTRUCTION, SHAPES, TOP_COMMENTS_MAX
 from agent.youtube import QuotaLedger, YouTubeClient
 from tests.test_classifier import response
 from tests.test_config import LOOPBACK_ONLY
@@ -1392,6 +1392,23 @@ class TestStages(RunCase):
         self.assertNotIn("<transcript>", message)
         (query,) = [query for endpoint, query in self.api.calls if endpoint == "commentThreads"]
         self.assertEqual((query["videoId"], query["maxResults"]), (A, str(TOP_COMMENTS_MAX)))
+
+    def test_consecutive_videos_get_different_shapes(self) -> None:
+        # 트래커 7C 질문 2 A ⑤ — 한 사이클에 연속해 쓴 두 영상의 프롬프트가 다른 짜임을 지시합니다
+        self.show(A, 2000, channel="UC1")
+        self.show(B, 2000, channel="UC2")
+        self.cycle(self.pipeline())
+        blocks = {name: SHAPE_INSTRUCTION.format(shape=SHAPES[name]) for name in SHAPES}
+        for video_id, name, other in (
+            (A, "scene_first", "question_first"),
+            (B, "question_first", "scene_first"),
+        ):
+            with self.subTest(video=video_id):
+                (message,) = self.claude.user_messages(video_id)
+                self.assertIn(blocks[name], message)
+                self.assertNotIn(blocks[other], message)
+                (line,) = self.lines(Event.COMMENT, video=video_id)
+                self.assertEqual(line["shape"], name)
 
     def test_comments_disabled_writes_with_empty_top_comments(self) -> None:
         self.api.comments[A] = 403
