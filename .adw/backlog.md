@@ -71,12 +71,12 @@
 - [~] Phase 6G — 결과 파일 개인 정보 가림 (실행기가 쓸 때 연락처 모양 가림 · 끝 줄 검사) (plans/interview-marketing-agent.md#phase-6g)
 - [ ] Phase 6F — 고친 뒤 다시 반영 (전후 숫자) (plans/interview-marketing-agent.md#phase-6f)
 - [ ] Phase 7 — 파이프라인 연결 · 운영 규칙 통합 (plans/interview-marketing-agent.md#phase-7)
-- [ ] Phase 7A — 탐지기 · 네트워크 오류 고침 (plans/interview-marketing-agent.md#phase-7a)
-- [ ] Phase 7B — jev 키가 없을 때 Claude 판단 (plans/interview-marketing-agent.md#phase-7b)
-- [ ] Phase 7C — 댓글 수 · 여는 방식 (건너뛴 영상 다시 쓰기 · 문장 짜임 고르기) (plans/interview-marketing-agent.md#phase-7c)
-- [ ] Phase 7D — 결과 화면 data/report.html (plans/interview-marketing-agent.md#phase-7d)
 - [ ] Phase 8 — 제출 문서 (README · PROCESS.md · 공개 정리) (plans/interview-marketing-agent.md#phase-8)
 - [ ] Phase 8A — 실제 실행 반영 (sample.log · 시연 링크 · 실제 숫자) (plans/interview-marketing-agent.md#phase-8a)
+- [ ] Phase 7A — 탐지기 · 네트워크 오류 고침 (plans/interview-marketing-agent.md#phase-7a)
+- [ ] Phase 7B — jev 키가 없을 때 Claude 판단 (plans/interview-marketing-agent.md#phase-7b)
+- [ ] Phase 7D — 결과 화면 data/report.html (plans/interview-marketing-agent.md#phase-7d)
+- [ ] Phase 7C — 댓글 수 · 여는 방식 (건너뛴 영상 다시 쓰기 · 문장 짜임 고르기) (plans/interview-marketing-agent.md#phase-7c)
 - [ ] (example) Add social login buttons to the login screen
 - [ ] (example) Add retry logic on payment failure
 - [ ] (example) [ui] Redesign the product card grid (plans/interview-shop.md#phase-4)
