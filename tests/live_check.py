@@ -312,22 +312,39 @@ def _match_view(text: str) -> str:
     return _DASH_BETWEEN_DIGITS.sub(r"\1-", text.translate(MATCH_VIEW))
 
 
+def _contact_spans(text: str) -> list[tuple[int, int]]:
+    """연락처 모양(CONTACT_RE)의 자리 — 찾기 전 맞춤(_match_view)과 가로줄을 바꾸지 않은 맞춤에서 찾아 겹치면 하나로 묶습니다.
+
+    숫자 뒤의 가로줄 닮은 글자를 하이픈으로 보면 계좌 앞 경계가 막히거나(2024ㅡ000000123456) 숫자 수가 상한을
+    넘으니(000-000-123456ㅡ12345678), 바꾸지 않은 맞춤이 찾는 자리도 놓치지 않습니다.
+    """
+    plain = text.translate(MATCH_VIEW)
+    views = {_match_view(text), plain}
+    spans: list[tuple[int, int]] = []
+    for start, end in sorted(match.span() for view in views for match in CONTACT_RE.finditer(view)):
+        if spans and start < spans[-1][1]:
+            spans[-1] = (spans[-1][0], max(spans[-1][1], end))
+        else:
+            spans.append((start, end))
+    return spans
+
+
 def count_contacts(text: str) -> int:
-    """글 안 연락처 모양(CONTACT_RE)의 곳 수 — 찾기 전 맞춤(_match_view)으로 맞춘 글에서 셉니다."""
-    return sum(1 for _ in CONTACT_RE.finditer(_match_view(text)))
+    """글 안 연락처 모양(CONTACT_RE)의 곳 수 — 두 맞춤에서 찾아 겹친 자리는 하나로 셉니다(_contact_spans)."""
+    return len(_contact_spans(text))
 
 
 def mask_contacts(text: str) -> str:
     """연락처 모양을 CONTACT_MASK 로 바꿉니다 — 바꾼 자리 옆에 새 모양이 드러나면 없어질 때까지 다시 봅니다.
 
-    자리는 찾기 전 맞춤(_match_view)으로 맞춘 글에서 찾고, 바꾸기는 원문에 합니다.
+    자리는 두 맞춤에서 찾고(_contact_spans), 바꾸기는 원문에 합니다.
     """
     while True:
         pieces: list[str] = []
         last = 0
-        for match in CONTACT_RE.finditer(_match_view(text)):
-            pieces += (text[last : match.start()], CONTACT_MASK)
-            last = match.end()
+        for start, end in _contact_spans(text):
+            pieces += (text[last:start], CONTACT_MASK)
+            last = end
         if not pieces:
             return text
         text = "".join(pieces) + text[last:]

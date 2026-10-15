@@ -725,8 +725,8 @@ MUTANTS: dict[str, tuple[str, str, str, str]] = {
     "live-check-contacts-unmasked": (
         "tests.live_check",
         "tests.test_live_check",
-        "for match in CONTACT_RE.finditer(_match_view(text)):",
-        "for match in ():",
+        "for start, end in _contact_spans(text):",
+        "for start, end in ():",
     ),
     "live-check-contact-line-blind": (
         "tests.live_check",
