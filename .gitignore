@@ -8,6 +8,9 @@
 client_secret_*.json
 token.json
 
+# 회사 과제 안내 PDF — 공개하지 않습니다 (트래커 Phase 8)
+docs/marketing-agent.pdf
+
 # 크롬 전용 프로필 — chrome-profile/ 또는 저장소 밖에만 둡니다 (계약 8절)
 chrome-profile/
 # 크롬 프로필 안의 비밀 파일 — 위치 규칙을 어겼을 때의 둘째 방어, 프로필 폴더 이름과 상관없이 막습니다
