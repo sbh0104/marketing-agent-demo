@@ -65,6 +65,7 @@ VALID = {
     },
     "chrome_debug_url": "http://localhost:9222",
     "allowed_videos": ["https://youtu.be/abcdefghijk"],
+    "test_run": False,
 }
 
 
@@ -1084,6 +1085,60 @@ class TextRuleTest(unittest.TestCase):
             with self.subTest(new=new):
                 path = write_config(self.dir, variant("topic: 연애\n", new))
                 self.assertEqual(load_config(path).topic, topic)
+
+
+class TestTestRun(unittest.TestCase):
+    """설정의 테스트 실행 칸 `test_run` — 참 · 거짓 값만 받습니다(트래커 Phase 7 질문 9 A, 헌법 12조 표본)."""
+
+    FLAG_ERROR = "참 · 거짓(true 또는 false)이어야 합니다: test_run"
+    # 빨강 표본 — 참 · 거짓 밖의 값은 조용히 거짓이 되지 않고 오류입니다(`no` 는 정하지 않은 표본이라 두지 않음)
+    RED_SAMPLES = (
+        ('"false"', "따옴표 친 글자 false"),
+        ("0", "정수 0"),
+        ("", "빈 값 — YAML null"),
+        ("1", "정수 1 — 0 의 짝"),
+        ("tRUE", "대소문자 — YAML 의 참 · 거짓 표기가 아님"),
+        ('" true"', "따옴표 안 앞 스페이스"),
+        ("'true'", "작은따옴표 친 글자 true"),
+        ("ｔｒｕｅ", "전각 닮은 글자"),
+        ("y", "PyYAML 이 참 · 거짓으로 읽지 않는 짝"),
+    )
+
+    def setUp(self) -> None:
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.dir = Path(tmp.name)
+
+    def load_sample(self, sample: str) -> Config:
+        text = variant("test_run: false", f"test_run: {sample}")
+        return load_config(write_config(self.dir, text))
+
+    def test_true_and_false_read_as_bool(self) -> None:
+        for sample, expected in (("true", True), ("false", False)):
+            with self.subTest(sample=sample):
+                value = self.load_sample(sample).test_run
+                self.assertIs(value, expected)
+
+    def test_missing_test_run_is_error(self) -> None:
+        text = REPO_CONFIG.read_text(encoding="utf-8")
+        lines = text.splitlines(keepends=True)
+        kept = [line for line in lines if not line.startswith("test_run:")]
+        self.assertEqual(len(lines) - len(kept), 1)
+        with self.assertRaises(ConfigError) as caught:
+            load_config(write_config(self.dir, "".join(kept)))
+        self.assertEqual(str(caught.exception), "필수 설정이 없습니다: test_run")
+
+    def test_repo_config_test_run_false(self) -> None:
+        self.assertIs(load_config(REPO_CONFIG).test_run, False)
+
+    def test_non_bool_samples_rejected_with_message(self) -> None:
+        for sample, label in self.RED_SAMPLES:
+            with self.subTest(label, sample=sample):
+                with self.assertRaises(ConfigError) as caught:
+                    self.load_sample(sample)
+                self.assertEqual(str(caught.exception), self.FLAG_ERROR)
+                # 변환 중 터진 것이 아니라 규칙이 거부한 값입니다
+                self.assertIsNone(caught.exception.__cause__)
 
 
 if __name__ == "__main__":

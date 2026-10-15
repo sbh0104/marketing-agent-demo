@@ -6,6 +6,7 @@
 검사합니다. 숫자는 유한값만 받고, 숫자 · 정수 키는 모두 상한이 있습니다 — 계약 2절.
 글자 키는 범주 L · M · N · P · S 의 글자와 U+0020 만 받고, 스페이스로 시작하거나 끝나는 값은
 잘라 쓰지 않고 오류이며(허용 목록 항목은 쓴 그대로), 주제(topic)는 500자까지입니다.
+참 · 거짓 키(test_run)는 bool 값만 받습니다 — 글자 "false" · 0 · 빈 값은 오류입니다.
 """
 from __future__ import annotations
 
@@ -75,6 +76,7 @@ class Config:
     classifier: ClassifierConfig
     chrome_debug_url: str
     allowed_videos: tuple[str, ...]
+    test_run: bool = False
 
 
 class _StrictLoader(yaml.SafeLoader):
@@ -125,6 +127,7 @@ _TOP_KEYS = (
     "classifier",
     "chrome_debug_url",
     "allowed_videos",
+    "test_run",
 )
 _SECTION_KEYS = {
     "trigger": ("min_views", "max_views", "max_age_hours", "min_views_per_hour"),
@@ -218,6 +221,13 @@ def _text(value: object, path: str) -> str:
         )
     if value[0] == " " or value[-1] == " ":  # 잘라 쓰지 않습니다 — 조용히 지나가지 않고 오류
         raise ConfigError(f"스페이스로 시작하거나 끝나면 안 됩니다: {path}")
+    return value
+
+
+def _flag(value: object, path: str) -> bool:
+    # bool 값만 — 글자 "false" · 0 · 빈 값은 조용히 거짓이 되지 않고 오류입니다(계약 2절)
+    if not isinstance(value, bool):
+        raise ConfigError(f"참 · 거짓(true 또는 false)이어야 합니다: {path}")
     return value
 
 
@@ -347,6 +357,7 @@ def config_from_mapping(data: Mapping[str, object]) -> Config:
         classifier=classifier_config,
         chrome_debug_url=url,
         allowed_videos=allowed_items,
+        test_run=_flag(data["test_run"], "test_run"),
     )
 
 

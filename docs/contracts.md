@@ -56,6 +56,7 @@ Phase 2–7 의 모든 단계가 기대는 계약입니다. 설정 읽기, 영�
 | `classifier.off_topic_reasons` | 글자 목록 | 같은 규칙 — jev 에 먼저 보임 | 4개 (config.yaml) |
 | `chrome_debug_url` | 글자 | 비어 있지 않고, 스페이스로 시작하거나 끝나지 않음, 글자 규칙(아래), `http://` 또는 `https://` 로 시작 | `http://localhost:9222` |
 | `allowed_videos` | 글자 목록 | 비워 두면 `()`; 항목은 쓴 그대로 보관 (글자 규칙 밖) | `- https://youtu.be/내-테스트-영상-ID` |
+| `test_run` | 참 · 거짓 | `true` · `false` | `false` |
 
 - "정수"는 bool 을 받지 않습니다. "숫자"는 정수나 실수(bool 제외)이고 실수로 저장되며,
   유한값만 받습니다 — `.inf` · `-.inf` · `.nan` 은 `유한한 숫자여야 합니다: <키>` 오류입니다.
