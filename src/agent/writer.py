@@ -16,7 +16,7 @@ from __future__ import annotations
 import re
 import unicodedata
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from difflib import SequenceMatcher
 from typing import Protocol
@@ -82,8 +82,12 @@ SHAPE_INSTRUCTION = (
     "이번 댓글의 짜임 — {shape}\n"
     "첫머리 · 연애사주 경험을 꺼내는 말 · 끝맺음을 이 짜임대로 쓰고, 나머지 규칙은 그대로 지킵니다."
 )
-NO_SCENE ="재료에 장면 없음"  # 스스로 건너뜀 이유 — 짚을 장면 · 말이 자료에 없다고 답함
+NO_SCENE = "재료에 장면 없음"  # 스스로 건너뜀 이유 — 짚을 장면 · 말이 자료에 없다고 답함
 NO_CONCERN = "재료에 연애 고민 없음"  # 스스로 건너뜀 이유 — 자료 속 사람의 연애 고민이 없다고 답함
+CHECK_FAILED = "검사 두 번 탈락"  # 건너뜀 머리말 — 다시 쓴 초안도 검사에서 떨어짐
+CLAUDE_FAILED = "claude 호출 실패"  # 건너뜀 머리말 — Claude 호출이 오류를 냄
+JEV_FAILED = "jev 검사 호출 실패"  # 건너뜀 머리말 — jev 자체 검사 호출이 오류를 냄
+JEV_INVALID = "jev 검사 응답 이상"  # 건너뜀 머리말 — jev 답이 질문마다 0–1 숫자가 아님
 # 작성 답을 도구 입력으로 묶습니다 — 건너뜀은 글이 아니라 두 참거짓으로 읽습니다
 WRITE_TOOL: dict[str, object] = {
     "name": "submit_comment",
@@ -208,6 +212,8 @@ class WriteResult:
 
     draft: CommentDraft | None
     skip_reason: str | None
+    # 건너뛴 이유의 머리말 상수 — 기억 칸과 다시 남기는 SKIP 이 씁니다(비교에서 빠짐)
+    head: str | None = field(default=None, compare=False)
 
     def __post_init__(self) -> None:
         if (self.draft is None) == (self.skip_reason is None):
@@ -444,14 +450,16 @@ def _error_detail(exc: BaseException) -> str:
     return f"{head}: {message}" if message else head
 
 
-def _skip(logbook: Logbook, record: VideoRecord, reason: str) -> WriteResult:
+def _skip(logbook: Logbook, record: VideoRecord, reason: str, head: str) -> WriteResult:
     logbook.write(Event.SKIP, video=record.video_id, reason=reason)
-    return WriteResult(None, reason)
+    return WriteResult(None, reason, head)
 
 
-def _api_failure(logbook: Logbook, record: VideoRecord, where: str, reason: str) -> WriteResult:
+def _api_failure(
+    logbook: Logbook, record: VideoRecord, where: str, reason: str, head: str
+) -> WriteResult:
     logbook.write(Event.ERROR, where=where, reason=reason, video=record.video_id)
-    return _skip(logbook, record, reason)
+    return _skip(logbook, record, reason, head)
 
 
 def anthropic_client(api_key: str | None = None) -> ClaudeClient:
@@ -521,12 +529,12 @@ def write_comment(
                 messages=messages,
             )
         except Exception as exc:
-            reason = f"claude 호출 실패: {_error_detail(exc)}"
-            return _api_failure(logbook, record, "writer.claude", reason)
+            reason = f"{CLAUDE_FAILED}: {_error_detail(exc)}"
+            return _api_failure(logbook, record, "writer.claude", reason, CLAUDE_FAILED)
         reply = read_reply(response)
         if isinstance(reply, str):
             reason = reply if not failures else f"{reply} — 1차: {failures[0]}"
-            return _skip(logbook, record, reason)
+            return _skip(logbook, record, reason, reply)
         if reply is None:
             problems = ["답을 읽을 수 없습니다"]
         else:
@@ -541,11 +549,12 @@ def write_comment(
             try:
                 answer = check(state, CHECK_QUESTIONS)
             except Exception as exc:
-                reason = f"jev 검사 호출 실패: {_error_detail(exc)}"
-                return _api_failure(logbook, record, "writer.jev", reason)
+                reason = f"{JEV_FAILED}: {_error_detail(exc)}"
+                return _api_failure(logbook, record, "writer.jev", reason, JEV_FAILED)
             invalid = _invalid_answer(answer)
             if invalid is not None:
-                return _api_failure(logbook, record, "writer.jev", f"jev 검사 응답 이상: {invalid}")
+                reason = f"{JEV_INVALID}: {invalid}"
+                return _api_failure(logbook, record, "writer.jev", reason, JEV_INVALID)
             problems = code_failures(text, recent, config)
             jev_failure = self_check_failure(answer, config.check_min_probability)
             if jev_failure is not None:
@@ -569,5 +578,6 @@ def write_comment(
     return _skip(
         logbook,
         record,
-        "검사 두 번 탈락 — " + " / ".join(f"{n}차: {f}" for n, f in enumerate(failures, start=1)),
+        CHECK_FAILED + " — " + " / ".join(f"{n}차: {f}" for n, f in enumerate(failures, start=1)),
+        CHECK_FAILED,
     )

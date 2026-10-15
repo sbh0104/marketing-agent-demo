@@ -26,10 +26,14 @@ from agent.config import CommentConfig, load_config
 from agent.logbook import Event, Logbook, parse_line
 from agent.models import CommentDraft, Judgement, Verdict, VideoRecord
 from agent.writer import (
+    CHECK_FAILED,
     CHECK_LABELS,
     CHECK_QUESTIONS,
+    CLAUDE_FAILED,
     CLAUDE_TIMEOUT_S,
     FRAME_MIN_CHARS,
+    JEV_FAILED,
+    JEV_INVALID,
     MAX_TOKENS,
     NO_CONCERN,
     NO_SCENE,
@@ -1588,6 +1592,36 @@ class WriteCommentTest(unittest.TestCase):
             with self.subTest(args=args):
                 with self.assertRaises(ValueError):
                     WriteResult(*args)
+
+    def test_skip_results_carry_their_head(self) -> None:
+        # 건너뛴 결과는 이유의 머리말 상수를 함께 싣습니다 — 실행 흐름의 기억 칸이 씁니다(트래커 7C)
+        failing = {**PASSING, "mentions_scene": 0.25}
+        runs = (
+            ("no_concern", [skip_reply(False, True)], [], NO_CONCERN),
+            ("no_scene", [skip_reply(True, False)], [], NO_SCENE),
+            (
+                "checks_failed",
+                [reply(CONCERN, GOOD), reply(CONCERN, GOOD2)],
+                [failing, failing],
+                CHECK_FAILED,
+            ),
+            ("claude_error", [FakeApiError("overloaded")], [], CLAUDE_FAILED),
+            ("jev_error", [reply(CONCERN, GOOD)], [TimeoutError("timed out")], JEV_FAILED),
+            ("jev_invalid", [reply(CONCERN, GOOD)], [{}], JEV_INVALID),
+        )
+        for label, replies, answers, head in runs:
+            with self.subTest(label):
+                path = self.dir / f"{label}.log"
+                result = self.write(FakeClaude(replies), FakeJev(answers), log_path=path)
+                self.assertIsNone(result.draft)
+                self.assertIs(result.head, head)
+                self.assertTrue(result.skip_reason.startswith(result.head), result.skip_reason)
+        passed = self.write(FakeClaude([reply(CONCERN, GOOD)]), FakeJev([PASSING]))
+        self.assertIsNotNone(passed.draft)
+        self.assertIsNone(passed.head)
+
+    def test_head_is_left_out_of_equality(self) -> None:
+        self.assertEqual(WriteResult(None, "x", "y"), WriteResult(None, "x"))
 
     def test_anthropic_client_imports_sdk_only_when_called(self) -> None:
         self.assertNotIn("anthropic", vars(agent.writer))
