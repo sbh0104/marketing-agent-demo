@@ -1785,7 +1785,7 @@
           },
           "grade_error": null,
           "grade_shape": null,
-          "human": "",
+          "human": "ok",
           "parsed": true,
           "passed": true,
           "scores": {
@@ -1895,7 +1895,7 @@
           },
           "grade_error": null,
           "grade_shape": null,
-          "human": "",
+          "human": "ok",
           "parsed": true,
           "passed": true,
           "scores": {
