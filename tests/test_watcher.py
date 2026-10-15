@@ -981,5 +981,96 @@ class ClockTest(WatcherCase):
         self.assertEqual(self.raw_lines(), [])
 
 
+L = "lllllllllll"  # 명단 영상
+W = "wwwwwwwwwww"  # 나이 창 안의 명단 영상
+O = "ooooooooooo"  # 나이 창 밖의 명단 밖 영상
+
+
+def listing(*entries: str) -> Config:
+    return dataclasses.replace(CONFIG, allowed_videos=entries)
+
+
+def listed_detect(video_id: str, keyword: str) -> tuple[Event, Fields]:
+    return Event.DETECT, {
+        "video": video_id,
+        "channel": "UC1",
+        "keyword": keyword,
+        "title": "연락 텀 때문에 불안한 썸",
+        "allowlisted": "true",
+    }
+
+
+class TestAllowlistTracking(WatcherCase):
+    """명단 영상은 검색 · 나이 창과 상관없이 늘 추적합니다(2026-10-15 제출 대조 질문 1 A)."""
+
+    def test_allowlisted_unknown_video_tracked_without_search(self) -> None:
+        # 검색이 찾지 않은, 나이 창 밖의 명단 영상 — 처음 본 사이클에 기록을 만듭니다
+        for entry in (L, f"https://youtu.be/{L}"):
+            with self.subTest(entry=entry):
+                self.reset(entry.replace("/", "_").replace(":", "_"))
+                self.api.videos[L] = video_item(L, 300, published="2026-10-01T00:00:00Z")
+                report = self.run_cycle(listing(entry))
+                record = self.store.get(L)
+                assert record is not None
+                self.assertEqual(record.keyword, "allowed_videos")
+                self.assertEqual(record.view_history, [ViewSample(NOW, 300)])
+                self.assertEqual(self.api.video_batches(), [[L]])
+                self.assertEqual(
+                    self.events(), [listed_detect(L, "allowed_videos"), views(L, 300)]
+                )
+                self.assertEqual(report, CycleReport(1, (L,), 1, 0, False, False))
+
+    def test_allowlisted_known_old_video_sampled_outside_window(self) -> None:
+        self.seed(L, published=NOW - 30 * HOUR)
+        self.seed(W, published=NOW - 2 * HOUR)
+        self.seed(O, published=NOW - 30 * HOUR)
+        for video_id in (L, W, O):
+            self.api.videos[video_id] = video_item(video_id, 1500)
+        report = self.run_cycle(listing(L, f"https://youtu.be/{W}"))
+        # 창 안의 명단 영상도 한 번만 묻습니다
+        self.assertEqual(self.api.video_batches(), [[W, L]])
+        self.assertEqual(self.counts(L), [1000, 1500])
+        self.assertEqual(self.counts(W), [1000, 1500])
+        self.assertEqual(self.counts(O), [1000])
+        self.assertEqual(self.events(), [views(W, 1500, prev=1000), views(L, 1500, prev=1000)])
+        self.assertEqual(report, CycleReport(1, (), 2, 0, False, False))
+
+    def test_allowlisted_found_by_search_keeps_keyword_once(self) -> None:
+        self.api.pages[("연애", None)] = search_page([L])
+        self.api.videos[L] = video_item(L, 1200)
+        report = self.run_cycle(listing(L))
+        record = self.store.get(L)
+        assert record is not None
+        self.assertEqual(record.keyword, "연애")
+        self.assertEqual(self.api.video_batches(), [[L]])
+        self.assertEqual(self.events(), [listed_detect(L, "연애"), views(L, 1200)])
+        self.assertEqual(report.detected, (L,))
+
+    def test_unreadable_allowlist_entry_not_queued(self) -> None:
+        config = listing("https://youtu.be/내-테스트-영상-ID", "MRK-not-an-id")
+        report = self.run_cycle(config)
+        self.assertEqual(self.api.video_batches(), [])
+        self.assertEqual(self.store.records(), [])
+        self.assertEqual(self.events(), [])
+        self.assertEqual(report, CycleReport(1, (), 0, 0, False, False))
+
+    def test_out_of_window_record_not_sampled(self) -> None:
+        # 명단 밖의 창 밖 영상은 명단이 있어도 더 재지 않습니다
+        self.seed(O, published=NOW - 13 * HOUR)
+        self.api.pages[("연애", None)] = search_page([A])
+        self.api.videos[A] = video_item(A, 1200)
+        self.api.videos[O] = video_item(O, 2000)
+        report = self.run_cycle(listing(L))
+        self.assertEqual(self.counts(O), [1000])
+        self.assertNotIn(O, [video_id for batch in self.api.video_batches() for video_id in batch])
+        self.assertEqual(self.api.video_batches(), [[A, L]])
+        # 검색이 찾은 명단 밖 영상의 DETECT 에는 allowlisted 가 없습니다
+        self.assertEqual(
+            self.events(),
+            [detect(A), views(A, 1200), skip(L, "unavailable", "videos.list")],
+        )
+        self.assertEqual(report.detected, (A,))
+
+
 if __name__ == "__main__":
     unittest.main()

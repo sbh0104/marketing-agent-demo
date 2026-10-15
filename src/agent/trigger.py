@@ -4,8 +4,9 @@
 (min_views_per_hour 이상)를 모두 만족하면 대상(yes)입니다. 기준은 부를 때마다 받은
 TriggerConfig 에서 읽고, 지금 시각도 인자로 받아 같은 입력이면 언제나 같은 판정입니다.
 시각은 벽시계가 아니라 순간으로 비교합니다.
-시간당 조회수는 시각이 다른 가장 늦은 두 기록으로 재며, 조회수가 줄었으면 재지 않습니다 —
-음수 속도는 없습니다. 판정만 돌려주고 저장 · 로그는 부르는 쪽이 합니다.
+시간당 조회수는 시각이 다른 가장 늦은 두 기록으로 재며, 기록이 한 시각이면 업로드 시각의
+조회수 0 을 직전 기록으로 칩니다(업로드가 그 기록보다 앞일 때만, 질문 3 B). 조회수가 줄었으면
+재지 않습니다 — 음수 속도는 없습니다. 판정만 돌려주고 저장 · 로그는 부르는 쪽이 합니다.
 """
 from __future__ import annotations
 
@@ -36,6 +37,24 @@ def _latest_pair(history: Sequence[ViewSample]) -> tuple[ViewSample, ViewSample]
     return earlier[-1], latest
 
 
+def _first_pair(record: VideoRecord) -> tuple[ViewSample, ViewSample] | None:
+    """(업로드 시각의 조회수 0, 최신) — 기록이 한 시각뿐인 첫 판정(질문 3 B).
+
+    기록이 없거나, 업로드 시각이 최신 기록보다 앞이 아니면(나이 0 · 미래 업로드) 잴 시간이 없어 None.
+    """
+    if not record.view_history:
+        return None
+    newest = max(record.view_history, key=lambda sample: (_utc(sample.at), sample.count))
+    if not _utc(record.published_at) < _utc(newest.at):
+        return None
+    return ViewSample(record.published_at, 0), newest
+
+
+def _measured_pair(record: VideoRecord) -> tuple[ViewSample, ViewSample] | None:
+    """판정과 views_per_hour 가 함께 쓰는 두 기록 — 시각이 다른 가장 늦은 둘, 없으면 업로드 0 과 최신."""
+    return _latest_pair(record.view_history) or _first_pair(record)
+
+
 def _rate(previous: ViewSample, latest: ViewSample) -> float | None:
     """두 기록 사이의 시간당 조회수. 조회수가 줄었으면(삭제 · 비공개 · 정정) None."""
     gained = latest.count - previous.count
@@ -49,7 +68,7 @@ def judge_trigger(record: VideoRecord, config: TriggerConfig, now: datetime) -> 
     """지금 대상으로 볼지 — 정해진 차례대로 보고 처음 걸린 판정을 돌려줍니다. 기록은 바꾸지 않습니다."""
     if now.utcoffset() is None:
         raise ValueError("now 에 시간대가 없습니다")
-    pair = _latest_pair(record.view_history)
+    pair = _measured_pair(record)
     if pair is None:
         return Judgement(Verdict.HOLD, "too_few_samples", now)
     previous, latest = pair
@@ -67,3 +86,11 @@ def judge_trigger(record: VideoRecord, config: TriggerConfig, now: datetime) -> 
     if rate < config.min_views_per_hour:
         return Judgement(Verdict.NO, "too_slow", now)
     return Judgement(Verdict.YES, "views_per_hour", now)
+
+
+def views_per_hour(record: VideoRecord) -> float | None:
+    """TRIGGER 줄의 per_hour — 판정과 같은 두 기록 사이의 시간당 조회수. 잴 수 없거나 줄었으면 None."""
+    pair = _measured_pair(record)
+    if pair is None:
+        return None
+    return _rate(*pair)

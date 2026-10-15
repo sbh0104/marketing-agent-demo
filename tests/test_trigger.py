@@ -1,4 +1,4 @@
-"""트리거 판정 테스트 — 세 조건, 판단 보류, 경계, 순서, 음수 속도 없음."""
+"""트리거 판정 테스트 — 세 조건, 판단 보류, 경계, 순서, 음수 속도 없음, 첫 표본 판정."""
 from __future__ import annotations
 
 import copy
@@ -11,7 +11,7 @@ from pathlib import Path
 from agent.config import TriggerConfig, load_config
 from agent.logbook import Event, format_line
 from agent.models import Verdict, VideoRecord, ViewSample
-from agent.trigger import judge_trigger
+from agent.trigger import judge_trigger, views_per_hour
 
 ROOT = Path(__file__).resolve().parent.parent
 UTC = timezone.utc
@@ -51,14 +51,21 @@ class HoldTests(unittest.TestCase):
         self.assertEqual(judged(video(), 1 * H), ("hold", "too_few_samples"))
 
     def test_single_sample_is_hold(self) -> None:
-        self.assertEqual(judged(video((2 * H, 1450)), AT), ("hold", "too_few_samples"))
+        # 업로드 시각이 그 기록 시각이면 잴 시간이 없습니다(나이 0 — 질문 3 B 뒤의 1행 보류)
+        record = video((2 * H, 1450), published_at=T0 + 2 * H)
+        self.assertEqual(judged(record, AT), ("hold", "too_few_samples"))
 
     def test_single_sample_holds_even_when_other_conditions_fail(self) -> None:
-        self.assertEqual(judged(video((20 * H, 6000)), 20 * H), ("hold", "too_few_samples"))
+        record = video((20 * H, 6000), published_at=T0 + 20 * H)
+        self.assertEqual(judged(record, 20 * H), ("hold", "too_few_samples"))
 
     def test_same_instant_samples_count_as_one(self) -> None:
+        # 같은 시각 두 기록은 한 기록 — 직전은 업로드 시각의 0, 최신은 그 시각의 큰 쪽(1450회 ÷ 2시간)
         record = video((2 * H, 1200), (2 * H, 1450))
-        self.assertEqual(judged(record, AT), ("hold", "too_few_samples"))
+        at_725 = dataclasses.replace(DEFAULTS, min_views_per_hour=725.0)
+        at_726 = dataclasses.replace(DEFAULTS, min_views_per_hour=726.0)
+        self.assertEqual(judged(record, AT, at_725), ("yes", "views_per_hour"))
+        self.assertEqual(judged(record, AT, at_726), ("no", "too_slow"))
 
     def test_decrease_is_hold(self) -> None:
         record = video((2 * H, 1450), (2 * H + 30 * M, 1300))
@@ -282,7 +289,7 @@ class ContractTests(unittest.TestCase):
 
     def test_every_reason_logs_unquoted(self) -> None:
         scenarios = (
-            (video((2 * H, 1450)), AT),
+            (video((2 * H, 1450), published_at=T0 + 2 * H), AT),
             (video((2 * H, 900), (2 * H + 30 * M, 999)), AT),
             (video((2 * H, 4900), (2 * H + 30 * M, 5001)), AT),
             (video(*GOOD, published_at=T0 + 2 * H + 31 * M), AT),
@@ -303,6 +310,129 @@ class ContractTests(unittest.TestCase):
                 line = format_line(now, Event.TRIGGER, fields)
                 self.assertTrue(line.endswith(f"verdict={verdict} reason={reason}"), line)
         self.assertEqual(seen, REASONS)
+
+
+class TestFirstSample(unittest.TestCase):
+    """시각이 다른 기록이 하나면 업로드 시각의 조회수 0 을 직전 기록으로 칩니다(2026-10-15 질문 3 B)."""
+
+    def test_single_sample_judged_from_upload_zero(self) -> None:
+        record = video((2 * H, 2000))  # 업로드 2시간 뒤 2000회 — 시간당 1000회
+        self.assertEqual(judged(record, 2 * H), ("yes", "views_per_hour"))
+        self.assertEqual(views_per_hour(record), 1000.0)
+        at_1000 = dataclasses.replace(DEFAULTS, min_views_per_hour=1000.0)
+        at_1001 = dataclasses.replace(DEFAULTS, min_views_per_hour=1001.0)
+        self.assertEqual(judged(record, 2 * H, at_1000), ("yes", "views_per_hour"))
+        self.assertEqual(judged(record, 2 * H, at_1001), ("no", "too_slow"))
+
+    def test_single_sample_slow_is_too_slow(self) -> None:
+        record = video((10 * H, 1200))  # 시간당 120회
+        self.assertEqual(judged(record, 10 * H), ("no", "too_slow"))
+        self.assertEqual(views_per_hour(record), 120.0)
+
+    def test_age_zero_single_sample_holds_too_few_samples(self) -> None:
+        # 업로드 시각 = 기록 시각 = 지금 — 0 으로 나누지 않고 보류합니다
+        record = video((2 * H, 2000), published_at=T0 + 2 * H)
+        self.assertEqual(judged(record, 2 * H), ("hold", "too_few_samples"))
+        self.assertIsNone(views_per_hour(record))
+
+    def test_future_upload_single_sample_holds_too_few_samples(self) -> None:
+        # 업로드 시각이 그 기록보다 뒤 — 표의 1행이 '미래 업로드' 행보다 앞입니다
+        record = video((2 * H, 2000), published_at=T0 + 2 * H + M)
+        self.assertEqual(judged(record, 2 * H), ("hold", "too_few_samples"))
+        self.assertIsNone(views_per_hour(record))
+
+    def test_empty_history_holds_too_few_samples(self) -> None:
+        record = video()
+        self.assertEqual(judged(record, 2 * H), ("hold", "too_few_samples"))
+        self.assertIsNone(views_per_hour(record))
+
+    def test_same_instant_samples_use_upload_zero(self) -> None:
+        record = video((2 * H, 1450), (2 * H, 1200))
+        self.assertEqual(judged(record, AT), ("yes", "views_per_hour"))
+        self.assertEqual(views_per_hour(record), 725.0)
+
+    def test_two_samples_ignore_upload_zero(self) -> None:
+        # 업로드 뒤 평균이면 시간당 509.6회지만, 시각이 다른 두 기록 사이는 148회입니다
+        record = video((2 * H, 1200), (2 * H + 30 * M, 1274))
+        self.assertEqual(judged(record, AT), ("no", "too_slow"))
+        self.assertEqual(views_per_hour(record), 148.0)
+
+    def test_views_per_hour_matches_judgement_pair(self) -> None:
+        records = (
+            video((2 * H, 2000)),
+            video((2 * H, 1200), (2 * H, 1450)),
+            video(*GOOD),
+            video((1 * H, 1000), (2 * H, 1100), (2 * H + 30 * M, 1450)),
+            video((2 * H + 30 * M, 1450), (2 * H, 1200)),
+        )
+        for record in records:
+            with self.subTest(record=record.view_history):
+                rate = views_per_hour(record)
+                self.assertIsNotNone(rate)
+                at_rate = dataclasses.replace(DEFAULTS, min_views_per_hour=rate)
+                above = dataclasses.replace(DEFAULTS, min_views_per_hour=rate + 1.0)
+                self.assertEqual(judged(record, AT, at_rate), ("yes", "views_per_hour"))
+                self.assertEqual(judged(record, AT, above), ("no", "too_slow"))
+
+    def test_views_per_hour_none_when_unmeasurable(self) -> None:
+        records = {
+            "empty": video(),
+            "age_zero": video((2 * H, 2000), published_at=T0 + 2 * H),
+            "decreased": video((2 * H, 1450), (2 * H + 30 * M, 1300)),
+        }
+        for label, record in records.items():
+            with self.subTest(label):
+                self.assertIsNone(views_per_hour(record))
+
+
+class TestJudgementStability(unittest.TestCase):
+    """판정이 바뀔 수 있나 — 계약 '트리거 판정' 절의 고친 문장(2026-10-15 질문 5 A)."""
+
+    def test_closed_window_never_yes_even_with_more_samples(self) -> None:
+        # 13시간 · 800회 영상 — 기록을 더해도 yes 가 아닙니다
+        rising = ((13 * H, 800), (14 * H, 1200), (15 * H, 2500), (16 * H, 4000))
+        verdicts = []
+        for count in range(1, len(rising) + 1):
+            samples = rising[:count]
+            verdicts.append(judged(video(*samples), samples[-1][0]))
+        self.assertEqual(
+            verdicts,
+            [("no", "views_below_min"), ("no", "too_old"), ("no", "too_old"), ("no", "too_old")],
+        )
+        self.assertEqual(judged(video((13 * H, 6000)), 13 * H), ("no", "views_above_max"))
+
+    def test_decreased_below_min_is_no_views_below_min(self) -> None:
+        record = video((2 * H, 1200), (2 * H + 30 * M, 900))
+        self.assertEqual(judged(record, AT), ("no", "views_below_min"))
+
+    def test_raising_max_age_hours_reopens_too_old(self) -> None:
+        record = video((12 * H, 1200), (13 * H, 1450))  # 시간당 250회, 13시간
+        self.assertEqual(judged(record, 13 * H), ("no", "too_old"))
+        wider = dataclasses.replace(DEFAULTS, max_age_hours=14.0)
+        self.assertEqual(judged(record, 13 * H, wider), ("yes", "views_per_hour"))
+
+    def test_decreased_views_verdict_by_row(self) -> None:
+        any_rate = dataclasses.replace(DEFAULTS, min_views_per_hour=0.0)
+        rows = (
+            ("in_range_in_window", ((2 * H, 1450), (2 * H + 30 * M, 1300)), AT,
+             ("hold", "views_decreased")),
+            ("below_min", ((2 * H, 1450), (2 * H + 30 * M, 999)), AT,
+             ("no", "views_below_min")),
+            ("above_max", ((2 * H, 6000), (2 * H + 30 * M, 5001)), AT,
+             ("no", "views_above_max")),
+            ("in_range_after_window", ((19 * H + 30 * M, 1450), (20 * H, 1300)), 20 * H,
+             ("no", "too_old")),
+        )
+        for label, samples, after, expected in rows:
+            with self.subTest(label):
+                self.assertEqual(judged(video(*samples), after, any_rate), expected)
+
+    def test_second_judgement_uses_latest_pair_not_first_sample_average(self) -> None:
+        # 100 → 1100 → 1200 (한 시간 간격) — 첫 기록부터의 평균(550)이나 업로드 뒤 평균(400)이 아니라 100
+        samples = ((1 * H, 100), (2 * H, 1100), (3 * H, 1200))
+        record = video(*samples)
+        self.assertEqual(judged(record, 3 * H), ("no", "too_slow"))
+        self.assertEqual(views_per_hour(record), 100.0)
 
 
 class _NewYork(tzinfo):

@@ -3,7 +3,7 @@
     python3 -m tests.mutants <이름>
 
 agent.guard / agent.store / agent.config / agent.scheduler / agent.logbook / agent.poster /
-agent.chrome / agent.classifier / agent.writer / agent.youtube / agent.watcher /
+agent.chrome / agent.classifier / agent.writer / agent.youtube / agent.watcher / agent.run /
 tests.live_check 의 소스에서 정확한 글자 하나를 바꿔 메모리에서만 모듈을 다시
 만들고(파일은 건드리지 않음), 해당 테스트 모듈을 돌립니다. agent.* 모듈은 src/ 에서,
 tests.* 모듈은 저장소 뿌리에서 읽습니다. 종료 코드 1 은 테스트가
@@ -919,6 +919,102 @@ MUTANTS: dict[str, tuple[str, str, str, str]] = {
         "tests.test_live_check",
         'if video["skip_kind"] in SELF_SKIP_KINDS:',
         'if video["result"] == "skip":',
+    ),
+    "config-test-run-any-value": (
+        "agent.config",
+        "tests.test_config",
+        "if not isinstance(value, bool):",
+        "if False:",
+    ),
+    "trigger-first-sample-ignored": (
+        "agent.trigger",
+        "tests.test_trigger",
+        "return _latest_pair(record.view_history) or _first_pair(record)",
+        "return _latest_pair(record.view_history)",
+    ),
+    "trigger-first-sample-age-zero": (
+        "agent.trigger",
+        "tests.test_trigger",
+        "if not _utc(record.published_at) < _utc(newest.at):",
+        "if False:",
+    ),
+    "watcher-allowlist-untracked": (
+        "agent.watcher",
+        "tests.test_watcher",
+        "*sorted(listed),",
+        "",
+    ),
+    "writer-status-ignored": (
+        "agent.writer",
+        "tests.test_writer",
+        'status = getattr(exc, "status", None)',
+        "status = None",
+    ),
+    "run-rejected-posts-live": (
+        "agent.run",
+        "tests.test_run",
+        "if rejected:",
+        "if False:",
+    ),
+    "run-chrome-for-all": (
+        "agent.run",
+        "tests.test_run",
+        "if record.video_id not in allowed:",
+        "if False:",
+    ),
+    "run-no-timing-exemption": (
+        "agent.run",
+        "tests.test_run",
+        "exempt = record.video_id in allowed",
+        "exempt = False",
+    ),
+    "run-fence-catches-base": (
+        "agent.run",
+        "tests.test_run",
+        "except Exception as exc:  # 영상 하나의 울타리",
+        "except BaseException as exc:  # 영상 하나의 울타리",
+    ),
+    "run-errors-uncounted": (
+        "agent.run",
+        "tests.test_run",
+        "errors += 1",
+        "errors += 0",
+    ),
+    "run-reason-follows-context": (
+        "agent.run",
+        "tests.test_run",
+        "text = str(exc)",
+        'text = f"{exc} {exc.__context__!r} {exc.__cause__!r}"',
+    ),
+    "run-reloader-forgets-rejection": (
+        "agent.run",
+        "tests.test_run",
+        "self.rejected = True",
+        "self.rejected = False",
+    ),
+    "run-lock-ignored": (
+        "agent.run",
+        "tests.test_run",
+        "fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)",
+        "None",
+    ),
+    "run-sdk-check-skipped": (
+        "agent.run",
+        "tests.test_run",
+        "if find_spec(module) is None:",
+        "if False:",
+    ),
+    "run-echo-strict": (
+        "agent.run",
+        "tests.test_run",
+        'reconfigure(errors="backslashreplace")',
+        'reconfigure(errors="strict")',
+    ),
+    "run-reason-str-unguarded": (
+        "agent.run",
+        "tests.test_run",
+        "except Exception:  # __str__ 이 터져도",
+        "except ZeroDivisionError:  # __str__ 이 터져도",
     ),
 }
 

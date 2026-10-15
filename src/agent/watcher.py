@@ -5,7 +5,8 @@
   `MAX_PAGES_PER_KEYWORD` 보다 적을 때만 받습니다. 페이지 상한이 토큰을 남긴 채 키워드를 끝내면
   그 뒤 결과를 보지 못한 것이므로 `QUOTA … counter=pages` 줄을 남깁니다.
 - 추적: 새 영상과 `trigger.max_age_hours` 안에 올라온 저장 영상 모두에 조회수 한 번씩. 새 영상은
-  `DETECT` · `VIEWS`, 아는 영상은 표본을 하나 덧붙이고 `VIEWS`.
+  `DETECT` · `VIEWS`, 아는 영상은 표본을 하나 덧붙이고 `VIEWS`. 명단 영상(allowed_videos)은
+  검색 · 나이 창과 상관없이 늘 추적합니다.
 - 쿼터 가드가 막은 단계는 `QUOTA`, API 오류로 멈춘 단계는 `ERROR` 줄을 남깁니다 — 빈 사이클과
   막힌 사이클이 조용히 같아 보이지 않습니다. 검색이 막혀도 추적은 돕니다.
 - 밖에서 온 글자의 외톨이 서로게이트는 U+FFFD 로 바꿉니다(HC1-2 R3). 영상 ID · 조회수 ·
@@ -20,12 +21,14 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 
 from agent.config import Config
+from agent.guard import allowed_video_ids
 from agent.logbook import Event, Logbook
 from agent.models import VIDEO_ID_RE, VideoRecord, ViewSample
 from agent.store import Store
 from agent.youtube import MAX_IDS_PER_CALL, QuotaExhausted, YouTubeClient, YouTubeError
 
 MAX_PAGES_PER_KEYWORD = 3
+ALLOWLIST_KEYWORD = "allowed_videos"  # 명단에서 처음 본 영상의 keyword — 검색어가 아니라 설정 칸 이름
 _SURROGATE_RE = re.compile(r"[\ud800-\udfff]")
 _REPLACEMENT = chr(0xFFFD)
 _COUNT_RE = re.compile(r"[0-9]{1,19}")
@@ -157,7 +160,10 @@ class Watcher:
         known = {r.video_id for r in self._store.records()}
         tally = _Tally()
         self._search(config, now, window_start, known, tally)
-        self._track(config, now, window_start, tally)
+        listed = allowed_video_ids(config.allowed_videos)
+        for video_id in sorted(listed - known):
+            tally.found.setdefault(video_id, ALLOWLIST_KEYWORD)
+        self._track(config, now, window_start, tally, listed)
         return tally.report()
 
     def _search(
@@ -217,12 +223,18 @@ class Watcher:
         return ids, token if isinstance(token, str) and token else None
 
     def _track(
-        self, config: Config, now: datetime, window_start: datetime, tally: _Tally
+        self,
+        config: Config,
+        now: datetime,
+        window_start: datetime,
+        tally: _Tally,
+        listed: frozenset[str],
     ) -> None:
-        queue = [
+        queue = list(dict.fromkeys([
             *tally.found,
             *[r.video_id for r in self._store.records() if r.published_at > window_start],
-        ]
+            *sorted(listed),
+        ]))
         for start in range(0, len(queue), MAX_IDS_PER_CALL):
             batch = queue[start:start + MAX_IDS_PER_CALL]
             try:
@@ -237,7 +249,7 @@ class Watcher:
                 tally.failed = True
                 return
             for video_id in batch:
-                self._record(video_id, items.get(video_id), now, tally)
+                self._record(video_id, items.get(video_id), now, tally, video_id in listed)
 
     def _record(
         self,
@@ -245,6 +257,7 @@ class Watcher:
         item: Mapping[str, object] | None,
         now: datetime,
         tally: _Tally,
+        listed: bool,
     ) -> None:
         if item is None:
             self._logbook.write(
@@ -278,12 +291,14 @@ class Watcher:
         prev = record.view_history[-2].count if len(record.view_history) > 1 else None
         if keyword is not None:
             tally.detected.append(video_id)
+            marks: dict[str, object] = {"allowlisted": True} if listed else {}
             self._logbook.write(
                 Event.DETECT,
                 video=video_id,
                 channel=record.channel_id,
                 keyword=keyword,
                 title=record.title,
+                **marks,
             )
         self._logbook.write(
             Event.VIEWS,

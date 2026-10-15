@@ -20,6 +20,8 @@ from types import SimpleNamespace
 from unittest import mock
 
 import agent.writer
+import tests.live_check as live_check
+from agent.classifier import JevError
 from agent.config import CommentConfig, load_config
 from agent.logbook import Event, Logbook, parse_line
 from agent.models import CommentDraft, Judgement, Verdict, VideoRecord
@@ -34,12 +36,14 @@ from agent.writer import (
     REPEAT_MIN_CHARS,
     REQUIRED_WORD,
     REWRITE_PROMPT,
+    SELF_CHECK_CRITERIA,
     SYSTEM_PROMPT,
     USER_INSTRUCTION,
     WRITE_TOOL,
     WriteResult,
     anthropic_client,
     code_failures,
+    jev_self_check,
     link_fragment,
     read_reply,
     repeated_run,
@@ -175,6 +179,36 @@ class FakeApiError(Exception):
     """SDK 의 상태 코드 있는 오류 모양."""
 
     status_code = 404
+
+
+class FakeStatusError(Exception):
+    """typesafe-sdk 의 TypeSafeError 모양 — 상태 코드가 status 에만 있습니다."""
+
+    status = 401
+
+
+class FakeBothError(Exception):
+    """status_code 와 status 가 모두 있는 오류 — status_code 가 먼저입니다."""
+
+    status_code = 404
+    status = 401
+
+
+class FakeAsk:
+    """classifier.Ask 모양의 가짜 — 받은 (모델, 상태, 질문) 을 적고, 질문마다 noul 답을 돌려줍니다."""
+
+    def __init__(self, answer: Mapping[str, float] | Exception) -> None:
+        self.answer = answer
+        self.calls: list[tuple[str, str, dict[str, object]]] = []
+
+    def __call__(
+        self, model: str, state: str, questions: Mapping[str, Mapping[str, object]]
+    ) -> object:
+        self.calls.append((model, state, copy.deepcopy(dict(questions))))
+        if isinstance(self.answer, Exception):
+            raise self.answer
+        nouls = {name: SimpleNamespace(noul=self.answer[name]) for name in questions}
+        return SimpleNamespace(answers=nouls)
 
 
 def logged(path: Path) -> list[tuple[datetime, Event, dict[str, str]]]:
@@ -1482,6 +1516,96 @@ class WriteCommentTest(unittest.TestCase):
         self.assertIn("ANTHROPIC_API_KEY=", env_lines)
         requirements = (ROOT / "requirements.txt").read_text(encoding="utf-8").splitlines()
         self.assertIn("anthropic>=0.40", requirements)
+
+
+class TestErrorStatus(unittest.TestCase):
+    """오류 이유의 상태 코드 — status_code, 없으면 status(계약 '댓글 작성' 절, 트래커 Phase 7 질문 4 A)."""
+
+    def setUp(self) -> None:
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.dir = Path(tmp.name)
+
+    def write(self, claude: FakeClaude, check: object, name: str) -> tuple[WriteResult, list]:
+        path = self.dir / f"{name}.log"
+        result = write_comment(
+            video(),
+            config=CONFIG,
+            claude=claude,
+            check=check,
+            previous=(),
+            logbook=Logbook(path, clock=lambda: NOW),
+            now=NOW,
+        )
+        return result, [(event, fields) for _, event, fields in logged(path)]
+
+    def assert_api_failure(
+        self, where: str, reason: str, result: WriteResult, events: list
+    ) -> None:
+        self.assertEqual(result, WriteResult(None, reason))
+        self.assertEqual(
+            events,
+            [
+                (Event.ERROR, {"where": where, "reason": reason, "video": VIDEO_ID}),
+                (Event.SKIP, {"video": VIDEO_ID, "reason": reason}),
+            ],
+        )
+
+    def test_status_read_when_no_status_code(self) -> None:
+        with self.subTest("jev"):
+            claude = FakeClaude([reply(CONCERN, GOOD)])
+            check = FakeJev([FakeStatusError("invalid api key")])
+            result, events = self.write(claude, check, "jev")
+            reason = "jev 검사 호출 실패: FakeStatusError 401: invalid api key"
+            self.assert_api_failure("writer.jev", reason, result, events)
+        with self.subTest("claude"):
+            claude = FakeClaude([FakeStatusError("invalid api key")])
+            result, events = self.write(claude, FakeJev([]), "claude")
+            reason = "claude 호출 실패: FakeStatusError 401: invalid api key"
+            self.assert_api_failure("writer.claude", reason, result, events)
+
+    def test_status_code_preferred_over_status(self) -> None:
+        claude = FakeClaude([reply(CONCERN, GOOD)])
+        result, events = self.write(claude, FakeJev([FakeBothError("not found")]), "both")
+        reason = "jev 검사 호출 실패: FakeBothError 404: not found"
+        self.assert_api_failure("writer.jev", reason, result, events)
+
+    def test_jev_error_from_sdk_ask_shape_keeps_401_in_head(self) -> None:
+        # 운영의 ask 는 classifier.sdk_ask — SDK 실패를 JevError("TypeSafeError 401") 로 감쌉니다
+        ask = FakeAsk(JevError("TypeSafeError 401"))
+        claude = FakeClaude([reply(CONCERN, GOOD)])
+        result, events = self.write(claude, jev_self_check(ask, "jev-latest"), "sdk")
+        reason = "jev 검사 호출 실패: JevError: TypeSafeError 401"
+        self.assert_api_failure("writer.jev", reason, result, events)
+        self.assertEqual(len(ask.calls), 1)
+
+
+class TestJevSelfCheck(unittest.TestCase):
+    """자체 검사 jev 어댑터는 src 에 있고, 실행기와 운영이 같은 함수를 씁니다(계약 '실제 호출 실행기' 절)."""
+
+    def test_adapter_asks_one_request_of_noul_questions(self) -> None:
+        ask = FakeAsk(PASSING)
+        check = jev_self_check(ask, "jev-latest")
+        self.assertEqual(check("검사할 자료", CHECK_QUESTIONS), PASSING)
+        criteria = {"true": "Yes, it does", "false": "No, it does not"}
+        self.assertEqual(SELF_CHECK_CRITERIA, criteria)
+        self.assertEqual(
+            ask.calls,
+            [
+                (
+                    "jev-latest",
+                    "검사할 자료",
+                    {
+                        name: {"type": "noul", "instructions": text, "criteria": criteria}
+                        for name, text in CHECK_QUESTIONS.items()
+                    },
+                )
+            ],
+        )
+
+    def test_live_check_uses_src_adapter(self) -> None:
+        self.assertIs(live_check.jev_self_check, agent.writer.jev_self_check)
+        self.assertIs(live_check.SELF_CHECK_CRITERIA, agent.writer.SELF_CHECK_CRITERIA)
 
 
 if __name__ == "__main__":

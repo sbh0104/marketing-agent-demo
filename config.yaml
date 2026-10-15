@@ -35,3 +35,4 @@ classifier:                    # ② 판별 — systemone model jev (계약 '주
 chrome_debug_url: http://localhost:9222
 allowed_videos:        # 실제 게시는 여기 있는 본인 테스트 영상에만
   - https://youtu.be/내-테스트-영상-ID
+test_run: false        # 참이면 테스트 실행 — 게시 직전까지만(저장만). --dry-run 과 둘 중 하나면 테스트이고, 설정으로 --dry-run 을 끌 수는 없습니다
