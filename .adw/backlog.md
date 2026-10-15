@@ -71,7 +71,7 @@
 - [x] Phase 6E — 댓글 품질 고치기 (게시 전 검사를 과제 문장에 맞춤 · 작성 프롬프트) (plans/interview-marketing-agent.md#phase-6e)
 - [x] Phase 6G — 결과 파일 개인 정보 가림 (실행기가 쓸 때 연락처 모양 가림 · 끝 줄 검사) (plans/interview-marketing-agent.md#phase-6g)
 - [~] Phase 6F — 고친 뒤 다시 반영 (전후 숫자) (plans/interview-marketing-agent.md#phase-6f)
-- [~] Phase 7 — 파이프라인 연결 · 운영 규칙 통합 (plans/interview-marketing-agent.md#phase-7)
+- [x] Phase 7 — 파이프라인 연결 · 운영 규칙 통합 (plans/interview-marketing-agent.md#phase-7)
 - [~] Phase 7F — 명단 영상 크롬 리허설 (테스트 실행에서 버튼 직전까지) (plans/interview-marketing-agent.md#phase-7f)
 - [ ] Phase 8 — 제출 문서 (README · PROCESS.md · 공개 정리) (plans/interview-marketing-agent.md#phase-8)
 - [ ] Phase 8A — 실제 실행 반영 (sample.log · 시연 링크 · 실제 숫자) (plans/interview-marketing-agent.md#phase-8a)

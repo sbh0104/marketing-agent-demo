@@ -6,10 +6,6 @@
 - evidence: 이번 ⑷ 13개(`.env.example` · `.gitignore` · `config.yaml` · `src/agent/store.py` · `src/agent/scheduler.py` · `tests/test_gitignore.py` …)는 모두 `1baaf13` 앞 커밋(첫 implement `63fab05`…`bce162f`, 07:08 복구 plan 의 `9a4b6c5` · `2262eca` · `56eec24`)의 파일이고, 11:09 에 다시 쓴 plan.md:402-473 의 `Files:` 줄은 HC1 고침 10개만 이름 붙인다 — verify-run V18 이 `git diff --name-only 1baaf13 7e39c3a` = 정확히 그 10개로 초록 (cycle 20261013-062542-adw/phase-1-foundation-contracts)
 - first confirmed: 2026-10-13 · last confirmed: 2026-10-15
 
-### E-004 · tooling — 이 기계의 셸 `grep` 은 GNU grep 이 아니라 ugrep 7.8.4 를 부르는 셸 함수다 — GNU grep 의 동작(NUL 이 든 파일의 `binary file matches` 등)을 재는 시험은 `/usr/bin/grep` 을 경로로 불러야 같은 것을 잰다
-- evidence: ship-report.md:320 (R5); `type grep` → "grep is a function", `/usr/bin/grep` 따로 있음 (cycle 20261013-062542-adw/phase-1-foundation-contracts)
-- first confirmed: 2026-10-13 · last confirmed: 2026-10-14
-
 ### E-006 · tooling — [stop:unknown · 1] 정지 부류 표에 "ship-check sensitive human checks — confirm in the interview before merge" 행이 없다 — 민감 확인 줄로 머지 전에 멈춘 ship-check 는 부류 `unknown` 으로 남는다
 - evidence: `.adw/journal/20261013-122544-stop-1/stop.md:1,5-6`(홈 트리) — "stop: ship-check · unknown · 1 · seen 2", "lesson: 표에 없는 정지 — 사유를 읽고 부류를 정한다"; 같은 꼴 첫 목격 20261013-075734-stop-1. 같은 stop.md 에 `stale harness: yes` — 현 하네스 표에 행이 이미 생겼는지는 이 retro 가 확인하지 못함
 - first confirmed: 2026-10-13 · last confirmed: 2026-10-14
@@ -60,7 +56,7 @@
 
 ### E-027 · gotcha — 가드의 youtu.be · shorts 거절 행이 한 검사(`;` 나누기 등)를 재려면 쿼리의 다른 이름이 모두 받는 이름(`si` · `t` · `feature`)이어야 한다 — 셋 밖 이름은 먼저 막혀 행이 다른 이유로 초록이 된다. Phase 1 의 S-003 잠금 행 `?x=1;y=2;v=B` 가 1A 뒤 그렇게 풀려, `guard.py:65` 의 `replace(";", "&")` 를 첫 구분자만 바꾸게 한 변이 g1 이 스위트 461개 초록으로 산다
 - evidence: `tests/test_guard.py:47` (S-003 행) · `src/agent/guard.py:23,65`; `.adw/ship-report.md:405` (가드 표 G1 의 `;` 행은 하나짜리 꼴만) · `:418-421` (R1) → S-056 이 받는 이름만 든 행으로 다시 잠금 (cycle 20261014-035715-adw/phase-1a-parser-allow-rules)
-- first confirmed: 2026-10-14 · last confirmed: 2026-10-14
+- first confirmed: 2026-10-14 · last confirmed: 2026-10-15
 
 ### E-028 · tooling — `tests/mutants.py` 의 변이는 소스에서 바꿀 글자가 **정확히 한 번** 나와야 돈다(아니면 종료 코드 2) — 가드 · 로그 · 설정의 한 줄을 고치는 페이즈는 그 줄을 겨눈 변이 문자열도 함께 고쳐야 하고, 같은 글자를 한 번 더 쓰는 줄을 더하기만 해도 기존 변이가 깨진다
 - evidence: `tests/mutants.py:9-10` 머리말("2 는 이름을 모르거나 바꿀 글자가 정확히 한 번 나오지 않았다는 뜻"); 1A 가 고친 가드 줄을 겨눈 `guard-youtu-be-ignores-query-v` · `guard-shorts-ignores-query-v` · `guard-query-ampersand-only`(`tests/mutants.py:139,145,151`); 등록부 82 → 90 (cycle 20261014-035715-adw/phase-1a-parser-allow-rules)
@@ -122,7 +118,12 @@
 - evidence: 위 줄 번호는 트리 `92bf38f` 에서 grep 으로 확인. 두 번째 ship-check 막힘 1과 세 번째 ship-check 민감 줄 ① ② ③ → 트래커 6G Trade-offs accepted 의 `skip_reason` · 키 소문자 · `repr` 줄 셋. 트래커 6G Responsibilities "그때 고칠 자리는 이유 칸을 이름과 숫자만 적기(`skip_reason` · 판별 이유 칸, 질문 3 A 꼴)" (cycle 20261015-130935-adw/phase-6g-live-check-redact)
 - first confirmed: 2026-10-15 · last confirmed: 2026-10-15
 
+### E-046 · reviewer — plan 이 등록한 음성 대조는 새 판정 규칙의 줄은 비틀지만, 모듈을 잇는 진입점의 연결 줄(단계 호출 하나 · 울타리 뒤 저장 · 시작 거절 예외 묶음 · 출력 연결)은 비틀지 않는다. 그래서 그 줄을 망가뜨려도 스위트가 초록이다. ship-check 의 변이 점검이 거기서 살아남은 변이를 찾아, 테스트만 고치는 스모크 항목으로 보낸다. E-041(새 판정의 경계)과 같은 부류를 세 페이즈 연속(6C · 6E · 7) 본 것이다. 다른 점은 줄의 종류뿐이다
+- evidence: 계획의 음성 대조 16개(`e27e7e3`)는 모두 빨강이다. 그런데 ship-check 가 `src/agent/run.py:266`(자체 검사 연결 `jev_self_check(self._services.ask, …)`) · `:331`(울타리 뒤 판별 `self._store.put`) · `:137`(이유 200자 · 공백 접기) · `:559`(main 의 `echo_stream` 연결) · `:492-496` · `:551`(시작 거절 묶음)에서 변이가 사는 것을 재현했다 → S-100 · S-101 · S-102(ship-report.md:187-190). 같은 자리들은 가드 매트릭스에도 행이 없었다(ship-report.md:220-224) (cycle 20261015-154340-adw/phase-7-pipeline-rules)
+- first confirmed: 2026-10-15 · last confirmed: 2026-10-15
+
 ## Retired (history — one line each, never deleted)
+- E-004 · tooling — 이 기계의 셸 `grep` 은 GNU grep 이 아니라 ugrep 7.8.4 를 부르는 셸 함수다 — GNU grep 의 동작(NUL 이 든 파일의 `binary file matches` 등)을 재는 시험은 `/usr/bin/grep` 을 경로로 불러야 같은 것을 잰다 — retired 2026-10-15 (over cap; unconfirmed since 2026-10-14)
 - E-021 · reviewer — 받아들인 위험을 재현한 **입력**으로 적으면 다음 ship-check 가 같은 코드 자리에서 다음 입력을 찾아 다시 멈춘다 — 자리(함수 · `except` 줄)로 적자 멈춤이 끝났다 — retired 2026-10-15 (꼬리 "자리로 적자 멈춤이 끝났다" 가 6G 에서 틀림: 자리(`tests/live_check.py:1621`)를 적은 `skip_reason` 대가 줄이 좁은 입력 종류 때문에 다음 ship-check 에서 다시 올라옴(journal 20261015-130935 ship-report.md:217) — 고친 사실을 E-043 에 다시 씀)
 - E-036 · gotcha — 레인 착지는 squash 없는 `merge --no-ff` 라(`.claude/skills/plan/scripts/finalize_step.py:1054`), 레인 끝 판에서만 지운 내용은 앞 레인 커밋마다 남아 main 기록에 붙는다(제출 때 공개) — 실행기는 영상마다 `untrusted.description` 을 `_clean` · 길이 자르기만 하고 결과 파일에 쓰므로(`tests/live_check.py:1380`), 사람이 커밋한 `docs/live-check/result.json` 에 채널 주인 연락처가 그대로 들어갈 수 있다 — retired 2026-10-15 (뒤 절 "실행기는 … `_clean` · 길이 자르기만 하고 결과 파일에 쓰므로" 가 6G 에서 틀림: `_kept`(`tests/live_check.py:353-360`)가 키 가림 → 연락처 가림 → 자르기 순서로 씀 — 앞 절(착지가 레인 역사를 main 에 붙임)은 E-044 에 다시 씀)
 - E-042 · gotcha — [stop:red-unbucketable · 6g] ship-check BLOCKED 이고 통이 그 고침을 못 받는다 — 이 페이즈는 제 브랜치에서 아래 Blockers 를 범위로 다시 돈다 — retired 2026-10-15 (shipped)

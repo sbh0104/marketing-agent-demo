@@ -740,7 +740,7 @@ Open questions
 ---
 
 ## Phase 7 — 파이프라인 연결 · 운영 규칙 통합
-- Status: Not started
+- Status: Done
 - Slug: pipeline-rules
 - After: Phase 2, Phase 3, Phase 4, Phase 5, Phase 6, Phase 6B, Phase 1A
 - Goal: 다섯 모듈을 한 흐름(`run.py`)으로 묶고, 운영 규칙 다섯 가지(영상당 댓글 1개 · 하루 상한 10개 · 채널 대기 24시간 · 허용 목록 강제 · 테스트 모드)가 실제로 작동하는지 확인한다. 허용 목록(본인 테스트) 영상은 검색 없이 늘 추적하고 타이밍만 면제해, 명단에 넣은 영상이면 몇 개든 판별 · 작성 · 게시를 실제로 거친다 (2026-10-15). 테스트 실행은 설정 칸 `test_run` 과 `--dry-run` 둘 중 하나로 켠다. 이 페이즈는 흐름 잇기 · 명단 영상 길 · 첫 표본 판정 · `test_run` 칸까지 한다. 명단 영상의 크롬 리허설 길은 Phase 7F, 크롬 주소 제한과 최소 표본 간격은 Phase 7G, 건너뛴 영상 기억은 Phase 7C 가 한다 (2026-10-15 Phase 7 인터뷰 질문 6 A).
