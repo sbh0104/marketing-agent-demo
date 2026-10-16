@@ -346,6 +346,14 @@ class SampleLogBrokenCopyTest(unittest.TestCase):
         failures = self.failures_of("noblock.log", b"\n".join(kept))
         self.assertEqual(failures, ["sha256", "lines", "blocked"])
 
+    def test_blocked_line_dry_run_copy_is_refused(self) -> None:
+        blocked = BLOCKED_POST.encode("utf-8")
+        changed = BLOCKED_POST.replace("reason=not_in_allowlist", "reason=dry_run")
+        failures = self.failures_of(
+            "dryrun.log", self.data.replace(blocked, changed.encode("utf-8"))
+        )
+        self.assertEqual(failures, ["sha256", "blocked"])
+
     def test_cut_last_line_copy_is_refused(self) -> None:
         failures = self.failures_of("cut.log", self.data[:-1])
         self.assertEqual(len(failures), 2, failures)
@@ -413,7 +421,9 @@ class LiveRunDocsTest(unittest.TestCase):
         self.assertIn(DEMO_URL, self.readme)
         self.assertIn(DEMO_URL, read(TRACKER))
         self.assertNotIn("준비 중", self.readme)
-        self.assertIn("실제 게시는 없습니다", self.readme)
+        demo = [line for line in self.readme.splitlines() if line.startswith("- 시연 영상:")]
+        self.assertEqual(len(demo), 1, demo)
+        self.assertIn("실제 게시는 없습니다", demo[0])
 
     def test_readme_points_at_sample_log(self) -> None:
         self.assertIn("실제 실행의 기록은 `logs/sample.log` 입니다", self.readme)
@@ -623,7 +633,7 @@ class LiveRunDocsTest(unittest.TestCase):
         self.assertEqual(first.utcoffset(), timedelta(hours=9))
         allowed = int(next(fields for _, event, fields in r2 if event == "START")["allowed"])
         videos_line = f"남의 채널 {KOREAN_COUNTERS[allowed]}의 인기 영상"
-        self.assertIn(videos_line, self.readme)
+        self.assertEqual(self.readme.count(videos_line), 2)
         for text in (
             f"**건너뜀 {len(skips)}의 이유.**",
             f"댓글 {KOREAN_COUNTERS[len(comments)]} 줄(`COMMENT`)",
@@ -650,6 +660,7 @@ class JudgeSampleTest(unittest.TestCase):
             "ALLOWED_VIDEOS 에는 지원자 영상이 있습니다",
             "커밋된 목록에는 지원자의 영상이 들어 있습니다",
             "  - 커밋된 명단: 지원자 영상",
+            "제출본의 allowlist 에는 지원자의 테스트 영상이 들어 있습니다",
         ):
             with self.subTest(sample=sample):
                 self.assertEqual(committed_list_claims(sample), [sample])
@@ -667,16 +678,37 @@ class JudgeSampleTest(unittest.TestCase):
                 self.assertEqual(committed_list_claims(sample), [])
 
     def test_recording_post_reach(self) -> None:
-        for word in RECORDING_WORDS:
-            for shape in POSTED_SHAPES:
+        """표본은 판정기 상수를 읽지 않고 여기 적은 글자로 만듭니다 — 상수가 줄면 빨강입니다."""
+        self.assertEqual(len(RECORDING_WORDS), 2)
+        self.assertEqual(len(POSTED_SHAPES), 15)
+        words = ("녹화", "시연")
+        shapes = (
+            "게시했",
+            "게시를했",
+            "게시됐",
+            "게시되었",
+            "게시하였",
+            "게시를하였",
+            "올라갔",
+            "올렸",
+            "달렸",
+            "달았",
+            "등록했",
+            "등록됐",
+            "등록되었",
+            "result=posted",
+            "mode=live",
+        )
+        for word in words:
+            for shape in shapes:
                 sample = f"{word}에서 {shape}"
                 with self.subTest(sample=sample):
                     self.assertEqual(recording_post_claims(sample), [sample])
-        for shape in POSTED_SHAPES:
+        for shape in shapes:
             sample = f"테스트 실행에서 {shape}"
             with self.subTest(sample=sample):
                 self.assertEqual(recording_post_claims(sample), [])
-        for word in RECORDING_WORDS:
+        for word in words:
             sample = f"{word}에는 실제 게시가 없습니다"
             with self.subTest(sample=sample):
                 self.assertEqual(recording_post_claims(sample), [])

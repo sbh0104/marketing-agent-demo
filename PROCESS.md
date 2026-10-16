@@ -240,7 +240,7 @@ ADWS 에서 페이즈 하나는 사이클 하나로 돕니다 — 이해 → 계
 - `CLASSIFY` 는 영상마다 한 번입니다. 녹화 실행의 248 가운데 230 은 사전 점검이 찾고 `Ctrl+C` 전에 판별하지 못한 영상이고, 18 은 녹화 실행이 새로 찾은 영상입니다.
 - `TRIGGER` 는 판별 결과와 상관없이 새 조회수 표본이 생긴 영상마다 다시 판정해, 녹화 실행에서는 추적한 영상 수와 같은 324 입니다. 작성기는 판별과 타이밍이 모두 `yes` 인 영상만 받고, 녹화 실행에서 그런 영상은 9 개입니다.
 - `hold` 는 보류입니다. 판별의 보류는 확신이 낮거나 `noul` 이 두 기준값 사이이거나 두 답이 엇갈렸거나 호출 · 응답에 오류가 있는 것이고(계약 '주제 판별' 절), 이 로그에는 `ERROR` 줄이 없어 오류로 보류한 영상은 없습니다. 타이밍의 보류는 잴 수 없어 미룬 판정입니다(계약 '트리거 판정' 절).
-- **허용 목록 밖 게시 없음.** 명단 밖 영상이 게시 단계에 온 것은 사전 점검의 한 번이고, `POST video=C_Ylul6a6y0 mode=test result=saved reason=not_in_allowlist`(13:47:42)로 크롬을 열지 않고 저장만 했습니다. 이유가 `dry_run` 이 아니라 `not_in_allowlist` 인 것은 가드가 테스트 실행인지보다 허용 목록을 먼저 보기 때문입니다(`src/agent/guard.py` 의 `decide_post`) — 그래서 이 줄은 테스트 실행이 아니었어도 막혔을 영상을 보입니다. 같은 영상은 녹화 실행에서 `SKIP … reason=duplicate_video` 입니다 — 한 폴더에서 테스트 시도가 한 번이라도 있으면 다음 실행부터 중복입니다.
+- **허용 목록 밖 게시 없음.** 명단 밖 영상의 `POST` 줄은 사전 점검의 한 줄이고, `POST video=C_Ylul6a6y0 mode=test result=saved reason=not_in_allowlist`(13:47:42)로 크롬을 열지 않고 저장만 했습니다. 이유가 `dry_run` 이 아니라 `not_in_allowlist` 인 것은 가드가 테스트 실행인지보다 허용 목록을 먼저 보기 때문입니다(`src/agent/guard.py` 의 `decide_post`) — 그래서 이 줄은 테스트 실행이 아니었어도 막혔을 영상을 보입니다. 같은 영상은 녹화 실행에서 `SKIP … reason=duplicate_video` 입니다 — 명단 밖 영상은 한 폴더에서 테스트 시도가 한 번이라도 있으면 다음 실행부터 중복입니다(명단 영상의 실제 게시는 `live` 시도만 셉니다).
 - **Phase 7C 의 효과.** 댓글 세 줄(`COMMENT`)의 짜임 칸 `shape=` 이 `scene_first` · `question_first` · `story_first` 로 셋 모두 다릅니다. 건너뜀의 `memory=run.write` 칸도 7C 가 처음 쓴 칸입니다(트래커 Phase 8A 질문 5 A).
 - **건너뜀 13의 이유.** `comments_disabled` 3 · `unavailable` 3 · `검사 두 번 탈락` 3 · `재료에 장면 없음` 2 · `재료에 연애 고민 없음` 1 · `duplicate_video` 1.
 
