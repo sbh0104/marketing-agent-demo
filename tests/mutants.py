@@ -1227,6 +1227,12 @@ MUTANTS: dict[str, tuple[str, str, str, str]] = {
         'if last[2].get("reason") == COMMENTS_DISABLED:',
         "if False:",
     ),
+    "run-disabled-writes": (
+        "agent.run",
+        "tests.test_run",
+        "if comments is None:",
+        "if False:",
+    ),
 }
 
 

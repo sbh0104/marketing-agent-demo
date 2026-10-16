@@ -29,8 +29,8 @@ from agent.config import Config, ConfigError, load_config
 from agent.env import EnvError, require_secret
 from agent.guard import allowed_video_ids, decide_post
 from agent.logbook import Event, Logbook, read_log
-from agent.models import Judgement, Verdict, VideoRecord
-from agent.poster import CommentPage, PageError, post_video
+from agent.models import Judgement, Memory, Verdict, VideoRecord
+from agent.poster import COMMENTS_DISABLED, CommentPage, PageError, post_video
 from agent.report import render_report, write_report
 from agent.scheduler import run_loop
 from agent.store import Store, StoreError
@@ -382,7 +382,11 @@ class Pipeline:
         return record
 
     def _write(self, record: VideoRecord, config: Config, check: SelfCheck) -> VideoRecord:
-        """판별 · 타이밍이 모두 yes 이고 댓글이 없을 때만 씁니다. 인기 댓글을 못 받으면 이번엔 쉽니다."""
+        """판별 · 타이밍이 모두 yes 이고 댓글이 없을 때만 씁니다. 인기 댓글을 못 받으면 이번엔 쉽니다.
+
+        댓글이 막힌 영상은 Claude 를 부르지 않고 SKIP reason=comments_disabled 를 남깁니다. 멈춘 까닭은 기억 칸에
+        적습니다.
+        """
         if (
             record.classification is None
             or record.classification.verdict is not Verdict.YES
@@ -411,6 +415,14 @@ class Pipeline:
                 Event.ERROR, where=exc.call, reason=exc.reason, video=record.video_id
             )
             return record
+        memory = record.memory
+        tries = memory.tries if memory is not None else 0
+        if comments is None:
+            self._logbook.write(Event.SKIP, video=record.video_id, reason=COMMENTS_DISABLED)
+            record.memory = Memory(COMMENTS_DISABLED, STAGE_WRITE, now, tries, 0)
+            self._store.put(record)
+            return record
+        count = sum(1 for text in comments if text.strip())
         result = write_comment(
             record,
             config=config.comment,
@@ -420,11 +432,14 @@ class Pipeline:
             logbook=self._logbook,
             now=now,
             transcript="",
-            top_comments=comments or (),
+            top_comments=comments,
         )
         if result.draft is not None:
             record.comment = result.draft
-            self._store.put(record)
+            record.memory = None
+        else:
+            record.memory = Memory(result.head, STAGE_WRITE, now, tries + 1, count)
+        self._store.put(record)
         return record
 
     def _post(

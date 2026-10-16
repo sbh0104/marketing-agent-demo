@@ -922,8 +922,8 @@ watcher = Watcher(Store(Path("data/videos.json")), logbook, client, clock)
 - 돌려주는 것은 항목마다 `snippet.topLevelComment.snippet.textDisplay` 글뿐이고, 작성자 이름 ·
   채널 ID 는 읽지 않습니다. 모양이 다른 항목은 건너뛰고, 외톨이 서로게이트는 U+FFFD 로 바꿉니다.
   `items` 가 목록이 아니면 `YouTubeError("commentThreads.list", "HTTP 200 items 가 목록이 아닙니다")`.
-- 오류 이유가 정확히 `HTTP 403 commentsDisabled` 이면 `None` 입니다 — 그 영상 하나의 일이고, 부르는
-  쪽은 제목 · 설명으로 이어 갑니다. 다른 403(`quotaExceeded` 등)과 그 밖의 오류는 `YouTubeError`
+- 오류 이유가 정확히 `HTTP 403 commentsDisabled` 이면 `None` 입니다 — 그 영상 하나의 일이고, 실행 흐름은
+  그 영상을 짓지 않고 `SKIP reason=comments_disabled` 로 건너뜁니다('실행 진입점' 절). 다른 403(`quotaExceeded` 등)과 그 밖의 오류는 `YouTubeError`
   그대로 올라갑니다.
 - `search(…, published_before=None)` — 주면 `publishedBefore=<UTC …Z>` 가 더해집니다(실제 호출 실행기의
   넓힌 창). 시간대가 없거나 `published_after` 와 같거나 이르면 `ValueError` 입니다. 탐지 사이클은
@@ -1602,10 +1602,11 @@ PYTHONPATH=src python3 -m agent.run [--dry-run] [--once]
 - **타이밍.** 새 기록마다 `judge_trigger` 로 다시 판정해 `record.trigger` 에 저장하고 `TRIGGER … per_hour=<views_per_hour>` 를
   씁니다. 명단 영상(`allowed_video_ids(config.allowed_videos)`)은 규칙 판정을 `rule_verdict=` · `rule_reason=` 에 함께 적고
   `verdict=yes reason=allowlisted` 로 통과합니다 — 다른 영상의 기준은 그대로입니다.
-- **작성.** 판별 · 타이밍이 모두 `yes` 이고 댓글이 없으면 인기 댓글(`top_comments` 앞 10개, 댓글이 막힌 영상은 `()`) ·
+- **작성.** 판별 · 타이밍이 모두 `yes` 이고 댓글이 없으면 인기 댓글(`top_comments` 앞 10개) ·
   `previous=store.comments()` · `transcript=""` 로 `write_comment` 를 부르고, 초안을 `record.comment` 에 넣어 저장합니다.
   인기 댓글을 못 받은 영상(`QUOTA` 또는 `ERROR where=commentThreads.list`)은 이번 사이클에 쓰지 않습니다.
-  명단 밖 영상의 댓글도 저장소와 `COMMENT` 줄에 남습니다.
+  댓글이 막힌 영상(`top_comments` 가 `None`)은 Claude 를 부르지 않고 `SKIP video=<ID> reason=comments_disabled` 한 줄을 남깁니다.
+  인기 댓글이 0개인 영상(`[]`)은 그대로 씁니다. 명단 밖 영상의 댓글도 저장소와 `COMMENT` 줄에 남습니다.
 - **게시.** 댓글이 있는 영상마다 `post_video(…, dry_run=<테스트 실행>, …)`(6절)를 부릅니다. 영상당 1개 · 하루 상한 · 채널
   대기는 명단 영상에도 저장소가 그대로 셉니다(4절). 테스트 실행은 `--dry-run` 또는 `config.test_run` 이고, 설정은
   `--dry-run` 을 끄지 못합니다. 명단 영상에는 게시마다 `ChromeSession(config.chrome_debug_url)` 을 새로 만들어 그 `new_page` 를
@@ -1628,7 +1629,7 @@ PYTHONPATH=src python3 -m agent.run [--dry-run] [--once]
 - **음성 대조.** `python3 -m tests.mutants <이름>` — `run-rejected-posts-live` · `run-chrome-for-all` · `run-no-timing-exemption` ·
   `run-fence-catches-base` · `run-errors-uncounted` · `run-reason-follows-context` · `run-reloader-forgets-rejection` ·
   `run-lock-ignored` · `watcher-allowlist-untracked` · `trigger-first-sample-ignored` · `trigger-first-sample-age-zero` ·
-  `config-test-run-any-value` · `writer-status-ignored` · `run-sdk-check-skipped` · `run-echo-strict` · `run-reason-str-unguarded`.
+  `config-test-run-any-value` · `writer-status-ignored` · `run-sdk-check-skipped` · `run-echo-strict` · `run-reason-str-unguarded` · `run-disabled-writes`.
 
 ## 결과 화면 — `report.py` (Phase 7D)
 

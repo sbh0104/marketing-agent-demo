@@ -26,7 +26,7 @@ from agent.classifier import MATCH_ID, JevError
 from agent.config import ConfigError, load_config
 from agent.guard import decide_post
 from agent.logbook import Event, Logbook, read_log
-from agent.models import Judgement, Verdict, VideoRecord, ViewSample
+from agent.models import CommentDraft, Judgement, Memory, Verdict, VideoRecord, ViewSample
 from agent.report import render_report
 from agent.scheduler import run_loop
 from agent.store import Store
@@ -54,6 +54,7 @@ KEYS = {
     "TYPESAFE_API_KEY": "jev-key-0002",
     "ANTHROPIC_API_KEY": "claude-key-0003",
 }
+NO_SCENE_ANSWER = {"has_love_concern": True, "has_scene": False}  # 재료에 장면 없음 — 스스로 건너뜀
 
 
 def replace_once(text: str, old: str, new: str) -> str:
@@ -174,12 +175,25 @@ class WriterClaude:
         self.messages = self
         self.calls: list[dict[str, object]] = []
         self.error: Exception | None = None
+        # 영상 ID → 그 영상에 차례로 낼 도구 입력(None 은 보통 초안)
+        self.answers: dict[str, list[dict[str, object] | None]] = {}
 
     def create(self, **kwargs: object) -> object:
         self.calls.append(kwargs)
         if self.error is not None:
             raise self.error
+        found, answer = self._next_answer(kwargs)
+        if found and answer is not None:
+            return tool_reply(answer)
         return tool_reply(reply(CONCERN, draft(len(self.calls))))
+
+    def _next_answer(self, kwargs: dict[str, object]) -> tuple[bool, dict[str, object] | None]:
+        """그 영상에 줄을 선 답이 있으면 (True, 도구 입력 또는 None), 없으면 (False, None)."""
+        first = str(kwargs["messages"][0]["content"])
+        for video_id, queued in self.answers.items():
+            if queued and title_of(video_id) in first:
+                return True, queued.pop(0)
+        return False, None
 
     def user_messages(self, video_id: str) -> list[str]:
         """그 영상에 보낸 첫 user 차례 글들."""
@@ -1410,14 +1424,42 @@ class TestStages(RunCase):
                 (line,) = self.lines(Event.COMMENT, video=video_id)
                 self.assertEqual(line["shape"], name)
 
-    def test_comments_disabled_writes_with_empty_top_comments(self) -> None:
+    def test_comments_disabled_skips_without_claude(self) -> None:
+        # 트래커 7C 질문 4 A ④ — 댓글을 막아 둔 영상은 짓지 않고 건너뜁니다(옛 '빈 인기 댓글로 씀' 을 뒤집음)
         self.api.comments[A] = 403
         self.show(A, 2000)
         self.cycle(self.pipeline())
+        self.assertEqual(self.claude.calls, [])
+        self.assertEqual([call for call in self.jev.calls if call == ("check", A)], [])
+        self.assertEqual(
+            self.lines(Event.SKIP, video=A), [{"video": A, "reason": "comments_disabled"}]
+        )
+        self.assertEqual(self.lines(Event.ERROR), [])
+        record = self.record(A)
+        self.assertIsNone(record.comment)
+        memory = record.memory
+        self.assertIsInstance(memory, Memory)
+        self.assertEqual(
+            (memory.reason, memory.stage, memory.tries), ("comments_disabled", "run.write", 0)
+        )
+        threads = [q for name, q in self.api.calls if name == "commentThreads"]
+        self.assertEqual([query["videoId"] for query in threads], [A])
+        # E-054 — 가짜 유튜브가 정말 막힘(None)을 돌려주는지 직접 봅니다
+        limits = self.load().limits
+        self.assertIsNone(
+            self.services.youtube.top_comments(A, self.clock.now, limits, TOP_COMMENTS_MAX)
+        )
+
+    def test_zero_top_comments_still_writes(self) -> None:
+        # 트래커 7C 질문 4 A ④ — 인기 댓글 0개(빈 목록)는 막힘과 갈라 지금처럼 씁니다
+        self.api.comments[A] = []
+        self.show(A, 2000)
+        self.cycle(self.pipeline())
         (message,) = self.claude.user_messages(A)
+        self.assertEqual(len(self.claude.calls), 1)
         self.assertNotIn("<top_comments>", message)
         self.assertIsNotNone(self.record(A).comment)
-        self.assertEqual(self.lines(Event.ERROR), [])
+        self.assertEqual(self.lines(Event.SKIP, video=A), [])
 
     def test_top_comments_failure_skips_writing(self) -> None:
         for case in ("http", "quota"):
@@ -1489,6 +1531,64 @@ class TestStages(RunCase):
         self.assertNotIn(D, self.api.sampled())
         self.assertEqual(self.lines(Event.TRIGGER, video=D), [])
         self.assertEqual(self.record(D), old)
+
+
+class TestMemory(RunCase):
+    """기억 칸 — 작성 · 게시가 멈춘 까닭을 적고, 명단 밖 영상만 다음 새 기록에서 읽습니다(트래커 7C)."""
+
+    def bump(self, video_id: str, views: int) -> None:
+        """다음 videos.list 의 조회수만 바꿉니다 — 업로드 시각은 그대로."""
+        self.api.videos[video_id]["statistics"]["viewCount"] = str(views)
+
+    def cycle_events(self, n: int) -> list[tuple[Event, dict[str, str]]]:
+        """n 번째 CYCLE 줄 앞(n − 1 번째 CYCLE 줄 뒤, 없으면 로그 처음부터)의 줄과 그 CYCLE 줄."""
+        events = self.events()
+        ends = [index for index, (event, _) in enumerate(events) if event is Event.CYCLE]
+        start = ends[n - 2] + 1 if n > 1 else 0
+        return events[start : ends[n - 1] + 1]
+
+    def thread_calls(self, video_id: str) -> int:
+        return sum(
+            1
+            for name, query in self.api.calls
+            if name == "commentThreads" and query["videoId"] == video_id
+        )
+
+    def row(self, video_id: str) -> str:
+        page = (self.root / "data" / "report.html").read_text(encoding="utf-8")
+        match = re.search(rf'<tr id="v-{video_id}">.*?</tr>', page)
+        self.assertIsNotNone(match, video_id)
+        return match.group()
+
+    def test_write_outcomes_fill_memory(self) -> None:
+        # 계약 3절 Memory — 스스로 건너뜀은 머리말 · 부른 횟수 · 넘긴 비어 있지 않은 인기 댓글 수, 초안은 지움
+        self.api.comments[A] = ["첫 인기 댓글", "   "]
+        self.claude.answers[A] = [NO_SCENE_ANSWER]
+        self.show(A, 2000)
+        pipeline = self.pipeline()
+        self.cycle(pipeline)
+        memory = self.record(A).memory
+        self.assertIsInstance(memory, Memory)
+        self.assertEqual(
+            (memory.reason, memory.stage, memory.tries, memory.top_comments),
+            ("재료에 장면 없음", "run.write", 1, 1),
+        )
+        self.assertIsNotNone(memory.at.utcoffset())
+        self.cycle(pipeline)
+        self.assertIsNotNone(self.record(A).comment)
+        self.assertIsNone(self.record(A).memory)
+        # 명단 밖 영상 — 검사 두 번 탈락
+        self.setUp()
+        self.jev.reads_like_ad = 0.9
+        self.show(C, 2000, channel="UC3")
+        self.find(C)
+        self.cycle(self.pipeline())
+        memory = self.record(C).memory
+        self.assertEqual(
+            (memory.reason, memory.stage, memory.tries, memory.top_comments),
+            ("검사 두 번 탈락", "run.write", 1, 0),
+        )
+        self.assertIsNotNone(memory.at.utcoffset())
 
 
 class TestConfigRejected(RunCase):
