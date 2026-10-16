@@ -1204,6 +1204,22 @@ class TestReport(RunCase):
         hrefs = set(re.findall(r'href="([^"]*)"', page))
         self.assertEqual(hrefs, {watch(listed), watch(searched)})
 
+    def test_reason_badge_survives_reprocessing_with_same_reason(self) -> None:
+        """새 표본으로 다시 다룬 영상은 그 주기에 다시 적힌 이유로 이유 배지를 지킵니다 (트래커 Phase 7H · 7C 맞물림)."""
+        self.write_config(allowed=(A,))
+        self.claude.error = RuntimeError("Claude 가 답하지 않습니다")
+        pipeline = self.pipeline()
+        self.show(A, 2000)
+        self.cycle(pipeline)
+        badge = '<span class="badge reason">AI 호출 오류 (Claude)</span>'
+        self.assertIn(badge, self.row(A))
+        first_cycle_end = read_log(self.log_path)[-1][0]
+        self.show(A, 2100)
+        self.cycle(pipeline)
+        # 둘째 주기가 첫 주기의 모든 줄보다 늦게 다시 판정했으니, 배지는 둘째 주기에 다시 적힌 줄에서 옵니다
+        self.assertGreater(self.record(A).trigger.at, first_cycle_end)
+        self.assertIn(badge, self.row(A))
+
 
 class TestOperatingRules(RunCase):
     def test_one_comment_per_video(self) -> None:

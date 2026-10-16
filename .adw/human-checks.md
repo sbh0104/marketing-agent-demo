@@ -1245,3 +1245,43 @@
 - source: adw/smoke-sweep-s110-s113
 - tag: plain
 - status: open
+
+### H-153 — Phase 7C 가 착지할 때 `tests/test_run.py::TestReport::test_reason_badge_survives_reprocessing_with_same_reason` 이 초록으로 남는지 봅니다 — 7C 의 기억이 다시 쓰지 않을 때마다 그 주기의 타이밍 시각 뒤에 원래 이유 머리말의 `SKIP` 한 줄을 다시 남겨야 합니다
+- project: marketing-agent-demo
+- when: 2026-10-16 · plans/interview-marketing-agent.md#phase-7h
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-7h-report-stale-reason-labels
+- tag: plain
+- status: open
+
+### H-154 — Phase 7C 와 이 페이즈 가운데 나중에 착지하는 쪽이 `REASON_LABELS` · `test_listed_codes_get_labels` 기대 표 · 계약 '결과 화면' 절 코드 표의 글자 충돌을 풀 때, 7C 의 울타리 오류 코드 · `comments_disabled` 행과 이 페이즈의 `invalid_item` · `page_mismatch` 행이 모두 남았는지 확인합니다
+- project: marketing-agent-demo
+- when: 2026-10-16 · plans/interview-marketing-agent.md#phase-7h
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-7h-report-stale-reason-labels
+- tag: plain
+- status: open
+
+### H-155 — 새 이름표 두 개("영상 정보를 읽을 수 없음" · "열린 화면이 다른 영상이라 저장만")의 문구가 화면에서 자연스러운지 판단합니다
+- project: marketing-agent-demo
+- when: 2026-10-16 · plans/interview-marketing-agent.md#phase-7h
+- from: ship-report.md § Human checks — .adw/verify-plan.md § Coverage decisions
+- source: adw/phase-7h-report-stale-reason-labels
+- tag: plain
+- status: open
+
+### H-156 — 진짜 주기 하나를 돌린 뒤 `data/report.html` 을 열어, 이유 배지가 그 영상의 지금 상태와 맞는지 둘러봅니다(탐색 점검 — 기계가 덮었다고 주장하지 않음)
+- project: marketing-agent-demo
+- when: 2026-10-16 · plans/interview-marketing-agent.md#phase-7h
+- from: ship-report.md § Human checks — .adw/verify-plan.md § Coverage decisions
+- source: adw/phase-7h-report-stale-reason-labels
+- tag: plain
+- status: open
+
+### H-157 — 할당량에 걸려 작성 단계에서 멈춘 다시 다룬 영상이 이유 배지 없이 '댓글 안 씀'만 보이는 것을 받아들일지(트래커 Trade-offs 줄로), 아니면 `QUOTA` 줄을 이유 출처로 더하는 일을 맡을 페이즈를 정할지 고릅니다
+- project: marketing-agent-demo
+- when: 2026-10-16 · plans/interview-marketing-agent.md#phase-7h
+- from: ship-report.md § Human checks — .adw/ship-report.md § Risks
+- source: adw/phase-7h-report-stale-reason-labels
+- tag: plain
+- status: open

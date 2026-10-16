@@ -28,7 +28,7 @@
 
 ### E-026 · reviewer — 헌법 9조 짝 테스트가 초록이어도 약속 문장은 그 테스트가 재는 것보다 넓을 수 있다 — 9조 첫 사례(Phase 1A)에서 빠진 짝은 0 이었지만 PARTIAL 이 7개였고, 짝이 초록인 계약 7절 "터미널에 가짜 줄이 그려지지 않습니다" 는 화면 폭 접힘까지 약속해 ship-check 가 사이클 안 줄이기가 아니라 사람 확인(R4)으로 올렸다
 - evidence: `.adw/ship-report.md:350-362` (Promise 정산 — MISSING 0 · PROVES L68 · L301 · L445 · PARTIAL 7, L445-446 짝은 입력 넷뿐이라 변이 l14 가 짝을 통과) · `:442-450` (R4) · `:477` (민감 확인 줄, confirmed 2026-10-14); 인터뷰가 `3a4a6e7` 로 문장을 짝이 재는 만큼으로 좁힘. E-009 부류의 9조 뒤 첫 목격 (cycle 20261014-035715-adw/phase-1a-parser-allow-rules)
-- first confirmed: 2026-10-14 · last confirmed: 2026-10-14
+- first confirmed: 2026-10-14 · last confirmed: 2026-10-16
 
 ### E-027 · gotcha — 가드의 youtu.be · shorts 거절 행이 한 검사(`;` 나누기 등)를 재려면 쿼리의 다른 이름이 모두 받는 이름(`si` · `t` · `feature`)이어야 한다 — 셋 밖 이름은 먼저 막혀 행이 다른 이유로 초록이 된다. Phase 1 의 S-003 잠금 행 `?x=1;y=2;v=B` 가 1A 뒤 그렇게 풀려, `guard.py:65` 의 `replace(";", "&")` 를 첫 구분자만 바꾸게 한 변이 g1 이 스위트 461개 초록으로 산다
 - evidence: `tests/test_guard.py:47` (S-003 행) · `src/agent/guard.py:23,65`; `.adw/ship-report.md:405` (가드 표 G1 의 `;` 행은 하나짜리 꼴만) · `:418-421` (R1) → S-056 이 받는 이름만 든 행으로 다시 잠금 (cycle 20261014-035715-adw/phase-1a-parser-allow-rules)
@@ -37,10 +37,6 @@
 ### E-028 · tooling — `tests/mutants.py` 의 변이는 소스에서 바꿀 글자가 **정확히 한 번** 나와야 돈다(아니면 종료 코드 2) — 가드 · 로그 · 설정의 한 줄을 고치는 페이즈는 그 줄을 겨눈 변이 문자열도 함께 고쳐야 하고, 같은 글자를 한 번 더 쓰는 줄을 더하기만 해도 기존 변이가 깨진다
 - evidence: `tests/mutants.py:9-10` 머리말("2 는 이름을 모르거나 바꿀 글자가 정확히 한 번 나오지 않았다는 뜻"); 1A 가 고친 가드 줄을 겨눈 `guard-youtu-be-ignores-query-v` · `guard-shorts-ignores-query-v` · `guard-query-ampersand-only`(`tests/mutants.py:139,145,151`); 등록부 82 → 90 (cycle 20261014-035715-adw/phase-1a-parser-allow-rules)
 - first confirmed: 2026-10-14 · last confirmed: 2026-10-15
-
-### E-029 · tooling — PyYAML 이 읽은 16진수(`0x…`) 정수는 파이썬의 4,300자리 문자열 변환 한도를 읽기에서 거치지 않는다(2의 거듭제곱 진법은 한도 밖) — 십진 `str()` · `format` 에 닿아서야 `ValueError` 가 나므로, 십진수 행만 있는 시험은 이 꼴을 재지 않는다. 정수 키는 1A 의 필수 상한(`src/agent/config.py:174`)이 막지만, 새 숫자 읽기는 같은 꼴을 다시 만날 수 있다
-- evidence: `python3 -I -c "import yaml; n=yaml.safe_load('k: 0x'+'F'*3700)['k']; str(n)"` → 14,800비트 int 로 읽힌 뒤 `ValueError: Exceeds the limit (4300 digits) for integer string conversion` (이 retro 실측); Phase 1 ship-report R4 · 트래커 Phase 1A 결정 2 (cycle 20261014-035715-adw/phase-1a-parser-allow-rules)
-- first confirmed: 2026-10-14 · last confirmed: 2026-10-14
 
 ### E-031 · codebase — 설정 읽기 `_construct_mapping` 은 중복 키 검사보다 먼저 `loader.flatten_mapping(node)` 를 부른다 — YAML 병합 키(`<<`)로 앵커를 겹겹이 이은 작은 파일이 항목을 기하급수로 복사해, "키가 두 번 나옵니다" 오류나 "이전 설정 유지"에 닿기 전에 메모리를 다 쓸 수 있다
 - evidence: `src/agent/config.py:84-85` (`def _construct_mapping` 첫 줄이 `loader.flatten_mapping(node)`, 중복 검사 `seen` 은 그 뒤 `:86-92`); ship-report R7 — 2,144바이트 파일 n=25 에서 2.97초 · 최대 RSS 1,081,456 KB 뒤 `키가 두 번 나옵니다`, n=30 은 약 32 GB 추정, base 와 HEAD 같음(n=22 0.36초 대 0.35초). 막으려면 설정 파일 형식(병합 키 · 별칭 금지) 결정이 필요해 주인 없음 (cycle 20261014-112313-adw/phase-1c-text-config-allow)
@@ -122,7 +118,12 @@
 - evidence: `src/agent/youtube.py:354` `except Exception as exc:` → `:355` `raise YouTubeError(call, self._redact(f"network {type(exc).__name__}: {exc}")) from None`. 삼켜지는 자리 — `tests/test_live_check.py:1951` `raise AssertionError(f"모르는 호출입니다: {endpoint}")` · `:2008-2009` 소켓 금지 가드 → `tests/live_check.py:1513` · `:1526` `except YouTubeError:`; `tests/test_watcher_network.py:31` `raise AssertionError(f"Google 밖의 주소입니다: {url}")` → `:66` · `:93` `assertTrue(fields["reason"].startswith("network "), …)` (ship-check 감사 3 메모 6 → 스모크 S-113, cycle 20261015-213331-adw/phase-7a-watcher-network-fixes)
 - first confirmed: 2026-10-16 · last confirmed: 2026-10-16
 
+### E-055 · hazard — Phase 7H 부터 결과 화면의 이유 배지는 그 영상의 저장소 시각 가운데 가장 늦은 것(판별 `classification.at` · 판별이 있을 때만 타이밍 `trigger.at` · 댓글 · 마지막 게시 시도, 초로 내림)보다 이르지 않은 `SKIP` · `ERROR` · 리허설 `POST` 줄에서만 나온다 — 그래서 영상을 다시 다루면서(새 표본 → `_time` 이 `trigger.at` 을 덮어씀) 아직 유효한 이유를 같은 주기에 그 꼴의 줄로 다시 적지 않는 길은 배지를 지운다. 오늘 아는 길은 `_write` 의 할당량 멈춤 하나(`QUOTA` 만 적고 돌아감)
+- evidence: `src/agent/report.py:119-138` `_store_floor`(:130 판별이 있을 때만 trigger · :138 `max(times).replace(microsecond=0)`) · `:141` `_is_reason_source` · `:153` `late_lines`; `src/agent/run.py:355` `_time` · `:399-408` `except QuotaExhausted`(`Event.QUOTA` 만 적고 `return record`); ship-check 메모리 실험 HEAD `c2 (QUOTA in write) reason: None | outcome: 댓글 안 씀` ↔ base `… reason: AI 호출 오류 (Claude)`(ship-report Risks 1); 7C 의 기억과의 맞물림은 `tests/test_run.py:1190` `test_reason_badge_survives_reprocessing_with_same_reason` 이 잠금 (cycle 20261016-075402-adw/phase-7h-report-stale-reason-labels)
+- first confirmed: 2026-10-16 · last confirmed: 2026-10-16
+
 ## Retired (history — one line each, never deleted)
+- E-029 · tooling — PyYAML 이 읽은 16진수(`0x…`) 정수는 파이썬의 4,300자리 문자열 변환 한도를 읽기에서 거치지 않는다(2의 거듭제곱 진법은 한도 밖) — 십진 `str()` · `format` 에 닿아서야 `ValueError` 가 나므로, 십진수 행만 있는 시험은 이 꼴을 재지 않는다. 정수 키는 1A 의 필수 상한(`src/agent/config.py:174`)이 막지만, 새 숫자 읽기는 같은 꼴을 다시 만날 수 있다 — retired 2026-10-16 (over cap; unconfirmed since 2026-10-14)
 - E-025 · codebase — `YouTubeError` 는 글자열 두 개(`call` · `reason`)만 든다(상태 코드 · 오류 이유 속성 없음) — 403 종류 구분은 글자열 같음 비교(`exc.reason == COMMENTS_DISABLED`)에 기대고, 200 모양 오류도 같은 예외라 받는 쪽이 오류 종류를 가르지 못한다 — retired 2026-10-16 (over cap; unconfirmed since 2026-10-14)
 - E-030 · tooling — 민감 확인 줄로 머지 앞에서 멈춘 사이클은 인터뷰가 트래커만 고치고 코드를 한 바이트도 바꾸지 않아도 허브가 verify-run 부터 다시 돌린다 — 같은 코드 트리에서 verify-run 과 ship-check 전체(감사 포함)가 한 번 더 돈다 — retired 2026-10-16 (7D · 8 에서 틀림: 확인 인터뷰가 `human_checks.py confirm` 뒤 cycle-control `retry step=smoke-file` 로 재개하면 verify-run · ship-check 를 다시 돌지 않음(7D `gate/20261016-010911-cycle-control.json` `"issued_by": "cyclechat"` · retro-bundle Steps ship-check `skipped` · verify-run 시도 1) — verify-run 부터 다시 도는 것은 허브 ↪ Move 길뿐; 두 길을 고친 사실로 E-053 에 다시 씀)
 - E-038 · tooling — 과제 안내 `docs/marketing-agent.pdf` 는 홈 체크아웃에 추적되지 않은 파일(`??`)로만 있어 레인 worktree 에는 없다 — 레인 안의 사이클(understand · plan · ship-check)은 과제 원문을 다시 읽지 못하고 트래커가 인용한 문장만 쓴다 — retired 2026-10-16 (근거 `??` 가 낡음: 이 페이즈 `be6895b` 가 `.gitignore:12` 에 `docs/marketing-agent.pdf` 를 더해 홈 체크아웃에서 무시 파일이 됨. 레인에 없다는 사실(레인 `ls docs/marketing-agent.pdf` → No such file, 2026-10-16)은 E-051 로 옮김)

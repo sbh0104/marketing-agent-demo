@@ -1179,6 +1179,18 @@ MUTANTS: dict[str, tuple[str, str, str, str]] = {
         "(floor is None or line[0] >= floor)",
         "True",
     ),
+    "report-floor-trigger-off": (
+        "agent.report",
+        "tests.test_report",
+        "times.append(record.trigger.at)",
+        "pass",
+    ),
+    "report-floor-hold-counts-trigger": (
+        "agent.report",
+        "tests.test_report",
+        "if record.classification is not None and record.trigger is not None:",
+        "if record.trigger is not None:",
+    ),
     "report-raw-reason": (
         "agent.report",
         "tests.test_report",
