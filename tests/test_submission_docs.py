@@ -650,6 +650,7 @@ class JudgeSampleTest(unittest.TestCase):
             "ALLOWED_VIDEOS 에는 지원자 영상이 있습니다",
             "커밋된 목록에는 지원자의 영상이 들어 있습니다",
             "  - 커밋된 명단: 지원자 영상",
+            "제출본의 allowlist 에는 지원자의 테스트 영상이 들어 있습니다",
         ):
             with self.subTest(sample=sample):
                 self.assertEqual(committed_list_claims(sample), [sample])
@@ -667,16 +668,37 @@ class JudgeSampleTest(unittest.TestCase):
                 self.assertEqual(committed_list_claims(sample), [])
 
     def test_recording_post_reach(self) -> None:
-        for word in RECORDING_WORDS:
-            for shape in POSTED_SHAPES:
+        """표본은 판정기 상수를 읽지 않고 여기 적은 글자로 만듭니다 — 상수가 줄면 빨강입니다."""
+        self.assertEqual(len(RECORDING_WORDS), 2)
+        self.assertEqual(len(POSTED_SHAPES), 15)
+        words = ("녹화", "시연")
+        shapes = (
+            "게시했",
+            "게시를했",
+            "게시됐",
+            "게시되었",
+            "게시하였",
+            "게시를하였",
+            "올라갔",
+            "올렸",
+            "달렸",
+            "달았",
+            "등록했",
+            "등록됐",
+            "등록되었",
+            "result=posted",
+            "mode=live",
+        )
+        for word in words:
+            for shape in shapes:
                 sample = f"{word}에서 {shape}"
                 with self.subTest(sample=sample):
                     self.assertEqual(recording_post_claims(sample), [sample])
-        for shape in POSTED_SHAPES:
+        for shape in shapes:
             sample = f"테스트 실행에서 {shape}"
             with self.subTest(sample=sample):
                 self.assertEqual(recording_post_claims(sample), [])
-        for word in RECORDING_WORDS:
+        for word in words:
             sample = f"{word}에는 실제 게시가 없습니다"
             with self.subTest(sample=sample):
                 self.assertEqual(recording_post_claims(sample), [])
