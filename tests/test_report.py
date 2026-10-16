@@ -18,7 +18,7 @@ import agent.run as run
 from agent.guard import decide_post
 from agent.logbook import REQUIRED_FIELDS, Event, format_line, parse_line
 from agent.models import CommentDraft, Judgement, PostAttempt, Verdict, VideoRecord, ViewSample
-from agent.poster import DRY_RUN, NO_COMMENT, WATCH_URL
+from agent.poster import DRY_RUN, NO_COMMENT, PAGE_MISMATCH, WATCH_URL
 from agent.report import (
     FAILED,
     LOG_UNREADABLE,
@@ -48,6 +48,7 @@ from agent.writer import NO_CONCERN, NO_SCENE
 T = datetime(2026, 10, 12, 12, 0, tzinfo=timezone.utc)
 S = timedelta(seconds=1)
 HOUR = timedelta(hours=1)
+MS = timedelta(milliseconds=1)
 A = "AAAAAAAAAAA"
 B = "BBBBBBBBBBB"
 C = "CCCCCCCCCCC"
@@ -156,9 +157,11 @@ class TestLabels(unittest.TestCase):
             "duplicate_video": "이미 처리한 영상",
             "not_in_allowlist": "허용 목록 밖이라 게시하지 않음",
             "invalid_video": "영상 주소를 읽을 수 없음",
+            "invalid_item": "영상 정보를 읽을 수 없음",
             "dry_run": "테스트 실행 — 저장만",
             "no_comment": "댓글 없음",
             "config_rejected": "설정 거절로 저장만",
+            "page_mismatch": "열린 화면이 다른 영상이라 저장만",
             "unavailable": "영상을 볼 수 없음",
         }
         self.assertEqual(REASON_LABELS, expected)
@@ -193,6 +196,7 @@ class TestLabels(unittest.TestCase):
         codes = (
             NO_COMMENT,
             DRY_RUN,
+            PAGE_MISMATCH,
             run.CONFIG_REJECTED,
             decide_post("not a url", (), True).reason,
             decide_post("abcdefghijk", (), True).reason,
@@ -235,6 +239,19 @@ class TestLabels(unittest.TestCase):
             "검사 두 번 통과 못함",
             "jev 검사 실패",
             "Claude 호출 실패: X",
+            "Invalid_item",
+            " invalid_item",
+            "invalid_item ",
+            "invalid-item",
+            "invaliditem",
+            "ｉnvalid_item",  # 전각 i (U+FF49)
+            "invalid_items",
+            "Page_mismatch",
+            " page_mismatch",
+            "page-mismatch",
+            "pagemismatch",
+            "ｐage_mismatch",  # 전각 p (U+FF50)
+            "page_error",  # poster 의 다른 원인 — 목록 밖
         )
         for reason in samples:
             with self.subTest(reason=reason):
@@ -248,6 +265,8 @@ class TestLabels(unittest.TestCase):
             ("재료에 장면 없음 — 1차: 답을 읽을 수 없습니다", "작성 건너뜀 — 짚을 장면 없음"),
             ("claude 호출 실패: RuntimeError: " + mark("server"), "AI 호출 오류 (Claude)"),
             ("재료에 장면 없음표", "작성 건너뜀 — 짚을 장면 없음"),
+            ("invalid_item", "영상 정보를 읽을 수 없음"),
+            ("page_mismatch", "열린 화면이 다른 영상이라 저장만"),
         )
         for reason, label in samples:
             with self.subTest(reason=reason):
@@ -279,6 +298,7 @@ class TestLabels(unittest.TestCase):
             "ｒun.post",  # 전각 r (U+FF52)
             mark("where"),
             "videos.list",  # 감시기 _fail 의 ERROR 에는 video= 가 없습니다
+            "search.list",  # 감시기 검색 오류의 ERROR 에도 video= 가 없습니다 — 목록 밖 (트래커 Phase 7H 결정 2)
         )
         for where in samples:
             with self.subTest(where=where):
@@ -370,6 +390,7 @@ class TestLateLines(unittest.TestCase):
             ("not_in_allowlist", "허용 목록 밖이라 게시하지 않음"),
             ("config_rejected", "설정 거절로 저장만"),
             ("dry_run", "테스트 실행 — 저장만"),
+            ("page_mismatch", "열린 화면이 다른 영상이라 저장만"),
         )
         for reason, label in cases:
             with self.subTest(reason=reason):
@@ -397,6 +418,121 @@ class TestLateLines(unittest.TestCase):
         )
         self.assertEqual(badges(posted, None)[2], "로그를 읽지 못함")
         self.assertEqual(badges(posted, None), (POSTED, T + HOUR, LOG_UNREADABLE))
+
+
+class TestJudgedFloor(unittest.TestCase):
+    """판별 · 타이밍 시각도 늦은 줄의 기준 — 판별 보류 영상만 타이밍 시각을 세지 않습니다 (트래커 Phase 7H 결정 1)."""
+
+    def test_classify_error_then_judged_no_has_no_reason(self) -> None:
+        held = line(T, Event.ERROR, where="classify", reason="API 오류: 503", video=A)
+        first = record(A, trigger=Judgement(Verdict.HOLD, "too_few_samples", T + 5 * MS))
+        self.assertEqual(badges(first, [held]), (NO_DRAFT, None, "판별 단계 오류"))
+        second = record(
+            A,
+            classification=Judgement(Verdict.NO, "연애 고민 아님", T + HOUR),
+            trigger=Judgement(Verdict.HOLD, "too_few_samples", T + HOUR + 5 * MS),
+        )
+        self.assertEqual(late_lines(second, [held]), [])
+        self.assertEqual(badges(second, [held]), (NO_DRAFT, None, None))
+
+    def test_claude_failure_then_timing_no_has_no_reason(self) -> None:
+        failed = [
+            line(
+                T + S,
+                Event.SKIP,
+                video=A,
+                reason="claude 호출 실패: RuntimeError: " + mark("server"),
+            ),
+            line(T + S, Event.ERROR, where="writer.claude", reason=mark("e"), video=A),
+        ]
+        timed_yes = record(
+            A, classification=JUDGED, trigger=Judgement(Verdict.YES, "규칙 통과", T)
+        )
+        self.assertEqual(badges(timed_yes, failed), (NO_DRAFT, None, "AI 호출 오류 (Claude)"))
+        timed_no = record(
+            A, classification=JUDGED, trigger=Judgement(Verdict.NO, "규칙 미달", T + HOUR)
+        )
+        self.assertEqual(late_lines(timed_no, failed), [])
+        self.assertEqual(badges(timed_no, failed), (NO_DRAFT, None, None))
+
+    def test_unavailable_shown_until_seen_again(self) -> None:
+        gone = line(T + HOUR, Event.SKIP, video=A, reason="unavailable", call="videos.list")
+        waiting = record(
+            A, classification=JUDGED, trigger=Judgement(Verdict.NO, "규칙 미달", T)
+        )
+        self.assertEqual(badges(waiting, [gone]), (NO_DRAFT, None, "영상을 볼 수 없음"))
+        again = record(
+            A, classification=JUDGED, trigger=Judgement(Verdict.NO, "규칙 미달", T + 2 * HOUR)
+        )
+        self.assertEqual(late_lines(again, [gone]), [])
+        self.assertEqual(badges(again, [gone]), (NO_DRAFT, None, None))
+
+    def test_hold_keeps_classify_error_when_timing_ticks_second(self) -> None:
+        error = line(
+            T + 10 * S + 999 * MS, Event.ERROR, where="classify", reason="API 오류: 503", video=A
+        )
+        self.assertEqual(error[0], T + 10 * S)  # 로그 시각은 초 단위
+        held = record(A, trigger=Judgement(Verdict.HOLD, "too_few_samples", T + 11 * S + 4 * MS))
+        self.assertEqual(late_lines(held, [error]), [error])
+        self.assertEqual(badges(held, [error]), (NO_DRAFT, None, "판별 단계 오류"))
+
+    def test_classification_time_counts_alone(self) -> None:
+        judged = record(
+            A, classification=Judgement(Verdict.YES, "연애 고민 상담", T + 10 * S + 400 * MS)
+        )
+        early = line(T + 9 * S, Event.SKIP, video=A, reason="daily_cap")
+        same = line(T + 10 * S + 600 * MS, Event.SKIP, video=A, reason="channel_cooldown")
+        self.assertEqual(late_lines(judged, [early, same]), [same])
+        self.assertEqual(badges(judged, [early]), (NO_DRAFT, None, None))
+        self.assertEqual(badges(judged, [early, same]), (NO_DRAFT, None, "같은 채널 대기 중"))
+
+    def test_rehearsal_before_new_timing_is_not_the_outcome(self) -> None:
+        again = record(
+            A,
+            classification=JUDGED,
+            trigger=Judgement(Verdict.YES, "allowlisted", T + HOUR),
+            comment=drafted(T),
+        )
+        old = rehearsal(T + S)
+        self.assertEqual(badges(again, [old]), (NO_POST, None, None))
+        fresh = rehearsal(T + HOUR)
+        self.assertEqual(badges(again, [old, fresh]), (REHEARSED, T + HOUR, None))
+
+    def test_rerecorded_reason_after_new_timing_keeps_badge(self) -> None:
+        """다시 다룬 주기에 다시 적힌 이유는 남습니다 — Phase 7C 가 기억한 건너뜀을 SKIP 으로 다시 남기는 자리."""
+        again = record(
+            A,
+            classification=JUDGED,
+            trigger=Judgement(Verdict.YES, "규칙 통과", T + HOUR + 400 * MS),
+        )
+        dropped = "검사 두 번 탈락 — 1차: 글자 수 30자 — 40–120자여야 합니다 / 2차: …"
+        first = line(T + S, Event.SKIP, video=A, reason=dropped)
+        self.assertEqual(badges(again, [first]), (NO_DRAFT, None, None))
+        rerecorded = line(T + HOUR + 600 * MS, Event.SKIP, video=A, reason=dropped)
+        self.assertEqual(late_lines(again, [first, rerecorded]), [rerecorded])
+        self.assertEqual(
+            badges(again, [first, rerecorded]), (NO_DRAFT, None, "검사 두 번 탈락")
+        )
+
+    def test_invalid_item_shown_until_sampled_again(self) -> None:
+        # 저장된 영상의 videos.list 응답을 읽지 못한 감시기 줄 — 그 영상의 ID 를 답니다
+        broken = line(
+            T + HOUR,
+            Event.SKIP,
+            video=A,
+            reason="invalid_item",
+            call="videos.list",
+            detail=mark("detail"),
+        )
+        waiting = record(
+            A, classification=JUDGED, trigger=Judgement(Verdict.NO, "규칙 미달", T)
+        )
+        self.assertEqual(badges(waiting, [broken]), (NO_DRAFT, None, "영상 정보를 읽을 수 없음"))
+        again = record(
+            A, classification=JUDGED, trigger=Judgement(Verdict.NO, "규칙 미달", T + 2 * HOUR)
+        )
+        self.assertEqual(late_lines(again, [broken]), [])
+        self.assertEqual(badges(again, [broken]), (NO_DRAFT, None, None))
 
 
 class TestRender(unittest.TestCase):
@@ -543,6 +679,38 @@ class TestRender(unittest.TestCase):
         self.assertEqual(cells(shown)[5], "첫 줄<br>둘째 줄<br>셋째 줄")
         self.assertNotIn("\u2028", page)
         self.assertEqual(page.splitlines(), lines[:-1])
+
+    def test_new_labels_reach_their_cells(self) -> None:
+        saved = record(
+            A,
+            classification=JUDGED,
+            comment=drafted(T),
+            attempts=[attempt(T + 5 * S, "test", "saved", "page_mismatch")],
+        )
+        skipped = record(B, classification=JUDGED)
+        events = [
+            # 저장된 영상의 videos.list 응답을 읽지 못한 감시기 줄 — 그 영상의 ID 를 답니다
+            line(
+                T + 6 * S,
+                Event.SKIP,
+                video=B,
+                reason="invalid_item",
+                call="videos.list",
+                detail=mark("detail"),
+            )
+        ]
+        page = render_report([saved, skipped], events, generated_at=T)
+        self.assertEqual(
+            cells(row(page, A))[6],
+            '<span class="badge">열린 화면이 다른 영상이라 저장만</span>'
+            "<br><small>2026-10-12T21:00:05+09:00</small>",
+        )
+        self.assertEqual(
+            cells(row(page, B))[6],
+            '<span class="badge">댓글 안 씀</span>'
+            '<br><span class="badge reason">영상 정보를 읽을 수 없음</span>',
+        )
+        self.assertNotIn("MRK", page)
 
 
 MARKED_IDS = ("MRKvideo001", "MRKvideo002", "MRKvideo003")

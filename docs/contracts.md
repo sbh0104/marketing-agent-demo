@@ -1631,8 +1631,10 @@ PYTHONPATH=src python3 -m agent.run [--dry-run] [--once]
 - **판단한 쪽.** 그 영상의 마지막 `CLASSIFY` 줄의 `judge=`, 그 줄에 없으면 그 줄 앞 마지막 `START` 줄의 `judge=` 입니다.
   둘 다 없거나(Phase 7B 전의 줄) 저장된 판별이 없는 영상(오류 보류)이면 빈칸입니다.
 - **늦은 로그 줄.** 그 영상(`video=`)의 `SKIP` · `ERROR` · `POST … mode=test result=rehearsed` 줄 가운데 저장소의 마지막 결과
-  (댓글 시각과 마지막 시도 시각 중 늦은 쪽)와 같은 초이거나 그보다 늦은 줄입니다 — 로그 시각이 초 단위라 같은 초는 늦은 쪽으로 셉니다.
-  댓글도 시도도 없으면 그 영상의 그런 줄 모두입니다. 그보다 이른 줄은 이유로 쓰지 않습니다.
+  (판별 시각 · 타이밍 시각 · 댓글 시각 · 마지막 시도 시각 가운데 가장 늦은 것)와 같은 초이거나 그보다 늦은 줄입니다 — 로그 시각이 초 단위라 같은 초는 늦은 쪽으로 셉니다.
+  타이밍은 새 표본마다 다시 판정해 그 시각이 그 영상을 마지막으로 다룬 때이므로, 그 뒤 다시 적히지 않은 지난 주기의 이유 · 리허설은 쓰지 않습니다.
+  판별 칸이 빈 영상(판별 보류)은 타이밍 시각을 세지 않습니다 — 보류 때도 같은 주기에 타이밍이 판정되어 그 시각이 판별 오류 줄보다 늦기 때문입니다.
+  세는 시각이 하나도 없으면 그 영상의 그런 줄 모두입니다. 그보다 이른 줄은 이유로 쓰지 않습니다.
 - **결과 배지.** 늦은 로그 줄 가운데 파일에서 마지막 줄이 리허설 `POST` 이면 "리허설 — 게시 버튼 앞에서 멈춤" 입니다.
   아니면 저장소의 마지막 시도로 정합니다 — `live/posted` "게시됨" · `live/reserved` "게시 결과 모름 — 로그 참고" ·
   `live/failed` "게시 실패 — 로그 참고" · `test/saved` 는 그 시도 `reason` 의 이름표(아래 표)입니다.
@@ -1652,9 +1654,11 @@ PYTHONPATH=src python3 -m agent.run [--dry-run] [--once]
   | `duplicate_video` | 이미 처리한 영상 |
   | `not_in_allowlist` | 허용 목록 밖이라 게시하지 않음 |
   | `invalid_video` | 영상 주소를 읽을 수 없음 |
+  | `invalid_item` | 영상 정보를 읽을 수 없음 |
   | `dry_run` | 테스트 실행 — 저장만 |
   | `no_comment` | 댓글 없음 |
   | `config_rejected` | 설정 거절로 저장만 |
+  | `page_mismatch` | 열린 화면이 다른 영상이라 저장만 |
   | `unavailable` | 영상을 볼 수 없음 |
   | `재료에 장면 없음`으로 시작 | 작성 건너뜀 — 짚을 장면 없음 |
   | `재료에 연애 고민 없음`으로 시작 | 작성 건너뜀 — 연애 고민 없음 |
@@ -1679,8 +1683,8 @@ PYTHONPATH=src python3 -m agent.run [--dry-run] [--once]
 - **실패.** 로그를 읽지 못하면(`OSError` · `ValueError`) `ERROR where=report reason=<예외 종류>: <메시지>` 한 줄을 쓰고, 이유 배지를 모두
   "로그를 읽지 못함" 으로, 리허설 · 판단한 쪽을 비운 채 저장소 칸으로 화면을 씁니다. 화면을 만들거나 쓰다 난 그 밖의 `Exception` 도
   `ERROR where=report` 한 줄로 남기고 사이클은 그대로 끝납니다. `KeyboardInterrupt` 같은 `BaseException` 은 그대로 올라갑니다.
-- **음성 대조.** `python3 -m tests.mutants <이름>` — `report-late-filter-off` · `report-raw-reason` · `report-unescaped` ·
-  `report-prefix-anywhere` · `run-report-fence-narrow` · `run-report-log-degrade-silent`.
+- **음성 대조.** `python3 -m tests.mutants <이름>` — `report-late-filter-off` · `report-floor-trigger-off` · `report-floor-hold-counts-trigger` ·
+  `report-raw-reason` · `report-unescaped` · `report-prefix-anywhere` · `run-report-fence-narrow` · `run-report-log-degrade-silent`.
 
 ## 공개용 사본 — `tests/public_copy.py` (Phase 8)
 
