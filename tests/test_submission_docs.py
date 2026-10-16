@@ -346,6 +346,14 @@ class SampleLogBrokenCopyTest(unittest.TestCase):
         failures = self.failures_of("noblock.log", b"\n".join(kept))
         self.assertEqual(failures, ["sha256", "lines", "blocked"])
 
+    def test_blocked_line_dry_run_copy_is_refused(self) -> None:
+        blocked = BLOCKED_POST.encode("utf-8")
+        changed = BLOCKED_POST.replace("reason=not_in_allowlist", "reason=dry_run")
+        failures = self.failures_of(
+            "dryrun.log", self.data.replace(blocked, changed.encode("utf-8"))
+        )
+        self.assertEqual(failures, ["sha256", "blocked"])
+
     def test_cut_last_line_copy_is_refused(self) -> None:
         failures = self.failures_of("cut.log", self.data[:-1])
         self.assertEqual(len(failures), 2, failures)
@@ -413,7 +421,9 @@ class LiveRunDocsTest(unittest.TestCase):
         self.assertIn(DEMO_URL, self.readme)
         self.assertIn(DEMO_URL, read(TRACKER))
         self.assertNotIn("준비 중", self.readme)
-        self.assertIn("실제 게시는 없습니다", self.readme)
+        demo = [line for line in self.readme.splitlines() if line.startswith("- 시연 영상:")]
+        self.assertEqual(len(demo), 1, demo)
+        self.assertIn("실제 게시는 없습니다", demo[0])
 
     def test_readme_points_at_sample_log(self) -> None:
         self.assertIn("실제 실행의 기록은 `logs/sample.log` 입니다", self.readme)
@@ -623,7 +633,7 @@ class LiveRunDocsTest(unittest.TestCase):
         self.assertEqual(first.utcoffset(), timedelta(hours=9))
         allowed = int(next(fields for _, event, fields in r2 if event == "START")["allowed"])
         videos_line = f"남의 채널 {KOREAN_COUNTERS[allowed]}의 인기 영상"
-        self.assertIn(videos_line, self.readme)
+        self.assertEqual(self.readme.count(videos_line), 2)
         for text in (
             f"**건너뜀 {len(skips)}의 이유.**",
             f"댓글 {KOREAN_COUNTERS[len(comments)]} 줄(`COMMENT`)",
