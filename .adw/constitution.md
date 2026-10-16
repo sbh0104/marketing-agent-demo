@@ -161,6 +161,10 @@
      `real process` · `real network` · `real Chrome` · `this diff` · `harness tool`.
      A row that drives the project's code through fakes, or reads a tracked file the
      suite can read, is a port; article 9's `Promise: L<n> — V<m>` row included.
+     A row that only runs mutants registered in `tests/mutants.py`
+     (`python3 -m tests.mutants <name>`) ends `— kept: tests/mutants.py (<names>)`
+     instead: the registry is tracked, so the check already outlives the cycle
+     (article 14); a row that measures anything else as well cannot use it.
      verify-run does not read this file, so `## Checks` opens with this paragraph,
      verbatim:
      `Port rule (constitution 13): after a "green: port to" row is green, write its
@@ -170,13 +174,73 @@
      "not ported: V<n> — <why>" under the report's checks; the verdict follows the
      probe. After the last port, run V1 again on the final tree and record it.`
    - **verify-run** — follows the port rule as `## Checks` states it.
-   - **ship-check** — count: every row but V1 has one tail with a listed reason; a
-     missing tail or an unlisted reason is a `## Test integrity` finding. Every port
-     row has its test in the diff or a `not ported:` line in verify-report; each
+   - **ship-check** — count: every row but V1 has one tail with a listed reason, or a
+     `kept:` tail whose names are all in the committed `tests/mutants.py`; a missing
+     tail, an unlisted reason or an unregistered name is a `## Test integrity`
+     finding. Every port row has its test in the diff or a `not ported:` line in
+     verify-report; each
      `not ported:` line becomes one `### S-NEW-<n>` smoke item under the usual
      deferral conditions. The mutation spot-check aims one mutant at what each ported
      test claims to hold; a ported test that stays green under it is a
      `## Test integrity` finding.
+14. **A guard's boundary is moved one step each way, and both moves turn the suite
+    red.** Until the upstream harness carries this rule (ADWS backlog line
+    `marketing-agent-demo E-041 이관`), it lives here. Plans registered one mutant per
+    comparison, so the other side shipped unmeasured and came back as a smoke item:
+    6C `2 * grade_errors > graded` (`>=` caught, `> graded + 1` green) · 6C
+    `self.popular < …popular_drafts_min` (`<=` green) · 6D `raised > 1` (`>= 1.5`
+    caught, `>= 1` green) · 6E `range(found, found + len(word))` (both ends green) —
+    S-077 · S-087 · S-088.
+    A **boundary** is a size comparison (`<` · `<=` · `>` · `>=`) or a range or slice
+    end (`range(a, b)` · `x[a:b]`) on a line the diff adds or changes, inside a judge
+    the `Guard reach` row of `.claude/skills/verify-plan/references/test-taxonomy.md`
+    applies to — cite its applies-clause, never restate it; judges inside `tests/`
+    count. Comparisons outside such a judge are out of scope (ship-check's spot-check
+    still samples them). Phase cycles and smoke sweeps alike.
+    Each boundary gets two mutants: the **flip** (`>`↔`>=`, `<`↔`<=`) and the
+    **shift**, the compared value moved one unit `u` the other way (`x >= k` →
+    `x > k` · `x >= k - u`; `x > k` → `x >= k` · `x > k + u`); a range or slice end
+    gets one move inward and one outward by 1. `u` is the smallest step the value
+    takes — 1 for counts and positions, 0.01 for probabilities and scores, the
+    config's own unit for durations — and is written beside the boundary. A float
+    shift is run once against its sample before it counts (`1 − 0.9` is
+    `0.0999…98`, `src/agent/writer.py:145`).
+    A mutant that cannot serve is skipped with one of two reasons, never another:
+    `no mutant: hangs — <the loop>` (the move makes a loop never end:
+    `while found >= 0` → `>= -1`) ·
+    `no mutant: same result — <why no input reaches the moved side>`.
+    The boundary's other mutant is still registered.
+   - **plan** — `## Test plan` carries one line per boundary:
+     `Boundary: <file>::<judge> "<comparison>" (u <unit>) → <flip name> · <shift name>`,
+     a skipped mutant written as its `no mutant:` reason in place of its name; the
+     guard matrix's mutation row names the same mutants. The step that writes the
+     judge says: "both boundary mutants are registered in tests/mutants.py and caught
+     by a sample at the boundary and one unit past it, in this step".
+   - **implement** — register both mutants and write their samples as suite tests in
+     the judge's step. A boundary mutant that stays green is a missing sample in that
+     step: add the test, never change code to kill it. A sample that shows the code
+     contradicting a tracker decision is a code miss, except in a sensitive area,
+     where the step stops as it does today.
+   - **verify-plan** — match the diff's boundaries against the plan's `Boundary:`
+     lines. Each boundary with neither two registered mutants nor a listed reason
+     gets one `## Checks` row naming its two mutants (anchor → replacement), ending
+     `— kept: tests/mutants.py (<names>)` (article 13). verify-run does not read this
+     file, so when such a row exists `## Checks` opens with this paragraph, verbatim:
+     `Boundary rule (constitution 14): for a row that names boundary mutants, register
+     each in tests/mutants.py and run it. A mutant that stays green gets a suite test
+     at the boundary and one unit past it; commit the registry entry and the test
+     alone (test files only). This is not a fix and spends no cap. Still green after
+     one more test-only try → revert that commit and write "not locked: <mutant> —
+     <why>" under the report's checks. After the last such commit, run V1 again on the
+     final tree and record it.`
+   - **verify-run** — follows the boundary rule as `## Checks` states it.
+   - **ship-check** — count: every boundary in the diff has two mutants in the
+     committed `tests/mutants.py`, or one and a listed `no mutant:` reason; a missing
+     mutant or an unlisted reason is a `## Test integrity` finding. Each
+     `not locked:` line becomes one `### S-NEW-<n>` smoke item under the usual
+     deferral conditions. When the diff has a `same result` reason, the mutation
+     spot-check plants one such mutant; one that turns a test red or changes an
+     output is a `## Test integrity` finding.
 
 ## Never
 
