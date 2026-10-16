@@ -38,6 +38,7 @@ SUITE_COMMAND = (
 )
 
 DEMO_URL = "https://www.youtube.com/watch?v=vwogTb6XHGk"
+LIVE_RUN_HEADING = "## 실제 실행 (`logs/sample.log`)"
 COMMIT_X = "7dd5450"
 SAMPLE_SHA256 = "2c99255324a9f537728f25e00e3684765cd1191220c643933e92ae0031bb88e7"
 SAMPLE_LINES = 1738
@@ -567,6 +568,31 @@ class LiveRunDocsTest(unittest.TestCase):
     def test_docs_have_no_contact_shapes(self) -> None:
         self.assertEqual(count_contacts(self.readme), 0)
         self.assertEqual(count_contacts(self.process), 0)
+
+    def test_live_run_section_sits_between_failures_and_time(self) -> None:
+        heads = [line for line in self.process.splitlines() if line.startswith("## ")]
+        self.assertEqual(heads.count(LIVE_RUN_HEADING), 1, heads)
+        k = heads.index(LIVE_RUN_HEADING)
+        self.assertEqual(heads[k - 1:k + 2], ["## 실패와 개선", LIVE_RUN_HEADING, "## 총 소요 시간"])
+
+    def test_process_table_is_one_block_in_the_live_run_section(self) -> None:
+        lines = self.process.splitlines()
+        rows = table_rows(sample_rows())
+        self.assertEqual(lines.count(rows[0]), 1)
+        at = lines.index(rows[0])
+        owner = [line for line in lines[:at] if line.startswith("## ")][-1]
+        self.assertEqual(owner, LIVE_RUN_HEADING)
+        self.assertEqual(
+            lines[at - 1:at + len(rows) + 2], ["", rows[0], "|---|---|---|", *rows[1:], ""]
+        )
+
+    def test_demo_link_line_is_above_the_first_heading(self) -> None:
+        lines = self.readme.splitlines()
+        demo = [i for i, line in enumerate(lines) if line.startswith("- 시연 영상:")]
+        self.assertEqual(len(demo), 1, demo)
+        self.assertIn(DEMO_URL, lines[demo[0]])
+        first = next(i for i, line in enumerate(lines) if line.startswith("## "))
+        self.assertLess(demo[0], first)
 
 
 class JudgeSampleTest(unittest.TestCase):
