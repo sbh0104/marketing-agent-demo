@@ -1943,6 +1943,139 @@ class TestMemory(RunCase):
         self.assertEqual([fields["errors"] for fields in self.lines(Event.CYCLE)], ["1"])
         self.assertEqual(self.posted_live(), [B])
 
+    def jev_stops(self) -> tuple[tuple[str, object, str], ...]:
+        """jev 정지 둘 — (이름, 사이클마다 준비, 기억의 머리말). 부른 뒤의 setUp 마다 서비스를 다시 감쌉니다.
+
+        자체 검사 질문(MATCH_ID 가 없는 질문)만 오류를 내고, 판별 질문은 self.jev 가 그대로 답합니다.
+        """
+        down = {"on": False}
+
+        def ask(model: str, state: str, questions: Mapping[str, object]) -> object:
+            if down["on"] and MATCH_ID not in questions:
+                raise RuntimeError("jev 가 답하지 않습니다")
+            return self.jev(model, state, questions)
+
+        def jev_error(on: bool) -> None:
+            self.services = dataclasses.replace(self.services, ask=ask)
+            down["on"] = on
+
+        def jev_invalid(on: bool) -> None:
+            self.jev.reads_like_ad = 1.5 if on else 0.1  # 0–1 밖의 답
+
+        return (
+            ("jev_error", jev_error, "jev 검사 호출 실패"),
+            ("jev_invalid", jev_invalid, "jev 검사 응답 이상"),
+        )
+
+    def test_out_of_list_no_concern_rewrites_only_when_top_comments_grow(self) -> None:
+        # 트래커 7C 질문 5 A ② — 재료에 연애 고민 없음도 스스로 건너뜀(THIN_HEADS)이라, 명단 밖 영상은
+        # 인기 댓글 수가 그대로면 Claude 를 부르지 않고 다시 SKIP, 늘었으면 다시 씁니다
+        head = "재료에 연애 고민 없음"
+        self.claude.answers[C] = [{"has_love_concern": False, "has_scene": True}]
+        self.api.comments[C] = ["하나"]
+        self.show(C, 2000, channel="UC3")
+        self.find(C)
+        pipeline = self.pipeline()
+        self.cycle(pipeline)
+        self.assertEqual(
+            [fields for _, fields in self.skips(1, C)], [{"video": C, "reason": head}]
+        )
+        memory = self.record(C).memory
+        self.assertEqual(
+            (memory.reason, memory.stage, memory.tries, memory.top_comments),
+            (head, "run.write", 1, 1),
+        )
+        self.bump(C, 2400)
+        claude_before = len(self.claude.user_messages(C))
+        threads_before = self.thread_calls(C)
+        self.cycle(pipeline)
+        self.assertEqual(len(self.claude.user_messages(C)), claude_before)
+        self.assertEqual(self.thread_calls(C) - threads_before, 1)
+        ((timed_at, timed),) = self.triggers(2, C)
+        self.assertEqual(timed["verdict"], "yes")
+        ((skipped_at, fields),) = self.skips(2, C)
+        self.assertEqual(fields, {"video": C, "reason": head, "memory": "run.write"})
+        self.assertGreater(skipped_at, timed_at)
+        self.bump(C, 2800)
+        self.api.comments[C] = ["하나", "둘"]
+        self.cycle(pipeline)
+        self.assertEqual(len(self.claude.user_messages(C)), claude_before + 1)
+        self.assertEqual(self.skips(3, C), [])
+        self.assertIsNotNone(self.record(C).comment)
+        self.assertIsNone(self.record(C).memory)
+
+    def test_out_of_list_jev_stops_are_not_redone(self) -> None:
+        # 트래커 7C 질문 5 A — jev 자체 검사가 오류를 냈거나 이상한 답을 낸 명단 밖 영상은 다음 새 기록에서
+        # Claude · jev · commentThreads 를 부르지 않고, 머리말만 든 SKIP 하나만 다시 남깁니다
+        for label, prepare, head in self.jev_stops():
+            with self.subTest(label):
+                self.setUp()
+                prepare(True)
+                self.show(C, 2000, channel="UC3")
+                self.find(C)
+                pipeline = self.pipeline()
+                self.cycle(pipeline)
+                memory = self.record(C).memory
+                self.assertEqual((memory.reason, memory.stage), (head, "run.write"))
+                prepare(False)
+                self.bump(C, 2400)
+                claude_before = len(self.claude.calls)
+                jev_before = len(self.jev.calls)
+                threads_before = self.thread_calls(C)
+                self.cycle(pipeline)
+                self.assertEqual(len(self.claude.calls), claude_before)
+                self.assertEqual(len(self.jev.calls), jev_before)
+                self.assertEqual(self.thread_calls(C), threads_before)
+                seen = [
+                    (event, fields)
+                    for event, fields in self.cycle_events(2)
+                    if fields.get("video") == C
+                ]
+                self.assertEqual(
+                    [event for event, _ in seen], [Event.VIEWS, Event.TRIGGER, Event.SKIP]
+                )
+                self.assertEqual(seen[-1][1], {"video": C, "reason": head, "memory": "run.write"})
+
+    def test_listed_video_rewrites_after_jev_stops(self) -> None:
+        # 트래커 7C 질문 1 A · 3 A ① — 명단 영상은 jev 정지 둘 뒤에도 기억을 읽지 않고 다음 새 기록에서 다시 씁니다
+        for label, prepare, head in self.jev_stops():
+            with self.subTest(label):
+                self.setUp()
+                prepare(True)
+                self.show(A, 2000)
+                pipeline = self.pipeline()
+                self.cycle(pipeline)
+                memory = self.record(A).memory
+                self.assertEqual((memory.reason, memory.stage), (head, "run.write"))
+                prepare(False)
+                with mock.patch.object(run, "write_comment", wraps=run.write_comment) as spy:
+                    self.cycle(pipeline)
+                self.assertEqual([call.args[0].video_id for call in spy.call_args_list], [A])
+                self.assertIsNotNone(self.record(A).comment)
+                self.assertIsNone(self.record(A).memory)
+                self.assertEqual(self.skips(2, A), [])
+
+    def test_reason_badge_survives_reprocessing_of_remembered_out_of_list_video(self) -> None:
+        """기억한 명단 밖 영상을 새 표본으로 다시 다뤄도 그 주기에 다시 남긴 머리말로 이유 배지를 지킵니다
+        (트래커 Phase 7H · 7C 맞물림)."""
+        self.claude.error = RuntimeError("Claude 가 답하지 않습니다")
+        self.show(C, 2000, channel="UC3")
+        self.find(C)
+        pipeline = self.pipeline()
+        self.cycle(pipeline)
+        badge = '<span class="badge reason">AI 호출 오류 (Claude)</span>'
+        self.assertIn(badge, self.row(C))
+        first_cycle_end = read_log(self.log_path)[-1][0]
+        self.bump(C, 2400)
+        self.cycle(pipeline)
+        self.assertEqual(
+            [fields for _, fields in self.skips(2, C)],
+            [{"video": C, "reason": "claude 호출 실패", "memory": "run.write"}],
+        )
+        # 둘째 주기가 첫 주기의 모든 줄보다 늦게 다시 판정했으니, 배지는 둘째 주기에 다시 남긴 줄에서 옵니다
+        self.assertGreater(self.record(C).trigger.at, first_cycle_end)
+        self.assertIn(badge, self.row(C))
+
 
 class TestConfigRejected(RunCase):
     """run_loop 를 그대로 돌립니다 — 좋은 설정을 읽은 뒤 run_loop 전에 고장 난 파일을 써서

@@ -967,8 +967,18 @@ if result.draft is not None:
     store.put(record)
 ```
 
+초안이 없는 갈래는 이 모양에 없습니다 — 작성기가 건너뛰면 `record.memory` 에
+`Memory(result.head, "run.write", now, <작성기를 부른 횟수 + 1>, <넘긴 비어 있지 않은 인기 댓글 수>)`
+를 적어 저장하고(초안이 나오면 기억을 지움), 인기 댓글을 못 받았거나 · 댓글이 막혔거나
+(`SKIP reason=comments_disabled` 와 그 기억) · 명단 밖 영상의 기억이 작성을 멈췄으면(스스로 건너뜀은
+인기 댓글이 늘지 않았을 때만 — `SKIP reason=<기억의 머리말> memory=run.write`) 작성기를 부르지
+않습니다('실행 진입점' 절의 '작성' · '기억').
+
 - `WriteResult(draft, skip_reason)` 는 둘 중 정확히 하나를 담습니다(둘 다 있거나 둘 다 없으면
-  `ValueError`). `write_comment` 는 `COMMENT` · `SKIP` · `ERROR` 줄을 직접 남기고 저장소는
+  `ValueError`). 세 번째 칸 `head`(기본값 `None`)는 건너뛴 이유의 머리말 상수(`NO_SCENE` ·
+  `NO_CONCERN` · `CHECK_FAILED` · `CLAUDE_FAILED` · `JEV_FAILED` · `JEV_INVALID`)이고 비교에서
+  빠집니다(`compare=False`) — 실행 흐름의 기억 칸과 기억 때문에 다시 남기는 `SKIP` 이 이 값을
+  읽습니다. `write_comment` 는 `COMMENT` · `SKIP` · `ERROR` 줄을 직접 남기고 저장소는
   건드리지 않습니다 — 초안을 `record.comment` 에 넣고 `store.put` 하는 것은 Phase 7 의
   몫입니다.
 - **주제 판별 문** — `record.classification` 이 없거나 `verdict` 가 `yes` 가 아니면
@@ -997,7 +1007,8 @@ if result.draft is not None:
   위험이라 이 저장소의 방법이 아닙니다. 그래서 `transcript` 는 늘 `""` 이고, 인기 댓글은 탐지 절의
   `YouTubeClient.top_comments(video_id, now, limits, TOP_COMMENTS_MAX)` 가 가져옵니다. 실행 흐름은
   댓글이 막힌 영상(`None`)을 짓지 않고 `SKIP reason=comments_disabled` 로 건너뜁니다('실행 진입점'
-  절). 실행기(`tests/live_check.py`)는 `top_comments=()` 로 제목 · 설명만 씁니다.
+  절). 실행기(`tests/live_check.py`)는 같은 `top_comments` 에서 비어 있지 않은 글만 거른 목록을
+  `top_comments=` 로 넘깁니다 — 댓글이 막힌 영상이면 `[]` 이고, 목록이 비면 제목 · 설명만 씁니다.
 
 **흐름** — 시도마다(최대 두 번):
 
