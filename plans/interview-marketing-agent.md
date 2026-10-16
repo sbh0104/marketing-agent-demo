@@ -1142,7 +1142,7 @@ Open questions
 ---
 
 ## Phase 8A — 실제 실행 반영 (sample.log · 시연 링크 · 실제 숫자)
-- Status: In progress
+- Status: Done
 - Slug: submission-live-run
 - After: Phase 8, Phase 7C, Phase 7H
 - Goal: 사람이 시연을 녹화하며 돌린 실제 실행의 로그를 `logs/sample.log` 로 두고, 그 기록이 과제 체크리스트(허용 목록 밖 게시 없음 · 실제 게시 · 운영 규칙)를 보이는지 확인하고, README 의 시연 링크와 PROCESS.md 의 실제 숫자를 채운다. (2026-10-16 8A 인터뷰 · 슬롯 4a6f5256) 녹화는 7C · 7H 가 착지한 main 으로 하고, 로그는 짧은 인터뷰가 미리 훑어 미리 만든 이 페이즈의 가지에 커밋한 뒤 ▶ Start 한다 — `- After:` 에 7C · 7H 를 더한 까닭이다. (2026-10-16 8A 인터뷰 2 · 슬롯 8a) 녹화에 실제 게시가 없어(질문 4 C) 체크리스트의 '실제 게시' 는 이 페이즈가 보이지 않는다 — 문서가 그 사실과 녹화 설정을 밝힌다. 로그 · 시연 링크 · 커밋 X 는 이 인터뷰가 레인 가지에 커밋했다.

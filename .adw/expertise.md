@@ -34,17 +34,9 @@
 - evidence: 이번 ship-report R12 — `plans/interview-marketing-agent.md:477` "이 페이즈가 채점을 고쳐도 main 은 초록 그대로다"를 감사 3 이 재현했다: 6C 후보 ① → `test_verdict_recount_is_go_with_one_line` · `test_summary_first_line_is_the_recount` FAIL, 새 지문 칸 → `test_every_fingerprint_key_is_sorted` FAIL. 같은 두 번째 실행이 R5 의 중복 줄 꼴(S-075)도 새로 찾았다. 인터뷰 커밋 `7bdb488` 은 `plans/` 만; retro-bundle Steps ship-check 시도 2 $26.0421 (cycle 20261014-112322-adw/phase-6b-live-check-apply). 앞 목격: 1C — 홈 `.adw/backlog.md` E-030 이관 줄 "1C 에서 R7 · R8 을 건진 우연한 두 번째 감사도 사라짐" (journal 20261014-112313-adw-phase-1c-text-config-allow)
 - first confirmed: 2026-10-14 · last confirmed: 2026-10-16
 
-### E-033 · tooling — 이 기계에는 여전히 `typesafe_sdk` 도 `anthropic` 도 없어 진짜 jev · Claude 호출은 사람 환경에서만 돈다 — 진짜 호출의 기록은 사람이 커밋한 `docs/live-check/result.json` 하나뿐이고(6A 실행기 `tests/live_check.py`), 스위트는 가짜 SDK(`tests/test_classifier.py`) · 가짜 Claude(`tests/test_writer.py`)로만 돈다. 다시 재려면 사람 재실행이 필요하다(트래커 6C → 6D 길)
-- evidence: `python3 -I -c "import typesafe_sdk"` · `python3 -I -c "import anthropic"` → 둘 다 `ModuleNotFoundError` (이 retro 실측, 2026-10-14); `docs/live-check/result.json` `run_at 2026-10-14T04:28:16.180435+00:00` · `calls {'claude': 23, 'jev': 72, 'youtube': 17}` · `models` 두 이름 `accepted`; `tests/live_check.py:72` `from tests.jev_accuracy import PASS_CORRECT, REPO_CONFIG, judge_examples, tally`. E-012 · E-016 을 잇는다 (cycle 20261014-112322-adw/phase-6b-live-check-apply)
-- first confirmed: 2026-10-14 · last confirmed: 2026-10-15
-
 ### E-037 · codebase — 실행기 테스트의 가짜 Claude(`tests/test_live_check.py` `FakeClaude.create`)는 `system` 글이 `GRADE_SYSTEM` · `TOPIC_SYSTEM` · `SKIP_GRADE_SYSTEM` 중 무엇과 같은지로 호출 종류를 가리고, 셋 다 아니면 오류 없이 `write`(작성)로 센다 — 실행기에 새 system 글로 Claude 를 부르는 호출을 더하는 페이즈가 가짜에 갈래를 더하지 않으면 그 호출은 작성 큐의 답을 받는다. 최악 호출 수를 글자로 잠근 `test_default_limits_fit_under_ceilings` 도 함께 본다
 - evidence: `tests/test_live_check.py:1583-1594`(`system is None` → probe · `GRADE_SYSTEM` → grade · `TOPIC_SYSTEM` → topic · `SKIP_GRADE_SYSTEM` → skip_grade · `else` → write) · `:2229`(`{"jev": 114, "claude": 103, "youtube": 35}`, 6E 에서 그대로). 6C 가 `topic` 갈래를, 6E 가 `skip_grade` 갈래를 더했다 — 6E understand 가 옛 E-035 로 이 자리를 짚었고 plan-repairs R1 의 가짜 로그 `['topic', 'write', 'write', 'grade', 'skip_grade']` 가 새 갈래가 도는 것을 보였다 (cycle 20261014-172227-adw/phase-6c-live-check-grader-fix · 20261015-091934-adw/phase-6e-comment-quality-fix)
 - first confirmed: 2026-10-14 · last confirmed: 2026-10-16
-
-### E-039 · codebase — 실행기의 재료 채점(`SKIP_GRADE_SYSTEM`)과 작성 규칙의 '장면' 은 뜻이 다르다 — 재료 채점의 `material_has_scene` 은 `<video_title>` 도 장면 출처로 세지만, 작성 규칙 3 은 제목을 되풀이하는 것을 장면으로 치지 않는다. 제목만 있는 영상의 스스로 건너뜀('재료에 장면 없음')은 재료 채점에서 '부당' 쪽으로 기운다
-- evidence: `tests/live_check.py:189-190`(`material_has_scene — … <video_title> · <video_description> · <top_comments> 안에 실제로 있습니까?`) · `src/agent/writer.py:33`(규칙 3 "장면 · 말은 설명이나 인기 댓글이 전하는 영상 속 장면 · 말뿐이고, 제목을 되풀이하는 것은 장면이 아닙니다"). ship-report Risks 4 · Human checks 7번째 줄(6F 가 "정당한 건너뜀 n/m" 을 셀 때 감안) (cycle 20261015-091934-adw/phase-6e-comment-quality-fix)
-- first confirmed: 2026-10-15 · last confirmed: 2026-10-15
 
 ### E-040 · hazard — 작성 프롬프트 규칙 2 가 과제 문구 "비슷한 고민이 있었을 때" 를 그대로 담는다 — Claude 가 두 영상의 댓글에 이 문구를 베끼면 반복 검사(`REPEAT_MIN_CHARS = 12`)와 문장 틀 검사(`FRAME_MIN_CHARS = 6`)가 함께 걸려 다시 쓰기, 또는 '검사 두 번 탈락' `SKIP` 이 된다. 진짜 모델로는 재현 안 됨
 - evidence: `src/agent/writer.py:32`(규칙 2 원문) · `:106` · `:112`. ship-report Risks 2 의 검사 출력 `이전 댓글과 겹칩니다: 비슷한고민이있었을때연애사주` 와 문장 틀 조각 `비슷한고민이`. 6F 의 SKIP 이유를 읽을 때 · Phase 7 이 `writer.py` 를 고칠 때 볼 자리 (cycle 20261015-091934-adw/phase-6e-comment-quality-fix)
@@ -122,7 +114,17 @@
 - evidence: tests/test_report.py:159-171 (기대 dict 에 `comments_disabled` · `stage_error` 행) · 7C plan-repairs R2(계획이 그 테스트 수정을 빠뜨려 수리) (cycle 20261016-075749-adw/phase-7c-comment-yield-variety)
 - first confirmed: 2026-10-16 · last confirmed: 2026-10-16
 
+### E-060 · reviewer — plan 이 제출 문서(PROCESS · README)의 문장을 받아쓰게 하면 트래커 규칙의 범위 말이 빠질 수 있고, "코드가 이렇게 동작한다" 는 산문 주장을 코드와 대는 기계 검사는 없다 — verify-plan 은 Usability 를 N/A 로 두고 ship-check 품질 감사만 찾는다. 제출 문서는 계약 문서가 아니라 고침이 사람 확인(E-009)이 아니라 스모크 통으로 간다
+- evidence: PROCESS.md:243 끝 구절 "한 폴더에서 테스트 시도가 한 번이라도 있으면 다음 실행부터 중복입니다" — 트래커 plans/interview-marketing-agent.md:1165 는 "명단 밖 영상은 …" 으로 좁혔고, 문장을 정한 .adw/plan.md:188 에서 그 범위가 빠졌다; 코드 `src/agent/store.py:42-44` 는 실제 게시면 `live` 시도만 센다 · `docs/contracts.md:283-284`. 잠근 테스트 없음 → ship-report R1 · R4 · S-125 (cycle 20261016-105037-adw/phase-8a-submission-live-run). 앞 꼴: E-009(계약 문서)
+- first confirmed: 2026-10-16 · last confirmed: 2026-10-16
+
+### E-061 · reviewer — 목록 판정기의 reach 테스트가 판정기 상수를 돌며 표본을 만들면 상수가 줄어도 초록이다 — 헌법 12조 표본이 plan `## Test plan` 에 있어도 이 꼴은 막지 못하고, ship-check 변이(상수에서 꼴 하나 지우기)가 살아남아 테스트만 고치는 스모크 항목이 된다
+- evidence: `tests/test_submission_docs.py:669-682` `test_recording_post_reach` 가 `RECORDING_WORDS` · `POSTED_SHAPES`(:81-98)로 `f"{word}에서 {shape}"` 표본을 만든다 — ship-report 변이 M2(`POSTED_SHAPES` 에서 `"올렸"` 지움) · LW(`LIST_WORDS` 에서 `allowlist` 지움) 살아남음 → S-126 (cycle 20261016-105037-adw/phase-8a-submission-live-run)
+- first confirmed: 2026-10-16 · last confirmed: 2026-10-16
+
 ## Retired (history — one line each, never deleted)
+- E-033 · tooling — 이 기계에는 여전히 `typesafe_sdk` 도 `anthropic` 도 없어 진짜 jev · Claude 호출은 사람 환경에서만 돈다 — 진짜 호출의 기록은 사람이 커밋한 `docs/live-check/result.json` 하나뿐이고(6A 실행기 `tests/live_check.py`), 스위트는 가짜 SDK(`tests/test_classifier.py`) · 가짜 Claude(`tests/test_writer.py`)로만 돈다. 다시 재려면 사람 재실행이 필요하다(트래커 6C → 6D 길) — retired 2026-10-16 (over cap; unconfirmed since 2026-10-15)
+- E-039 · codebase — 실행기의 재료 채점(`SKIP_GRADE_SYSTEM`)과 작성 규칙의 '장면' 은 뜻이 다르다 — 재료 채점의 `material_has_scene` 은 `<video_title>` 도 장면 출처로 세지만, 작성 규칙 3 은 제목을 되풀이하는 것을 장면으로 치지 않는다. 제목만 있는 영상의 스스로 건너뜀('재료에 장면 없음')은 재료 채점에서 '부당' 쪽으로 기운다 — retired 2026-10-16 (over cap; unconfirmed since 2026-10-15)
 - E-031 · codebase — 설정 읽기 `_construct_mapping` 은 중복 키 검사보다 먼저 `loader.flatten_mapping(node)` 를 부른다 — YAML 병합 키(`<<`)로 앵커를 겹겹이 이은 작은 파일이 항목을 기하급수로 복사해, "키가 두 번 나옵니다" 오류나 "이전 설정 유지"에 닿기 전에 메모리를 다 쓸 수 있다 — retired 2026-10-16 (over cap; unconfirmed since 2026-10-14)
 - E-032 · tooling — 글자 규칙(`logbook._is_raw`, 설정 `_text` 가 같은 함수)의 판정은 실행 중인 파이썬의 `unicodedata` 판을 따르는데, 이 기계의 파이썬은 판이 둘이다 — `/usr/bin/python3` · `python3.14` 는 3.14.4(유니코드 16.0.0), `~/.local/bin/python3.12` 는 3.12.13(15.0.0)이고 `python3.10` · `python3.13` 은 PATH 에 없다 — retired 2026-10-16 (over cap; unconfirmed since 2026-10-14)
 - E-017 · hazard — 작성기 링크 검사 `_link_char`(src/agent/writer.py:115-124)는 유니코드 이름에 `_SEPARATOR_NAMES`(`DOT` · `FULL STOP` 등)가 든 글자만 점으로 남기고 나머지 기호는 버리며, `_LINK_RE` 의 끝은 `[a-z]{2,}` 다 — 점 닮은꼴(U+2027 `‧` · U+2022 · U+2219 · U+00B0) · 키릴 끝 · U+202E 뒤집기로 쓴 주소는 코드 검사를 지나고 jev 광고 질문만 남는다. E-005 와 같은 "열거한 꼴" 부류가 Phase 1 밖에서 처음 목격된 것 — retired 2026-10-16 (over cap; unconfirmed since 2026-10-15)
