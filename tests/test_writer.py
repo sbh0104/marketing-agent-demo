@@ -715,6 +715,21 @@ class WriteCommentTest(unittest.TestCase):
         )
         self.assertNotEqual(blocks[0], blocks[1])
 
+    def test_shape_rotation_continues_past_the_recent_window(self) -> None:
+        # 계약 '댓글 작성' 절의 짜임 — 프롬프트에 보이는 최근 20개가 아니라 지금까지 쓴 댓글 수
+        # 전체로 돕니다. pick_shape 가 최근 창만 세면 20개를 넘긴 뒤로 늘 첫 짜임입니다
+        names = list(SHAPES)
+        for n in (20, 21, 24, 25):
+            with self.subTest(n=n):
+                previous = [f"예전에 남긴 {i}번째 댓글이에요" for i in range(n)]
+                claude = FakeClaude([reply(CONCERN, GOOD)])
+                result = self.write(claude, FakeJev([PASSING]), previous=previous)
+                self.assertEqual((len(claude.calls), result.draft.text), (1, GOOD))
+                self.assertEqual(
+                    self.user_message(claude).split("\n\n")[-2],
+                    SHAPE_INSTRUCTION.format(shape=SHAPES[names[n % len(SHAPES)]]),
+                )
+
     def test_every_shape_keeps_the_saju_experience(self) -> None:
         # 트래커 7C 질문 2 A · E-040 — 바꾸는 것은 경험을 어떻게 꺼내느냐이지, 경험이 있느냐가 아닙니다
         self.assertTrue(4 <= len(SHAPES) <= 5, list(SHAPES))
