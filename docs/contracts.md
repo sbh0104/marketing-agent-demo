@@ -1607,6 +1607,15 @@ PYTHONPATH=src python3 -m agent.run [--dry-run] [--once]
   인기 댓글을 못 받은 영상(`QUOTA` 또는 `ERROR where=commentThreads.list`)은 이번 사이클에 쓰지 않습니다.
   댓글이 막힌 영상(`top_comments` 가 `None`)은 Claude 를 부르지 않고 `SKIP video=<ID> reason=comments_disabled` 한 줄을 남깁니다.
   인기 댓글이 0개인 영상(`[]`)은 그대로 씁니다. 명단 밖 영상의 댓글도 저장소와 `COMMENT` 줄에 남습니다.
+- **기억 (Phase 7C).** 작성 · 게시가 멈추면 그 까닭을 `record.memory`(3절 `Memory`)에 적습니다 — 작성기가 건너뛰면 그 머리말 · 작성기를 부른 횟수 · 넘긴 인기 댓글 수,
+  댓글이 막히면 `comments_disabled`, 울타리가 예외를 잡으면 `stage_error` 와 그 단계입니다. 초안이 나오면 기억을 지웁니다. 명단 밖 영상은 새 조회수 기록마다 기억을 읽습니다.
+  - 스스로 건너뜀(`재료에 장면 없음` · `재료에 연애 고민 없음`)은 타이밍이 `yes` 일 때 인기 댓글을 다시 받아(1단위) 비어 있지 않은 인기 댓글이 지난 시도보다 많을 때 다시 씁니다.
+  - 작성기를 부른 횟수가 3(`WRITE_TRIES_MAX`)이 되면 스스로 건너뜀도 인기 댓글을 다시 받지 않습니다.
+  - 검사 두 번 탈락 · Claude · jev 오류 · 댓글 막힘은 다시 쓰지 않고 인기 댓글도 다시 받지 않습니다.
+  - 울타리 오류는 그 단계부터 다시 부르지 않습니다 — 판별에서 났으면 판별 · 타이밍 · 작성 · 게시, 게시에서 났으면 게시만입니다.
+  - 기억 때문에 단계를 부르지 않는 새 기록마다 `SKIP video=<ID> reason=<기억의 reason> memory=<기억의 stage>` 한 줄을 남깁니다 — 작성 · 게시에서 멈춘 기억이면 그 새 기록의 `TRIGGER` 줄 뒤입니다.
+  - 기억 칸과 이 `SKIP` 줄에는 머리말 · 이유 코드 · 단계 · 시각 · 횟수 · 인기 댓글 수만 들고, 이유의 세부 · 초안 · 오류 원문은 들지 않습니다.
+  명단 영상은 기억을 적기만 하고 읽지 않습니다 — 무엇으로 멈췄든 다음 새 기록에서 판별 · 타이밍 · 작성 · 게시를 다시 거치고, 영상당 1개(`duplicate_video`) · 하루 상한 · 채널 대기는 그대로입니다.
 - **게시.** 댓글이 있는 영상마다 `post_video(…, dry_run=<테스트 실행>, …)`(6절)를 부릅니다. 영상당 1개 · 하루 상한 · 채널
   대기는 명단 영상에도 저장소가 그대로 셉니다(4절). 테스트 실행은 `--dry-run` 또는 `config.test_run` 이고, 설정은
   `--dry-run` 을 끄지 못합니다. 명단 영상에는 게시마다 `ChromeSession(config.chrome_debug_url)` 을 새로 만들어 그 `new_page` 를
@@ -1625,11 +1634,12 @@ PYTHONPATH=src python3 -m agent.run [--dry-run] [--once]
   갑니다. `KeyboardInterrupt` 같은 `BaseException` 은 그대로 올라가 `STOP reason=interrupted`(종료 코드 130)로 끝납니다.
   울타리 줄과 `on_error` 의 `ERROR where=cycle|config` 줄은 예외 자신의 종류와 메시지만 쓰고, `__context__` · `__cause__` ·
   traceback 을 따라가지 않습니다(Phase 2 ship-report R6).
-  그 영상을 다음 사이클에 다시 하지 않게 하는 기억은 아직 없습니다(Phase 7C).
+  울타리가 잡은 예외는 그 영상의 기억 칸에 `stage_error` 와 그 단계로 적습니다(위 '기억'). 기억 칸을 적다가 난 예외는 같은 `where=` 의 `ERROR` 한 줄을 더 남깁니다.
 - **음성 대조.** `python3 -m tests.mutants <이름>` — `run-rejected-posts-live` · `run-chrome-for-all` · `run-no-timing-exemption` ·
   `run-fence-catches-base` · `run-errors-uncounted` · `run-reason-follows-context` · `run-reloader-forgets-rejection` ·
   `run-lock-ignored` · `watcher-allowlist-untracked` · `trigger-first-sample-ignored` · `trigger-first-sample-age-zero` ·
-  `config-test-run-any-value` · `writer-status-ignored` · `run-sdk-check-skipped` · `run-echo-strict` · `run-reason-str-unguarded` · `run-disabled-writes`.
+  `config-test-run-any-value` · `writer-status-ignored` · `run-sdk-check-skipped` · `run-echo-strict` · `run-reason-str-unguarded` · `run-disabled-writes` ·
+  `run-memory-ignored` · `run-listed-reads-memory` · `run-thin-ignores-growth` · `run-fence-forgotten` · `run-listed-repost-unguarded`.
 
 ## 결과 화면 — `report.py` (Phase 7D)
 

@@ -1233,6 +1233,36 @@ MUTANTS: dict[str, tuple[str, str, str, str]] = {
         "if comments is None:",
         "if False:",
     ),
+    "run-memory-ignored": (
+        "agent.run",
+        "tests.test_run",
+        "if memory.stage != stage:",
+        "if True:",
+    ),
+    "run-listed-reads-memory": (
+        "agent.run",
+        "tests.test_run",
+        "if record is None or record.memory is None or record.video_id in allowed:",
+        "if record is None or record.memory is None:",
+    ),
+    "run-thin-ignores-growth": (
+        "agent.run",
+        "tests.test_run",
+        "and count <= memory.top_comments",
+        "and True",
+    ),
+    "run-fence-forgotten": (
+        "agent.run",
+        "tests.test_run",
+        "self._remember_fence(video_id, stage)",
+        "None",
+    ),
+    "run-listed-repost-unguarded": (
+        "agent.store",
+        "tests.test_run",
+        'return any(a.mode == "live" for a in record.attempts)',
+        "return False",
+    ),
 }
 
 

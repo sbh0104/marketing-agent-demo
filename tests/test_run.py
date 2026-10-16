@@ -27,7 +27,7 @@ from agent.config import ConfigError, load_config
 from agent.guard import decide_post
 from agent.logbook import Event, Logbook, read_log
 from agent.models import CommentDraft, Judgement, Memory, Verdict, VideoRecord, ViewSample
-from agent.report import render_report
+from agent.report import reason_label, render_report
 from agent.scheduler import run_loop
 from agent.store import Store
 from agent.watcher import Watcher
@@ -1025,6 +1025,9 @@ class MarkedClaude(WriterClaude):
         self.calls.append(kwargs)
         if self.error is not None:
             raise self.error
+        found, answer = self._next_answer(kwargs)
+        if found and answer is not None:
+            return tool_reply(answer)
         message = tool_reply(
             reply(mark("concern"), draft(len(self.calls)) + mark("comment")),
             text=mark("claude-text"),
@@ -1589,6 +1592,340 @@ class TestMemory(RunCase):
             ("검사 두 번 탈락", "run.write", 1, 0),
         )
         self.assertIsNotNone(memory.at.utcoffset())
+
+    def skips(self, n: int, video_id: str) -> list[tuple[int, dict[str, str]]]:
+        """n 번째 사이클의 그 영상 SKIP 줄 — (사이클 안 차례, 필드)."""
+        return [
+            (index, fields)
+            for index, (event, fields) in enumerate(self.cycle_events(n))
+            if event is Event.SKIP and fields.get("video") == video_id
+        ]
+
+    def triggers(self, n: int, video_id: str) -> list[tuple[int, dict[str, str]]]:
+        """n 번째 사이클의 그 영상 TRIGGER 줄 — (사이클 안 차례, 필드)."""
+        return [
+            (index, fields)
+            for index, (event, fields) in enumerate(self.cycle_events(n))
+            if event is Event.TRIGGER and fields.get("video") == video_id
+        ]
+
+    def test_listed_video_reads_no_memory(self) -> None:
+        # 트래커 7C 질문 1 A · 3 A ① — 명단 영상은 기억을 적기만 하고, 무엇으로 멈췄든 다음 새 기록에서
+        # 그 단계를 다시 부릅니다(재료가 그대로여도)
+        def thin(on: bool) -> None:
+            if on:
+                self.claude.answers[A] = [NO_SCENE_ANSWER]
+
+        def check_failed(on: bool) -> None:
+            self.jev.reads_like_ad = 0.9 if on else 0.1
+
+        def claude_error(on: bool) -> None:
+            self.claude.error = RuntimeError("Claude 가 답하지 않습니다") if on else None
+
+        def disabled(on: bool) -> None:
+            self.api.comments[A] = 403
+
+        def nothing(on: bool) -> None:
+            pass
+
+        # (이름, 사이클마다 준비, 첫 사이클에 터뜨릴 단계 함수, 기억의 이유 · 단계, 둘째 사이클에 엿볼 단계 함수)
+        write = "write_comment"
+        kinds = (
+            ("thin", thin, None, ("재료에 장면 없음", "run.write"), write),
+            ("check_failed", check_failed, None, ("검사 두 번 탈락", "run.write"), write),
+            ("claude_error", claude_error, None, ("claude 호출 실패", "run.write"), write),
+            ("write_fence", nothing, write, ("stage_error", "run.write"), write),
+            ("classify_fence", nothing, "classify", ("stage_error", "run.classify"), "classify"),
+            (
+                "trigger_fence",
+                nothing,
+                "judge_trigger",
+                ("stage_error", "run.trigger"),
+                "judge_trigger",
+            ),
+            ("comments_disabled", disabled, None, ("comments_disabled", "run.write"), None),
+        )
+        for label, prepare, fenced, remembered, spied in kinds:
+            with self.subTest(label):
+                self.setUp()
+                self.show(A, 2000)
+                pipeline = self.pipeline()
+                prepare(True)
+                with contextlib.ExitStack() as stack:
+                    if fenced is not None:
+                        stack.enter_context(self.patch_stage(fenced, ValueError("단계가 터졌습니다")))
+                    self.cycle(pipeline)
+                memory = self.record(A).memory
+                self.assertIsNotNone(memory)
+                self.assertEqual((memory.reason, memory.stage), remembered)
+                self.assertIsNotNone(memory.at.utcoffset())
+                prepare(False)
+                if spied is None:
+                    self.cycle(pipeline)
+                    self.assertEqual(self.thread_calls(A), 2)
+                    self.assertEqual(
+                        [fields for _, fields in self.skips(2, A)],
+                        [{"video": A, "reason": "comments_disabled"}],
+                    )
+                else:
+                    with mock.patch.object(run, spied, wraps=getattr(run, spied)) as spy:
+                        self.cycle(pipeline)
+                    self.assertEqual([call.args[0].video_id for call in spy.call_args_list], [A])
+                    self.assertIsNotNone(self.record(A).comment)
+                    self.assertIsNone(self.record(A).memory)
+                for _, fields in self.skips(2, A):
+                    self.assertNotIn("memory", fields)
+
+    def test_out_of_list_self_skip_rewrites_only_when_top_comments_grow(self) -> None:
+        # 트래커 7C 질문 5 A ② — 명단 밖 영상의 스스로 건너뜀은 인기 댓글이 지난 시도보다 늘었을 때만,
+        # 작성기를 세 번(WRITE_TRIES_MAX) 부를 때까지 다시 씁니다
+        self.claude.answers[C] = [NO_SCENE_ANSWER] * 3
+        self.api.comments[C] = ["하나"]
+        self.show(C, 2000, channel="UC3")
+        self.find(C)
+        pipeline = self.pipeline()
+        fresh = {"video": C, "reason": "재료에 장면 없음"}
+        repeated = {**fresh, "memory": "run.write"}
+        # (조회수, 인기 댓글, 그 사이클의 Claude 호출 · commentThreads 호출, SKIP, 기억의 tries · top_comments)
+        steps = (
+            (2000, ["하나"], 1, 1, fresh, (1, 1)),
+            (2400, ["하나"], 0, 1, repeated, (1, 1)),
+            (2800, ["하나", "둘"], 1, 1, fresh, (2, 2)),
+            (3200, ["하나", "둘", "셋"], 1, 1, fresh, (3, 3)),
+            (3600, ["하나", "둘", "셋", "넷"], 0, 0, repeated, (3, 3)),
+        )
+        for n, (views, tops, claude_calls, threads, skipped, kept) in enumerate(steps, start=1):
+            with self.subTest(cycle=n):
+                self.bump(C, views)
+                self.api.comments[C] = tops
+                claude_before = len(self.claude.user_messages(C))
+                threads_before = self.thread_calls(C)
+                self.cycle(pipeline)
+                ((timed_at, timed),) = self.triggers(n, C)
+                self.assertEqual(timed["verdict"], "yes")
+                self.assertEqual(len(self.claude.user_messages(C)) - claude_before, claude_calls)
+                self.assertEqual(self.thread_calls(C) - threads_before, threads)
+                ((skipped_at, fields),) = self.skips(n, C)
+                self.assertEqual(fields, skipped)
+                self.assertGreater(skipped_at, timed_at)
+                memory = self.record(C).memory
+                self.assertEqual(
+                    (memory.reason, memory.stage, memory.tries, memory.top_comments),
+                    ("재료에 장면 없음", "run.write", *kept),
+                )
+
+    def test_out_of_list_stops_are_not_redone(self) -> None:
+        # 트래커 7C 질문 5 A · 7H 질문 1 A ② — 검사 두 번 탈락 · AI 호출 오류 · 댓글 막힘은 다음 새 기록에서
+        # 다시 쓰지 않고, 그 TRIGGER 줄 뒤에 머리말만 든 SKIP 을 다시 남깁니다
+        def check_failed(on: bool) -> None:
+            self.jev.reads_like_ad = 0.9 if on else 0.1
+
+        def claude_error(on: bool) -> None:
+            self.claude.error = RuntimeError("Claude 가 답하지 않습니다") if on else None
+
+        def disabled(on: bool) -> None:
+            self.api.comments[C] = 403
+
+        kinds = (
+            ("check_failed", check_failed, "검사 두 번 탈락"),
+            ("claude_error", claude_error, "claude 호출 실패"),
+            ("comments_disabled", disabled, "comments_disabled"),
+        )
+        for label, prepare, reason in kinds:
+            with self.subTest(label):
+                self.setUp()
+                self.show(C, 2000, channel="UC3")
+                self.find(C)
+                pipeline = self.pipeline()
+                prepare(True)
+                self.cycle(pipeline)
+                prepare(False)
+                self.bump(C, 2400)
+                claude_before = len(self.claude.user_messages(C))
+                checks_before = self.jev.calls.count(("check", C))
+                threads_before = self.thread_calls(C)
+                self.cycle(pipeline)
+                self.assertEqual(len(self.claude.user_messages(C)), claude_before)
+                self.assertEqual(self.jev.calls.count(("check", C)), checks_before)
+                self.assertEqual(self.thread_calls(C), threads_before)
+                ((timed_at, timed),) = self.triggers(2, C)
+                self.assertEqual(timed["verdict"], "yes")
+                ((skipped_at, fields),) = self.skips(2, C)
+                self.assertEqual(fields, {"video": C, "reason": reason, "memory": "run.write"})
+                self.assertGreater(skipped_at, timed_at)
+                self.assertIn(
+                    f'<span class="badge reason">{reason_label(reason)}</span>', self.row(C)
+                )
+
+    def test_out_of_list_fenced_stage_not_called_next_sample(self) -> None:
+        # Phase 7 질문 4 A ② — 울타리 오류는 어느 단계에서 났든 다음 새 기록에서 그 단계부터 부르지 않습니다
+        for name, where in STAGES:
+            with self.subTest(stage=where):
+                self.setUp()
+                self.show(C, 2000, channel="UC3")
+                self.find(C)
+                pipeline = self.pipeline()
+                with self.patch_stage(name, ValueError("단계가 터졌습니다"), video_id=C):
+                    self.cycle(pipeline)
+                self.bump(C, 2400)
+                with mock.patch.object(run, name, wraps=getattr(run, name)) as spy:
+                    self.cycle(pipeline)
+                self.assertEqual(
+                    [call for call in spy.call_args_list if call.args[0].video_id == C], []
+                )
+                ((skipped_at, fields),) = self.skips(2, C)
+                self.assertEqual(fields, {"video": C, "reason": "stage_error", "memory": where})
+                timed = self.triggers(2, C)
+                if where in (run.STAGE_WRITE, run.STAGE_POST):
+                    ((timed_at, _),) = timed
+                    self.assertGreater(skipped_at, timed_at)
+                else:
+                    self.assertEqual(timed, [])
+                self.assertEqual(
+                    [fields for fields in self.lines(Event.ERROR) if fields.get("video") == C],
+                    [{"where": where, "reason": "ValueError: 단계가 터졌습니다", "video": C}],
+                )
+                self.assertEqual(
+                    [event for event, _ in self.cycle_events(1) if event is Event.ERROR],
+                    [Event.ERROR],
+                )
+                self.assertEqual(
+                    [fields["errors"] for fields in self.lines(Event.CYCLE)], ["1", "0"]
+                )
+                self.assertIn(
+                    '<span class="badge reason">단계 오류 뒤 다시 하지 않음</span>', self.row(C)
+                )
+
+    def test_listed_video_posted_then_fenced_gets_no_second_post(self) -> None:
+        # 트래커 7C 질문 3 A ③ — 게시 뒤 울타리에 걸린 명단 영상을 다시 다뤄도 duplicate_video 로 두 번째 게시가 없습니다
+        self.show(A, 2000)
+        pipeline = self.pipeline()
+        real = run.post_video
+
+        def post_then_raise(record: object, **kwargs: object) -> None:
+            real(record, **kwargs)
+            raise ValueError("게시 뒤에 터졌습니다")
+
+        with mock.patch.object(run, "post_video", side_effect=post_then_raise):
+            self.cycle(pipeline)
+        memory = self.record(A).memory
+        self.assertEqual((memory.reason, memory.stage), ("stage_error", "run.post"))
+        self.cycle(pipeline)
+        self.assertEqual(self.chrome.submits, [watch(A)])
+        self.assertEqual(self.posted_live(), [A])
+        self.assertEqual(
+            [fields for _, fields in self.skips(2, A)], [{"video": A, "reason": "duplicate_video"}]
+        )
+
+    def test_memory_and_repeated_skip_carry_no_service_text(self) -> None:
+        # 계약 '실행 진입점' 절의 기억 — 기억 칸과 다시 남긴 SKIP 에는 머리말 · 이유 코드 · 단계 · 시각 · 수만
+        # 들고, 이유의 세부 · 초안 · 오류 원문은 들지 않습니다
+        searched = "MRKsearchCC"
+        heads = {
+            "claude_error": "claude 호출 실패",
+            "check_failed": "검사 두 번 탈락",
+            "thin": "재료에 장면 없음",
+            "comments_disabled": "comments_disabled",
+            "write_fence": "stage_error",
+        }
+        for label, head in heads.items():
+            with self.subTest(label):
+                self.setUp()
+                self.claude = MarkedClaude()
+                self.services = dataclasses.replace(self.services, claude=self.claude)
+                loaded = self.load()
+                config = dataclasses.replace(
+                    loaded,
+                    classifier=dataclasses.replace(
+                        loaded.classifier,
+                        on_topic_reasons=(mark("label"), *loaded.classifier.on_topic_reasons),
+                    ),
+                )
+                self.jev.classify[None] = response(choice=mark("label"))
+                pipeline = self.pipeline()
+                judged = T0 - 12 * HOUR
+                old = VideoRecord(
+                    video_id=D,
+                    channel_id="UC4",
+                    title=title_of(D),
+                    description="",
+                    published_at=T0 - 13 * HOUR,
+                    detected_at=judged,
+                    keyword=KEYWORD,
+                    view_history=[ViewSample(judged, 800)],
+                    classification=Judgement(Verdict.YES, "연애 고민 상담", judged),
+                    trigger=Judgement(Verdict.NO, "views_below_min", judged),
+                    comment=CommentDraft(CONCERN, draft(99) + mark("comment"), judged),
+                )
+                self.store.put(old)
+                self.show(searched, 2000, channel="UC3")
+                # 제목에 title_of 를 함께 두어 MarkedClaude 의 answers 가 이 영상을 알아봅니다
+                self.api.videos[searched]["snippet"].update(
+                    title=title_of(searched) + mark("title-searched"),
+                    description=mark("description-searched"),
+                    channelId=mark("channel-searched"),
+                )
+                self.api.comments[searched] = [mark("top-comment")]
+                self.find(searched)
+                if label == "claude_error":
+                    self.claude.error = RuntimeError(mark("claude-error"))
+                elif label == "thin":
+                    self.claude.answers[searched] = [None, NO_SCENE_ANSWER]
+                elif label == "comments_disabled":
+                    self.api.comments[searched] = 403
+                with contextlib.ExitStack() as stack:
+                    if label == "write_fence":
+                        fence = self.patch_stage(
+                            "write_comment", ValueError(mark("fence")), video_id=searched
+                        )
+                        stack.enter_context(fence)
+                    self.cycle(pipeline, config)
+                self.claude.error = None
+                self.bump(searched, 2400)
+                self.cycle(pipeline, config)
+                # 표시 글이 정말 첫 사이클의 원래 줄까지 왔는지
+                first = [
+                    (event, fields)
+                    for event, fields in self.cycle_events(1)
+                    if fields.get("video") == searched and event in (Event.SKIP, Event.ERROR)
+                ]
+                if label == "write_fence":
+                    ((event, fields),) = first
+                    self.assertIs(event, Event.ERROR)
+                    self.assertIn("MRK", fields["reason"])
+                elif label != "comments_disabled":
+                    (fields,) = [fields for event, fields in first if event is Event.SKIP]
+                    self.assertIn("mrk", fields["reason"].casefold())
+                memory = self.record(searched).memory
+                stored = json.dumps(memory.to_dict(), ensure_ascii=False)
+                self.assertNotIn("mrk", stored.casefold())
+                repeated = [fields for _, fields in self.skips(2, searched)]
+                self.assertEqual(
+                    repeated, [{"video": searched, "reason": head, "memory": "run.write"}]
+                )
+                for fields in repeated:
+                    self.assertNotIn("mrk", fields["reason"].casefold())
+                    self.assertNotIn("mrk", fields["memory"].casefold())
+
+    def test_fence_memory_failure_adds_one_error_line(self) -> None:
+        # 계약 '실행 진입점' 절의 울타리 — 기억 칸을 적다가 난 예외는 같은 where= 의 ERROR 한 줄을 더 남기고
+        # 다음 영상으로 갑니다
+        self.show(A, 2000, channel="UC1")
+        self.show(B, 2000, channel="UC2")
+        with (
+            self.patch_stage("write_comment", ValueError("작성기가 터졌습니다")),
+            mock.patch.object(run, "Memory", side_effect=ValueError("기억 실패")),
+        ):
+            self.cycle(self.pipeline())
+        self.assertEqual(
+            [fields for fields in self.lines(Event.ERROR) if fields.get("video") == A],
+            [
+                {"where": "run.write", "reason": "ValueError: 작성기가 터졌습니다", "video": A},
+                {"where": "run.write", "reason": "ValueError: 기억 실패", "video": A},
+            ],
+        )
+        self.assertEqual([fields["errors"] for fields in self.lines(Event.CYCLE)], ["1"])
+        self.assertEqual(self.posted_live(), [B])
 
 
 class TestConfigRejected(RunCase):
