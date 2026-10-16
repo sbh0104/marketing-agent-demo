@@ -6,6 +6,7 @@ import json
 import tempfile
 import unittest
 from collections import Counter
+from datetime import timedelta
 from pathlib import Path
 
 import agent.run
@@ -69,6 +70,9 @@ SPLITS = {
     "CLASSIFY": ("verdict", ("yes", "no", "hold")),
     "TRIGGER": ("verdict", ("yes", "no", "hold")),
     "POST": ("result", ("saved", "rehearsed", "posted")),
+}
+KOREAN_COUNTERS = {
+    1: "한", 2: "두", 3: "세", 4: "네", 5: "다섯", 6: "여섯", 7: "일곱", 8: "여덟", 9: "아홉"
 }
 REMAINING_8A = ["7B jev 키가 없을 때 Claude 판단"]
 REMAINING_HEADER = "남은 일(트래커의 페이즈 제목):"
@@ -593,6 +597,46 @@ class LiveRunDocsTest(unittest.TestCase):
         self.assertIn(DEMO_URL, lines[demo[0]])
         first = next(i for i, line in enumerate(lines) if line.startswith("## "))
         self.assertLess(demo[0], first)
+
+    def test_process_hand_numbers_are_counted_from_sample_log(self) -> None:
+        rows = sample_rows()
+        r1, r2 = runs(rows)
+        skips = [fields for _, event, fields in rows if event == "SKIP"]
+        self.assertEqual(len(skips), sum(SKIP_REASONS.values()))
+        self.assertTrue(any(fields.get("memory") == "run.write" for fields in skips))
+        comments = [fields for _, event, fields in rows if event == "COMMENT"]
+        blocked = [
+            row for row in rows if row[1] == "POST" and row[2].get("reason") == "not_in_allowlist"
+        ]
+        self.assertEqual(len(blocked), 1)
+        self.assertIn(blocked[0], r1)
+        duplicate = [
+            fields
+            for _, event, fields in r2
+            if event == "SKIP"
+            and fields.get("video") == BLOCKED_VIDEO
+            and fields.get("reason", "").split(" — ", 1)[0] == "duplicate_video"
+        ]
+        self.assertEqual(len(duplicate), 1)
+        t1, t2 = (next(at for at, event, _ in run if event == "START") for run in (r1, r2))
+        first, last = rows[0][0], rows[-1][0]
+        self.assertEqual(first.utcoffset(), timedelta(hours=9))
+        allowed = int(next(fields for _, event, fields in r2 if event == "START")["allowed"])
+        videos_line = f"남의 채널 {KOREAN_COUNTERS[allowed]}의 인기 영상"
+        self.assertIn(videos_line, self.readme)
+        for text in (
+            f"**건너뜀 {len(skips)}의 이유.**",
+            f"댓글 {KOREAN_COUNTERS[len(comments)]} 줄(`COMMENT`)",
+            f"`{BLOCKED_POST}`({blocked[0][0]:%H:%M:%S})",
+            "같은 영상은 녹화 실행에서 `SKIP … reason=duplicate_video`",
+            f"{t1:%H:%M:%S} 의 첫 실행",
+            f"{t2:%H:%M:%S} 의 둘째 실행",
+            f"{first:%Y-%m-%d %H:%M:%S}–{last:%H:%M:%S}(+09:00)",
+            "`memory=run.write`",
+            videos_line,
+        ):
+            with self.subTest(text=text):
+                self.assertIn(text, self.process)
 
 
 class JudgeSampleTest(unittest.TestCase):
