@@ -89,7 +89,7 @@
 - [x] Phase 7G — 크롬 주소 · 표본 간격 다지기 (이 컴퓨터 주소만 · 최소 표본 간격) (plans/interview-marketing-agent.md#phase-7g)
 - [ ] Phase 7B — jev 키가 없을 때 Claude 판단 (plans/interview-marketing-agent.md#phase-7b)
 - [x] Phase 7D — 결과 화면 data/report.html (plans/interview-marketing-agent.md#phase-7d)
-- [~] Phase 7C — 댓글 수 · 여는 방식 (건너뛴 영상 다시 쓰기 · 문장 짜임 고르기) (plans/interview-marketing-agent.md#phase-7c)
+- [x] Phase 7C — 댓글 수 · 여는 방식 (건너뛴 영상 다시 쓰기 · 문장 짜임 고르기) (plans/interview-marketing-agent.md#phase-7c)
 - [x] Phase 7H — 결과 화면 다지기 (낡은 이유 배지 · 이름표 둘) (plans/interview-marketing-agent.md#phase-7h)
 - [ ] (example) Add social login buttons to the login screen
 - [ ] (example) Add retry logic on payment failure
@@ -119,6 +119,9 @@
 - [ ] (retro 후보 · E-041) plan 이 등록하는 변이가 새 판정의 경계(비교 연산 · 범위 양 끝)를 비틀지 않아 ship-check 변이 점검이 살아남은 변이를 찾음 — 최소 계약 고침: `.claude/skills/plan/SKILL.md:128` 가드 매트릭스 변이 행에 "새 비교 · 범위 끝마다 양쪽 한 칸 변이" 를 요구(또는 ship-check 가 이미 잡으니 그대로 둘지 인터뷰가 정함) (sightings: 20261014-172227-adw/phase-6c-live-check-grader-fix · 20261015-091934-adw/phase-6e-comment-quality-fix)
 
 - [ ] (retro 후보 · E-052) 계획이 "Hold gate-plan" · "Deferred to a human: … before implement" 로 사람 결정을 계획 관문에 맡겨도 `autonomy: full` 이 관문을 자동 승인해, 그 결정이 implement · verify 를 다 쓴 뒤 ship-check 민감 정지로만 돌아옴 — 최소 계약 고침: `.claude/skills/plan/scripts/cycle_driver.py:712` 자동 승인 앞에서 plan.md 의 기계 읽기 표지(예: `Hold gate-plan` 줄)를 보면 관문을 사람에게 열기 — 또는 plan 스킬이 그런 결정을 계획 관문 전 🎤 인터뷰로 보내기(어느 쪽인지, ADWS 로 넘길지 인터뷰가 정함) (sightings: 20261015-211343-adw/phase-7g-chrome-url-sample-gap · 20261015-211335-adw/phase-8-submission-docs)
+
+- [ ] (retro 후보 · T4 경보) plan 설계 예산·꾸러미 규칙 재검토 — ⑶ 계획서 수리: 3 · ⑷ 계획 밖(트래커 plans/interview-*.md 제외): 0 (cycle: 20261016-075749-adw/phase-7c-comment-yield-variety ⑷ 0)
+- [ ] (retro 후보 · E-057) 트래커 "조건(테스트로 잠금)" 행 · 기억 표 행이 추적 안 되는 `.adw/verify.sh` 프로브로만 재여 ship-check 변이가 스위트에서 살아남고 "스위트로 옮기기" 스모크 항목이 되풀이됨 — 최소 계약 고침: `.adw/constitution.md:48-51` 의 짝 규칙(`Promise: … → tests/<file>::<test>`)을 계약 문장뿐 아니라 트래커의 "테스트로 잠금" 조건 줄과 verify-plan 표의 행에도 걸기(또는 verify-plan 스킬이 스위트 짝 없는 프로브 행에 `suite gap` 표지를 달아 ship-check 가 변이 없이 바로 S 항목으로 넘기기) (sightings: 20261014-112313-adw/phase-1c-text-config-allow S-058 · 20261015-091934-adw/phase-6e-comment-quality-fix S-091 · 20261016-075749-adw/phase-7c-comment-yield-variety S-122)
 
 ## Done
 

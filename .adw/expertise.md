@@ -10,10 +10,6 @@
 - evidence: Phase 1 — 계약 2절 "비교와 셈에만"(R4) · 7절 문단(R5) (journal 20261013-062542-adw-phase-1-foundation-contracts summary flagged ②③); Phase 4 — '트리거 판정' 절 세 문장 R1/Q2 → Human checks 1 (E-007) (cycle 20261013-161358-adw/phase-4-trigger-timing)
 - first confirmed: 2026-10-13 · last confirmed: 2026-10-16
 
-### E-017 · hazard — 작성기 링크 검사 `_link_char`(src/agent/writer.py:115-124)는 유니코드 이름에 `_SEPARATOR_NAMES`(`DOT` · `FULL STOP` 등)가 든 글자만 점으로 남기고 나머지 기호는 버리며, `_LINK_RE` 의 끝은 `[a-z]{2,}` 다 — 점 닮은꼴(U+2027 `‧` · U+2022 · U+2219 · U+00B0) · 키릴 끝 · U+202E 뒤집기로 쓴 주소는 코드 검사를 지나고 jev 광고 질문만 남는다. E-005 와 같은 "열거한 꼴" 부류가 Phase 1 밖에서 처음 목격된 것
-- evidence: ship-report R1 — `bit‧ly/3xYzAb` 가 `bitly/3xyzab` 로 읽혀 통과(감사 재현); `## Human checks` 3번째 줄 — 어디까지 막을지는 사람 결정(보이지 않는 글자를 다 막으면 U+200D 이모지 잇기도 막힘). 실제 게시는 허용 목록뿐(`src/agent/guard.py:94`) (cycle 20261013-161439-adw/phase-5-writer-comment)
-- first confirmed: 2026-10-13 · last confirmed: 2026-10-15
-
 ### E-022 · hazard — 계약 절 이름 테스트 `tests/test_contract_sections.py` 는 열거한 꼴만 잡는다 — 제목은 `HEADING_RE = ^## ([0-9]+)\.`(:20), 인용은 `([0-9]+)절`(:21) 뿐이라 `## 11 제목`(마침표 없음) · `## 11) 제목` · `##  11.`(공백 둘) · `### 11.` · 앞 공백 셋 `   ## 11.`(마크다운에서는 여전히 제목) 과 `§11` · `11 절` · ASCII 아닌 숫자는 초록으로 지나간다. E-005 · E-017 · E-019 와 같은 "열거한 꼴" 부류
 - evidence: `tests/test_contract_sections.py:20-21`; 감사관이 다섯 제목 꼴을 `[]` 로 읽음 — journal `20261014-035724-adw-phase-1b-contract-section-names/ship-report.md:177-181`(Risks 2) · 돌연변이 표 `:145-148`; 인용 쪽 사각지대는 트래커 Phase 1B 질문 1 trade-off 가 받아들임, 제목 쪽은 아직 결정 없음(질문 2 A 빨강 꼴 ① 밖). verify-plan.md:127 Property-based N/A "two regexes over a small enumerated shape set" 가 이 꼴들을 ship-check 까지 가렸다 (cycle 20261014-035724-adw/phase-1b-contract-section-names)
 - first confirmed: 2026-10-14 · last confirmed: 2026-10-16
@@ -34,18 +30,6 @@
 - evidence: `tests/test_guard.py:47` (S-003 행) · `src/agent/guard.py:23,65`; `.adw/ship-report.md:405` (가드 표 G1 의 `;` 행은 하나짜리 꼴만) · `:418-421` (R1) → S-056 이 받는 이름만 든 행으로 다시 잠금 (cycle 20261014-035715-adw/phase-1a-parser-allow-rules)
 - first confirmed: 2026-10-14 · last confirmed: 2026-10-16
 
-### E-028 · tooling — `tests/mutants.py` 의 변이는 소스에서 바꿀 글자가 **정확히 한 번** 나와야 돈다(아니면 종료 코드 2) — 가드 · 로그 · 설정의 한 줄을 고치는 페이즈는 그 줄을 겨눈 변이 문자열도 함께 고쳐야 하고, 같은 글자를 한 번 더 쓰는 줄을 더하기만 해도 기존 변이가 깨진다
-- evidence: `tests/mutants.py:9-10` 머리말("2 는 이름을 모르거나 바꿀 글자가 정확히 한 번 나오지 않았다는 뜻"); 1A 가 고친 가드 줄을 겨눈 `guard-youtu-be-ignores-query-v` · `guard-shorts-ignores-query-v` · `guard-query-ampersand-only`(`tests/mutants.py:139,145,151`); 등록부 82 → 90 (cycle 20261014-035715-adw/phase-1a-parser-allow-rules)
-- first confirmed: 2026-10-14 · last confirmed: 2026-10-15
-
-### E-031 · codebase — 설정 읽기 `_construct_mapping` 은 중복 키 검사보다 먼저 `loader.flatten_mapping(node)` 를 부른다 — YAML 병합 키(`<<`)로 앵커를 겹겹이 이은 작은 파일이 항목을 기하급수로 복사해, "키가 두 번 나옵니다" 오류나 "이전 설정 유지"에 닿기 전에 메모리를 다 쓸 수 있다
-- evidence: `src/agent/config.py:84-85` (`def _construct_mapping` 첫 줄이 `loader.flatten_mapping(node)`, 중복 검사 `seen` 은 그 뒤 `:86-92`); ship-report R7 — 2,144바이트 파일 n=25 에서 2.97초 · 최대 RSS 1,081,456 KB 뒤 `키가 두 번 나옵니다`, n=30 은 약 32 GB 추정, base 와 HEAD 같음(n=22 0.36초 대 0.35초). 막으려면 설정 파일 형식(병합 키 · 별칭 금지) 결정이 필요해 주인 없음 (cycle 20261014-112313-adw/phase-1c-text-config-allow)
-- first confirmed: 2026-10-14 · last confirmed: 2026-10-14
-
-### E-032 · tooling — 글자 규칙(`logbook._is_raw`, 설정 `_text` 가 같은 함수)의 판정은 실행 중인 파이썬의 `unicodedata` 판을 따르는데, 이 기계의 파이썬은 판이 둘이다 — `/usr/bin/python3` · `python3.14` 는 3.14.4(유니코드 16.0.0), `~/.local/bin/python3.12` 는 3.12.13(15.0.0)이고 `python3.10` · `python3.13` 은 PATH 에 없다
-- evidence: 이 retro 실측 — `python3 -I -c "…unicodedata.unidata_version, unicodedata.category(chr(0x1FAE9))"` → `/usr/bin/python3 3.14.4 16.0.0 So` · `~/.local/bin/python3.12 3.12.13 15.0.0 Cn` · `/usr/bin/python3.14 3.14.4 16.0.0 So`; 트래커 Phase 1C Trade-offs(HC1 질문 1 B) — `topic: "연애 고민 🫩"` 이 3.14.4 에서 `load OK`, 3.12.13 에서 `ConfigError`(인터뷰가 잰 3.10.20 은 PATH 밖 다른 경로) (cycle 20261014-112313-adw/phase-1c-text-config-allow)
-- first confirmed: 2026-10-14 · last confirmed: 2026-10-14
-
 ### E-034 · reviewer — 트래커만 고친 확인 인터뷰 뒤의 두 번째 ship-check 는 코드가 같은 트리에서도 새 결함을 찾는다 — 6B 에서는 인터뷰가 막 쓴 트래커 줄 자체(Phase 6C 결정 문장, R12)가 6B 테스트보다 넓었다. E-030 상류 고침이 받아들인 "새 트래커 줄은 기계가 다시 대조하지 않음"이 이런 결함을 잃는다
 - evidence: 이번 ship-report R12 — `plans/interview-marketing-agent.md:477` "이 페이즈가 채점을 고쳐도 main 은 초록 그대로다"를 감사 3 이 재현했다: 6C 후보 ① → `test_verdict_recount_is_go_with_one_line` · `test_summary_first_line_is_the_recount` FAIL, 새 지문 칸 → `test_every_fingerprint_key_is_sorted` FAIL. 같은 두 번째 실행이 R5 의 중복 줄 꼴(S-075)도 새로 찾았다. 인터뷰 커밋 `7bdb488` 은 `plans/` 만; retro-bundle Steps ship-check 시도 2 $26.0421 (cycle 20261014-112322-adw/phase-6b-live-check-apply). 앞 목격: 1C — 홈 `.adw/backlog.md` E-030 이관 줄 "1C 에서 R7 · R8 을 건진 우연한 두 번째 감사도 사라짐" (journal 20261014-112313-adw-phase-1c-text-config-allow)
 - first confirmed: 2026-10-14 · last confirmed: 2026-10-16
@@ -56,7 +40,7 @@
 
 ### E-037 · codebase — 실행기 테스트의 가짜 Claude(`tests/test_live_check.py` `FakeClaude.create`)는 `system` 글이 `GRADE_SYSTEM` · `TOPIC_SYSTEM` · `SKIP_GRADE_SYSTEM` 중 무엇과 같은지로 호출 종류를 가리고, 셋 다 아니면 오류 없이 `write`(작성)로 센다 — 실행기에 새 system 글로 Claude 를 부르는 호출을 더하는 페이즈가 가짜에 갈래를 더하지 않으면 그 호출은 작성 큐의 답을 받는다. 최악 호출 수를 글자로 잠근 `test_default_limits_fit_under_ceilings` 도 함께 본다
 - evidence: `tests/test_live_check.py:1583-1594`(`system is None` → probe · `GRADE_SYSTEM` → grade · `TOPIC_SYSTEM` → topic · `SKIP_GRADE_SYSTEM` → skip_grade · `else` → write) · `:2229`(`{"jev": 114, "claude": 103, "youtube": 35}`, 6E 에서 그대로). 6C 가 `topic` 갈래를, 6E 가 `skip_grade` 갈래를 더했다 — 6E understand 가 옛 E-035 로 이 자리를 짚었고 plan-repairs R1 의 가짜 로그 `['topic', 'write', 'write', 'grade', 'skip_grade']` 가 새 갈래가 도는 것을 보였다 (cycle 20261014-172227-adw/phase-6c-live-check-grader-fix · 20261015-091934-adw/phase-6e-comment-quality-fix)
-- first confirmed: 2026-10-14 · last confirmed: 2026-10-15
+- first confirmed: 2026-10-14 · last confirmed: 2026-10-16
 
 ### E-039 · codebase — 실행기의 재료 채점(`SKIP_GRADE_SYSTEM`)과 작성 규칙의 '장면' 은 뜻이 다르다 — 재료 채점의 `material_has_scene` 은 `<video_title>` 도 장면 출처로 세지만, 작성 규칙 3 은 제목을 되풀이하는 것을 장면으로 치지 않는다. 제목만 있는 영상의 스스로 건너뜀('재료에 장면 없음')은 재료 채점에서 '부당' 쪽으로 기운다
 - evidence: `tests/live_check.py:189-190`(`material_has_scene — … <video_title> · <video_description> · <top_comments> 안에 실제로 있습니까?`) · `src/agent/writer.py:33`(규칙 3 "장면 · 말은 설명이나 인기 댓글이 전하는 영상 속 장면 · 말뿐이고, 제목을 되풀이하는 것은 장면이 아닙니다"). ship-report Risks 4 · Human checks 7번째 줄(6F 가 "정당한 건너뜀 n/m" 을 셀 때 감안) (cycle 20261015-091934-adw/phase-6e-comment-quality-fix)
@@ -64,7 +48,7 @@
 
 ### E-040 · hazard — 작성 프롬프트 규칙 2 가 과제 문구 "비슷한 고민이 있었을 때" 를 그대로 담는다 — Claude 가 두 영상의 댓글에 이 문구를 베끼면 반복 검사(`REPEAT_MIN_CHARS = 12`)와 문장 틀 검사(`FRAME_MIN_CHARS = 6`)가 함께 걸려 다시 쓰기, 또는 '검사 두 번 탈락' `SKIP` 이 된다. 진짜 모델로는 재현 안 됨
 - evidence: `src/agent/writer.py:32`(규칙 2 원문) · `:106` · `:112`. ship-report Risks 2 의 검사 출력 `이전 댓글과 겹칩니다: 비슷한고민이있었을때연애사주` 와 문장 틀 조각 `비슷한고민이`. 6F 의 SKIP 이유를 읽을 때 · Phase 7 이 `writer.py` 를 고칠 때 볼 자리 (cycle 20261015-091934-adw/phase-6e-comment-quality-fix)
-- first confirmed: 2026-10-15 · last confirmed: 2026-10-15
+- first confirmed: 2026-10-15 · last confirmed: 2026-10-16
 
 ### E-041 · reviewer — plan 이 등록한 변이(`tests/mutants.py`)는 새 판정의 경계(비교 연산 `<` ↔ `<=` · 범위 끝 한 글자)를 비틀지 않고, ship-check 의 변이 점검이 거기서 살아남은 변이를 찾아 테스트만 고치는 스모크 항목으로 보낸다 — 두 페이즈 연속. 착지와 스윕 사이에 다른 페이즈가 그 경계를 잘못 고치면 그 사이클의 스위트는 초록이다
 - evidence: 6C — Guard B 첫 행 `target 2, min 0` 으로 `<=` 변이 M8a 생존 → R3 · S-077, 분모 변이 M23 생존 → R4 · S-078(6C summary.md Coverage decisions). 6E — verify-run V5 `mutants new: 8 run · caught 8` · V6 `47/47` 인데 ship-check 가 `_frame_pieces` 의 '연애사주' 빼기 앞 끝 · 뒤 끝과 `skip_human` 값 변이 생존을 재현 → S-093 · S-094(ship-report.md:173-176). 가드 매트릭스 행 규칙은 `.claude/skills/plan/SKILL.md:128`(변이 행만 `unmeasured` 허용) (cycle 20261014-172227-adw/phase-6c-live-check-grader-fix · 20261015-091934-adw/phase-6e-comment-quality-fix)
@@ -122,7 +106,27 @@
 - evidence: `src/agent/report.py:119-138` `_store_floor`(:130 판별이 있을 때만 trigger · :138 `max(times).replace(microsecond=0)`) · `:141` `_is_reason_source` · `:153` `late_lines`; `src/agent/run.py:355` `_time` · `:399-408` `except QuotaExhausted`(`Event.QUOTA` 만 적고 `return record`); ship-check 메모리 실험 HEAD `c2 (QUOTA in write) reason: None | outcome: 댓글 안 씀` ↔ base `… reason: AI 호출 오류 (Claude)`(ship-report Risks 1); 7C 의 기억과의 맞물림은 `tests/test_run.py:1190` `test_reason_badge_survives_reprocessing_with_same_reason` 이 잠금 (cycle 20261016-075402-adw/phase-7h-report-stale-reason-labels)
 - first confirmed: 2026-10-16 · last confirmed: 2026-10-16
 
+### E-056 · codebase — `tests/test_submission_docs.py` `ProcessPromptTest.test_writer_prompts_are_quoted_verbatim` 는 `PROCESS.md` 에 `SYSTEM_PROMPT` · `USER_INSTRUCTION` · `REWRITE_PROMPT` · `WRITE_TOOL`(JSON, indent 2) 이 글자 그대로 들어 있는지 잠근다 — `writer.py` 프롬프트 글을 바꾸는 페이즈는 같은 diff 에서 `PROCESS.md` 도 고쳐야 스위트가 초록이다
+- evidence: tests/test_submission_docs.py:38-47 (`assertIn(text, self.process)`) · 7C 가 규칙 2 를 고치며 `PROCESS.md` 를 함께 고침(`git diff --name-only main..adw/phase-7c-comment-yield-variety` 에 `PROCESS.md`) (cycle 20261016-075749-adw/phase-7c-comment-yield-variety)
+- first confirmed: 2026-10-16 · last confirmed: 2026-10-16
+
+### E-057 · reviewer — verify-plan 이 계획 `## Test plan` 에 짝이 없는 행동(트래커 "조건(테스트로 잠금)" 의 표 행 · 순서 · 기억 칸)을 추적 안 되는 `.adw/verify.sh` 프로브로만 재면, ship-check 변이가 스위트에서 살아남아 "프로브를 스위트로 옮기기" 스모크 항목이 된다 — 헌법의 짝 규칙(`.adw/constitution.md:48-51` "The test lives in the suite, never only in `.adw/verify.sh`")은 계약 문장(`Promise:`)에만 걸려 이 행들을 잡지 못한다
+- evidence: S-058(1C — `order_url_before_topic` 이 V2 에만, 순서 바꾼 변이 `OK`) · S-091(6E — L1021 짝이 V16 에만) · 7C S-122(`THIN_HEADS` 에서 `NO_CONCERN` 뺀 변이 · jev 행 변이 셋이 스위트 1063개 초록, V12 · V13 만 잼 — ship-report Test integrity c) (cycle 20261016-075749-adw/phase-7c-comment-yield-variety)
+- first confirmed: 2026-10-16 · last confirmed: 2026-10-16
+
+### E-058 · gotcha — `Store.put` 은 메모리 쪽 기록(`self._videos[...]`)을 먼저 바꾸고 `self.save()` 를 부른다 — 저장이 `OSError` 로 실패해도 그 프로세스 안에서는 새 기록(초안 · 기억)이 있는 것으로 보이므로, 실행 흐름의 기억 관문은 "저장 실패 뒤 메모리에 남은 상태" 칸을 따로 재야 한다
+- evidence: src/agent/store.py:106-107 · ship-check 재현(HEAD 081b9f8 사본): 명단 밖 C 의 초안 저장 `OSError` → 기억 `(stage_error, run.write)` + 댓글이 함께 남아 다음 새 기록에서 `post_video` 1회(S-123) (cycle 20261016-075749-adw/phase-7c-comment-yield-variety)
+- first confirmed: 2026-10-16 · last confirmed: 2026-10-16
+
+### E-059 · codebase — 건너뜀 이유 코드를 더하면 세 곳이 함께 움직인다: `src/agent/report.py` `REASON_LABELS`, 그 표를 기대 dict 와 `assertEqual` 로 통째 잠근 `tests/test_report.py` `TestLabels.test_listed_codes_get_labels`, 계약의 이유 코드 표 — 기대 dict 를 빠뜨리면 이름표를 더한 순간 빨갛다
+- evidence: tests/test_report.py:159-171 (기대 dict 에 `comments_disabled` · `stage_error` 행) · 7C plan-repairs R2(계획이 그 테스트 수정을 빠뜨려 수리) (cycle 20261016-075749-adw/phase-7c-comment-yield-variety)
+- first confirmed: 2026-10-16 · last confirmed: 2026-10-16
+
 ## Retired (history — one line each, never deleted)
+- E-031 · codebase — 설정 읽기 `_construct_mapping` 은 중복 키 검사보다 먼저 `loader.flatten_mapping(node)` 를 부른다 — YAML 병합 키(`<<`)로 앵커를 겹겹이 이은 작은 파일이 항목을 기하급수로 복사해, "키가 두 번 나옵니다" 오류나 "이전 설정 유지"에 닿기 전에 메모리를 다 쓸 수 있다 — retired 2026-10-16 (over cap; unconfirmed since 2026-10-14)
+- E-032 · tooling — 글자 규칙(`logbook._is_raw`, 설정 `_text` 가 같은 함수)의 판정은 실행 중인 파이썬의 `unicodedata` 판을 따르는데, 이 기계의 파이썬은 판이 둘이다 — `/usr/bin/python3` · `python3.14` 는 3.14.4(유니코드 16.0.0), `~/.local/bin/python3.12` 는 3.12.13(15.0.0)이고 `python3.10` · `python3.13` 은 PATH 에 없다 — retired 2026-10-16 (over cap; unconfirmed since 2026-10-14)
+- E-017 · hazard — 작성기 링크 검사 `_link_char`(src/agent/writer.py:115-124)는 유니코드 이름에 `_SEPARATOR_NAMES`(`DOT` · `FULL STOP` 등)가 든 글자만 점으로 남기고 나머지 기호는 버리며, `_LINK_RE` 의 끝은 `[a-z]{2,}` 다 — 점 닮은꼴(U+2027 `‧` · U+2022 · U+2219 · U+00B0) · 키릴 끝 · U+202E 뒤집기로 쓴 주소는 코드 검사를 지나고 jev 광고 질문만 남는다. E-005 와 같은 "열거한 꼴" 부류가 Phase 1 밖에서 처음 목격된 것 — retired 2026-10-16 (over cap; unconfirmed since 2026-10-15)
+- E-028 · tooling — `tests/mutants.py` 의 변이는 소스에서 바꿀 글자가 **정확히 한 번** 나와야 돈다(아니면 종료 코드 2) — 가드 · 로그 · 설정의 한 줄을 고치는 페이즈는 그 줄을 겨눈 변이 문자열도 함께 고쳐야 하고, 같은 글자를 한 번 더 쓰는 줄을 더하기만 해도 기존 변이가 깨진다 — retired 2026-10-16 (over cap; unconfirmed since 2026-10-15)
 - E-029 · tooling — PyYAML 이 읽은 16진수(`0x…`) 정수는 파이썬의 4,300자리 문자열 변환 한도를 읽기에서 거치지 않는다(2의 거듭제곱 진법은 한도 밖) — 십진 `str()` · `format` 에 닿아서야 `ValueError` 가 나므로, 십진수 행만 있는 시험은 이 꼴을 재지 않는다. 정수 키는 1A 의 필수 상한(`src/agent/config.py:174`)이 막지만, 새 숫자 읽기는 같은 꼴을 다시 만날 수 있다 — retired 2026-10-16 (over cap; unconfirmed since 2026-10-14)
 - E-025 · codebase — `YouTubeError` 는 글자열 두 개(`call` · `reason`)만 든다(상태 코드 · 오류 이유 속성 없음) — 403 종류 구분은 글자열 같음 비교(`exc.reason == COMMENTS_DISABLED`)에 기대고, 200 모양 오류도 같은 예외라 받는 쪽이 오류 종류를 가르지 못한다 — retired 2026-10-16 (over cap; unconfirmed since 2026-10-14)
 - E-030 · tooling — 민감 확인 줄로 머지 앞에서 멈춘 사이클은 인터뷰가 트래커만 고치고 코드를 한 바이트도 바꾸지 않아도 허브가 verify-run 부터 다시 돌린다 — 같은 코드 트리에서 verify-run 과 ship-check 전체(감사 포함)가 한 번 더 돈다 — retired 2026-10-16 (7D · 8 에서 틀림: 확인 인터뷰가 `human_checks.py confirm` 뒤 cycle-control `retry step=smoke-file` 로 재개하면 verify-run · ship-check 를 다시 돌지 않음(7D `gate/20261016-010911-cycle-control.json` `"issued_by": "cyclechat"` · retro-bundle Steps ship-check `skipped` · verify-run 시도 1) — verify-run 부터 다시 도는 것은 허브 ↪ Move 길뿐; 두 길을 고친 사실로 E-053 에 다시 씀)
