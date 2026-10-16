@@ -961,7 +961,7 @@ Phase 7 이 영상마다 부르는 모양:
 ```python
 result = write_comment(record, config=config.comment, claude=anthropic_client(),
                        check=jev_self_check(sdk_ask, config.classifier.model), previous=store.comments(),
-                       logbook=logbook, now=now, transcript="", top_comments=<top_comments 또는 ()>)
+                       logbook=logbook, now=now, transcript="", top_comments=<top_comments>)
 if result.draft is not None:
     record.comment = result.draft
     store.put(record)
@@ -995,8 +995,9 @@ if result.draft is not None:
 - **자료의 출처** — 자막은 공식 API 로 남의 영상에서 받을 수 없어 비어 있습니다.
   `captions.download` 는 OAuth 와 그 영상의 편집 권한(200단위)을 요구하고, 비공식 긁기는 약관 · 차단
   위험이라 이 저장소의 방법이 아닙니다. 그래서 `transcript` 는 늘 `""` 이고, 인기 댓글은 탐지 절의
-  `YouTubeClient.top_comments(video_id, now, limits, TOP_COMMENTS_MAX)` 가 가져옵니다. 댓글이 막힌
-  영상(`None`)은 `top_comments=()` 로 제목 · 설명만 씁니다.
+  `YouTubeClient.top_comments(video_id, now, limits, TOP_COMMENTS_MAX)` 가 가져옵니다. 실행 흐름은
+  댓글이 막힌 영상(`None`)을 짓지 않고 `SKIP reason=comments_disabled` 로 건너뜁니다('실행 진입점'
+  절). 실행기(`tests/live_check.py`)는 `top_comments=()` 로 제목 · 설명만 씁니다.
 
 **흐름** — 시도마다(최대 두 번):
 
