@@ -155,8 +155,14 @@ Phase 2–7 의 모든 단계가 기대는 계약입니다. 설정 읽기, 영�
 | `trigger` | `Judgement` 또는 없음 | 트리거 판정 (Phase 4) |
 | `comment` | `CommentDraft(concern, text, at, self_check)` 또는 없음 | 작성한 댓글 (Phase 5) |
 | `attempts` | `PostAttempt(at, mode, result, reason, screenshot)` 목록 | 게시 시도 — 저장소만 바꿈 |
+| `memory` | `Memory(reason, stage, at, tries, top_comments)` 또는 없음 | 기억 칸 — 작성 · 게시가 멈춘 까닭 (Phase 7C, '실행 진입점' 절의 기억) |
 
 - `Judgement(verdict, reason, at)` 의 `verdict` 는 `Verdict` 값 `yes` · `no` · `hold`.
+- `Memory(reason, stage, at, tries, top_comments)` 는 실행 흐름이 적는 기억 칸입니다('실행 진입점' 절의 기억). `reason` 은 작성기 건너뜀의 머리말(`재료에 장면 없음` ·
+  `재료에 연애 고민 없음` · `검사 두 번 탈락` · `claude 호출 실패` · `jev 검사 호출 실패` · `jev 검사 응답 이상`)이나 이유 코드(`comments_disabled` · `stage_error`),
+  `stage` 는 멈춘 단계(`run.classify` · `run.trigger` · `run.write` · `run.post`), `at` 은 멈춘 시각, `tries` 는 작성기를 부른 횟수,
+  `top_comments` 는 마지막으로 작성기를 부를 때 넘긴 비어 있지 않은 인기 댓글 수입니다(둘 다 0 이상 정수).
+  다섯 키 모두 필수이고, `memory` 키가 없는 옛 기록은 `None` 으로 읽습니다. Phase 7C 가 영상 기록에 더한 키는 `memory` 하나입니다.
 - **게시 시도 결과 상태:**
 
   | mode | result | 뜻 |
@@ -212,6 +218,7 @@ Phase 2–7 의 모든 단계가 기대는 계약입니다. 설정 읽기, 영�
       "description": "",
       "detected_at": "2026-10-12T03:00:00+00:00",
       "keyword": "썸",
+      "memory": null,
       "published_at": "2026-10-11T23:00:00+00:00",
       "title": "연락 텀 때문에 불안한 썸",
       "trigger": {
@@ -915,8 +922,8 @@ watcher = Watcher(Store(Path("data/videos.json")), logbook, client, clock)
 - 돌려주는 것은 항목마다 `snippet.topLevelComment.snippet.textDisplay` 글뿐이고, 작성자 이름 ·
   채널 ID 는 읽지 않습니다. 모양이 다른 항목은 건너뛰고, 외톨이 서로게이트는 U+FFFD 로 바꿉니다.
   `items` 가 목록이 아니면 `YouTubeError("commentThreads.list", "HTTP 200 items 가 목록이 아닙니다")`.
-- 오류 이유가 정확히 `HTTP 403 commentsDisabled` 이면 `None` 입니다 — 그 영상 하나의 일이고, 부르는
-  쪽은 제목 · 설명으로 이어 갑니다. 다른 403(`quotaExceeded` 등)과 그 밖의 오류는 `YouTubeError`
+- 오류 이유가 정확히 `HTTP 403 commentsDisabled` 이면 `None` 입니다 — 그 영상 하나의 일이고, 실행 흐름은
+  그 영상을 짓지 않고 `SKIP reason=comments_disabled` 로 건너뜁니다('실행 진입점' 절). 다른 403(`quotaExceeded` 등)과 그 밖의 오류는 `YouTubeError`
   그대로 올라갑니다.
 - `search(…, published_before=None)` — 주면 `publishedBefore=<UTC …Z>` 가 더해집니다(실제 호출 실행기의
   넓힌 창). 시간대가 없거나 `published_after` 와 같거나 이르면 `ValueError` 입니다. 탐지 사이클은
@@ -954,7 +961,7 @@ Phase 7 이 영상마다 부르는 모양:
 ```python
 result = write_comment(record, config=config.comment, claude=anthropic_client(),
                        check=jev_self_check(sdk_ask, config.classifier.model), previous=store.comments(),
-                       logbook=logbook, now=now, transcript="", top_comments=<top_comments 또는 ()>)
+                       logbook=logbook, now=now, transcript="", top_comments=<top_comments>)
 if result.draft is not None:
     record.comment = result.draft
     store.put(record)
@@ -988,8 +995,9 @@ if result.draft is not None:
 - **자료의 출처** — 자막은 공식 API 로 남의 영상에서 받을 수 없어 비어 있습니다.
   `captions.download` 는 OAuth 와 그 영상의 편집 권한(200단위)을 요구하고, 비공식 긁기는 약관 · 차단
   위험이라 이 저장소의 방법이 아닙니다. 그래서 `transcript` 는 늘 `""` 이고, 인기 댓글은 탐지 절의
-  `YouTubeClient.top_comments(video_id, now, limits, TOP_COMMENTS_MAX)` 가 가져옵니다. 댓글이 막힌
-  영상(`None`)은 `top_comments=()` 로 제목 · 설명만 씁니다.
+  `YouTubeClient.top_comments(video_id, now, limits, TOP_COMMENTS_MAX)` 가 가져옵니다. 실행 흐름은
+  댓글이 막힌 영상(`None`)을 짓지 않고 `SKIP reason=comments_disabled` 로 건너뜁니다('실행 진입점'
+  절). 실행기(`tests/live_check.py`)는 `top_comments=()` 로 제목 · 설명만 씁니다.
 
 **흐름** — 시도마다(최대 두 번):
 
@@ -1105,6 +1113,12 @@ if result.draft is not None:
   제목 300 · 설명 2000 · 자막 6000자, 인기 댓글 · 판별 이유 · 이전 댓글 · 검사용 고민과 초안
   각 300자입니다. jev 상태는 같은 자료 블록에 `<video_concern>` · `<draft_comment>` 를 더한
   것입니다.
+- **짜임 (Phase 7C)** — `SHAPES` 는 글 전체의 꼴(첫머리 · 연애사주 경험을 꺼내는 말 · 끝맺음) 다섯 개입니다:
+  `scene_first` · `question_first` · `story_first` · `reply_first` · `feeling_first`. 모든 짜임에 비슷한 고민 때 연애사주를 봤던 경험의 자리가 있습니다.
+  `write_comment` 는 `previous` 의 길이(지금까지 쓴 댓글 수)로 `SHAPES` 를 차례로 돌아 하나를 고르고(`pick_shape`), `SHAPE_INSTRUCTION` 으로
+  사용자 메시지의 `USER_INSTRUCTION` 바로 앞에 넣습니다. 그래서 고른 짜임은 바로 앞 네 댓글이 쓰지 않은 것이고, 다시 쓰기도 같은 짜임입니다.
+  시스템 프롬프트 규칙 2 는 경험을 꺼내는 말을 이 짜임에 맡기고, 규칙 6 은 짜임은 이 지시를 따르되 첫머리 · 문장을 잇는 말 · 끝맺음에 쓰는 말을 최근 댓글과 다르게 쓰게 합니다.
+  짜임을 지켰는지 보는 검사는 없습니다 — jev 다섯 질문 · 코드 검사 · 아래 대조표는 그대로입니다. 음성 대조 `python3 -m tests.mutants writer-shape-fixed`.
 - **API 오류** — Claude 호출이나 jev 호출이 오류를 내거나 jev 답이 이상하면 다시 쓰지 않고(다시
   써도 고쳐지지 않음) `ERROR where=writer.claude` 또는 `where=writer.jev` 와, 같은 이유의
   `SKIP` 을 남깁니다:
@@ -1119,14 +1133,14 @@ if result.draft is not None:
   원인과 함께 `ERROR` 로 보입니다. 그 `ERROR` 위에 멈춤 정책을 세우는 것은 Phase 7 의
   몫입니다. `try` 안에는 `messages.create` 와 `check` 호출만 있으므로, 모양이 틀린 Claude
   응답(작성기 버그)은 건너뛰기로 숨지 않고 그대로 오류가 됩니다.
-- **로그** — `COMMENT` 는 필수 필드 뒤에 `attempt`(1 또는 2)와
+- **로그** — `COMMENT` 는 필수 필드 뒤에 `attempt`(1 또는 2) ·
   `check`(`mentions_scene=0.90 reads_like_ad=0.10 follows_concern=0.80 concern_is_love_worry=0.85
-  saju_story_fits=0.75`)를 더합니다(7절의 "나머지 필드").
+  saju_story_fits=0.75`) · `shape`(고른 짜임 이름, Phase 7C)를 더합니다(7절의 "나머지 필드").
 - **`self_check`** — 초안의 `self_check` 는 `Judgement(yes, "<질문>=<P(예)> …", now)` 입니다.
   `CommentDraft.at` 도 넘겨받은 `now` 이고, 숨은 시계는 없습니다.
 - 프롬프트 원문(`SYSTEM_PROMPT` · `USER_INSTRUCTION` · `REWRITE_PROMPT` · `WRITE_TOOL` ·
-  `CHECK_QUESTIONS` · `CHECK_LABELS`)은 `writer.py` 맨 위에만 있고, Phase 8 의 PROCESS.md 가 옮겨
-  적습니다.
+  `CHECK_QUESTIONS` · `CHECK_LABELS` · `SHAPES` · `SHAPE_INSTRUCTION`)은 `writer.py` 맨 위에만 있고, Phase 8 의 PROCESS.md 가 옮겨
+  적습니다(`SHAPES` · `SHAPE_INSTRUCTION` 은 Phase 8A 가 옮김).
 - **과제 문장 대조표 (Phase 6E).** 과제 안내 4쪽 ④ 여덟 문장과 7쪽 평가표 '댓글 품질' 세 문장마다 게시
   전에 막는 자리와 짝 테스트입니다(문장은 트래커 Phase 6E 인터뷰 질문 1 A 가 옮긴 원문). 스위트
   테스트(`tests/test_task_table.py`)가 열한 문장이 표에 하나씩 있는지, 표의 규칙 번호 · jev 질문 · 코드
@@ -1589,10 +1603,20 @@ PYTHONPATH=src python3 -m agent.run [--dry-run] [--once]
 - **타이밍.** 새 기록마다 `judge_trigger` 로 다시 판정해 `record.trigger` 에 저장하고 `TRIGGER … per_hour=<views_per_hour>` 를
   씁니다. 명단 영상(`allowed_video_ids(config.allowed_videos)`)은 규칙 판정을 `rule_verdict=` · `rule_reason=` 에 함께 적고
   `verdict=yes reason=allowlisted` 로 통과합니다 — 다른 영상의 기준은 그대로입니다.
-- **작성.** 판별 · 타이밍이 모두 `yes` 이고 댓글이 없으면 인기 댓글(`top_comments` 앞 10개, 댓글이 막힌 영상은 `()`) ·
+- **작성.** 판별 · 타이밍이 모두 `yes` 이고 댓글이 없으면 인기 댓글(`top_comments` 앞 10개) ·
   `previous=store.comments()` · `transcript=""` 로 `write_comment` 를 부르고, 초안을 `record.comment` 에 넣어 저장합니다.
   인기 댓글을 못 받은 영상(`QUOTA` 또는 `ERROR where=commentThreads.list`)은 이번 사이클에 쓰지 않습니다.
-  명단 밖 영상의 댓글도 저장소와 `COMMENT` 줄에 남습니다.
+  댓글이 막힌 영상(`top_comments` 가 `None`)은 Claude 를 부르지 않고 `SKIP video=<ID> reason=comments_disabled` 한 줄을 남깁니다.
+  인기 댓글이 0개인 영상(`[]`)은 그대로 씁니다. 명단 밖 영상의 댓글도 저장소와 `COMMENT` 줄에 남습니다.
+- **기억 (Phase 7C).** 작성 · 게시가 멈추면 그 까닭을 `record.memory`(3절 `Memory`)에 적습니다 — 작성기가 건너뛰면 그 머리말 · 작성기를 부른 횟수 · 넘긴 인기 댓글 수,
+  댓글이 막히면 `comments_disabled`, 울타리가 예외를 잡으면 `stage_error` 와 그 단계입니다. 초안이 나오면 기억을 지웁니다. 명단 밖 영상은 새 조회수 기록마다 기억을 읽습니다.
+  - 스스로 건너뜀(`재료에 장면 없음` · `재료에 연애 고민 없음`)은 타이밍이 `yes` 일 때 인기 댓글을 다시 받아(1단위) 비어 있지 않은 인기 댓글이 지난 시도보다 많을 때 다시 씁니다.
+  - 작성기를 부른 횟수가 3(`WRITE_TRIES_MAX`)이 되면 스스로 건너뜀도 인기 댓글을 다시 받지 않습니다.
+  - 검사 두 번 탈락 · Claude · jev 오류 · 댓글 막힘은 다시 쓰지 않고 인기 댓글도 다시 받지 않습니다.
+  - 울타리 오류는 그 단계부터 다시 부르지 않습니다 — 판별에서 났으면 판별 · 타이밍 · 작성 · 게시, 게시에서 났으면 게시만입니다.
+  - 기억 때문에 단계를 부르지 않는 새 기록마다 `SKIP video=<ID> reason=<기억의 reason> memory=<기억의 stage>` 한 줄을 남깁니다 — 작성 · 게시에서 멈춘 기억이면 그 새 기록의 `TRIGGER` 줄 뒤입니다.
+  - 기억 칸과 이 `SKIP` 줄에는 머리말 · 이유 코드 · 단계 · 시각 · 횟수 · 인기 댓글 수만 들고, 이유의 세부 · 초안 · 오류 원문은 들지 않습니다.
+  명단 영상은 기억을 적기만 하고 읽지 않습니다 — 무엇으로 멈췄든 다음 새 기록에서 판별 · 타이밍 · 작성 · 게시를 다시 거치고, 영상당 1개(`duplicate_video`) · 하루 상한 · 채널 대기는 그대로입니다.
 - **게시.** 댓글이 있는 영상마다 `post_video(…, dry_run=<테스트 실행>, …)`(6절)를 부릅니다. 영상당 1개 · 하루 상한 · 채널
   대기는 명단 영상에도 저장소가 그대로 셉니다(4절). 테스트 실행은 `--dry-run` 또는 `config.test_run` 이고, 설정은
   `--dry-run` 을 끄지 못합니다. 명단 영상에는 게시마다 `ChromeSession(config.chrome_debug_url)` 을 새로 만들어 그 `new_page` 를
@@ -1611,11 +1635,12 @@ PYTHONPATH=src python3 -m agent.run [--dry-run] [--once]
   갑니다. `KeyboardInterrupt` 같은 `BaseException` 은 그대로 올라가 `STOP reason=interrupted`(종료 코드 130)로 끝납니다.
   울타리 줄과 `on_error` 의 `ERROR where=cycle|config` 줄은 예외 자신의 종류와 메시지만 쓰고, `__context__` · `__cause__` ·
   traceback 을 따라가지 않습니다(Phase 2 ship-report R6).
-  그 영상을 다음 사이클에 다시 하지 않게 하는 기억은 아직 없습니다(Phase 7C).
+  울타리가 잡은 예외는 그 영상의 기억 칸에 `stage_error` 와 그 단계로 적습니다(위 '기억'). 기억 칸을 적다가 난 예외는 같은 `where=` 의 `ERROR` 한 줄을 더 남깁니다.
 - **음성 대조.** `python3 -m tests.mutants <이름>` — `run-rejected-posts-live` · `run-chrome-for-all` · `run-no-timing-exemption` ·
   `run-fence-catches-base` · `run-errors-uncounted` · `run-reason-follows-context` · `run-reloader-forgets-rejection` ·
   `run-lock-ignored` · `watcher-allowlist-untracked` · `trigger-first-sample-ignored` · `trigger-first-sample-age-zero` ·
-  `config-test-run-any-value` · `writer-status-ignored` · `run-sdk-check-skipped` · `run-echo-strict` · `run-reason-str-unguarded`.
+  `config-test-run-any-value` · `writer-status-ignored` · `run-sdk-check-skipped` · `run-echo-strict` · `run-reason-str-unguarded` · `run-disabled-writes` ·
+  `run-memory-ignored` · `run-listed-reads-memory` · `run-thin-ignores-growth` · `run-fence-forgotten` · `run-listed-repost-unguarded`.
 
 ## 결과 화면 — `report.py` (Phase 7D)
 
@@ -1641,6 +1666,7 @@ PYTHONPATH=src python3 -m agent.run [--dry-run] [--once]
   시도도 리허설도 없으면 댓글이 있을 때 "게시 기록 없음", 없을 때 "댓글 안 씀" 입니다.
   결과 배지 아래에는 그 결과의 시각(시도의 `at`, 리허설 줄의 시각)을 KST 초로 적습니다 — 지난 사이클의 결과일 수 있습니다.
 - **이유 배지.** 늦은 로그 줄 가운데 파일에서 마지막 줄이 `SKIP` 이면 그 `reason=` 의 이름표, `ERROR` 이면 그 `where=` 의 이름표입니다.
+  `ERROR` 줄이라도 `reason=` 이 정확히 `comments_disabled` 이면(게시 단계의 `ERROR where=poster reason=comments_disabled`) `where=` 대신 `comments_disabled` 의 이름표입니다(Phase 7C).
   마지막 줄이 리허설이거나 늦은 줄이 없으면 이유 배지는 없습니다.
 - **이름표.** 이유 글이 아래 코드와 정확히 같거나 아래 머리말로 시작하면 그 이름표이고, 아니면 "기타 — 로그 참고" 입니다.
   `where=` 는 아래 단계와 정확히 같을 때 그 이름표이고, 아니면 "기타 — 로그 참고" 입니다.
@@ -1660,6 +1686,8 @@ PYTHONPATH=src python3 -m agent.run [--dry-run] [--once]
   | `config_rejected` | 설정 거절로 저장만 |
   | `page_mismatch` | 열린 화면이 다른 영상이라 저장만 |
   | `unavailable` | 영상을 볼 수 없음 |
+  | `comments_disabled` | 댓글을 막아 둔 영상 |
+  | `stage_error` | 단계 오류 뒤 다시 하지 않음 |
   | `재료에 장면 없음`으로 시작 | 작성 건너뜀 — 짚을 장면 없음 |
   | `재료에 연애 고민 없음`으로 시작 | 작성 건너뜀 — 연애 고민 없음 |
   | `검사 두 번 탈락`으로 시작 | 검사 두 번 탈락 |
@@ -1684,7 +1712,8 @@ PYTHONPATH=src python3 -m agent.run [--dry-run] [--once]
   "로그를 읽지 못함" 으로, 리허설 · 판단한 쪽을 비운 채 저장소 칸으로 화면을 씁니다. 화면을 만들거나 쓰다 난 그 밖의 `Exception` 도
   `ERROR where=report` 한 줄로 남기고 사이클은 그대로 끝납니다. `KeyboardInterrupt` 같은 `BaseException` 은 그대로 올라갑니다.
 - **음성 대조.** `python3 -m tests.mutants <이름>` — `report-late-filter-off` · `report-floor-trigger-off` · `report-floor-hold-counts-trigger` ·
-  `report-raw-reason` · `report-unescaped` · `report-prefix-anywhere` · `run-report-fence-narrow` · `run-report-log-degrade-silent`.
+  `report-raw-reason` · `report-unescaped` · `report-prefix-anywhere` · `run-report-fence-narrow` · `run-report-log-degrade-silent` ·
+  `report-disabled-unlabelled` · `report-poster-disabled-by-where`.
 
 ## 공개용 사본 — `tests/public_copy.py` (Phase 8)
 

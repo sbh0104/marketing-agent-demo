@@ -26,10 +26,14 @@ from agent.config import CommentConfig, load_config
 from agent.logbook import Event, Logbook, parse_line
 from agent.models import CommentDraft, Judgement, Verdict, VideoRecord
 from agent.writer import (
+    CHECK_FAILED,
     CHECK_LABELS,
     CHECK_QUESTIONS,
+    CLAUDE_FAILED,
     CLAUDE_TIMEOUT_S,
     FRAME_MIN_CHARS,
+    JEV_FAILED,
+    JEV_INVALID,
     MAX_TOKENS,
     NO_CONCERN,
     NO_SCENE,
@@ -37,6 +41,8 @@ from agent.writer import (
     REQUIRED_WORD,
     REWRITE_PROMPT,
     SELF_CHECK_CRITERIA,
+    SHAPE_INSTRUCTION,
+    SHAPES,
     SYSTEM_PROMPT,
     USER_INSTRUCTION,
     WRITE_TOOL,
@@ -45,6 +51,7 @@ from agent.writer import (
     code_failures,
     jev_self_check,
     link_fragment,
+    pick_shape,
     read_reply,
     repeated_run,
     self_check_failure,
@@ -647,10 +654,97 @@ class WriteCommentTest(unittest.TestCase):
                         "text": GOOD,
                         "attempt": "1",
                         "check": check.reason,
+                        "shape": "question_first",
                     },
                 )
             ],
         )
+
+    def test_shape_instruction_sits_before_user_instruction(self) -> None:
+        # 트래커 7C 질문 2 A — 고른 짜임 지시는 사용자 메시지의 USER_INSTRUCTION 바로 앞에 듭니다
+        block = SHAPE_INSTRUCTION.format(shape=SHAPES["scene_first"])
+        claude = FakeClaude([reply(CONCERN, GOOD)])
+        result = self.write(claude, FakeJev([PASSING]))
+        self.assertIsNotNone(result.draft)
+        first = self.user_message(claude)
+        self.assertTrue(first.endswith("\n\n" + block + "\n\n" + USER_INSTRUCTION), first)
+        self.assertEqual(
+            claude.calls[0]["system"], SYSTEM_PROMPT.format(min_chars=40, max_chars=120)
+        )
+        [(event, fields)] = self.events()
+        self.assertEqual((event, fields["shape"]), (Event.COMMENT, "scene_first"))
+        # 다시 쓰기도 같은 첫 메시지 — 같은 짜임입니다
+        claude = FakeClaude(["답할 수 없습니다", reply(CONCERN, GOOD)])
+        path = self.dir / "rewrite.log"
+        result = self.write(claude, FakeJev([PASSING]), log_path=path)
+        self.assertIsNotNone(result.draft)
+        self.assertEqual(len(claude.calls), 2)
+        for call in claude.calls:
+            with self.subTest(messages=len(call["messages"])):
+                self.assertEqual(call["messages"][0]["content"], first)
+                self.assertEqual(call["system"], SYSTEM_PROMPT.format(min_chars=40, max_chars=120))
+        [(event, fields)] = self.events(path)
+        self.assertEqual(
+            (event, fields["attempt"], fields["shape"]), (Event.COMMENT, "2", "scene_first")
+        )
+
+    def test_shape_rotates_with_comment_count(self) -> None:
+        # 계약 '댓글 작성' 절의 짜임 — 지금까지 쓴 댓글 수로 차례로 돌아, 바로 앞 네 댓글이 쓰지 않은 짜임
+        names = list(SHAPES)
+        picks = [pick_shape(["c"] * n) for n in range(2 * len(SHAPES))]
+        for n, pick in enumerate(picks):
+            with self.subTest(n=n):
+                self.assertEqual(pick, names[n % len(SHAPES)])
+                if n >= 4:
+                    self.assertNotIn(pick, picks[n - 4 : n])
+        first_claude = FakeClaude([reply(CONCERN, GOOD)])
+        first = self.write(first_claude, FakeJev([PASSING]), previous=[])
+        second_claude = FakeClaude([reply(CONCERN, GOOD2)])
+        self.write(
+            second_claude,
+            FakeJev([PASSING]),
+            previous=[first.draft.text],
+            log_path=self.dir / "second.log",
+        )
+        blocks = [
+            self.user_message(claude).split("\n\n")[-2] for claude in (first_claude, second_claude)
+        ]
+        self.assertEqual(
+            blocks,
+            [SHAPE_INSTRUCTION.format(shape=SHAPES[name]) for name in names[:2]],
+        )
+        self.assertNotEqual(blocks[0], blocks[1])
+
+    def test_every_shape_keeps_the_saju_experience(self) -> None:
+        # 트래커 7C 질문 2 A · E-040 — 바꾸는 것은 경험을 어떻게 꺼내느냐이지, 경험이 있느냐가 아닙니다
+        self.assertTrue(4 <= len(SHAPES) <= 5, list(SHAPES))
+        for name, text in SHAPES.items():
+            with self.subTest(name=name):
+                self.assertRegex(name, r"\A[a-z_]+\Z")
+                self.assertNotIn("\n", text)
+                for word in ("연애사주", "비슷한 고민", "첫머리", "끝맺음"):
+                    self.assertIn(word, text)
+
+    def test_rules_two_and_six_defer_to_the_shape(self) -> None:
+        # 트래커 7C 질문 2 A — 규칙 2 의 예 문구는 특정 뼈대를 부르지 않고, 규칙 6 은 짜임 지시를 따릅니다
+        self.assertNotIn("그때 연애사주에서 들은 말", SYSTEM_PROMPT)
+        self.assertNotIn("문장 짜임(첫머리 · 문장을 잇는 말 · 끝맺음)도", SYSTEM_PROMPT)
+        lines = SYSTEM_PROMPT.splitlines()
+        [rule_two] = [line for line in lines if line.startswith("2. ")]
+        [rule_six] = [line for line in lines if line.startswith("6. ")]
+        self.assertEqual(
+            rule_two,
+            "2. 댓글은 그 고민에 공감하면서, 비슷한 고민이 있었을 때 '연애사주'를 봤던 자기 경험을"
+            " 그 고민에 자연스럽게 잇습니다. 그 경험을 어떤 말로 꺼낼지는 자료 뒤에 주는 이번 댓글의"
+            " 짜임을 따릅니다.",
+        )
+        self.assertIn("비슷한 고민이 있었을 때 '연애사주'를 봤던 자기 경험", rule_two)
+        self.assertEqual(
+            rule_six,
+            "6. <my_previous_comments> 안의 문장을 다시 쓰지 않습니다. 이번 댓글의 짜임은 따르되,"
+            " 첫머리 · 문장을 잇는 말 · 끝맺음에 쓰는 말은 그 댓글들과 다르게 씁니다.",
+        )
+        self.assertIn("이번 댓글의 짜임은 따르되", rule_six)
 
     def test_model_name_comes_from_comment_config(self) -> None:
         claude = FakeClaude(["답할 수 없습니다", reply(CONCERN, GOOD)])
@@ -681,11 +775,12 @@ class WriteCommentTest(unittest.TestCase):
             ' 줄거리 · 주제 요약 · "점을 보고 싶다" 는 고민이 아닙니다. 타로 · 사주 풀이 영상은'
             " 그 풀이가 답하려는 상황(연락이 올지 · 재회 · 새 인연)이 고민입니다.",
             "2. 댓글은 그 고민에 공감하면서, 비슷한 고민이 있었을 때 '연애사주'를 봤던 자기 경험을"
-            " 그 고민에 자연스럽게 잇습니다(예: 연락 텀이 고민이면 그때 연애사주에서 들은 말).",
+            " 그 고민에 자연스럽게 잇습니다. 그 경험을 어떤 말로 꺼낼지는 자료 뒤에 주는 이번 댓글의"
+            " 짜임을 따릅니다.",
             "3. 영상 속 구체적인 장면이나 말을 하나 이상 짚습니다. 장면 · 말은 설명이나 인기 댓글이"
             " 전하는 영상 속 장면 · 말뿐이고, 제목을 되풀이하는 것은 장면이 아닙니다.",
-            "6. <my_previous_comments> 안의 문장을 다시 쓰지 않고, 문장 짜임(첫머리 · 문장을 잇는"
-            " 말 · 끝맺음)도 그 댓글들과 다르게 씁니다.",
+            "6. <my_previous_comments> 안의 문장을 다시 쓰지 않습니다. 이번 댓글의 짜임은 따르되,"
+            " 첫머리 · 문장을 잇는 말 · 끝맺음에 쓰는 말은 그 댓글들과 다르게 씁니다.",
         )
         for rule in rules:
             with self.subTest(rule=rule[:2]):
@@ -811,7 +906,7 @@ class WriteCommentTest(unittest.TestCase):
         )
 
     def test_prompt_originals_live_only_at_top_of_writer(self) -> None:
-        # 계약 '댓글 작성' 절 — 여섯 이름은 writer.py 첫 def/class 앞에서 한 번씩 정하고, 다른 src
+        # 계약 '댓글 작성' 절 — 여덟 이름은 writer.py 첫 def/class 앞에서 한 번씩 정하고, 다른 src
         # 모듈과 writer 함수 본문에는 그 15글자 이상 줄 · 질문의 복사본이 없습니다
         names = (
             "SYSTEM_PROMPT",
@@ -820,6 +915,8 @@ class WriteCommentTest(unittest.TestCase):
             "WRITE_TOOL",
             "CHECK_QUESTIONS",
             "CHECK_LABELS",
+            "SHAPES",
+            "SHAPE_INSTRUCTION",
         )
         tree = ast.parse(WRITER_PATH.read_text(encoding="utf-8"))
         first = min(
@@ -1495,6 +1592,36 @@ class WriteCommentTest(unittest.TestCase):
             with self.subTest(args=args):
                 with self.assertRaises(ValueError):
                     WriteResult(*args)
+
+    def test_skip_results_carry_their_head(self) -> None:
+        # 건너뛴 결과는 이유의 머리말 상수를 함께 싣습니다 — 실행 흐름의 기억 칸이 씁니다(트래커 7C)
+        failing = {**PASSING, "mentions_scene": 0.25}
+        runs = (
+            ("no_concern", [skip_reply(False, True)], [], NO_CONCERN),
+            ("no_scene", [skip_reply(True, False)], [], NO_SCENE),
+            (
+                "checks_failed",
+                [reply(CONCERN, GOOD), reply(CONCERN, GOOD2)],
+                [failing, failing],
+                CHECK_FAILED,
+            ),
+            ("claude_error", [FakeApiError("overloaded")], [], CLAUDE_FAILED),
+            ("jev_error", [reply(CONCERN, GOOD)], [TimeoutError("timed out")], JEV_FAILED),
+            ("jev_invalid", [reply(CONCERN, GOOD)], [{}], JEV_INVALID),
+        )
+        for label, replies, answers, head in runs:
+            with self.subTest(label):
+                path = self.dir / f"{label}.log"
+                result = self.write(FakeClaude(replies), FakeJev(answers), log_path=path)
+                self.assertIsNone(result.draft)
+                self.assertIs(result.head, head)
+                self.assertTrue(result.skip_reason.startswith(result.head), result.skip_reason)
+        passed = self.write(FakeClaude([reply(CONCERN, GOOD)]), FakeJev([PASSING]))
+        self.assertIsNotNone(passed.draft)
+        self.assertIsNone(passed.head)
+
+    def test_head_is_left_out_of_equality(self) -> None:
+        self.assertEqual(WriteResult(None, "x", "y"), WriteResult(None, "x"))
 
     def test_anthropic_client_imports_sdk_only_when_called(self) -> None:
         self.assertNotIn("anthropic", vars(agent.writer))

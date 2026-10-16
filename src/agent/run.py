@@ -29,14 +29,16 @@ from agent.config import Config, ConfigError, load_config
 from agent.env import EnvError, require_secret
 from agent.guard import allowed_video_ids, decide_post
 from agent.logbook import Event, Logbook, read_log
-from agent.models import Judgement, Verdict, VideoRecord
-from agent.poster import CommentPage, PageError, post_video
+from agent.models import Judgement, Memory, Verdict, VideoRecord
+from agent.poster import COMMENTS_DISABLED, CommentPage, PageError, post_video
 from agent.report import render_report, write_report
 from agent.scheduler import run_loop
 from agent.store import Store, StoreError
 from agent.trigger import judge_trigger, views_per_hour
 from agent.watcher import Watcher
 from agent.writer import (
+    NO_CONCERN,
+    NO_SCENE,
     TOP_COMMENTS_MAX,
     ClaudeClient,
     SelfCheck,
@@ -61,6 +63,9 @@ CHROME_WITHHELD = "chrome_withheld"  # PageError reason of the opener handed to 
 REASON_MAX = 200
 STAGE_CLASSIFY, STAGE_TRIGGER = "run.classify", "run.trigger"
 STAGE_WRITE, STAGE_POST = "run.write", "run.post"
+REMEMBERED_ERROR = "stage_error"     # SKIP reason while a remembered fence error keeps its stage uncalled
+THIN_HEADS = (NO_SCENE, NO_CONCERN)  # self skips rewritten only when the top comments grew
+WRITE_TRIES_MAX = 3                  # write_comment calls for a self-skipped out-of-list video — first try + two rewrites
 REPORT_WHERE = "report"  # 결과 화면의 ERROR where=
 # module, pip package — checked before secrets
 SDK_MODULES = (("typesafe_sdk", "typesafe-sdk"), ("anthropic", "anthropic"))
@@ -318,20 +323,65 @@ class Pipeline:
         rejected: bool,
         check: SelfCheck,
     ) -> bool:
-        """영상 하나의 판별 → 타이밍 → 작성 → 게시. 울타리가 예외를 받았으면 False."""
+        """영상 하나의 판별 → 타이밍 → 작성 → 게시. 울타리가 예외를 받았으면 False.
+
+        울타리 오류는 기억 칸에 적고, 명단 밖 영상은 다음 새 기록에서 그 단계부터 부르지 않습니다.
+        """
         stage = STAGE_CLASSIFY
         try:
+            if self._recalled(self._store.get(video_id), allowed, STAGE_CLASSIFY):
+                return True
             record = self._classify(video_id, config)
             stage = STAGE_TRIGGER
+            if self._recalled(record, allowed, STAGE_TRIGGER):
+                return True
             record = self._time(record, config, allowed)
             stage = STAGE_WRITE
-            record = self._write(record, config, check)
+            record = self._write(record, config, check, allowed)
             stage = STAGE_POST
             self._post(record, config, allowed=allowed, test_run=test_run, rejected=rejected)
         except Exception as exc:  # 영상 하나의 울타리 — BaseException 은 그대로 올라갑니다
             self._logbook.write(Event.ERROR, where=stage, reason=short_reason(exc), video=video_id)
+            self._remember_fence(video_id, stage)
             return False
         return True
+
+    def _recalled(self, record: VideoRecord | None, allowed: frozenset[str], stage: str) -> bool:
+        """명단 밖 영상의 기억이 이 단계에서 멈췄으면 SKIP 한 줄을 다시 남기고 True — 그 단계는 부르지 않습니다.
+
+        명단 영상은 기억을 읽지 않습니다. 상한 전의 스스로 건너뜀은 False — 인기 댓글 수는 _write 가 견줍니다.
+        """
+        if record is None or record.memory is None or record.video_id in allowed:
+            return False
+        memory = record.memory
+        if memory.stage != stage:
+            return False
+        if memory.reason in THIN_HEADS and memory.tries < WRITE_TRIES_MAX:
+            return False
+        self._skip_again(record.video_id, memory)
+        return True
+
+    def _skip_again(self, video_id: str, memory: Memory) -> None:
+        """기억 때문에 단계를 부르지 않는 새 기록의 SKIP — 이유는 기억의 머리말 · 코드 그대로, memory= 는 멈춘 단계."""
+        self._logbook.write(Event.SKIP, video=video_id, reason=memory.reason, memory=memory.stage)
+
+    def _remember_fence(self, video_id: str, stage: str) -> None:
+        """울타리 오류를 기억 칸에 적습니다(이유는 stage_error, 오류 원문은 적지 않음). 적다가 난 예외는 ERROR 한 줄로."""
+        try:
+            record = self._store.get(video_id)
+            if record is None:
+                return
+            memory = record.memory
+            record.memory = Memory(
+                REMEMBERED_ERROR,
+                stage,
+                self._clock(),
+                memory.tries if memory is not None else 0,
+                memory.top_comments if memory is not None else 0,
+            )
+            self._store.put(record)
+        except Exception as exc:  # 기억 칸을 못 적어도 다음 영상으로 갑니다
+            self._logbook.write(Event.ERROR, where=stage, reason=short_reason(exc), video=video_id)
 
     def _classify(self, video_id: str, config: Config) -> VideoRecord:
         """판별은 영상마다 한 번 — 오류 보류는 저장하지 않아 다음 새 기록 때 다시 묻습니다."""
@@ -381,8 +431,14 @@ class Pipeline:
         self._store.put(record)
         return record
 
-    def _write(self, record: VideoRecord, config: Config, check: SelfCheck) -> VideoRecord:
-        """판별 · 타이밍이 모두 yes 이고 댓글이 없을 때만 씁니다. 인기 댓글을 못 받으면 이번엔 쉽니다."""
+    def _write(
+        self, record: VideoRecord, config: Config, check: SelfCheck, allowed: frozenset[str]
+    ) -> VideoRecord:
+        """판별 · 타이밍이 모두 yes 이고 댓글이 없을 때만 씁니다. 인기 댓글을 못 받으면 이번엔 쉽니다.
+
+        댓글이 막힌 영상은 Claude 를 부르지 않고 SKIP reason=comments_disabled 를 남깁니다. 멈춘 까닭은 기억 칸에
+        적고, 명단 밖 영상의 스스로 건너뜀은 인기 댓글이 지난 시도보다 늘었을 때만 다시 씁니다.
+        """
         if (
             record.classification is None
             or record.classification.verdict is not Verdict.YES
@@ -390,6 +446,8 @@ class Pipeline:
             or record.trigger.verdict is not Verdict.YES
             or record.comment is not None
         ):
+            return record
+        if self._recalled(record, allowed, STAGE_WRITE):
             return record
         now = self._clock()
         try:
@@ -411,6 +469,22 @@ class Pipeline:
                 Event.ERROR, where=exc.call, reason=exc.reason, video=record.video_id
             )
             return record
+        memory = record.memory
+        tries = memory.tries if memory is not None else 0
+        if comments is None:
+            self._logbook.write(Event.SKIP, video=record.video_id, reason=COMMENTS_DISABLED)
+            record.memory = Memory(COMMENTS_DISABLED, STAGE_WRITE, now, tries, 0)
+            self._store.put(record)
+            return record
+        count = sum(1 for text in comments if text.strip())
+        if (
+            memory is not None
+            and record.video_id not in allowed
+            and memory.reason in THIN_HEADS
+            and count <= memory.top_comments
+        ):
+            self._skip_again(record.video_id, memory)
+            return record
         result = write_comment(
             record,
             config=config.comment,
@@ -420,11 +494,14 @@ class Pipeline:
             logbook=self._logbook,
             now=now,
             transcript="",
-            top_comments=comments or (),
+            top_comments=comments,
         )
         if result.draft is not None:
             record.comment = result.draft
-            self._store.put(record)
+            record.memory = None
+        else:
+            record.memory = Memory(result.head, STAGE_WRITE, now, tries + 1, count)
+        self._store.put(record)
         return record
 
     def _post(
@@ -438,6 +515,8 @@ class Pipeline:
     ) -> None:
         """댓글이 있으면 게시 단계로 — 명단 영상에만 게시마다 새 크롬 연결을 넘기고 끝나면 놓습니다."""
         if record.comment is None:
+            return
+        if self._recalled(record, allowed, STAGE_POST):
             return
         if rejected:
             self._save_rejected(record, config, allowed)

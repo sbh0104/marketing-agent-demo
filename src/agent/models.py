@@ -215,6 +215,46 @@ class PostAttempt:
         )
 
 
+@dataclass
+class Memory:
+    """기억 칸 — 작성 · 게시가 멈춘 까닭. 실행 흐름이 적고, 명단 밖 영상만 다음 새 기록에서 읽습니다(계약 3절)."""
+
+    reason: str        # 작성기 건너뜀 머리말 또는 이유 코드(comments_disabled · stage_error)
+    stage: str         # 멈춘 단계 — run.classify · run.trigger · run.write · run.post
+    at: datetime       # 멈춘 시각
+    tries: int = 0     # 작성기(write_comment)를 부른 횟수
+    top_comments: int = 0  # 마지막으로 작성기를 부를 때 넘긴 비어 있지 않은 인기 댓글 수
+
+    def __post_init__(self) -> None:
+        _text(self.reason, "Memory.reason", non_empty=True)
+        _text(self.stage, "Memory.stage", non_empty=True)
+        _aware(self.at, "Memory.at")
+        for name in ("tries", "top_comments"):
+            value = getattr(self, name)
+            if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                raise ValueError(f"Memory.{name}: 0 이상의 정수여야 합니다")
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "reason": self.reason,
+            "stage": self.stage,
+            "at": _iso(self.at),
+            "tries": self.tries,
+            "top_comments": self.top_comments,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, object]) -> "Memory":
+        data = _keys(data, ("reason", "stage", "at", "tries", "top_comments"), (), "Memory")
+        return cls(
+            data["reason"],
+            data["stage"],
+            _parse_time(data["at"], "Memory.at"),
+            data["tries"],
+            data["top_comments"],
+        )
+
+
 _RECORD_REQUIRED = (
     "video_id",
     "channel_id",
@@ -224,7 +264,7 @@ _RECORD_REQUIRED = (
     "detected_at",
     "keyword",
 )
-_RECORD_OPTIONAL = ("view_history", "classification", "trigger", "comment", "attempts")
+_RECORD_OPTIONAL = ("view_history", "classification", "trigger", "comment", "attempts", "memory")
 
 
 @dataclass
@@ -243,6 +283,7 @@ class VideoRecord:
     trigger: Judgement | None = None
     comment: CommentDraft | None = None
     attempts: list[PostAttempt] = field(default_factory=list)
+    memory: Memory | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.video_id, str) or not VIDEO_ID_RE.fullmatch(self.video_id):
@@ -258,6 +299,7 @@ class VideoRecord:
         _optional(self.trigger, Judgement, "VideoRecord.trigger")
         _optional(self.comment, CommentDraft, "VideoRecord.comment")
         _items(self.attempts, PostAttempt, "VideoRecord.attempts")
+        _optional(self.memory, Memory, "VideoRecord.memory")
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -273,6 +315,7 @@ class VideoRecord:
             "trigger": _dump(self.trigger),
             "comment": _dump(self.comment),
             "attempts": [attempt.to_dict() for attempt in self.attempts],
+            "memory": _dump(self.memory),
         }
 
     @classmethod
@@ -281,6 +324,7 @@ class VideoRecord:
         classification = data.get("classification")
         trigger = data.get("trigger")
         comment = data.get("comment")
+        m = data.get("memory")
         return cls(
             video_id=data["video_id"],
             channel_id=data["channel_id"],
@@ -302,8 +346,9 @@ class VideoRecord:
                 PostAttempt.from_dict(item)
                 for item in _list_of(data.get("attempts", []), "VideoRecord.attempts")
             ],
+            memory=Memory.from_dict(m) if m is not None else None,
         )
 
 
-def _dump(value: Judgement | CommentDraft | None) -> dict[str, object] | None:
+def _dump(value: Judgement | CommentDraft | Memory | None) -> dict[str, object] | None:
     return value.to_dict() if value is not None else None

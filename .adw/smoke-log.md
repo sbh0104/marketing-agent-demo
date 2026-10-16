@@ -1170,3 +1170,39 @@ other line is required on every item.
 - phase: plans/interview-marketing-agent.md#phase-7a
 - status: resolved
 - attempts: 0 · last failure: —
+
+### S-NEW-1 — 작성 단계 울타리 오류를 기억한 명단 밖 영상이 초안을 이미 저장했으면 다음 새 기록에서 게시 단계가 불리는 빈틈 막기
+- source: cycle 20261016-075749-adw/phase-7c-comment-yield-variety · tracker plans/interview-marketing-agent.md#phase-7c · deferred by ship-check
+- evidence: src/agent/run.py:519 (`_post` 는 `STAGE_POST` 기억만 봄) · src/agent/run.py:442-451 (`_write` 는 댓글이 있으면 `_recalled` 앞에서 돌아감) · src/agent/store.py:106-107 (`put` 이 메모리 쪽을 먼저 바꾸고 저장) — docs/contracts.md:1616 "울타리 오류는 그 단계부터 다시 부르지 않습니다". ship-check 재현(HEAD 081b9f8 사본, tests/test_run.py 가짜): 명단 밖 C 의 초안 저장이 한 번 `OSError` → 기억 `(stage_error, run.write)` + 댓글 → 다음 새 기록에서 `post_video` 1회 · `POST mode=test result=saved reason=not_in_allowlist`, 반복 `SKIP` 없음
+- direction: `_post` 의 기억 관문이 `STAGE_POST` 기억과 함께 `STAGE_WRITE` 기억에서도 반복 SKIP 을 남기고 멈추게 하고(명단 영상은 지금처럼 읽지 않음), tests/test_run.py 에 "초안 저장이 한 번 실패한 명단 밖 영상은 다음 새 기록에서 post_video 0회 · `SKIP reason=stage_error memory=run.write` 가 그 TRIGGER 뒤" 테스트를 더한다
+- touches: src/agent/run.py, tests/test_run.py
+- status: open
+- attempts: 0 · last failure: —
+- first seen: 2026-10-16 · last seen: 2026-10-16
+
+### S-NEW-2 — 프로브로만 잰 기억 관문 행(연애 고민 없음 · jev 오류 둘)과 7H 기준 아래 이유 배지를 스위트 테스트로 잠그기
+- source: cycle 20261016-075749-adw/phase-7c-comment-yield-variety · tracker plans/interview-marketing-agent.md#phase-7c · deferred by ship-check
+- evidence: tests/test_run.py 에 `has_love_concern: False` 답과 jev 오류 행이 없음 — ship-check 변이 `THIN_HEADS = (NO_SCENE, NO_CONCERN)`(src/agent/run.py:67) → `(NO_SCENE,)` 가 스위트 1063개 초록, jev 머리말을 얇은 쪽으로 치기 · jev 기억을 붙잡지 않기 · 명단 영상이 jev 기억만 읽기 세 변이도 초록. 이 행들은 추적되지 않는 사이클 파일 .adw/verify.sh 의 V12 · V13 만 잼. 또 트래커 7C 조건 줄(plans/interview-marketing-agent.md:898) — 7H 가 먼저 착지(main 2c48a16)해 "기억한 영상이 새 표본으로 다시 다뤄진 뒤에도 결과 화면의 이유 배지가 남는다" 테스트가 7C 몫
+- direction: tests/test_run.py 의 TestMemory 에 V12 · V13 을 옮긴다 — 명단 밖 `재료에 연애 고민 없음` 은 인기 댓글이 늘 때만 다시 씀, 명단 밖 `jev 검사 호출 실패` · `jev 검사 응답 이상` 은 다음 새 기록에서 Claude · jev · commentThreads 0회와 머리말만 든 반복 SKIP, 명단 영상은 같은 두 jev 정지 뒤 다시 씀 — 그리고 7H 의 `test_reason_badge_survives_reprocessing_with_same_reason` 꼴로 명단 밖 기억 영상의 둘째 주기 `trigger.at` 이 첫 주기 마지막 줄보다 늦은데도 이유 배지가 남는 테스트를 더한다(main 에 7C · 7H 가 함께 있을 때, 코드 변경 없음)
+- touches: tests/test_run.py
+- status: open
+- attempts: 0 · last failure: —
+- first seen: 2026-10-16 · last seen: 2026-10-16
+
+### S-NEW-3 — 짜임 고르기가 최근 20개 창을 넘어서도 도는지 테스트로 잠그기
+- source: cycle 20261016-075749-adw/phase-7c-comment-yield-variety · tracker plans/interview-marketing-agent.md#phase-7c · deferred by ship-check
+- evidence: src/agent/writer.py:508 `pick_shape(previous)` 를 `pick_shape(recent)`(:507, `RECENT_WINDOW = 20` :147)로 바꾼 변이가 스위트 초록 — 그 변이에서는 저장된 댓글이 20개를 넘으면 늘 `scene_first`. 지금 테스트(tests/test_writer.py:691 test_shape_rotates_with_comment_count)는 댓글 수 0–9 만 봄
+- direction: tests/test_writer.py 에 previous 길이 20 · 21 · 24 · 25 로 write_comment 를 불러 첫 사용자 메시지의 SHAPE_INSTRUCTION 이 `list(SHAPES)[n % len(SHAPES)]` 를 따르는지 단언 — 코드 변경 없음
+- touches: tests/test_writer.py
+- status: open
+- attempts: 0 · last failure: —
+- first seen: 2026-10-16 · last seen: 2026-10-16
+
+### S-NEW-4 — 계약 '댓글 작성' 절을 7C 코드와 맞추기(WriteResult.head · 실행 흐름의 기억 갈래 · 실행기의 빈 목록)
+- source: cycle 20261016-075749-adw/phase-7c-comment-yield-variety · tracker plans/interview-marketing-agent.md#phase-7c · deferred by ship-check
+- evidence: docs/contracts.md:970 `WriteResult(draft, skip_reason)` 가 실행 흐름이 읽는 `head`(src/agent/writer.py `WriteResult.head`, compare=False)를 말하지 않음 · :959-967 "Phase 7 이 영상마다 부르는 모양" 이 초안 갈래만 있고 기억 쓰기 · 작성기를 부르지 않는 경우가 없음 · :1000 은 실행기가 `top_comments=()` 를 넘긴다고 쓰지만 tests/live_check.py:1635 는 거른 목록(막힌 영상이면 `[]`)을 넘김
+- direction: 세 곳을 지금 코드대로 고쳐 쓴다 — 결정 · 동작 변경 없음
+- touches: docs/contracts.md
+- status: open
+- attempts: 0 · last failure: —
+- first seen: 2026-10-16 · last seen: 2026-10-16
