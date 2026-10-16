@@ -1049,7 +1049,7 @@ Open questions
 ---
 
 ## Phase 7H — 결과 화면 다지기 (낡은 이유 배지 · 이름표 둘)
-- Status: Not started
+- Status: Done
 - Slug: report-stale-reason-labels
 - After: Phase 7D
 - Goal: 결과 화면(`data/report.html`)이 지난 주기의 오류를 지금 상태처럼 보이지 않게 이유 배지의 기준을 넓히고(판별 · 타이밍 시각도 기준), 이름표 목록에 `invalid_item` · `page_mismatch` 둘을 더한다. Phase 7D 출하 점검이 사람에게 넘긴 확인 셋 가운데 둘을 고친다 (2026-10-16 7D 출하 전 확인 인터뷰 질문 1 B · 2 A 로 Phase 7D 에서 나눔 — 7D 는 지금 코드 그대로 착지). 녹화 · Phase 8 · 8A 는 이 페이즈를 기다리지 않는다.
