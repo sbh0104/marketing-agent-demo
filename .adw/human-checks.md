@@ -1285,3 +1285,51 @@
 - source: adw/phase-7h-report-stale-reason-labels
 - tag: plain
 - status: open
+
+### H-158 — 맥의 `config.yaml` `allowed_videos` 를 자리 표시(`https://youtu.be/내-테스트-영상-ID`)로 되돌리기 — 지금 그대로 `test_run: false` 로 돌리면 이미 쓴 댓글 둘(`3K82-PjUeP0` · `WxXINTXQSd4`)이 남의 채널에 실제로 게시됨(리허설은 실제 게시의 중복으로 치지 않고, 채널이 다섯이라 대기에도 안 걸림)
+- project: marketing-agent-demo
+- when: 2026-10-16 · plans/interview-marketing-agent.md#phase-8a
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-8a-submission-live-run
+- tag: sensitive: sensitive area · confirmed 2026-10-16
+- status: confirmed
+
+### H-159 — 시연 링크 `https://www.youtube.com/watch?v=vwogTb6XHGk` 를 한 번 열어, 녹화한 테스트 실행 영상인지와 로그인하지 않은 사람도 열 수 있는지 확인하기(코드는 글자가 있는지만 봄)
+- project: marketing-agent-demo
+- when: 2026-10-16 · plans/interview-marketing-agent.md#phase-8a
+- from: ship-report.md § Human checks — .adw/plan.md § Out of scope
+- source: adw/phase-8a-submission-live-run
+- tag: plain
+- status: open
+
+### H-160 — 공개본(H-140)은 스모크 통의 PROCESS 중복 규칙 문장 항목(S-NEW-1, 착지 때 번호를 받음)이 main 에서 고쳐진 뒤에 만들기 — 아니면 그 문장을 그대로 공개할지 정하기
+- project: marketing-agent-demo
+- when: 2026-10-16 · plans/interview-marketing-agent.md#phase-8a
+- from: ship-report.md § Human checks — .adw/ship-report.md § Risks
+- source: adw/phase-8a-submission-live-run
+- tag: plain
+- status: open
+
+### H-161 — `tests/test_submission_docs.py::committed_list_claims` undecided 표본 셋의 색 정하기: `커밋된 명단에는 본인 테스트 영상이 들어 있습니다`("본인" 이 지원자로 읽히는지) · `커밋된 명단에는 응모자의 테스트 영상이 있습니다`(지원자의 다른 낱말) · `ａｌｌｏｗｅｄ＿ｖｉｄｅｏｓ 에는 지원자 영상`(전각). 지금은 셋 다 통과하고, 답은 트래커 결정
+- project: marketing-agent-demo
+- when: 2026-10-16 · plans/interview-marketing-agent.md#phase-8a
+- from: ship-report.md § Human checks — .adw/plan.md § Test plan
+- source: adw/phase-8a-submission-live-run
+- tag: plain
+- status: open
+
+### H-162 — `tests/test_submission_docs.py::recording_post_claims` undecided 표본 셋의 색 정하기: `녹화 중 댓글을 남겼습니다`(목록 밖 동사, 지금 통과) · `녹화에서는 게시했다고 볼 수 없습니다`(부정문, 지금 걸림) · `녹화에서 ｐｏｓｔｅｄ`(전각, 지금 통과). 답은 트래커 결정
+- project: marketing-agent-demo
+- when: 2026-10-16 · plans/interview-marketing-agent.md#phase-8a
+- from: ship-report.md § Human checks — .adw/plan.md § Test plan
+- source: adw/phase-8a-submission-live-run
+- tag: plain
+- status: open
+
+### H-163 — `tests/test_submission_docs.py::sample_log_failures` undecided 표본의 색 정하기: 대문자 `mode=LIVE` 줄. 지금은 `mode=live` 조건이 잡지 않고 sha · 줄 수로만 걸림(`['sha256', 'lines']`). 에이전트는 이 꼴을 쓰지 않음. 답은 트래커 결정
+- project: marketing-agent-demo
+- when: 2026-10-16 · plans/interview-marketing-agent.md#phase-8a
+- from: ship-report.md § Human checks — .adw/plan.md § Test plan
+- source: adw/phase-8a-submission-live-run
+- tag: plain
+- status: open

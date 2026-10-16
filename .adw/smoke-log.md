@@ -1207,7 +1207,7 @@ other line is required on every item.
 - attempts: 0 · last failure: —
 - first seen: 2026-10-16 · last seen: 2026-10-16
 
-### S-NEW-1 — PROCESS '실제 실행' 절의 명단 밖 영상 줄: 중복 규칙을 명단 밖 영상으로 좁히고 '게시 단계에 한 번' 을 `POST` 줄로 고쳐 쓰기
+### S-122 — PROCESS '실제 실행' 절의 명단 밖 영상 줄: 중복 규칙을 명단 밖 영상으로 좁히고 '게시 단계에 한 번' 을 `POST` 줄로 고쳐 쓰기
 - source: cycle 20261016-105037-adw/phase-8a-submission-live-run · tracker plans/interview-marketing-agent.md#phase-8a · deferred by ship-check
 - evidence: PROCESS.md:243 끝 구절 "한 폴더에서 테스트 시도가 한 번이라도 있으면 다음 실행부터 중복입니다" 가 주어 없이 일반 규칙으로 읽힘 — src/agent/store.py:42-44 `_is_duplicate(live=True)` 는 `live` 시도만 셈, docs/contracts.md:283-284 "허용 목록의 데모 영상은 먼저 테스트 모드로 돌린 뒤 실제 게시할 수 있습니다", 트래커 8A 질문 2 A(plans/interview-marketing-agent.md:1165)는 "명단 밖 영상은" 으로 좁힘 · 같은 줄 앞머리 "명단 밖 영상이 게시 단계에 온 것은 사전 점검의 한 번" — 녹화 실행 14:12:00 에 같은 영상이 src/agent/poster.py:157-161 `check_post` 까지 가 `SKIP … reason=duplicate_video`(logs/sample.log:1219) · 글은 .adw/plan.md:188 이 받아쓰게 한 것이고 두 구절을 잠근 테스트 없음(.adw/ship-report.md § Quality review)
 - direction: PROCESS.md:243 의 두 구절만 고쳐 쓴다 — "명단 밖 영상의 `POST` 줄은 사전 점검의 한 줄이고" · "명단 밖 영상은 한 폴더에서 테스트 시도가 한 번이라도 있으면 다음 실행부터 중복입니다(명단 영상의 실제 게시는 `live` 시도만 셉니다)". 스위트가 잠근 글자(`` `POST video=C_Ylul6a6y0 mode=test result=saved reason=not_in_allowlist`(13:47:42) `` · `` 같은 영상은 녹화 실행에서 `SKIP … reason=duplicate_video` `` · "이유가 `dry_run` 이 아니라 …" 문장)는 그대로 두고, 고친 줄에 `녹화`/`시연` 과 게시한 꼴을 함께 쓰지 않는다 — 결정 · 숫자 · 코드 변경 없음
@@ -1216,7 +1216,7 @@ other line is required on every item.
 - attempts: 0 · last failure: —
 - first seen: 2026-10-16 · last seen: 2026-10-16
 
-### S-NEW-2 — 8A 문서 판정기 표본을 판정기 상수와 떼어 적기(게시한 꼴 15 × 녹화 · 시연 · `allowlist`)
+### S-123 — 8A 문서 판정기 표본을 판정기 상수와 떼어 적기(게시한 꼴 15 × 녹화 · 시연 · `allowlist`)
 - source: cycle 20261016-105037-adw/phase-8a-submission-live-run · tracker plans/interview-marketing-agent.md#phase-8a · deferred by ship-check
 - evidence: tests/test_submission_docs.py:669-682 `test_recording_post_reach` 가 판정기와 같은 `RECORDING_WORDS` · `POSTED_SHAPES`(:81-98)로 표본을 만들어, 15개 꼴 가운데 12개(`올렸` · `달았` · `등록했` · `mode=live` 등)나 낱말 `시연` 을 상수에서 지워도 모듈 초록(ship-check 돌연변이 — 하나씩 지우기에서 `게시했` · `게시됐` · `result=posted` 셋만 빨강) · :79 `LIST_WORDS` 의 `allowlist` 를 지워도 초록(빨강 표본 없음, .adw/guard-matrix.md:12 "C1 only")
 - direction: 판정기 상수를 읽지 않고 글자 그대로 적은 표본(15 꼴 × `녹화` · `시연` 의 30개, 또는 상수 길이 15 · 2 고정 단언)으로 reach 를 잠그고, `committed_list_claims` 에 `allowlist` 빨강 표본 하나를 더한다(인용: 트래커 8A 질문 4 A). 지금 README · PROCESS 에서 걸리는 줄 0개는 그대로여야 한다 — 테스트 파일만, 판정기 · 문서 · 코드 변경 없음
@@ -1225,7 +1225,7 @@ other line is required on every item.
 - attempts: 0 · last failure: —
 - first seen: 2026-10-16 · last seen: 2026-10-16
 
-### S-NEW-3 — 8A 문서 잠금 셋을 제 줄에 묶기(막은 줄의 reason · README `남의 채널 다섯` 두 곳 · 시연 링크 줄의 '실제 게시는 없습니다')
+### S-124 — 8A 문서 잠금 셋을 제 줄에 묶기(막은 줄의 reason · README `남의 채널 다섯` 두 곳 · 시연 링크 줄의 '실제 게시는 없습니다')
 - source: cycle 20261016-105037-adw/phase-8a-submission-live-run · tracker plans/interview-marketing-agent.md#phase-8a · deferred by ship-check
 - evidence: tests/test_submission_docs.py:162-169 `sample_log_failures` 의 blocked 조건에서 `and fields.get("reason") == "not_in_allowlist"` 를 지워도 초록(깨진 사본 `noblock.log` 는 그 줄을 통째로 지울 뿐) · :626 V9 포트가 `남의 채널 다섯의 인기 영상` 을 README 전체에 `assertIn` 해 README.md:149 · :156 중 하나만 `넷의` 로 바꿔도 초록(헌법 13조 — 포트 테스트가 쥔다고 한 것) · :416 `실제 게시는 없습니다` 가 README.md:7 대신 :156 으로도 채워져, README.md:7 의 그 구절을 지워도 초록
 - direction: 막은 줄의 `reason=` 만 다른 값(예: `dry_run`)으로 바꾼 사본을 더해 `["sha256", "blocked"]` 를 기대하고, README 의 `남의 채널 {n}의 인기 영상` 은 개수(2)로, `실제 게시는 없습니다` 는 `- 시연 영상:` 줄 안에서 단언한다 — 테스트 파일만, 문서 · 코드 변경 없음
