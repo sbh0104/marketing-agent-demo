@@ -61,6 +61,8 @@
      `Promise: L<n> — not a promise: <why>`. A `V<m>` row ends
      `— red: narrow the sentence to the measured behavior (constitution 9), not
      drift`, so verify-run, which does not read this file, takes it as a bounded fix.
+     Like every other row it also carries article 13's tail, so the measurement
+     lands in the suite instead of leaving with `.adw/verify.sh`.
      A caught flow promise whose pair line has no tag, or whose test leaves a text
      field of its fakes unmarked, gets `Promise: L<n> — V<m>`, where `V<m>` runs the
      code with every text field those fakes return marked; it ends the same way.
@@ -147,6 +149,34 @@
      carries the color it is given; one that does not is a `## Risks` line. Every
      `undecided` sample goes into `## Human checks`, one line per judge listing its
      samples, asking the person for the colors — the answer is a tracker decision.
+13. **A check that measures shipped code outlives the cycle.** Until the upstream
+    harness carries this rule (ADWS backlog line `marketing-agent-demo E-057 이관`),
+    it lives here. `.adw/verify.sh` is untracked and gone when the cycle ends, and
+    ship-check's mutation spot-check runs only the suite, so a behavior only a `V<n>`
+    row measured ships unlocked and returns as a "move it to the suite" smoke item
+    (1C S-058 · 6E S-091 · 7 S-098 · 7C S-119). Every cycle, smoke sweeps included.
+   - **verify-plan** — every `## Checks` row but V1 (the suite) ends with exactly one
+     tail: `— green: port to tests/<file> (<what the test asserts>)` or
+     `— probe only: <reason>`, the reason one of `base commit` · `other interpreter` ·
+     `real process` · `real network` · `real Chrome` · `this diff` · `harness tool`.
+     A row that drives the project's code through fakes, or reads a tracked file the
+     suite can read, is a port; article 9's `Promise: L<n> — V<m>` row included.
+     verify-run does not read this file, so `## Checks` opens with this paragraph,
+     verbatim:
+     `Port rule (constitution 13): after a "green: port to" row is green, write its
+     assertions as a suite test in the named file and commit it alone (test files
+     only). A port is not a fix and spends no cap. Port red → fix the test only,
+     once; still red, or the suite cannot hold it → revert that commit and write
+     "not ported: V<n> — <why>" under the report's checks; the verdict follows the
+     probe. After the last port, run V1 again on the final tree and record it.`
+   - **verify-run** — follows the port rule as `## Checks` states it.
+   - **ship-check** — count: every row but V1 has one tail with a listed reason; a
+     missing tail or an unlisted reason is a `## Test integrity` finding. Every port
+     row has its test in the diff or a `not ported:` line in verify-report; each
+     `not ported:` line becomes one `### S-NEW-<n>` smoke item under the usual
+     deferral conditions. The mutation spot-check aims one mutant at what each ported
+     test claims to hold; a ported test that stays green under it is a
+     `## Test integrity` finding.
 
 ## Never
 
