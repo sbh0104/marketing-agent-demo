@@ -1215,6 +1215,18 @@ MUTANTS: dict[str, tuple[str, str, str, str]] = {
         "return names[len(previous) % len(names)]",
         "return names[0]",
     ),
+    "report-disabled-unlabelled": (
+        "agent.report",
+        "tests.test_report",
+        'COMMENTS_DISABLED: "댓글을 막아 둔 영상",',
+        "",
+    ),
+    "report-poster-disabled-by-where": (
+        "agent.report",
+        "tests.test_report",
+        'if last[2].get("reason") == COMMENTS_DISABLED:',
+        "if False:",
+    ),
 }
 
 

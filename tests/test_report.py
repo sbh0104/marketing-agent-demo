@@ -43,7 +43,14 @@ from agent.report import (
     write_report,
 )
 from agent.trigger import views_per_hour
-from agent.writer import NO_CONCERN, NO_SCENE
+from agent.writer import (
+    CHECK_FAILED,
+    CLAUDE_FAILED,
+    JEV_FAILED,
+    JEV_INVALID,
+    NO_CONCERN,
+    NO_SCENE,
+)
 
 T = datetime(2026, 10, 12, 12, 0, tzinfo=timezone.utc)
 S = timedelta(seconds=1)
@@ -160,6 +167,8 @@ class TestLabels(unittest.TestCase):
             "no_comment": "댓글 없음",
             "config_rejected": "설정 거절로 저장만",
             "unavailable": "영상을 볼 수 없음",
+            "comments_disabled": "댓글을 막아 둔 영상",
+            "stage_error": "단계 오류 뒤 다시 하지 않음",
         }
         self.assertEqual(REASON_LABELS, expected)
         for code, label in expected.items():
@@ -397,6 +406,77 @@ class TestLateLines(unittest.TestCase):
         )
         self.assertEqual(badges(posted, None)[2], "로그를 읽지 못함")
         self.assertEqual(badges(posted, None), (POSTED, T + HOUR, LOG_UNREADABLE))
+
+
+class ReasonLabelSevenCTest(unittest.TestCase):
+    """Phase 7C 의 이름표 둘과 게시 단계의 같은 이유 코드 — 정확히 같을 때만 (헌법 12조 근접 표본)."""
+
+    POSTER_ERROR = "게시 단계 오류"
+
+    def test_new_codes_are_labelled_only_when_exact(self) -> None:
+        # 빨강 표본 — 이유 글이 REASON_LABELS 키와 정확히 같지 않으면 OTHER(트래커 7C '정확히 같거나')
+        red = (
+            "Comments_Disabled",
+            " comments_disabled",
+            "comments_disabled ",
+            "comments-disabled",
+            "ｃomments_disabled",  # 전각 c (U+FF43)
+            "commentsDisabled",  # 유튜브 오류 낱말 — 목록이 두지 않은 형제
+            "comments_disabled — 다시 확인 안 함",
+            "Stage_Error",
+            " stage_error",
+            "stage_error ",
+            "stage-error",
+            "ｓtage_error",  # 전각 s (U+FF53)
+        )
+        for reason in red:
+            with self.subTest(red=reason):
+                self.assertEqual(reason_label(reason), OTHER)
+        # 초록 표본 — 트래커 7C 질문 4 A 의 comments_disabled 이름표 · 7H 질문 1 A 의 새 이유 코드 이름표
+        green = (
+            ("comments_disabled", "댓글을 막아 둔 영상"),
+            ("stage_error", "단계 오류 뒤 다시 하지 않음"),
+        )
+        for reason, label in green:
+            with self.subTest(green=reason):
+                self.assertEqual(reason_label(reason), label)
+                self.assertEqual(REASON_LABELS[reason], label)
+
+    def test_poster_comments_disabled_error_takes_the_label(self) -> None:
+        # 트래커 7C 질문 4 A — 게시 단계의 같은 이유 코드도 그 이름표를 받습니다
+        commented = record(A, comment=drafted(T))
+
+        def error(reason: str) -> LogLine:
+            fields = {"where": "poster", "reason": reason, "stage": "before_click", "video": A}
+            return (T + S, Event.ERROR, fields)
+
+        self.assertEqual(
+            badges(commented, [error("comments_disabled")]), (NO_POST, None, "댓글을 막아 둔 영상")
+        )
+        # 빨강 표본 — 다른 글은 같은 코드가 아니라 where= 의 이름표 그대로
+        red = (
+            "Comments_Disabled",
+            " comments_disabled",
+            "comments_disabled ",
+            "comments-disabled",
+            "ｃomments_disabled",  # 전각 c (U+FF43)
+            "HTTP 403 commentsDisabled",  # commentThreads.list 의 오류 이유 — 형제
+        )
+        for reason in red:
+            with self.subTest(red=reason):
+                self.assertEqual(badges(commented, [error(reason)])[2], self.POSTER_ERROR)
+        self.assertEqual(where_label("poster"), self.POSTER_ERROR)
+        # 양성 대조 — 다른 게시 단계 원인은 옛 길(where= 의 이름표)
+        self.assertEqual(
+            badges(commented, [error("chrome_unreachable")]), (NO_POST, None, self.POSTER_ERROR)
+        )
+
+    def test_writer_heads_alone_keep_their_labels(self) -> None:
+        # 기억 때문에 다시 남기는 SKIP 은 머리말만 — 원래 SKIP 과 같은 이름표를 받습니다(트래커 7H 질문 1 A)
+        for head in (NO_SCENE, NO_CONCERN, CHECK_FAILED, CLAUDE_FAILED, JEV_FAILED, JEV_INVALID):
+            with self.subTest(head=head):
+                self.assertEqual(reason_label(head), reason_label(head + " — 세부"))
+                self.assertNotEqual(reason_label(head), OTHER)
 
 
 class TestRender(unittest.TestCase):

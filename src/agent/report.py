@@ -17,7 +17,7 @@ from pathlib import Path
 
 from agent.logbook import KST, Event
 from agent.models import VideoRecord
-from agent.poster import DRY_RUN, NO_COMMENT, WATCH_URL
+from agent.poster import COMMENTS_DISABLED, DRY_RUN, NO_COMMENT, WATCH_URL
 from agent.trigger import views_per_hour
 from agent.writer import NO_CONCERN, NO_SCENE
 
@@ -45,6 +45,8 @@ REASON_LABELS: dict[str, str] = {
     NO_COMMENT: "댓글 없음",
     "config_rejected": "설정 거절로 저장만",
     "unavailable": "영상을 볼 수 없음",
+    COMMENTS_DISABLED: "댓글을 막아 둔 영상",
+    "stage_error": "단계 오류 뒤 다시 하지 않음",  # run.REMEMBERED_ERROR — report 는 run 을 가져오지 않습니다
 }
 # 이유 머리말 → 이름표 — 이유 글이 이 머리말로 시작할 때, 앞에서부터 처음 맞는 것
 REASON_PREFIXES: tuple[tuple[str, str], ...] = (
@@ -159,7 +161,7 @@ def badges(
     """게시 결과 칸 — (결과 배지, 그 결과의 시각, 이유 배지). events 가 None 이면 로그를 못 읽은 것.
 
     결과는 늦은 줄의 마지막이 리허설이면 리허설, 아니면 저장소의 마지막 시도입니다. 이유는 늦은 줄의
-    마지막이 SKIP 이면 그 reason 의 이름표, ERROR 이면 그 where 의 이름표입니다.
+    마지막이 SKIP 이면 그 reason 의 이름표, ERROR 이면 그 where 의 이름표(이유가 정확히 comments_disabled 이면 그 이름표)입니다.
     """
     lines = late_lines(record, events) if events is not None else []
     last = lines[-1] if lines else None
@@ -181,7 +183,10 @@ def badges(
     elif last is not None and last[1] is Event.SKIP:
         reason = reason_label(last[2]["reason"])
     elif last is not None and last[1] is Event.ERROR:
-        reason = where_label(last[2]["where"])
+        if last[2].get("reason") == COMMENTS_DISABLED:  # 게시 단계의 같은 이유 코드도 그 이름표(트래커 7C)
+            reason = REASON_LABELS[COMMENTS_DISABLED]
+        else:
+            reason = where_label(last[2]["where"])
     return outcome, outcome_at, reason
 
 

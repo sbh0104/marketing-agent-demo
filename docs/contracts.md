@@ -1652,6 +1652,7 @@ PYTHONPATH=src python3 -m agent.run [--dry-run] [--once]
   시도도 리허설도 없으면 댓글이 있을 때 "게시 기록 없음", 없을 때 "댓글 안 씀" 입니다.
   결과 배지 아래에는 그 결과의 시각(시도의 `at`, 리허설 줄의 시각)을 KST 초로 적습니다 — 지난 사이클의 결과일 수 있습니다.
 - **이유 배지.** 늦은 로그 줄 가운데 파일에서 마지막 줄이 `SKIP` 이면 그 `reason=` 의 이름표, `ERROR` 이면 그 `where=` 의 이름표입니다.
+  `ERROR` 줄이라도 `reason=` 이 정확히 `comments_disabled` 이면(게시 단계의 `ERROR where=poster reason=comments_disabled`) `where=` 대신 `comments_disabled` 의 이름표입니다(Phase 7C).
   마지막 줄이 리허설이거나 늦은 줄이 없으면 이유 배지는 없습니다.
 - **이름표.** 이유 글이 아래 코드와 정확히 같거나 아래 머리말로 시작하면 그 이름표이고, 아니면 "기타 — 로그 참고" 입니다.
   `where=` 는 아래 단계와 정확히 같을 때 그 이름표이고, 아니면 "기타 — 로그 참고" 입니다.
@@ -1669,6 +1670,8 @@ PYTHONPATH=src python3 -m agent.run [--dry-run] [--once]
   | `no_comment` | 댓글 없음 |
   | `config_rejected` | 설정 거절로 저장만 |
   | `unavailable` | 영상을 볼 수 없음 |
+  | `comments_disabled` | 댓글을 막아 둔 영상 |
+  | `stage_error` | 단계 오류 뒤 다시 하지 않음 |
   | `재료에 장면 없음`으로 시작 | 작성 건너뜀 — 짚을 장면 없음 |
   | `재료에 연애 고민 없음`으로 시작 | 작성 건너뜀 — 연애 고민 없음 |
   | `검사 두 번 탈락`으로 시작 | 검사 두 번 탈락 |
@@ -1693,7 +1696,7 @@ PYTHONPATH=src python3 -m agent.run [--dry-run] [--once]
   "로그를 읽지 못함" 으로, 리허설 · 판단한 쪽을 비운 채 저장소 칸으로 화면을 씁니다. 화면을 만들거나 쓰다 난 그 밖의 `Exception` 도
   `ERROR where=report` 한 줄로 남기고 사이클은 그대로 끝납니다. `KeyboardInterrupt` 같은 `BaseException` 은 그대로 올라갑니다.
 - **음성 대조.** `python3 -m tests.mutants <이름>` — `report-late-filter-off` · `report-raw-reason` · `report-unescaped` ·
-  `report-prefix-anywhere` · `run-report-fence-narrow` · `run-report-log-degrade-silent`.
+  `report-prefix-anywhere` · `run-report-fence-narrow` · `run-report-log-degrade-silent` · `report-disabled-unlabelled` · `report-poster-disabled-by-where`.
 
 ## 공개용 사본 — `tests/public_copy.py` (Phase 8)
 
